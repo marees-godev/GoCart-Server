@@ -1,4 +1,5 @@
 package main
+<<<<<<< HEAD
 
 import (
 	"context"
@@ -111,3 +112,5 @@ func main() {
 
 	log.Info("Service stopped", "service", cfg.App.Name)
 }
+=======
+>>>>>>> bfe4a68 (feat: initialize go modules and boilerplate main packages for all microservices (#2))
