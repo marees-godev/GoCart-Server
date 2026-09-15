@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
@@ -21,6 +22,7 @@ import (
 func main() {
 	cfg := config.LoadEnv()
 
+	// 1. Initialize structured logger
 	log := logger.New(logger.Config{
 		ServiceName: cfg.App.Name,
 		Environment: cfg.App.Environment,
@@ -29,6 +31,7 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
+	// 2. Initialize distributed tracing
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
 		Environment: cfg.App.Environment,
@@ -47,6 +50,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	// 3. Initialize database connection pool
 	db, err := database.New(ctx, database.Config{
 		URL:            cfg.Database.URL,
 		MaxConns:       cfg.Database.MaxConns,
@@ -61,6 +65,7 @@ func main() {
 	}
 	defer db.Close()
 
+	// 4. Run auto migrations if enabled
 	if cfg.Database.AutoMigrate {
 		migrator, err := database.NewMigrator(db.Pool, cfg.Database.MigrationsPath)
 		if err != nil {
@@ -73,35 +78,25 @@ func main() {
 		}
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.Handler())
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintf(w, `{"status":"UP","service":"%s"}`, cfg.App.Name)
+	// 5. Setup Fiber HTTP server with observability middleware
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
 	})
 
-	handler := middleware.Recovery(
-		middleware.RequestID(
-			middleware.Tracing(cfg.App.Name)(
-				middleware.Metrics(cfg.App.Name)(
-					middleware.Logger(mux),
-				),
-			),
-		),
-	)
+	app.Use(adaptor.HTTPMiddleware(middleware.Recovery))
+	app.Use(adaptor.HTTPMiddleware(middleware.RequestID))
+	app.Use(adaptor.HTTPMiddleware(middleware.Tracing(cfg.App.Name)))
+	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
+	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
-	server := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cfg.HTTP.Port),
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	// Metrics, Health and Readiness endpoints
+	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
+	healthHandler.Register(app)
+	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
 		}
@@ -110,10 +105,7 @@ func main() {
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
 	}
 

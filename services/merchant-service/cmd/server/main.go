@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
@@ -77,39 +78,25 @@ func main() {
 		}
 	}
 
-	// 5. Setup HTTP server with observability middleware
-	mux := http.NewServeMux()
-
-	// Metrics and Health endpoints
-	mux.Handle("/metrics", metrics.Handler())
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintf(w, `{"status":"UP","service":"%s"}`, cfg.App.Name)
+	// 5. Setup Fiber HTTP server with observability middleware
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
 	})
 
-	// Wrap middleware stack
-	handler := middleware.Recovery(
-		middleware.RequestID(
-			middleware.Tracing(cfg.App.Name)(
-				middleware.Metrics(cfg.App.Name)(
-					middleware.Logger(mux),
-				),
-			),
-		),
-	)
+	app.Use(adaptor.HTTPMiddleware(middleware.Recovery))
+	app.Use(adaptor.HTTPMiddleware(middleware.RequestID))
+	app.Use(adaptor.HTTPMiddleware(middleware.Tracing(cfg.App.Name)))
+	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
+	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
-	server := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cfg.HTTP.Port),
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	// Metrics, Health and Readiness endpoints
+	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
+	healthHandler.Register(app)
+	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
 		}
@@ -118,10 +105,7 @@ func main() {
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
 	}
 
