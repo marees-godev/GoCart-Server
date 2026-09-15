@@ -2,8 +2,6 @@ package health
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -87,39 +85,6 @@ func (h *Handler) Ready(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(Response{
-		Status:  "ok",
-		Service: h.serviceName,
-	})
-}
-
-func (h *Handler) HealthHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(Response{
-		Status:  "ok",
-		Service: h.serviceName,
-	})
-}
-
-func (h *Handler) ReadyHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-
-	for _, checker := range h.checkers {
-		if err := checker.Check(ctx); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(Response{
-				Status:  "unavailable",
-				Service: h.serviceName,
-			})
-			return
-		}
-	}
-
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(Response{
 		Status:  "ok",
 		Service: h.serviceName,
 	})
