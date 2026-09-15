@@ -1,3 +1,4 @@
-module github.com/inventory-service
+module github.com/marees-godev/GoCart-Server/services/inventory-service
 
-go 1.26.3
+go 1.26.2
+
