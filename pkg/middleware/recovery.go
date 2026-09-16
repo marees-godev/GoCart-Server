@@ -1,11 +1,12 @@
 package middleware
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+
+	"github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/response"
 )
 
 func Recovery(next http.Handler) http.Handler {
@@ -22,15 +23,11 @@ func Recovery(next http.Handler) http.Handler {
 					slog.String("path", r.URL.Path),
 				)
 
-				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"error":   "Internal Server Error",
-					"message": fmt.Sprintf("%v", rec),
-				})
+				response.Error(w, http.StatusInternalServerError, errors.CodeInternalError, "An internal server error occurred")
 			}
 		}()
 
 		next.ServeHTTP(w, r)
 	})
 }
+
