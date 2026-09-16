@@ -19,7 +19,7 @@ func WriteJSON(w http.ResponseWriter, status int, data any) error {
 	return json.NewEncoder(w).Encode(data)
 }
 
-func Error(w http.ResponseWriter, status int, code, message string) {
+func Error(w http.ResponseWriter, status int, code, message string) *ErrorResponse {
 	if code == "" {
 		code = errors.CodeInternalError
 	}
@@ -29,11 +29,12 @@ func Error(w http.ResponseWriter, status int, code, message string) {
 
 	resp := errors.NewErrorResponse(code, message)
 	_ = WriteJSON(w, status, resp)
+	return resp
 }
 
-func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+func WriteError(w http.ResponseWriter, r *http.Request, err error) *ErrorResponse {
 	if err == nil {
-		return
+		return nil
 	}
 
 	appErr := errors.AsAppError(err)
@@ -42,5 +43,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusInternalServerError
 	}
 
-	_ = WriteJSON(w, status, appErr.ToResponse())
+	resp := appErr.ToResponse()
+	_ = WriteJSON(w, status, resp)
+	return resp
 }

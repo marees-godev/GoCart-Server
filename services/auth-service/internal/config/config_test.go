@@ -7,6 +7,7 @@ import (
 
 func TestLoadEnv(t *testing.T) {
 	_ = os.Setenv("PORT", "9999")
+	_ = os.Setenv("APP_ENV", "test")
 	_ = os.Setenv("ENV", "test")
 	_ = os.Setenv("DB_MAX_CONNS", "10")
 	_ = os.Setenv("DB_AUTO_MIGRATE", "false")
@@ -15,6 +16,7 @@ func TestLoadEnv(t *testing.T) {
 
 	defer func() {
 		_ = os.Unsetenv("PORT")
+		_ = os.Unsetenv("APP_ENV")
 		_ = os.Unsetenv("ENV")
 		_ = os.Unsetenv("DB_MAX_CONNS")
 		_ = os.Unsetenv("DB_AUTO_MIGRATE")

@@ -1,0 +1,48 @@
+# syntax=docker/dockerfile:1.4
+# ------------------------------------------------------------------------------
+# Stage 1: Build binary from monorepo context
+# ------------------------------------------------------------------------------
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+# Install SSL certificates and timezone data
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Copy workspace and module definitions for optimal layer caching
+COPY go.work go.work.sum* ./
+COPY go.mod go.sum ./
+COPY contracts/ contracts/
+COPY pkg/ pkg/
+COPY services/ services/
+
+# Pass service directory name via build arg (e.g. auth-service, user-service)
+ARG SERVICE_NAME
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64 \
+    GOTOOLCHAIN=auto
+
+# Compile binary with stripped debug symbols for minimal image size
+RUN go build -ldflags="-w -s" -o /app/server ./services/${SERVICE_NAME}/cmd/server
+
+# ------------------------------------------------------------------------------
+# Stage 2: Minimal non-root runtime container
+# ------------------------------------------------------------------------------
+FROM gcr.io/distroless/static-debian12:nonroot
+
+WORKDIR /app
+
+ARG SERVICE_NAME
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/server /app/server
+
+# Copy migration files for runtime migration / verification
+COPY --from=builder /app/services/${SERVICE_NAME}/migrations /app/migrations
+
+USER nonroot:nonroot
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app/server"]

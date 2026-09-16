@@ -3,6 +3,7 @@ FROM golang:alpine AS builder
 WORKDIR /app
 
 COPY go.work go.work.sum* go.mod go.sum ./
+COPY contracts/ ./contracts/
 COPY pkg/ ./pkg/
 COPY services/ ./services/
 

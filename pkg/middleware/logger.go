@@ -22,7 +22,6 @@ func Logger(next http.Handler) http.Handler {
 			srw = existing
 		} else {
 			srw = NewStatusResponseWriter(w)
-			w = srw
 		}
 
 		next.ServeHTTP(srw, r)
