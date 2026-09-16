@@ -128,12 +128,17 @@ The `-service` flag accepts singular, plural, or full service names:
 
 ### Makefile Reference
 
-The root [Makefile](file:///d:/projects/GoCart-Server/Makefile) simplifies common development and database tasks:
+The root [Makefile](file:///d:/projects/GoCart-Server/Makefile) simplifies common development, docker, and database tasks:
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
 | `make build` | Builds all service and utility binaries to `./bin/` | `make build` |
 | `make test` | Runs unit and integration tests across packages | `make test` |
+| `make docker-up` | Launches full stack (infrastructure + microservices) via Docker Compose | `make docker-up` |
+| `make docker-down` | Stops all Docker containers | `make docker-down` |
+| `make docker-build` | Rebuilds all service Docker container images | `make docker-build` |
+| `make infra-up` | Launches local infrastructure only (PostgreSQL, Redis, Kafka) | `make infra-up` |
+| `make infra-down` | Stops local infrastructure containers | `make infra-down` |
 | `make migrate` | Applies pending migrations for a specific service | `make migrate SERVICE=auth` |
 | `make migrate-up` | Alias for `make migrate` | `make migrate-up SERVICE=order` |
 | `make migrate-drop` | Drops all tables and resets the public schema for a service | `make migrate-drop SERVICE=auth` |
@@ -172,9 +177,23 @@ PRODUCTS_DATABASE_URL=postgresql://...
 ## Getting Started
 
 ### Prerequisites
-- **Go**: `1.22+` (or `1.26+`)
-- **PostgreSQL**: `15+` (local or hosted e.g. Supabase)
+- **Docker & Docker Compose**: `20.10+` / `v2+` (Required for local infrastructure and containerized services)
+- **Go**: `1.24+` (Optional, for native local Go development)
 - **Make** (optional, recommended for CLI shortcuts)
+
+### Docker Local Development (Recommended)
+
+To start PostgreSQL, Redis, and Kafka in containers for local development:
+```bash
+make infra-up
+```
+
+To start all infrastructure dependencies and all 14 microservices in containers:
+```bash
+make docker-up
+```
+
+For comprehensive details on local setup, ports, and troubleshooting, refer to [Local Development Guide](file:///d:/Projects/GoCart-Server/docs/local-development.md).
 
 ### Running Migrations
 To initialize all microservice databases from scratch:
