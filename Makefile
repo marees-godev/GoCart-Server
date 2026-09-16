@@ -1,4 +1,4 @@
-.PHONY: build test migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth
+.PHONY: build test migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth docker-up docker-down docker-build infra-up infra-down
 
 # Build all binaries
 build:
@@ -8,6 +8,22 @@ build:
 # Run all tests
 test:
 	go test -v ./pkg/...
+
+# Docker compose commands
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-build:
+	docker compose build
+
+infra-up:
+	docker compose up -d postgres redis kafka
+
+infra-down:
+	docker compose stop postgres redis kafka
 
 # Run migration for a specific service (e.g. make migrate SERVICE=auth or make migrate-up SERVICE=auth)
 migrate:
@@ -39,3 +55,4 @@ migrate-reset-all:
 # Run auth-service server
 run-auth:
 	go run services/auth-service/cmd/server/main.go
+
