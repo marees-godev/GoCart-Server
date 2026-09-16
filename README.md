@@ -157,7 +157,7 @@ Each service manages its own `.env` configuration file in its respective directo
 ```env
 # services/auth-service/.env
 PORT=9451
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gocart_auth?sslmode=disable
+DATABASE_URL=postgresql://postgres:password@localhost:5432/gocart_auth?sslmode=disable
 DB_MAX_CONNS=25
 DB_MIN_CONNS=2
 DB_AUTO_MIGRATE=true
