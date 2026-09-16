@@ -24,24 +24,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: gocart-redis
-  postgres:
-    image: postgres:16-alpine
-    container_name: gocart-postgres
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-local-dbs.sql:/docker-entrypoint-initdb.d/init-local-dbs.sql:ro
+      - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - gocart-network
 
   kafka:
     image: apache/kafka:latest
@@ -76,7 +70,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-  postgres_data:
     driver: local
   kafka_data:
     driver: local
