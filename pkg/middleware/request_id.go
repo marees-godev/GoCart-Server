@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -29,3 +30,14 @@ func RequestID(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+func GetRequestID(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if id, ok := ctx.Value(logger.RequestIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+

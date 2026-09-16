@@ -3,6 +3,8 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -35,7 +37,7 @@ func Logger(next http.Handler) http.Handler {
 			level = slog.LevelWarn
 		}
 
-		slog.Log(ctx, level, "HTTP request completed",
+		attrs := []any{
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.Path),
 			slog.Int("status", srw.StatusCode),
@@ -43,6 +45,33 @@ func Logger(next http.Handler) http.Handler {
 			slog.Int64("bytes_written", srw.BytesWritten),
 			slog.String("remote_addr", r.RemoteAddr),
 			slog.String("user_agent", r.UserAgent()),
-		)
+		}
+
+		if r.URL.RawQuery != "" {
+			attrs = append(attrs, slog.String("query", sanitizeQuery(r.URL.RawQuery)))
+		}
+
+		slog.Log(ctx, level, "HTTP request completed", attrs...)
 	})
 }
+
+func sanitizeQuery(query string) string {
+	if query == "" {
+		return ""
+	}
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return "[REDACTED]"
+	}
+	for k := range values {
+		lk := strings.ToLower(k)
+		if strings.Contains(lk, "password") || strings.Contains(lk, "token") ||
+			strings.Contains(lk, "secret") || strings.Contains(lk, "key") ||
+			strings.Contains(lk, "auth") || strings.Contains(lk, "cvv") ||
+			strings.Contains(lk, "card") {
+			values.Set(k, "[REDACTED]")
+		}
+	}
+	return values.Encode()
+}
+
