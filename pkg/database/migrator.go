@@ -137,7 +137,7 @@ func (m *Migrator) applyMigration(ctx context.Context, version string, sqlConten
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, sqlContent); err != nil {
 		return fmt.Errorf("execution error: %w", err)

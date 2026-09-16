@@ -101,9 +101,7 @@ func (c *Consumer) Start(ctx context.Context, handler HandlerFunc) error {
 			continue
 		}
 
-		if err := c.processMessage(ctx, msg, handler); err != nil {
-			// Log error; retry handler handles DLQ dispatch if max retries exceeded
-		}
+		_ = c.processMessage(ctx, msg, handler)
 
 		// Commit offset after processing/handling
 		if err := c.reader.CommitMessages(ctx, msg); err != nil {

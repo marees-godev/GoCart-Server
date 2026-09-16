@@ -74,8 +74,5 @@ func isSensitiveKey(key string) bool {
 
 func isSensitiveValue(val string) bool {
 	lowerVal := strings.ToLower(val)
-	if strings.HasPrefix(lowerVal, "bearer ") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(lowerVal, "bearer ")
 }
