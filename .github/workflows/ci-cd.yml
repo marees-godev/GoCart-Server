@@ -1,0 +1,331 @@
+name: GoCart Monorepo CI/CD
+
+on:
+  pull_request:
+    branches: [ dev, main ]
+  push:
+    branches: [ dev, main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Step 1: Detect changed microservices
+  # ----------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Path Filter for Services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            auth-service:
+              - 'services/auth-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            cart-service:
+              - 'services/cart-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            category-service:
+              - 'services/category-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            delivery-service:
+              - 'services/delivery-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            inventory-service:
+              - 'services/inventory-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            merchant-service:
+              - 'services/merchant-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            notification-service:
+              - 'services/notification-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            order-service:
+              - 'services/order-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            payment-service:
+              - 'services/payment-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            product-service:
+              - 'services/product-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            rating-service:
+              - 'services/rating-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            return-service:
+              - 'services/return-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            store-service:
+              - 'services/store-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+            user-service:
+              - 'services/user-service/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
+
+  # ----------------------------------------------------------------------------
+  # Step 2: Lint & Static Code Analysis
+  # ----------------------------------------------------------------------------
+  lint:
+    name: Lint & Static Analysis
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.services != '[]' && needs.detect-changes.outputs.services != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m --issues-exit-code=1
+
+  # ----------------------------------------------------------------------------
+  # Step 3: Run Unit Tests & Verify Independent Build
+  # ----------------------------------------------------------------------------
+  test:
+    name: Test (${{ matrix.service }})
+    needs: [detect-changes, lint]
+    if: ${{ needs.detect-changes.outputs.services != '[]' && needs.detect-changes.outputs.services != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Run Unit Tests with Race Detector
+        run: |
+          go test -v -race -coverprofile=coverage.out ./services/${{ matrix.service }}/... ./pkg/...
+
+      - name: Verify Service Binary Compilation
+        run: |
+          go build -v -o /dev/null ./services/${{ matrix.service }}/cmd/server
+
+  # ----------------------------------------------------------------------------
+  # Step 4: Build & Publish Docker Image (Only on dev or main push)
+  # ----------------------------------------------------------------------------
+  build-and-push:
+    name: Package (${{ matrix.service }})
+    needs: [detect-changes, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    outputs:
+      env_target: ${{ steps.env-select.outputs.target_env }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Target Environment
+        id: env-select
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "target_env=production" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo "target_env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "target_env=none" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=dev-latest,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=ref,event=branch
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.service
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # ----------------------------------------------------------------------------
+  # Step 5A: Deploy to Staging on Render (Triggered on 'dev' branch push)
+  # ----------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to Render Staging (${{ matrix.service }})
+    needs: [detect-changes, test]
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    steps:
+      - name: Trigger Render Staging Deploy Hook
+        env:
+          SERVICE_NAME: ${{ matrix.service }}
+        run: |
+          # Formats service name into env var key e.g. AUTH_SERVICE -> RENDER_AUTH_SERVICE_STAGING_HOOK
+          SERVICE_KEY=$(echo "$SERVICE_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          HOOK_VAR_NAME="RENDER_${SERVICE_KEY}_STAGING_HOOK"
+          HOOK_URL="${!HOOK_VAR_NAME}"
+          
+          if [ -z "$HOOK_URL" ]; then
+            # Fallback to generic staging deploy hook if individual hook not set
+            HOOK_URL="${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+          fi
+
+          if [ -n "$HOOK_URL" ]; then
+            echo "Triggering Render Staging deployment for $SERVICE_NAME..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$HOOK_URL")
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+              echo "Deployment triggered successfully for $SERVICE_NAME (HTTP $HTTP_STATUS)"
+            else
+              echo "Render deploy hook returned status $HTTP_STATUS"
+              exit 1
+            fi
+          else
+            echo "Notice: No Render deploy hook secret found for $SERVICE_NAME (Check RENDER_${SERVICE_KEY}_STAGING_HOOK or RENDER_STAGING_DEPLOY_HOOK)"
+          fi
+
+  # ----------------------------------------------------------------------------
+  # Step 5B: Deploy to Production on Render (Triggered on 'main' branch push)
+  # ----------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Render Production (${{ matrix.service }})
+    needs: [detect-changes, test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    steps:
+      - name: Trigger Render Production Deploy Hook
+        env:
+          SERVICE_NAME: ${{ matrix.service }}
+        run: |
+          # Formats service name into env var key e.g. AUTH_SERVICE -> RENDER_AUTH_SERVICE_PROD_HOOK
+          SERVICE_KEY=$(echo "$SERVICE_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          HOOK_VAR_NAME="RENDER_${SERVICE_KEY}_PROD_HOOK"
+          HOOK_URL="${!HOOK_VAR_NAME}"
+          
+          if [ -z "$HOOK_URL" ]; then
+            # Fallback to generic prod deploy hook if individual hook not set
+            HOOK_URL="${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+          fi
+
+          if [ -n "$HOOK_URL" ]; then
+            echo "Triggering Render Production deployment for $SERVICE_NAME..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$HOOK_URL")
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+              echo "Deployment triggered successfully for $SERVICE_NAME (HTTP $HTTP_STATUS)"
+            else
+              echo "Render deploy hook returned status $HTTP_STATUS"
+              exit 1
+            fi
+          else
+            echo "Notice: No Render deploy hook secret found for $SERVICE_NAME (Check RENDER_${SERVICE_KEY}_PROD_HOOK or RENDER_PROD_DEPLOY_HOOK)"
+          fi
+
