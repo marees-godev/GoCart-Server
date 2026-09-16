@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -13,6 +15,8 @@ type Config struct {
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Kafka    KafkaConfig
+	Outbox   OutboxConfig
 }
 
 type AppConfig struct {
@@ -42,6 +46,17 @@ type TracingConfig struct {
 	Enabled      bool
 	Exporter     string
 	OTLPEndpoint string
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	PollInterval time.Duration
+	BatchSize    int
+	MaxRetries   int
 }
 
 func LoadEnv() *Config {
@@ -75,6 +90,15 @@ func LoadEnv() *Config {
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "order-service"),
+		},
+		Outbox: OutboxConfig{
+			PollInterval: GetEnvAsDuration("OUTBOX_POLL_INTERVAL", 2*time.Second),
+			BatchSize:    GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:   GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+		},
 	}
 }
 
@@ -107,4 +131,34 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			result = append(result, t)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
 }

@@ -12,11 +12,14 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/order-service/internal/handler"
 )
 
 func main() {
@@ -78,7 +81,31 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize Kafka producer
+	producer := kafka.NewProducer(kafka.Config{
+		Brokers:        cfg.Kafka.Brokers,
+		ClientID:       cfg.Kafka.ClientID,
+		ConnectTimeout: 10 * time.Second,
+		MaxRetries:     cfg.Outbox.MaxRetries,
+		RetryInterval:  500 * time.Millisecond,
+	})
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Error("Failed to close Kafka producer", "error", err)
+		}
+	}()
+
+	// 6. Start the outbox publisher as a background goroutine.
+	//    It stops automatically when ctx is cancelled (SIGTERM / SIGINT).
+	outboxStore := outbox.NewStore()
+	outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
+		PollInterval: cfg.Outbox.PollInterval,
+		BatchSize:    cfg.Outbox.BatchSize,
+		MaxRetries:   cfg.Outbox.MaxRetries,
+	})
+	go outboxPublisher.Start(ctx)
+
+	// 7. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -93,6 +120,10 @@ func main() {
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
+
+	// Admin outbox endpoints (mount under /admin — gate with auth middleware in production)
+	adminOutboxHandler := handler.NewAdminOutboxHandler(outboxStore, db.Pool)
+	adminOutboxHandler.Register(app)
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
