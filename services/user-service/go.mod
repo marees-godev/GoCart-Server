@@ -1,3 +1,3 @@
 module github.com/marees-godev/GoCart-Server/services/user-service
 
-go 1.26.2
+go 1.24.0
