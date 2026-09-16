@@ -12,6 +12,7 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Copy workspace and module definitions for optimal layer caching
 COPY go.work go.work.sum* ./
 COPY go.mod go.sum ./
+COPY contracts/ contracts/
 COPY pkg/ pkg/
 COPY services/ services/
 
