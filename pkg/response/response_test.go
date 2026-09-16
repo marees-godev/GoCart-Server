@@ -12,7 +12,11 @@ import (
 
 func TestErrorResponseFormat(t *testing.T) {
 	rec := httptest.NewRecorder()
-	Error(rec, http.StatusBadRequest, "BAD_REQUEST", "Invalid body")
+	retErr := Error(rec, http.StatusBadRequest, "BAD_REQUEST", "Invalid body")
+
+	if retErr == nil {
+		t.Fatal("expected non-nil *ErrorResponse return value")
+	}
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rec.Code)
@@ -23,11 +27,11 @@ func TestErrorResponseFormat(t *testing.T) {
 		t.Fatalf("failed to decode JSON response: %v", err)
 	}
 
-	if res.Error.Code != "BAD_REQUEST" {
-		t.Errorf("expected code 'BAD_REQUEST', got '%s'", res.Error.Code)
+	if res.Error.Code != "BAD_REQUEST" || retErr.Error.Code != "BAD_REQUEST" {
+		t.Errorf("expected code 'BAD_REQUEST', got res='%s' retErr='%s'", res.Error.Code, retErr.Error.Code)
 	}
-	if res.Error.Message != "Invalid body" {
-		t.Errorf("expected message 'Invalid body', got '%s'", res.Error.Message)
+	if res.Error.Message != "Invalid body" || retErr.Error.Message != "Invalid body" {
+		t.Errorf("expected message 'Invalid body', got res='%s' retErr='%s'", res.Error.Message, retErr.Error.Message)
 	}
 }
 
@@ -36,7 +40,11 @@ func TestWriteErrorWithAppError(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 
 	appErr := errors.NotFound("user not found")
-	WriteError(rec, req, appErr)
+	retErr := WriteError(rec, req, appErr)
+
+	if retErr == nil {
+		t.Fatal("expected non-nil *ErrorResponse return value")
+	}
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", rec.Code)
@@ -47,11 +55,11 @@ func TestWriteErrorWithAppError(t *testing.T) {
 		t.Fatalf("failed to decode JSON response: %v", err)
 	}
 
-	if res.Error.Code != errors.CodeNotFound {
-		t.Errorf("expected code %s, got %s", errors.CodeNotFound, res.Error.Code)
+	if res.Error.Code != errors.CodeNotFound || retErr.Error.Code != errors.CodeNotFound {
+		t.Errorf("expected code %s, got res=%s retErr=%s", errors.CodeNotFound, res.Error.Code, retErr.Error.Code)
 	}
-	if res.Error.Message != "user not found" {
-		t.Errorf("expected message 'user not found', got '%s'", res.Error.Message)
+	if res.Error.Message != "user not found" || retErr.Error.Message != "user not found" {
+		t.Errorf("expected message 'user not found', got res='%s' retErr='%s'", res.Error.Message, retErr.Error.Message)
 	}
 }
 
@@ -60,7 +68,11 @@ func TestWriteErrorInternalSanitization(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 
 	internalErr := errors.Internal(stdErrors.New("db connection failed"), "db secret failure details")
-	WriteError(rec, req, internalErr)
+	retErr := WriteError(rec, req, internalErr)
+
+	if retErr == nil {
+		t.Fatal("expected non-nil *ErrorResponse return value")
+	}
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d", rec.Code)
@@ -71,10 +83,15 @@ func TestWriteErrorInternalSanitization(t *testing.T) {
 		t.Fatalf("failed to decode JSON response: %v", err)
 	}
 
-	if res.Error.Code != errors.CodeInternalError {
-		t.Errorf("expected code %s, got %s", errors.CodeInternalError, res.Error.Code)
+	if res.Error.Code != errors.CodeInternalError || retErr.Error.Code != errors.CodeInternalError {
+		t.Errorf("expected code %s, got res=%s retErr=%s", errors.CodeInternalError, res.Error.Code, retErr.Error.Code)
 	}
-	if res.Error.Message != "An internal server error occurred" {
-		t.Errorf("expected sanitized message, got '%s'", res.Error.Message)
+	if res.Error.Message != "An internal server error occurred" || retErr.Error.Message != "An internal server error occurred" {
+		t.Errorf("expected sanitized message, got res='%s' retErr='%s'", res.Error.Message, retErr.Error.Message)
+	}
+
+	nilRet := WriteError(rec, req, nil)
+	if nilRet != nil {
+		t.Errorf("expected nil *ErrorResponse for nil error input, got %v", nilRet)
 	}
 }
