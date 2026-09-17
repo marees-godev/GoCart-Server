@@ -1,4 +1,4 @@
-package graphql
+package resolver
 
 // This file will be automatically regenerated based on the schema, any resolver implementations
 // will be copied through when generating and any unknown code will be moved to the end.
@@ -6,19 +6,18 @@ package graphql
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/generated"
 )
 
 // Health is the resolver for the health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
-	panic(fmt.Errorf("not implemented: Health - health"))
+	return "OK", nil
 }
 
 // Version is the resolver for the version field.
 func (r *queryResolver) Version(ctx context.Context) (string, error) {
-	panic(fmt.Errorf("not implemented: Version - version"))
+	return r.Resolver.Version, nil
 }
 
 // Query returns generated.QueryResolver implementation.

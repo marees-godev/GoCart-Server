@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
+	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolver"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 )
 
@@ -22,7 +23,7 @@ func setupTestApp() *fiber.App {
 	healthHandler := health.NewHandler("api-gateway")
 	healthHandler.Register(app)
 
-	gqlResolver := gwGraphQL.NewResolver("1.0.0")
+	gqlResolver := gwResolver.NewResolver("1.0.0")
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
 
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))

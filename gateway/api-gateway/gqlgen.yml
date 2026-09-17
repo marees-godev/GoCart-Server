@@ -1,5 +1,5 @@
 schema:
-  - internal/graphql/schema.graphqls
+  - internal/graphql/schema/schema.graphqls
 
 exec:
   filename: internal/graphql/generated/generated.go
@@ -11,6 +11,6 @@ model:
 
 resolver:
   layout: follow-schema
-  dir: internal/graphql
-  package: graphql
+  dir: internal/graphql/resolver
+  package: resolver
   filename_template: "{name}.resolvers.go"

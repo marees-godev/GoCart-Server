@@ -177,7 +177,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../schema.graphqls", Input: `type Query {
+	{Name: "../schema/schema.graphqls", Input: `type Query {
   health: String!
   version: String!
 }

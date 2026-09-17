@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolver"
 	pkgGraphQL "github.com/marees-godev/GoCart-Server/pkg/graphql"
 )
 
@@ -23,12 +24,12 @@ type Response struct {
 }
 
 type Server struct {
-	resolver *Resolver
+	resolver *resolver.Resolver
 }
 
-func NewServer(resolver *Resolver) *Server {
+func NewServer(r *resolver.Resolver) *Server {
 	return &Server{
-		resolver: resolver,
+		resolver: r,
 	}
 }
 

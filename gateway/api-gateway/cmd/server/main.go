@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
+	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolver"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
@@ -68,8 +69,9 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	// 5. Initialize and register GraphQL server
-	gqlResolver := gwGraphQL.NewResolver(cfg.App.Version)
+	gqlResolver := gwResolver.NewResolver(cfg.App.Version)
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
+
 
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
 	app.All("/query", adaptor.HTTPHandler(gqlServer))
