@@ -1,9 +1,10 @@
-.PHONY: build test migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth docker-up docker-down docker-build infra-up infra-down
+.PHONY: build test generate-graphql migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth run-gateway docker-up docker-down docker-build infra-up infra-down
 
 # Build all binaries
 build:
 	go build -o ./bin/migrate.exe ./cmd/migrate
 	go build -o ./bin/auth-service.exe ./services/auth-service/cmd/server
+	go build -o ./bin/api-gateway.exe ./gateway/api-gateway/cmd/server
 
 # Run all tests
 test:
@@ -55,4 +56,13 @@ migrate-reset-all:
 # Run auth-service server
 run-auth:
 	go run services/auth-service/cmd/server/main.go
+
+# Run api-gateway server
+run-gateway:
+	go run gateway/api-gateway/cmd/server/main.go
+
+# Generate GraphQL code for api-gateway
+generate-graphql:
+	cd gateway/api-gateway && go run github.com/99designs/gqlgen generate
+
 

@@ -28,6 +28,13 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            api-gateway:
+              - 'gateway/api-gateway/**'
+              - 'pkg/**'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'go.mod'
+              - 'go.sum'
             auth-service:
               - 'services/auth-service/**'
               - 'pkg/**'
@@ -174,13 +181,32 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      - name: Verify GraphQL Schema & Code Generation
+        if: matrix.service == 'api-gateway'
+        run: |
+          make generate-graphql
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Error: Generated GraphQL code is out of sync with schema.graphqls!"
+            echo "Please run 'make generate-graphql' locally and commit the changes."
+            git status --porcelain
+            exit 1
+          fi
+
       - name: Run Unit Tests with Race Detector
         run: |
-          go test -v -race -coverprofile=coverage.out ./services/${{ matrix.service }}/... ./pkg/...
+          if [ "${{ matrix.service }}" = "api-gateway" ]; then
+            go test -v -race -coverprofile=coverage.out ./gateway/api-gateway/... ./pkg/...
+          else
+            go test -v -race -coverprofile=coverage.out ./services/${{ matrix.service }}/... ./pkg/...
+          fi
 
       - name: Verify Service Binary Compilation
         run: |
-          go build -v -o /dev/null ./services/${{ matrix.service }}/cmd/server
+          if [ "${{ matrix.service }}" = "api-gateway" ]; then
+            go build -v -o /dev/null ./gateway/api-gateway/cmd/server
+          else
+            go build -v -o /dev/null ./services/${{ matrix.service }}/cmd/server
+          fi
 
   # ----------------------------------------------------------------------------
   # Step 4: Build & Publish Docker Image (Only on dev or main push)
@@ -239,7 +265,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: infrastructure/docker/Dockerfile.service
+          file: ${{ matrix.service == 'api-gateway' && 'gateway/api-gateway/Dockerfile' || 'infrastructure/docker/Dockerfile.service' }}
           build-args: |
             SERVICE_NAME=${{ matrix.service }}
           push: ${{ github.event_name == 'push' }}
@@ -247,6 +273,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
 
   # ----------------------------------------------------------------------------
   # Step 5A: Deploy to Staging on Render (Triggered on 'dev' branch push)
