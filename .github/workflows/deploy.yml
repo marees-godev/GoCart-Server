@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - api-gateway
           - auth-service
           - cart-service
           - category-service
