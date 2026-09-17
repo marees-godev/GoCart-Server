@@ -27,7 +27,6 @@ func setupTestApp() *fiber.App {
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
 
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
-	app.All("/query", adaptor.HTTPHandler(gqlServer))
 	app.Get("/playground", adaptor.HTTPHandler(gwGraphQL.PlaygroundHandler("Playground", "/graphql")))
 
 	return app

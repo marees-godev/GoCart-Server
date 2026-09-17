@@ -72,9 +72,7 @@ func main() {
 	gqlResolver := gwResolver.NewResolver(cfg.App.Version)
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
 
-
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
-	app.All("/query", adaptor.HTTPHandler(gqlServer))
 
 	if cfg.GraphQL.PlaygroundEnabled {
 		playgroundHandler := gwGraphQL.PlaygroundHandler("GoCart API Gateway GraphQL", "/graphql")
