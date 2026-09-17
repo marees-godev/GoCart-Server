@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
+	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/cartpb"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/orderpb"
@@ -195,7 +196,7 @@ func setupTestApp(introEnabled bool) *fiber.App {
 		&mockOrderClient{},
 	)
 
-	resolver := NewResolver(clients)
+	resolver := gwResolver.NewResolver(clients)
 	schema, _ := NewSchema(resolver)
 
 	cfg := &config.Config{
@@ -494,4 +495,3 @@ func TestHandlePlayground_Disabled(t *testing.T) {
 		t.Errorf("expected status 403, got %d", resp.StatusCode)
 	}
 }
-

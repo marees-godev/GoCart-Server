@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolver"
+	resolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	pkgGraphQL "github.com/marees-godev/GoCart-Server/pkg/graphql"
 )
 

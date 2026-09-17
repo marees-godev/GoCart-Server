@@ -2,9 +2,20 @@ package graphql
 
 import (
 	"github.com/graphql-go/graphql"
+	mutation "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mutations"
+	resolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 )
 
-func NewSchema(resolver *Resolver) (graphql.Schema, error) {
+func NewSchema(res *resolver.Resolver, mut ...*mutation.MutationResolver) (graphql.Schema, error) {
+	var mutResolver *mutation.MutationResolver
+	if len(mut) > 0 && mut[0] != nil {
+		mutResolver = mut[0]
+	} else if res != nil {
+		mutResolver = mutation.NewMutationResolver(res.Clients)
+	} else {
+		mutResolver = mutation.NewMutationResolver(nil)
+	}
+
 	// User Type
 	userType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "User",
@@ -139,10 +150,30 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 	rootQuery := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
+			"health": &graphql.Field{
+				Type:        graphql.String,
+				Description: "Health check",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					if res == nil {
+						return "OK", nil
+					}
+					return res.Health(p.Context)
+				},
+			},
+			"version": &graphql.Field{
+				Type:        graphql.String,
+				Description: "Get API version",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					if res == nil {
+						return "1.0.0", nil
+					}
+					return res.GetVersion(p.Context)
+				},
+			},
 			"me": &graphql.Field{
 				Type:        userType,
 				Description: "Get logged in user details",
-				Resolve:     resolver.Me,
+				Resolve:     res.Me,
 			},
 			"user": &graphql.Field{
 				Type:        userType,
@@ -150,7 +181,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 				},
-				Resolve: resolver.User,
+				Resolve: res.User,
 			},
 			"product": &graphql.Field{
 				Type:        productType,
@@ -158,7 +189,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 				},
-				Resolve: resolver.Product,
+				Resolve: res.Product,
 			},
 			"products": &graphql.Field{
 				Type:        graphql.NewNonNull(graphql.NewList(graphql.NewNonNull(productType))),
@@ -167,7 +198,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 					"limit":  &graphql.ArgumentConfig{Type: graphql.Int},
 					"offset": &graphql.ArgumentConfig{Type: graphql.Int},
 				},
-				Resolve: resolver.Products,
+				Resolve: res.Products,
 			},
 			"cart": &graphql.Field{
 				Type:        cartType,
@@ -175,7 +206,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 				},
-				Resolve: resolver.Cart,
+				Resolve: res.Cart,
 			},
 			"order": &graphql.Field{
 				Type:        orderType,
@@ -183,7 +214,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.ID)},
 				},
-				Resolve: resolver.Order,
+				Resolve: res.Order,
 			},
 		},
 	})
@@ -198,7 +229,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(loginInput)},
 				},
-				Resolve: resolver.Login,
+				Resolve: mutResolver.Login,
 			},
 			"register": &graphql.Field{
 				Type:        graphql.NewNonNull(authPayloadType),
@@ -206,7 +237,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(registerInput)},
 				},
-				Resolve: resolver.Register,
+				Resolve: mutResolver.Register,
 			},
 			"createProduct": &graphql.Field{
 				Type:        graphql.NewNonNull(productType),
@@ -214,7 +245,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createProductInput)},
 				},
-				Resolve: resolver.CreateProduct,
+				Resolve: mutResolver.CreateProduct,
 			},
 			"addToCart": &graphql.Field{
 				Type:        graphql.NewNonNull(cartType),
@@ -222,7 +253,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(addToCartInput)},
 				},
-				Resolve: resolver.AddToCart,
+				Resolve: mutResolver.AddToCart,
 			},
 			"createOrder": &graphql.Field{
 				Type:        graphql.NewNonNull(orderType),
@@ -230,7 +261,7 @@ func NewSchema(resolver *Resolver) (graphql.Schema, error) {
 				Args: graphql.FieldConfigArgument{
 					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createOrderInput)},
 				},
-				Resolve: resolver.CreateOrder,
+				Resolve: mutResolver.CreateOrder,
 			},
 		},
 	})

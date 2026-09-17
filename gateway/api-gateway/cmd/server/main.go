@@ -11,7 +11,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
-	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolver"
+	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
+	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
@@ -68,11 +69,27 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	// 5. Initialize and register GraphQL server
-	gqlResolver := gwResolver.NewResolver(cfg.App.Version)
-	gqlServer := gwGraphQL.NewServer(gqlResolver)
+	// 5. Initialize gRPC clients and GraphQL server
+	grpcClients, err := gatewayGRPC.NewClients(cfg)
+	if err != nil {
+		log.Warn("Failed to initialize gRPC clients", "error", err)
+	} else if grpcClients != nil {
+		defer grpcClients.Close()
+	}
 
-	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
+	gqlResolver := gwResolver.NewResolver(grpcClients, cfg.App.Version)
+	gqlSchema, err := gwGraphQL.NewSchema(gqlResolver)
+	if err != nil {
+		log.Error("Failed to initialize GraphQL schema", "error", err)
+		os.Exit(1)
+	}
+
+	gqlHandler := gwGraphQL.NewHandler(gqlSchema, cfg)
+	gqlHandler.RegisterRoutes(app)
+
+	// Additional endpoint aliases for backward compatibility
+	legacyServer := gwGraphQL.NewServer(gqlResolver)
+	app.All("/graphql", adaptor.HTTPHandler(legacyServer))
 
 	if cfg.GraphQL.PlaygroundEnabled {
 		playgroundHandler := gwGraphQL.PlaygroundHandler("GoCart API Gateway GraphQL", "/graphql")
