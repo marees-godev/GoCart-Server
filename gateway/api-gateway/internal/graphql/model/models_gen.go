@@ -2,5 +2,94 @@
 
 package model
 
+type AddToCartInput struct {
+	UserID    string `json:"userId"`
+	ProductID string `json:"productId"`
+	Quantity  int    `json:"quantity"`
+}
+
+type AuthPayload struct {
+	Token string `json:"token"`
+	User  *User  `json:"user"`
+}
+
+type Cart struct {
+	ID          string      `json:"id"`
+	UserID      string      `json:"userId"`
+	Items       []*CartItem `json:"items"`
+	TotalAmount float64     `json:"totalAmount"`
+}
+
+type CartItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type CreateOrderInput struct {
+	UserID          string `json:"userId"`
+	CartID          string `json:"cartId"`
+	ShippingAddress string `json:"shippingAddress"`
+}
+
+type CreateProductInput struct {
+	Name          string  `json:"name"`
+	Description   *string `json:"description,omitempty"`
+	Price         float64 `json:"price"`
+	CategoryID    *string `json:"categoryId,omitempty"`
+	StockQuantity int     `json:"stockQuantity"`
+}
+
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type Mutation struct {
+}
+
+type Order struct {
+	ID          string       `json:"id"`
+	UserID      string       `json:"userId"`
+	Status      string       `json:"status"`
+	Items       []*OrderItem `json:"items"`
+	TotalAmount float64      `json:"totalAmount"`
+	CreatedAt   *string      `json:"createdAt,omitempty"`
+}
+
+type OrderItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	Price     float64 `json:"price"`
+}
+
+type Product struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Description   *string `json:"description,omitempty"`
+	Price         float64 `json:"price"`
+	CategoryID    *string `json:"categoryId,omitempty"`
+	StockQuantity int     `json:"stockQuantity"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+}
+
 type Query struct {
+}
+
+type RegisterInput struct {
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+}
+
+type User struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+	Role      *string `json:"role,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
 }

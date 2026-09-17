@@ -1,18 +1,17 @@
 package resolvers
 
 import (
-	"github.com/graphql-go/graphql"
+	"context"
+
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/productpb"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
-func (r *Resolver) Products(p graphql.ResolveParams) (interface{}, error) {
+func (r *Resolver) Products(ctx context.Context, limit, offset int) (interface{}, error) {
 	if r.Clients == nil || r.Clients.ProductClient == nil {
 		return nil, appErrors.Internal(nil, "product client unavailable")
 	}
-	limit, _ := p.Args["limit"].(int)
-	offset, _ := p.Args["offset"].(int)
 	if limit <= 0 {
 		limit = 10
 	}
@@ -20,7 +19,7 @@ func (r *Resolver) Products(p graphql.ResolveParams) (interface{}, error) {
 		offset = 0
 	}
 
-	res, err := r.Clients.ProductClient.ListProducts(p.Context, &productpb.ListProductsRequest{
+	res, err := r.Clients.ProductClient.ListProducts(ctx, &productpb.ListProductsRequest{
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	})

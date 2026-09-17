@@ -8,7 +8,141 @@ import (
 	"context"
 
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/generated"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/cartpb"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/orderpb"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/productpb"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
+
+// Login is the resolver for the login field.
+func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	if input.Email == "" || input.Password == "" {
+		return nil, appErrors.BadRequest("email and password are required")
+	}
+
+	res, err := r.Clients.UserClient.Login(ctx, &userpb.LoginRequest{
+		Email:    input.Email,
+		Password: input.Password,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AuthPayload{
+		Token: res.Token,
+		User:  toModelUser(res.User),
+	}, nil
+}
+
+// Register is the resolver for the register field.
+func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	if input.Email == "" || input.Password == "" {
+		return nil, appErrors.BadRequest("email and password are required")
+	}
+
+	fn := ""
+	if input.FirstName != nil {
+		fn = *input.FirstName
+	}
+	ln := ""
+	if input.LastName != nil {
+		ln = *input.LastName
+	}
+
+	res, err := r.Clients.UserClient.Register(ctx, &userpb.RegisterRequest{
+		Email:     input.Email,
+		Password:  input.Password,
+		FirstName: fn,
+		LastName:  ln,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AuthPayload{
+		Token: res.Token,
+		User:  toModelUser(res.User),
+	}, nil
+}
+
+// CreateProduct is the resolver for the createProduct field.
+func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
+	if r.Clients == nil || r.Clients.ProductClient == nil {
+		return nil, appErrors.Internal(nil, "product client unavailable")
+	}
+	if input.Name == "" || input.Price <= 0 {
+		return nil, appErrors.BadRequest("valid product name and positive price are required")
+	}
+
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+	catID := ""
+	if input.CategoryID != nil {
+		catID = *input.CategoryID
+	}
+
+	res, err := r.Clients.ProductClient.CreateProduct(ctx, &productpb.CreateProductRequest{
+		Name:          input.Name,
+		Description:   desc,
+		Price:         input.Price,
+		CategoryId:    catID,
+		StockQuantity: int32(input.StockQuantity),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toModelProduct(res.Product), nil
+}
+
+// AddToCart is the resolver for the addToCart field.
+func (r *mutationResolver) AddToCart(ctx context.Context, input model.AddToCartInput) (*model.Cart, error) {
+	if r.Clients == nil || r.Clients.CartClient == nil {
+		return nil, appErrors.Internal(nil, "cart client unavailable")
+	}
+	if input.UserID == "" || input.ProductID == "" || input.Quantity <= 0 {
+		return nil, appErrors.BadRequest("userId, productId, and positive quantity are required")
+	}
+
+	res, err := r.Clients.CartClient.AddToCart(ctx, &cartpb.AddToCartRequest{
+		UserId:    input.UserID,
+		ProductId: input.ProductID,
+		Quantity:  int32(input.Quantity),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toModelCart(res.Cart), nil
+}
+
+// CreateOrder is the resolver for the createOrder field.
+func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
+	if r.Clients == nil || r.Clients.OrderClient == nil {
+		return nil, appErrors.Internal(nil, "order client unavailable")
+	}
+	if input.UserID == "" || input.CartID == "" {
+		return nil, appErrors.BadRequest("userId and cartId are required")
+	}
+
+	res, err := r.Clients.OrderClient.CreateOrder(ctx, &orderpb.CreateOrderRequest{
+		UserId:          input.UserID,
+		CartId:          input.CartID,
+		ShippingAddress: input.ShippingAddress,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toModelOrder(res.Order), nil
+}
 
 // Health is the resolver for the health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
@@ -17,10 +151,212 @@ func (r *queryResolver) Health(ctx context.Context) (string, error) {
 
 // Version is the resolver for the version field.
 func (r *queryResolver) Version(ctx context.Context) (string, error) {
+	if r.Resolver.Version == "" {
+		return "1.0.0", nil
+	}
 	return r.Resolver.Version, nil
 }
+
+// Me is the resolver for the me field.
+func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	userId, ok := ctx.Value("userID").(string)
+	if !ok || userId == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: userId})
+	if err != nil {
+		return nil, err
+	}
+	return toModelUser(res.User), nil
+}
+
+// User is the resolver for the user field.
+func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("user id is required")
+	}
+
+	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: id})
+	if err != nil {
+		return nil, err
+	}
+	return toModelUser(res.User), nil
+}
+
+// Product is the resolver for the product field.
+func (r *queryResolver) Product(ctx context.Context, id string) (*model.Product, error) {
+	if r.Clients == nil || r.Clients.ProductClient == nil {
+		return nil, appErrors.Internal(nil, "product client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("product id is required")
+	}
+
+	res, err := r.Clients.ProductClient.GetProduct(ctx, &productpb.GetProductRequest{Id: id})
+	if err != nil {
+		return nil, err
+	}
+	return toModelProduct(res.Product), nil
+}
+
+// Products is the resolver for the products field.
+func (r *queryResolver) Products(ctx context.Context, limit *int, offset *int) ([]*model.Product, error) {
+	if r.Clients == nil || r.Clients.ProductClient == nil {
+		return nil, appErrors.Internal(nil, "product client unavailable")
+	}
+	l := int32(10)
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+	o := int32(0)
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	res, err := r.Clients.ProductClient.ListProducts(ctx, &productpb.ListProductsRequest{
+		Limit:  l,
+		Offset: o,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	products := make([]*model.Product, len(res.Products))
+	for i, prod := range res.Products {
+		products[i] = toModelProduct(prod)
+	}
+	return products, nil
+}
+
+// Cart is the resolver for the cart field.
+func (r *queryResolver) Cart(ctx context.Context, userID string) (*model.Cart, error) {
+	if r.Clients == nil || r.Clients.CartClient == nil {
+		return nil, appErrors.Internal(nil, "cart client unavailable")
+	}
+	if userID == "" {
+		return nil, appErrors.BadRequest("userId is required")
+	}
+
+	res, err := r.Clients.CartClient.GetCart(ctx, &cartpb.GetCartRequest{UserId: userID})
+	if err != nil {
+		return nil, err
+	}
+	return toModelCart(res.Cart), nil
+}
+
+// Order is the resolver for the order field.
+func (r *queryResolver) Order(ctx context.Context, id string) (*model.Order, error) {
+	if r.Clients == nil || r.Clients.OrderClient == nil {
+		return nil, appErrors.Internal(nil, "order client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("order id is required")
+	}
+
+	res, err := r.Clients.OrderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: id})
+	if err != nil {
+		return nil, err
+	}
+	return toModelOrder(res.Order), nil
+}
+
+// Mutation returns generated.MutationResolver implementation.
+func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// ----------------------------------------------------------------------------
+// Model Converters
+// ----------------------------------------------------------------------------
+
+func toModelUser(u *userpb.User) *model.User {
+	if u == nil {
+		return nil
+	}
+	fn := u.FirstName
+	ln := u.LastName
+	role := u.Role
+	ca := u.CreatedAt
+	return &model.User{
+		ID:        u.Id,
+		Email:     u.Email,
+		FirstName: &fn,
+		LastName:  &ln,
+		Role:      &role,
+		CreatedAt: &ca,
+	}
+}
+
+func toModelProduct(p *productpb.Product) *model.Product {
+	if p == nil {
+		return nil
+	}
+	desc := p.Description
+	catID := p.CategoryId
+	ca := p.CreatedAt
+	return &model.Product{
+		ID:            p.Id,
+		Name:          p.Name,
+		Description:   &desc,
+		Price:         p.Price,
+		CategoryID:    &catID,
+		StockQuantity: int(p.StockQuantity),
+		CreatedAt:     &ca,
+	}
+}
+
+func toModelCart(c *cartpb.Cart) *model.Cart {
+	if c == nil {
+		return nil
+	}
+	items := make([]*model.CartItem, len(c.Items))
+	for i, item := range c.Items {
+		items[i] = &model.CartItem{
+			ID:        item.Id,
+			ProductID: item.ProductId,
+			Quantity:  int(item.Quantity),
+			UnitPrice: item.UnitPrice,
+		}
+	}
+	return &model.Cart{
+		ID:          c.Id,
+		UserID:      c.UserId,
+		Items:       items,
+		TotalAmount: c.TotalAmount,
+	}
+}
+
+func toModelOrder(o *orderpb.Order) *model.Order {
+	if o == nil {
+		return nil
+	}
+	items := make([]*model.OrderItem, len(o.Items))
+	for i, item := range o.Items {
+		items[i] = &model.OrderItem{
+			ID:        item.Id,
+			ProductID: item.ProductId,
+			Quantity:  int(item.Quantity),
+			Price:     item.Price,
+		}
+	}
+	ca := o.CreatedAt
+	return &model.Order{
+		ID:          o.Id,
+		UserID:      o.UserId,
+		Status:      o.Status,
+		Items:       items,
+		TotalAmount: o.TotalAmount,
+		CreatedAt:   &ca,
+	}
+}
