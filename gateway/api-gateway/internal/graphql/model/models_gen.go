@@ -2,5 +2,34 @@
 
 package model
 
+type AuthPayload struct {
+	Token string `json:"token"`
+	User  *User  `json:"user"`
+}
+
+type LoginInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type Mutation struct {
+}
+
 type Query struct {
+}
+
+type RegisterInput struct {
+	Email     string  `json:"email"`
+	Password  string  `json:"password"`
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+}
+
+type User struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+	Role      *string `json:"role,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
 }

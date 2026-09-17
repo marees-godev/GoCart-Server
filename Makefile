@@ -1,4 +1,4 @@
-.PHONY: build test generate-graphql migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth run-gateway docker-up docker-down docker-build infra-up infra-down
+.PHONY: build test generate-graphql gqlgen gql-gen migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth run-gateway docker-up docker-down docker-build infra-up infra-down
 
 # Build all binaries
 build:
@@ -9,6 +9,7 @@ build:
 # Run all tests
 test:
 	go test -v ./pkg/...
+	go test -v ./gateway/api-gateway/...
 
 # Docker compose commands
 docker-up:
@@ -62,7 +63,8 @@ run-gateway:
 	go run gateway/api-gateway/cmd/server/main.go
 
 # Generate GraphQL code for api-gateway
-generate-graphql:
+generate-graphql gqlgen gql-gen:
 	cd gateway/api-gateway && go run github.com/99designs/gqlgen generate
+
 
 

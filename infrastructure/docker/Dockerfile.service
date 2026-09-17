@@ -14,6 +14,7 @@ COPY go.work go.work.sum* ./
 COPY go.mod go.sum ./
 COPY contracts/ contracts/
 COPY pkg/ pkg/
+COPY gateway/ gateway/
 COPY services/ services/
 
 # Pass service directory name via build arg (e.g. auth-service, user-service)

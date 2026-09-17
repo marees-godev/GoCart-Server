@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package gocart.user;
+
+option go_package = "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb";
+
+service UserService {
+  rpc GetUser (GetUserRequest) returns (GetUserResponse);
+  rpc Login (LoginRequest) returns (AuthResponse);
+  rpc Register (RegisterRequest) returns (AuthResponse);
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string role = 5;
+  string created_at = 6;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message AuthResponse {
+  string token = 1;
+  User user = 2;
+}
