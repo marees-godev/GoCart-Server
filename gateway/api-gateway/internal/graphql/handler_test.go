@@ -12,16 +12,9 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/cartpb"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/orderpb"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/productpb"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"google.golang.org/grpc"
 )
-
-// ----------------------------------------------------------------------------
-// Mock gRPC Clients
-// ----------------------------------------------------------------------------
 
 type mockUserClient struct{}
 
@@ -62,128 +55,6 @@ func (m *mockUserClient) Register(ctx context.Context, in *userpb.RegisterReques
 	}, nil
 }
 
-type mockProductClient struct{}
-
-func (m *mockProductClient) GetProduct(ctx context.Context, in *productpb.GetProductRequest, opts ...grpc.CallOption) (*productpb.GetProductResponse, error) {
-	return &productpb.GetProductResponse{
-		Product: &productpb.Product{
-			Id:            in.Id,
-			Name:          "Mock Laptop",
-			Description:   "High performance laptop",
-			Price:         1299.99,
-			CategoryId:    "cat-tech",
-			StockQuantity: 15,
-			CreatedAt:     "2026-01-01T00:00:00Z",
-		},
-	}, nil
-}
-
-func (m *mockProductClient) ListProducts(ctx context.Context, in *productpb.ListProductsRequest, opts ...grpc.CallOption) (*productpb.ListProductsResponse, error) {
-	return &productpb.ListProductsResponse{
-		Products: []*productpb.Product{
-			{
-				Id:            "p-1",
-				Name:          "Product 1",
-				Price:         19.99,
-				StockQuantity: 50,
-			},
-			{
-				Id:            "p-2",
-				Name:          "Product 2",
-				Price:         29.99,
-				StockQuantity: 30,
-			},
-		},
-		Total: 2,
-	}, nil
-}
-
-func (m *mockProductClient) CreateProduct(ctx context.Context, in *productpb.CreateProductRequest, opts ...grpc.CallOption) (*productpb.CreateProductResponse, error) {
-	return &productpb.CreateProductResponse{
-		Product: &productpb.Product{
-			Id:            "p-new",
-			Name:          in.Name,
-			Description:   in.Description,
-			Price:         in.Price,
-			CategoryId:    in.CategoryId,
-			StockQuantity: in.StockQuantity,
-			CreatedAt:     "2026-09-17T00:00:00Z",
-		},
-	}, nil
-}
-
-type mockCartClient struct{}
-
-func (m *mockCartClient) GetCart(ctx context.Context, in *cartpb.GetCartRequest, opts ...grpc.CallOption) (*cartpb.GetCartResponse, error) {
-	return &cartpb.GetCartResponse{
-		Cart: &cartpb.Cart{
-			Id:     "c-1",
-			UserId: in.UserId,
-			Items: []*cartpb.CartItem{
-				{
-					Id:        "ci-1",
-					ProductId: "p-1",
-					Quantity:  2,
-					UnitPrice: 19.99,
-				},
-			},
-			TotalAmount: 39.98,
-		},
-	}, nil
-}
-
-func (m *mockCartClient) AddToCart(ctx context.Context, in *cartpb.AddToCartRequest, opts ...grpc.CallOption) (*cartpb.AddToCartResponse, error) {
-	return &cartpb.AddToCartResponse{
-		Cart: &cartpb.Cart{
-			Id:     "c-1",
-			UserId: in.UserId,
-			Items: []*cartpb.CartItem{
-				{
-					Id:        "ci-2",
-					ProductId: in.ProductId,
-					Quantity:  in.Quantity,
-					UnitPrice: 25.00,
-				},
-			},
-			TotalAmount: float64(in.Quantity) * 25.00,
-		},
-	}, nil
-}
-
-type mockOrderClient struct{}
-
-func (m *mockOrderClient) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpc.CallOption) (*orderpb.GetOrderResponse, error) {
-	return &orderpb.GetOrderResponse{
-		Order: &orderpb.Order{
-			Id:     in.Id,
-			UserId: "u-1",
-			Status: "PENDING",
-			Items: []*orderpb.OrderItem{
-				{
-					Id:        "oi-1",
-					ProductId: "p-1",
-					Quantity:  1,
-					Price:     99.99,
-				},
-			},
-			TotalAmount: 99.99,
-			CreatedAt:   "2026-09-17T00:00:00Z",
-		},
-	}, nil
-}
-
-func (m *mockOrderClient) CreateOrder(ctx context.Context, in *orderpb.CreateOrderRequest, opts ...grpc.CallOption) (*orderpb.CreateOrderResponse, error) {
-	return &orderpb.CreateOrderResponse{
-		Order: &orderpb.Order{
-			Id:          "ord-new",
-			UserId:      in.UserId,
-			Status:      "CREATED",
-			TotalAmount: 150.00,
-			CreatedAt:   "2026-09-17T00:00:00Z",
-		},
-	}, nil
-}
-
 // ----------------------------------------------------------------------------
 // Helper to Setup Test Fiber App
 // ----------------------------------------------------------------------------
@@ -191,9 +62,6 @@ func (m *mockOrderClient) CreateOrder(ctx context.Context, in *orderpb.CreateOrd
 func setupTestApp(introEnabled bool) *fiber.App {
 	clients := gatewayGRPC.NewClientsWithServices(
 		&mockUserClient{},
-		&mockProductClient{},
-		&mockCartClient{},
-		&mockOrderClient{},
 	)
 
 	resolver := gwResolver.NewResolver(clients)
@@ -218,7 +86,7 @@ func TestHandleQuery_ValidProductQuery(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `query { product(id: "prod-100") { id name price description } }`,
+		"query": `query { user(id: "u-100") { id email firstName } }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 
@@ -242,46 +110,13 @@ func TestHandleQuery_ValidProductQuery(t *testing.T) {
 		t.Fatalf("expected data field in response, got %v", res)
 	}
 
-	product, ok := data["product"].(map[string]interface{})
-	if !ok || product == nil {
-		t.Fatalf("expected product object in data, got %v", data)
+	user, ok := data["user"].(map[string]interface{})
+	if !ok || user == nil {
+		t.Fatalf("expected user object in data, got %v", data)
 	}
 
-	if product["id"] != "prod-100" {
-		t.Errorf("expected product id 'prod-100', got '%v'", product["id"])
-	}
-	if product["name"] != "Mock Laptop" {
-		t.Errorf("expected product name 'Mock Laptop', got '%v'", product["name"])
-	}
-}
-
-func TestHandleQuery_ValidProductsListQuery(t *testing.T) {
-	app := setupTestApp(true)
-
-	reqBody := map[string]interface{}{
-		"query": `query { products(limit: 5) { id name price } }`,
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
-	}
-
-	var res map[string]interface{}
-	_ = json.NewDecoder(resp.Body).Decode(&res)
-
-	data := res["data"].(map[string]interface{})
-	products := data["products"].([]interface{})
-	if len(products) != 2 {
-		t.Errorf("expected 2 products, got %d", len(products))
+	if user["id"] != "u-100" {
+		t.Errorf("expected user id 'u-100', got '%v'", user["id"])
 	}
 }
 
@@ -316,11 +151,11 @@ func TestHandleMutation_Login(t *testing.T) {
 	}
 }
 
-func TestHandleMutation_CreateProduct(t *testing.T) {
+func TestHandleMutation_Register(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `mutation { createProduct(input: {name: "Wireless Mouse", price: 49.99, stockQuantity: 100}) { id name price } }`,
+		"query": `mutation { register(input: {email: "new@gocart.com", password: "password123", firstName: "Jane"}) { token user { id email } } }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 
@@ -340,47 +175,10 @@ func TestHandleMutation_CreateProduct(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&res)
 
 	data := res["data"].(map[string]interface{})
-	cp := data["createProduct"].(map[string]interface{})
+	reg := data["register"].(map[string]interface{})
 
-	if cp["id"] != "p-new" {
-		t.Errorf("expected id 'p-new', got '%v'", cp["id"])
-	}
-	if cp["name"] != "Wireless Mouse" {
-		t.Errorf("expected name 'Wireless Mouse', got '%v'", cp["name"])
-	}
-}
-
-func TestHandleMutation_AddToCart(t *testing.T) {
-	app := setupTestApp(true)
-
-	reqBody := map[string]interface{}{
-		"query": `mutation { addToCart(input: {userId: "u-1", productId: "p-10", quantity: 3}) { id userId totalAmount } }`,
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
-	}
-
-	var res map[string]interface{}
-	_ = json.NewDecoder(resp.Body).Decode(&res)
-
-	data := res["data"].(map[string]interface{})
-	cart := data["addToCart"].(map[string]interface{})
-
-	if cart["userId"] != "u-1" {
-		t.Errorf("expected userId 'u-1', got '%v'", cart["userId"])
-	}
-	if cart["totalAmount"] != 75.0 {
-		t.Errorf("expected totalAmount 75.0, got '%v'", cart["totalAmount"])
+	if reg["token"] != "jwt-mock-register-token" {
+		t.Errorf("expected token 'jwt-mock-register-token', got '%v'", reg["token"])
 	}
 }
 
@@ -439,7 +237,7 @@ func TestHandleQuery_IntrospectionEnabled(t *testing.T) {
 }
 
 func TestHandleQuery_IntrospectionDisabled(t *testing.T) {
-	app := setupTestApp(false) // introspection disabled
+	app := setupTestApp(false)
 
 	reqBody := map[string]interface{}{
 		"query": `query { __schema { queryType { name } } }`,

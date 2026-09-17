@@ -2,20 +2,14 @@ package grpc
 
 import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/cartpb"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/orderpb"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/productpb"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Clients struct {
-	UserClient    userpb.UserServiceClient
-	ProductClient productpb.ProductServiceClient
-	CartClient    cartpb.CartServiceClient
-	OrderClient   orderpb.OrderServiceClient
-	conns         []*grpc.ClientConn
+	UserClient userpb.UserServiceClient
+	conns      []*grpc.ClientConn
 }
 
 func NewClients(cfg *config.Config) (*Clients, error) {
@@ -50,10 +44,7 @@ func NewClients(cfg *config.Config) (*Clients, error) {
 	}
 
 	return &Clients{
-		UserClient:    userpb.NewUserServiceClient(userConn),
-		ProductClient: productpb.NewProductServiceClient(productConn),
-		CartClient:    cartpb.NewCartServiceClient(cartConn),
-		OrderClient:   orderpb.NewOrderServiceClient(orderConn),
+		UserClient: userpb.NewUserServiceClient(userConn),
 		conns: []*grpc.ClientConn{
 			userConn, productConn, cartConn, orderConn,
 		},
@@ -62,15 +53,9 @@ func NewClients(cfg *config.Config) (*Clients, error) {
 
 func NewClientsWithServices(
 	u userpb.UserServiceClient,
-	p productpb.ProductServiceClient,
-	c cartpb.CartServiceClient,
-	o orderpb.OrderServiceClient,
 ) *Clients {
 	return &Clients{
-		UserClient:    u,
-		ProductClient: p,
-		CartClient:    c,
-		OrderClient:   o,
+		UserClient: u,
 	}
 }
 

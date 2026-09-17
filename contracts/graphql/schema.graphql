@@ -7,46 +7,6 @@ type User {
   createdAt: String
 }
 
-type Product {
-  id: ID!
-  name: String!
-  description: String
-  price: Float!
-  categoryId: String
-  stockQuantity: Int!
-  createdAt: String
-}
-
-type CartItem {
-  id: ID!
-  productId: String!
-  quantity: Int!
-  unitPrice: Float!
-}
-
-type Cart {
-  id: ID!
-  userId: String!
-  items: [CartItem!]!
-  totalAmount: Float!
-}
-
-type OrderItem {
-  id: ID!
-  productId: String!
-  quantity: Int!
-  price: Float!
-}
-
-type Order {
-  id: ID!
-  userId: String!
-  status: String!
-  items: [OrderItem!]!
-  totalAmount: Float!
-  createdAt: String
-}
-
 type AuthPayload {
   token: String!
   user: User!
@@ -64,39 +24,14 @@ input RegisterInput {
   lastName: String
 }
 
-input CreateProductInput {
-  name: String!
-  description: String
-  price: Float!
-  categoryId: String
-  stockQuantity: Int!
-}
-
-input AddToCartInput {
-  userId: ID!
-  productId: ID!
-  quantity: Int!
-}
-
-input CreateOrderInput {
-  userId: ID!
-  cartId: ID!
-  shippingAddress: String!
-}
-
 type Query {
+  health: String!
+  version: String!
   me: User
   user(id: ID!): User
-  product(id: ID!): Product
-  products(limit: Int, offset: Int): [Product!]!
-  cart(userId: ID!): Cart
-  order(id: ID!): Order
 }
 
 type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
-  createProduct(input: CreateProductInput!): Product!
-  addToCart(input: AddToCartInput!): Cart!
-  createOrder(input: CreateOrderInput!): Order!
 }
