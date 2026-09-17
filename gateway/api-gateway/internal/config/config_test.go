@@ -21,6 +21,21 @@ func TestLoadEnvDefaults(t *testing.T) {
 	if cfg.Logger.Level == "" {
 		t.Errorf("expected default Logger.Level, got empty")
 	}
+	if cfg.UserServiceAddr == "" {
+		t.Errorf("expected default UserServiceAddr, got empty")
+	}
+	if cfg.ProductServiceAddr == "" {
+		t.Errorf("expected default ProductServiceAddr, got empty")
+	}
+	if cfg.CartServiceAddr == "" {
+		t.Errorf("expected default CartServiceAddr, got empty")
+	}
+	if cfg.OrderServiceAddr == "" {
+		t.Errorf("expected default OrderServiceAddr, got empty")
+	}
+	if !cfg.GraphQLIntrospectionEnabled {
+		t.Errorf("expected default GraphQLIntrospectionEnabled to be true")
+	}
 }
 
 func TestGetEnv(t *testing.T) {

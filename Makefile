@@ -9,6 +9,7 @@ build:
 # Run all tests
 test:
 	go test -v ./pkg/...
+	go test -v ./gateway/api-gateway/...
 
 # Docker compose commands
 docker-up:

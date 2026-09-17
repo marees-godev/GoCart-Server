@@ -8,11 +8,17 @@ import (
 )
 
 type Config struct {
-	App     AppConfig
-	HTTP    HTTPConfig
-	Logger  LoggerConfig
-	Tracing TracingConfig
-	GraphQL GraphQLConfig
+	App                         AppConfig
+	HTTP                        HTTPConfig
+	Services                    ServicesConfig
+	Logger                      LoggerConfig
+	Tracing                     TracingConfig
+	GraphQL                     GraphQLConfig
+	UserServiceAddr             string
+	ProductServiceAddr          string
+	CartServiceAddr             string
+	OrderServiceAddr            string
+	GraphQLIntrospectionEnabled bool
 }
 
 type AppConfig struct {
@@ -23,6 +29,13 @@ type AppConfig struct {
 
 type HTTPConfig struct {
 	Port string
+}
+
+type ServicesConfig struct {
+	UserServiceAddr    string
+	ProductServiceAddr string
+	CartServiceAddr    string
+	OrderServiceAddr   string
 }
 
 type LoggerConfig struct {
@@ -46,6 +59,12 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
+	userServiceAddr := GetEnv("USER_SERVICE_ADDR", "localhost:5050")
+	productServiceAddr := GetEnv("PRODUCT_SERVICE_ADDR", "localhost:7070")
+	cartServiceAddr := GetEnv("CART_SERVICE_ADDR", "localhost:8181")
+	orderServiceAddr := GetEnv("ORDER_SERVICE_ADDR", "localhost:8500")
+	introEnabled := GetEnvAsBool("GRAPHQL_INTROSPECTION_ENABLED", GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true))
+
 	return &Config{
 		App: AppConfig{
 			Name:        GetEnv("APP_NAME", "api-gateway"),
@@ -54,6 +73,12 @@ func LoadEnv() *Config {
 		},
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "8080"),
+		},
+		Services: ServicesConfig{
+			UserServiceAddr:    userServiceAddr,
+			ProductServiceAddr: productServiceAddr,
+			CartServiceAddr:    cartServiceAddr,
+			OrderServiceAddr:   orderServiceAddr,
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),
@@ -67,6 +92,11 @@ func LoadEnv() *Config {
 		GraphQL: GraphQLConfig{
 			PlaygroundEnabled: GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true),
 		},
+		UserServiceAddr:             userServiceAddr,
+		ProductServiceAddr:          productServiceAddr,
+		CartServiceAddr:             cartServiceAddr,
+		OrderServiceAddr:            orderServiceAddr,
+		GraphQLIntrospectionEnabled: introEnabled,
 	}
 }
 
