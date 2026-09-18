@@ -14,6 +14,7 @@ type Config struct {
 	Logger                      LoggerConfig
 	Tracing                     TracingConfig
 	GraphQL                     GraphQLConfig
+	JWT                         JWTConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -51,6 +52,11 @@ type TracingConfig struct {
 
 type GraphQLConfig struct {
 	PlaygroundEnabled bool
+}
+
+type JWTConfig struct {
+	Secret string
+	Issuer string
 }
 
 func LoadEnv() *Config {
@@ -91,6 +97,10 @@ func LoadEnv() *Config {
 		},
 		GraphQL: GraphQLConfig{
 			PlaygroundEnabled: GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true),
+		},
+		JWT: JWTConfig{
+			Secret: GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
+			Issuer: GetEnv("JWT_ISSUER", "gocart-api-gateway"),
 		},
 		UserServiceAddr:             userServiceAddr,
 		ProductServiceAddr:          productServiceAddr,

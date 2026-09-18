@@ -1,3 +1,11 @@
+enum Role {
+  ADMIN
+  MERCHANT
+  CUSTOMER
+}
+
+directive @auth(requires: [Role!]) on FIELD_DEFINITION | OBJECT
+
 type User {
   id: ID!
   email: String!
@@ -27,8 +35,8 @@ input RegisterInput {
 type Query {
   health: String!
   version: String!
-  me: User
-  user(id: ID!): User
+  me: User @auth
+  user(id: ID!): User @auth(requires: [ADMIN])
 }
 
 type Mutation {

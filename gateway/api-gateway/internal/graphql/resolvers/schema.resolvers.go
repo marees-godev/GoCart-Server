@@ -10,6 +10,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/generated"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
@@ -88,8 +89,15 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	if r.Clients == nil || r.Clients.UserClient == nil {
 		return nil, appErrors.Internal(nil, "user client unavailable")
 	}
-	userId, ok := ctx.Value("userID").(string)
-	if !ok || userId == "" {
+
+	userId := ""
+	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
+		userId = userCtx.UserID
+	} else if legacyID, ok := ctx.Value("userID").(string); ok {
+		userId = legacyID
+	}
+
+	if userId == "" {
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
