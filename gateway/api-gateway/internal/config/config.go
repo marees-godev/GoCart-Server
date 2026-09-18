@@ -17,6 +17,7 @@ type Config struct {
 	GraphQL                     GraphQLConfig
 	GRPC                        GRPCConfig
 	JWT                         JWTConfig
+	RateLimit                   RateLimitConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -80,6 +81,12 @@ type JWTConfig struct {
 	Issuer string
 }
 
+type RateLimitConfig struct {
+	Enabled bool
+	Max     int
+	Window  time.Duration
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("gateway/api-gateway/.env")
@@ -140,6 +147,11 @@ func LoadEnv() *Config {
 		JWT: JWTConfig{
 			Secret: GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
 			Issuer: GetEnv("JWT_ISSUER", "gocart-api-gateway"),
+		},
+		RateLimit: RateLimitConfig{
+			Enabled: GetEnvAsBool("RATE_LIMIT_ENABLED", true),
+			Max:     GetEnvAsInt("RATE_LIMIT_MAX_REQUESTS", 1000),
+			Window:  GetEnvAsDuration("RATE_LIMIT_WINDOW", time.Minute),
 		},
 		UserServiceAddr:             userServiceAddr,
 		ProductServiceAddr:          productServiceAddr,

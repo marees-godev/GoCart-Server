@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	gqlHandler "github.com/99designs/gqlgen/graphql/handler"
@@ -16,6 +17,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	pkgGraphQL "github.com/marees-godev/GoCart-Server/pkg/graphql"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
+	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 )
 
 type contextKey string
@@ -38,16 +41,87 @@ type Handler struct {
 
 func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 	srv := gqlHandler.NewDefaultServer(es)
+
+	srv.AroundOperations(func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
+		oc := graphql.GetOperationContext(ctx)
+		opName := "anonymous"
+		if oc != nil {
+			if oc.OperationName != "" {
+				opName = oc.OperationName
+			} else if oc.Operation != nil && oc.Operation.Name != "" {
+				opName = oc.Operation.Name
+			}
+		}
+
+		start := time.Now()
+		resHandler := next(ctx)
+		duration := time.Since(start)
+
+		var userID, role string
+		if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
+			userID = userCtx.UserID
+			role = userCtx.Role
+		} else {
+			if uID, ok := ctx.Value(userIDKey).(string); ok {
+				userID = uID
+			}
+			if r, ok := ctx.Value(userRoleKey).(string); ok {
+				role = r
+			}
+		}
+
+		reqID := middleware.GetRequestID(ctx)
+
+		logger.FromContext(ctx).Info("GraphQL operation completed",
+			"operation_name", opName,
+			"request_id", reqID,
+			"user_id", userID,
+			"role", role,
+			"duration", duration.String(),
+			"duration_ms", float64(duration.Microseconds())/1000.0,
+		)
+
+		return resHandler
+	})
+
 	srv.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
 		err := graphql.DefaultErrorPresenter(ctx, e)
 		appErr := appErrors.AsAppError(e)
+		errorCode := "INTERNAL_SERVER_ERROR"
 		if appErr != nil {
 			if err.Extensions == nil {
 				err.Extensions = make(map[string]interface{})
 			}
 			err.Extensions["code"] = appErr.Code
 			err.Message = appErr.ClientMessage()
+			errorCode = appErr.Code
 		}
+
+		oc := graphql.GetOperationContext(ctx)
+		opName := "anonymous"
+		if oc != nil {
+			if oc.OperationName != "" {
+				opName = oc.OperationName
+			} else if oc.Operation != nil && oc.Operation.Name != "" {
+				opName = oc.Operation.Name
+			}
+		}
+
+		var userID, role string
+		if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
+			userID = userCtx.UserID
+			role = userCtx.Role
+		}
+
+		logger.FromContext(ctx).Warn("GraphQL operation error",
+			"operation_name", opName,
+			"error_code", errorCode,
+			"request_id", middleware.GetRequestID(ctx),
+			"user_id", userID,
+			"role", role,
+			"error", e.Error(),
+		)
+
 		return err
 	})
 

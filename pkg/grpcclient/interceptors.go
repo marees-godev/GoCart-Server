@@ -2,15 +2,18 @@ package grpcclient
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type contextKey string
@@ -105,17 +108,76 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 		err := invoker(outCtx, method, req, reply, cc, opts...)
 		duration := time.Since(start)
 
+		st, _ := status.FromError(err)
+		grpcStatus := st.Code().String()
+		downstreamService := extractServiceName(cc.Target(), method)
+
+		var userID, role string
+		if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+			userID = u.UserID
+			role = u.Role
+		} else {
+			userID = GetUserID(ctx)
+			role = GetUserRole(ctx)
+		}
+
 		if err != nil {
+			var errorCode string
+			if appErr := errors.AsAppError(err); appErr != nil {
+				errorCode = appErr.Code
+			} else {
+				errorCode = grpcStatus
+			}
+
 			logger.FromContext(ctx).Warn("Service-to-service gRPC call failed",
 				"method", method,
+				"downstream_service", downstreamService,
 				"target", cc.Target(),
+				"grpc_status", grpcStatus,
+				"error_code", errorCode,
+				"request_id", reqID,
+				"user_id", userID,
+				"role", role,
 				"duration", duration.String(),
+				"duration_ms", float64(duration.Microseconds())/1000.0,
 				"error", err,
+			)
+		} else {
+			logger.FromContext(ctx).Debug("Service-to-service gRPC call succeeded",
+				"method", method,
+				"downstream_service", downstreamService,
+				"target", cc.Target(),
+				"grpc_status", grpcStatus,
+				"request_id", reqID,
+				"user_id", userID,
+				"role", role,
+				"duration", duration.String(),
+				"duration_ms", float64(duration.Microseconds())/1000.0,
 			)
 		}
 
 		return err
 	}
+}
+
+func extractServiceName(target, method string) string {
+	if method != "" {
+		parts := strings.Split(strings.TrimPrefix(method, "/"), "/")
+		if len(parts) > 0 {
+			pkgParts := strings.Split(parts[0], ".")
+			if len(pkgParts) > 0 {
+				svc := pkgParts[len(pkgParts)-1]
+				if svc != "" {
+					return strings.ToLower(svc)
+				}
+			}
+		}
+	}
+	if target != "" {
+		parts := strings.Split(target, ":")
+		return parts[0]
+	}
+	return "downstream-service"
 }
 
 // UnaryServerInterceptor extracts propagated request metadata and initializes context for downstream services.

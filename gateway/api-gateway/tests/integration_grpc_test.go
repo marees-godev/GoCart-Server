@@ -24,6 +24,7 @@ import (
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -435,5 +436,80 @@ func TestE2E_DownstreamFailureHandlingAndErrorTranslation(t *testing.T) {
 					tt.expectedCode, code, gqlResp.Errors[0].Message)
 			}
 		})
+	}
+}
+
+func TestE2E_GatewayRateLimiting(t *testing.T) {
+	backend := newMockCartBackend()
+	lis := bufconn.Listen(1024 * 1024)
+	grpcServer := grpc.NewServer()
+	cartpb.RegisterCartServiceServer(grpcServer, backend)
+
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+	defer func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}()
+
+	cfg := &config.Config{
+		App: config.AppConfig{
+			Name: "api-gateway",
+		},
+		GRPC: config.GRPCConfig{
+			CartServiceAddr: "passthrough://bufnet",
+			DefaultTimeout:  2 * time.Second,
+		},
+		RateLimit: config.RateLimitConfig{
+			Enabled: true,
+			Max:     2,
+			Window:  500 * time.Millisecond,
+		},
+	}
+
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
+
+	rateLimiter := middleware.NewRateLimiter(middleware.RateLimiterConfig{
+		MaxRequests: cfg.RateLimit.Max,
+		Window:      cfg.RateLimit.Window,
+		KeyFunc: func(r *http.Request) string {
+			return r.Header.Get("X-Forwarded-For")
+		},
+	})
+	app.Use(adaptor.HTTPMiddleware(rateLimiter.Middleware))
+
+	app.Get("/test-rate-limit", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusOK)
+	})
+
+	// First 2 requests within window succeed
+	for i := 1; i <= 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/test-rate-limit", nil)
+		req.Header.Set("X-Forwarded-For", "192.168.1.100")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("request %d: expected 200, got %d", i, resp.StatusCode)
+		}
+	}
+
+	// 3rd request exceeds limit -> 429
+	req := httptest.NewRequest(http.MethodGet, "/test-rate-limit", nil)
+	req.Header.Set("X-Forwarded-For", "192.168.1.100")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("3rd request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("expected 429 Too Many Requests, got %d", resp.StatusCode)
+	}
+
+	if resp.Header.Get("Retry-After") == "" {
+		t.Errorf("expected Retry-After header to be set on rate limited response")
 	}
 }
