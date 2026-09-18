@@ -1,339 +1,44 @@
 # ==============================================================================
-# GoCart Monorepo - Render Infrastructure Blueprint
+# GoCart Monorepo - Single-Service Render Infrastructure Blueprint
+# Runs all 14 microservices and API Gateway inside 1 Free Web Service via Supervisord
 # ==============================================================================
 # Docs: https://render.com/docs/blueprint-spec
 
 services:
-  # ----------------------------------------------------------------------------
-  # 1. Auth Service
-  # ----------------------------------------------------------------------------
   - type: web
-    name: gocart-auth-service
+    name: gocart-backend
     env: docker
     plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
+    dockerfilePath: Dockerfile
     dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: auth-service
     healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 8080
       - key: APP_NAME
-        value: auth-service
+        value: gocart-backend
       - key: APP_ENV
         value: production
       - key: LOG_LEVEL
         value: info
       - key: LOG_FORMAT
         value: json
+      - key: DB_AUTO_MIGRATE
+        value: "true"
+      # External PostgreSQL Connection URL (Neon / Supabase / etc.)
       - key: DATABASE_URL
         sync: false
+      # External Redis Connection URL / Addr (Upstash / etc.)
+      - key: REDIS_URL
+        sync: false
+      # Security & JWT Configuration
       - key: JWT_SECRET
         generateValue: true
-
-  # ----------------------------------------------------------------------------
-  # 2. User Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-user-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: user-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: user-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 3. Product Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-product-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: product-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: product-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 4. Category Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-category-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: category-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: category-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 5. Cart Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-cart-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: cart-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: cart-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 6. Order Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-order-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: order-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: order-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 7. Payment Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-payment-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: payment-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: payment-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 8. Inventory Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-inventory-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: inventory-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: inventory-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 9. Merchant Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-merchant-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: merchant-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: merchant-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 10. Store Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-store-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: store-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: store-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 11. Delivery Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-delivery-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: delivery-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: delivery-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 12. Notification Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-notification-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: notification-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: notification-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 13. Rating Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-rating-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: rating-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: rating-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-  # ----------------------------------------------------------------------------
-  # 14. Return Service
-  # ----------------------------------------------------------------------------
-  - type: web
-    name: gocart-return-service
-    env: docker
-    plan: free
-    dockerfilePath: infrastructure/docker/Dockerfile.service
-    dockerContext: .
-    dockerBuildArgs:
-      - key: SERVICE_NAME
-        value: return-service
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: 8080
-      - key: APP_NAME
-        value: return-service
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-
-databases:
-  - name: gocart-db
-    databaseName: gocart
-    user: gocart_user
-    plan: free
+      - key: JWT_ISSUER
+        value: gocart-api-gateway
+      # GraphQL settings
+      - key: GRAPHQL_PLAYGROUND_ENABLED
+        value: "true"
+      - key: GRAPHQL_INTROSPECTION_ENABLED
+        value: "true"
+      # Observability
+      - key: TRACING_ENABLED
+        value: "false"
