@@ -13,6 +13,13 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type contextKey string
+
+const (
+	userIDKey   contextKey = "userID"
+	userRoleKey contextKey = "userRole"
+)
+
 const (
 	HeaderRequestID     = "x-request-id"
 	HeaderCorrelationID = "x-correlation-id"
@@ -56,10 +63,10 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 		} else {
 			if uID, ok := ctx.Value(logger.UserIDKey).(string); ok && uID != "" {
 				md.Set(HeaderUserID, uID)
-			} else if uID, ok := ctx.Value("userID").(string); ok && uID != "" {
+			} else if uID, ok := ctx.Value(userIDKey).(string); ok && uID != "" {
 				md.Set(HeaderUserID, uID)
 			}
-			if role, ok := ctx.Value("userRole").(string); ok && role != "" {
+			if role, ok := ctx.Value(userRoleKey).(string); ok && role != "" {
 				md.Set(HeaderUserRole, role)
 			}
 		}
@@ -146,8 +153,8 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 			if userID != "" {
 				ctx = logger.WithUserID(ctx, userID)
-				ctx = context.WithValue(ctx, "userID", userID)
-				ctx = context.WithValue(ctx, "userRole", role)
+				ctx = context.WithValue(ctx, userIDKey, userID)
+				ctx = context.WithValue(ctx, userRoleKey, role)
 				userCtx := &auth.UserContext{
 					UserID: userID,
 					Role:   role,
@@ -180,7 +187,7 @@ func GetUserID(ctx context.Context) string {
 	if id, ok := ctx.Value(logger.UserIDKey).(string); ok && id != "" {
 		return id
 	}
-	if id, ok := ctx.Value("userID").(string); ok && id != "" {
+	if id, ok := ctx.Value(userIDKey).(string); ok && id != "" {
 		return id
 	}
 	return ""
@@ -194,7 +201,7 @@ func GetUserRole(ctx context.Context) string {
 	if u, ok := auth.UserFromContext(ctx); ok && u != nil && u.Role != "" {
 		return u.Role
 	}
-	if role, ok := ctx.Value("userRole").(string); ok && role != "" {
+	if role, ok := ctx.Value(userRoleKey).(string); ok && role != "" {
 		return role
 	}
 	return ""

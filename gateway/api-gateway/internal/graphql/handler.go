@@ -18,6 +18,13 @@ import (
 	pkgGraphQL "github.com/marees-godev/GoCart-Server/pkg/graphql"
 )
 
+type contextKey string
+
+const (
+	userIDKey   contextKey = "userID"
+	userRoleKey contextKey = "userRole"
+)
+
 type GraphQLRequest struct {
 	Query         string                 `json:"query"`
 	OperationName string                 `json:"operationName"`
@@ -61,8 +68,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if authHeader != "" {
 		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
 			ctx = auth.WithUser(ctx, userCtx)
-			ctx = context.WithValue(ctx, "userID", userCtx.UserID)
-			ctx = context.WithValue(ctx, "userRole", userCtx.Role)
+			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
 			r = r.WithContext(ctx)
 		}
 	}
@@ -85,17 +92,17 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 	if authHeader != "" {
 		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
 			ctx = auth.WithUser(ctx, userCtx)
-			ctx = context.WithValue(ctx, "userID", userCtx.UserID)
-			ctx = context.WithValue(ctx, "userRole", userCtx.Role)
+			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
 			c.SetUserContext(ctx)
 		}
 	} else if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
-		ctx = context.WithValue(ctx, "userID", userCtx.UserID)
-		ctx = context.WithValue(ctx, "userRole", userCtx.Role)
+		ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+		ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
 		c.SetUserContext(ctx)
 	} else {
-		if legacyID, ok := ctx.Value("userID").(string); ok && legacyID != "" {
-			legacyRole, _ := ctx.Value("userRole").(string)
+		if legacyID, ok := ctx.Value(userIDKey).(string); ok && legacyID != "" {
+			legacyRole, _ := ctx.Value(userRoleKey).(string)
 			userCtx := &auth.UserContext{
 				UserID: legacyID,
 				Role:   legacyRole,
