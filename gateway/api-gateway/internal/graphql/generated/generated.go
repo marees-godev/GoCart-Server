@@ -4193,10 +4193,7 @@ func (ec *executionContext) unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGo
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]model.Role, len(vSlice))
 	for i := range vSlice {
