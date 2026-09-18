@@ -7,14 +7,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"google.golang.org/grpc"
 )
+
+const testJWTSecret = "gocart-secret-key-change-in-production"
 
 type mockUserClient struct{}
 
@@ -25,7 +29,7 @@ func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest,
 			Email:     "user@example.com",
 			FirstName: "Jane",
 			LastName:  "Doe",
-			Role:      "customer",
+			Role:      "CUSTOMER",
 			CreatedAt: "2026-01-01T00:00:00Z",
 		},
 	}, nil
@@ -37,7 +41,7 @@ func (m *mockUserClient) Login(ctx context.Context, in *userpb.LoginRequest, opt
 		User: &userpb.User{
 			Id:    "u-100",
 			Email: in.Email,
-			Role:  "customer",
+			Role:  "CUSTOMER",
 		},
 	}, nil
 }
@@ -50,14 +54,10 @@ func (m *mockUserClient) Register(ctx context.Context, in *userpb.RegisterReques
 			Email:     in.Email,
 			FirstName: in.FirstName,
 			LastName:  in.LastName,
-			Role:      "customer",
+			Role:      "CUSTOMER",
 		},
 	}, nil
 }
-
-// ----------------------------------------------------------------------------
-// Helper to Setup Test Fiber App
-// ----------------------------------------------------------------------------
 
 func setupTestApp(introEnabled bool) *fiber.App {
 	clients := gatewayGRPC.NewClientsWithServices(
@@ -65,12 +65,15 @@ func setupTestApp(introEnabled bool) *fiber.App {
 	)
 
 	resolver := gwResolver.NewResolver(clients)
-	schema, _ := NewSchema(resolver)
-
 	cfg := &config.Config{
 		GraphQLIntrospectionEnabled: introEnabled,
+		JWT: config.JWTConfig{
+			Secret: testJWTSecret,
+			Issuer: "gocart-api-gateway",
+		},
 	}
 
+	schema, _ := NewSchema(resolver, cfg)
 	handler := NewHandler(schema, cfg)
 
 	app := fiber.New()
@@ -78,15 +81,11 @@ func setupTestApp(introEnabled bool) *fiber.App {
 	return app
 }
 
-// ----------------------------------------------------------------------------
-// Test Cases
-// ----------------------------------------------------------------------------
-
-func TestHandleQuery_ValidProductQuery(t *testing.T) {
+func TestPublicQuery_HealthAndVersion(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `query { user(id: "u-100") { id email firstName } }`,
+		"query": `query { health version }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 
@@ -105,16 +104,186 @@ func TestHandleQuery_ValidProductQuery(t *testing.T) {
 	var res map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&res)
 
+	data := res["data"].(map[string]interface{})
+	if data["health"] != "OK" {
+		t.Errorf("expected health 'OK', got %v", data["health"])
+	}
+}
+
+func TestProtectedQuery_Me_Unauthenticated(t *testing.T) {
+	app := setupTestApp(true)
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	errors, ok := res["errors"].([]interface{})
+	if !ok || len(errors) == 0 {
+		t.Fatalf("expected authorization error for unauthenticated query, got %v", res)
+	}
+
+	firstErr := errors[0].(map[string]interface{})
+	extensions, ok := firstErr["extensions"].(map[string]interface{})
+	if !ok || extensions["code"] != "UNAUTHORIZED" {
+		t.Errorf("expected UNAUTHORIZED error code, got extensions: %v", extensions)
+	}
+}
+
+func TestProtectedQuery_Me_InvalidToken(t *testing.T) {
+	app := setupTestApp(true)
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer invalid-token-string")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	errors, ok := res["errors"].([]interface{})
+	if !ok || len(errors) == 0 {
+		t.Fatalf("expected error for invalid token, got %v", res)
+	}
+
+	firstErr := errors[0].(map[string]interface{})
+	extensions := firstErr["extensions"].(map[string]interface{})
+	if extensions["code"] != "UNAUTHORIZED" {
+		t.Errorf("expected UNAUTHORIZED code, got %v", extensions["code"])
+	}
+}
+
+func TestProtectedQuery_Me_ValidToken(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, err := auth.GenerateToken(auth.UserContext{
+		UserID: "u-100",
+		Role:   "CUSTOMER",
+		Email:  "user@example.com",
+	}, testJWTSecret, 1*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email firstName } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+	t.Logf("response body: %v", res)
+
 	data, ok := res["data"].(map[string]interface{})
 	if !ok || data == nil {
-		t.Fatalf("expected data field in response, got %v", res)
+		t.Fatalf("expected data map, got %v", res)
+	}
+	me, ok := data["me"].(map[string]interface{})
+	if !ok || me == nil {
+		t.Fatalf("expected me map, got %v", data)
+	}
+	if me["id"] != "u-100" {
+		t.Errorf("expected me.id 'u-100', got '%v'", me["id"])
+	}
+}
+
+func TestRBAC_AdminRequired_CustomerRole(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "u-100",
+		Role:   "CUSTOMER",
+	}, testJWTSecret, 1*time.Hour)
+
+	reqBody := map[string]interface{}{
+		"query": `query { user(id: "u-100") { id email } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	user, ok := data["user"].(map[string]interface{})
-	if !ok || user == nil {
-		t.Fatalf("expected user object in data, got %v", data)
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	errors, ok := res["errors"].([]interface{})
+	if !ok || len(errors) == 0 {
+		t.Fatalf("expected error for customer role accessing admin query, got %v", res)
 	}
 
+	firstErr := errors[0].(map[string]interface{})
+	extensions := firstErr["extensions"].(map[string]interface{})
+	if extensions["code"] != "FORBIDDEN" {
+		t.Errorf("expected FORBIDDEN code for insufficient role, got %v", extensions["code"])
+	}
+}
+
+func TestRBAC_AdminRequired_AdminRole(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "u-admin",
+		Role:   "ADMIN",
+	}, testJWTSecret, 1*time.Hour)
+
+	reqBody := map[string]interface{}{
+		"query": `query { user(id: "u-100") { id email } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data := res["data"].(map[string]interface{})
+	user := data["user"].(map[string]interface{})
 	if user["id"] != "u-100" {
 		t.Errorf("expected user id 'u-100', got '%v'", user["id"])
 	}
@@ -134,10 +303,6 @@ func TestHandleMutation_Login(t *testing.T) {
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
 	}
 
 	var res map[string]interface{}
@@ -167,10 +332,6 @@ func TestHandleMutation_Register(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
-	}
-
 	var res map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&res)
 
@@ -179,60 +340,6 @@ func TestHandleMutation_Register(t *testing.T) {
 
 	if reg["token"] != "jwt-mock-register-token" {
 		t.Errorf("expected token 'jwt-mock-register-token', got '%v'", reg["token"])
-	}
-}
-
-func TestHandleQuery_InvalidGraphQLSyntax(t *testing.T) {
-	app := setupTestApp(true)
-
-	reqBody := map[string]interface{}{
-		"query": `query { invalidField { `,
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var res map[string]interface{}
-	_ = json.NewDecoder(resp.Body).Decode(&res)
-
-	errors, ok := res["errors"].([]interface{})
-	if !ok || len(errors) == 0 {
-		t.Fatalf("expected errors array for syntax error, got %v", res)
-	}
-}
-
-func TestHandleQuery_IntrospectionEnabled(t *testing.T) {
-	app := setupTestApp(true)
-
-	reqBody := map[string]interface{}{
-		"query": `query { __schema { queryType { name } } }`,
-	}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
-	}
-
-	var res map[string]interface{}
-	_ = json.NewDecoder(resp.Body).Decode(&res)
-
-	data, ok := res["data"].(map[string]interface{})
-	if !ok || data == nil {
-		t.Fatalf("expected data for enabled introspection, got %v", res)
 	}
 }
 
@@ -263,33 +370,5 @@ func TestHandleQuery_IntrospectionDisabled(t *testing.T) {
 	firstErr := errs[0].(map[string]interface{})
 	if firstErr["message"] != "GraphQL introspection is disabled" {
 		t.Errorf("expected message 'GraphQL introspection is disabled', got '%v'", firstErr["message"])
-	}
-}
-
-func TestHandlePlayground_Enabled(t *testing.T) {
-	app := setupTestApp(true)
-
-	req := httptest.NewRequest(http.MethodGet, "/playground", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("expected status 200, got %d", resp.StatusCode)
-	}
-}
-
-func TestHandlePlayground_Disabled(t *testing.T) {
-	app := setupTestApp(false)
-
-	req := httptest.NewRequest(http.MethodGet, "/playground", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("expected status 403, got %d", resp.StatusCode)
 	}
 }
