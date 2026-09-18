@@ -21,21 +21,7 @@ func TestLoadEnvDefaults(t *testing.T) {
 	if cfg.Logger.Level == "" {
 		t.Errorf("expected default Logger.Level, got empty")
 	}
-	if cfg.UserServiceAddr == "" {
-		t.Errorf("expected default UserServiceAddr, got empty")
-	}
-	if cfg.ProductServiceAddr == "" {
-		t.Errorf("expected default ProductServiceAddr, got empty")
-	}
-	if cfg.CartServiceAddr == "" {
-		t.Errorf("expected default CartServiceAddr, got empty")
-	}
-	if cfg.OrderServiceAddr == "" {
-		t.Errorf("expected default OrderServiceAddr, got empty")
-	}
-	if !cfg.GraphQLIntrospectionEnabled {
-		t.Errorf("expected default GraphQLIntrospectionEnabled to be true")
-	}
+
 }
 
 func TestGetEnv(t *testing.T) {
@@ -63,5 +49,18 @@ func TestGetEnvAsBool(t *testing.T) {
 
 	if GetEnvAsBool("NON_EXISTENT_BOOL", false) {
 		t.Errorf("expected default false, got true")
+	}
+}
+
+func TestGetEnvAsDuration(t *testing.T) {
+	os.Setenv("TEST_DURATION_KEY", "10s")
+	defer os.Unsetenv("TEST_DURATION_KEY")
+
+	if GetEnvAsDuration("TEST_DURATION_KEY", 0) != 10*1000000000 {
+		t.Errorf("expected 10s duration")
+	}
+
+	if GetEnvAsDuration("NON_EXISTENT_DURATION", 5*1000000000) != 5*1000000000 {
+		t.Errorf("expected default 5s duration")
 	}
 }

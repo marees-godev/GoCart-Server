@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
@@ -69,7 +70,15 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	// 5. Initialize gRPC clients and GraphQL server
+	// 5. Initialize gRPC client manager
+	clientMgr, err := client.NewClientManager(cfg)
+	if err != nil {
+		log.Error("Failed to initialize gRPC client manager", "error", err)
+		os.Exit(1)
+	}
+	defer clientMgr.Close()
+
+	// 6. Initialize gRPC clients and GraphQL server
 	grpcClients, err := gatewayGRPC.NewClients(cfg)
 	if err != nil {
 		log.Warn("Failed to initialize gRPC clients", "error", err)

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package gocart.merchant.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant;merchant";
+
+service MerchantService {
+  rpc GetMerchant (GetMerchantRequest) returns (GetMerchantResponse);
+  rpc CreateMerchant (CreateMerchantRequest) returns (CreateMerchantResponse);
+  rpc UpdateMerchantStatus (UpdateMerchantStatusRequest) returns (UpdateMerchantStatusResponse);
+}
+
+message Merchant {
+  string id = 1;
+  string user_id = 2;
+  string business_name = 3;
+  string status = 4;
+  string tax_id = 5;
+  string created_at = 6;
+}
+
+message GetMerchantRequest {
+  string id = 1;
+}
+
+message GetMerchantResponse {
+  Merchant merchant = 1;
+}
+
+message CreateMerchantRequest {
+  string user_id = 1;
+  string business_name = 2;
+  string tax_id = 3;
+}
+
+message CreateMerchantResponse {
+  Merchant merchant = 1;
+}
+
+message UpdateMerchantStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message UpdateMerchantStatusResponse {
+  Merchant merchant = 1;
+}

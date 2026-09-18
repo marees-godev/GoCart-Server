@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package gocart.store.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/store;store";
+
+service StoreService {
+  rpc GetStore (GetStoreRequest) returns (GetStoreResponse);
+  rpc ListStores (ListStoresRequest) returns (ListStoresResponse);
+  rpc CreateStore (CreateStoreRequest) returns (CreateStoreResponse);
+}
+
+message Store {
+  string id = 1;
+  string merchant_id = 2;
+  string name = 3;
+  string description = 4;
+  bool is_active = 5;
+  string created_at = 6;
+}
+
+message GetStoreRequest {
+  string id = 1;
+}
+
+message GetStoreResponse {
+  Store store = 1;
+}
+
+message ListStoresRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  string merchant_id = 3;
+}
+
+message ListStoresResponse {
+  repeated Store stores = 1;
+  int32 total = 2;
+}
+
+message CreateStoreRequest {
+  string merchant_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message CreateStoreResponse {
+  Store store = 1;
+}

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package gocart.category.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/category;category";
+
+service CategoryService {
+  rpc GetCategory (GetCategoryRequest) returns (GetCategoryResponse);
+  rpc ListCategories (ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc CreateCategory (CreateCategoryRequest) returns (CreateCategoryResponse);
+}
+
+message Category {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  string parent_id = 4;
+  string description = 5;
+  string created_at = 6;
+}
+
+message GetCategoryRequest {
+  string id = 1;
+}
+
+message GetCategoryResponse {
+  Category category = 1;
+}
+
+message ListCategoriesRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+  int32 total = 2;
+}
+
+message CreateCategoryRequest {
+  string name = 1;
+  string slug = 2;
+  string parent_id = 3;
+  string description = 4;
+}
+
+message CreateCategoryResponse {
+  Category category = 1;
+}

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package gocart.delivery.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery;delivery";
+
+service DeliveryService {
+  rpc CreateDelivery (CreateDeliveryRequest) returns (CreateDeliveryResponse);
+  rpc GetDelivery (GetDeliveryRequest) returns (GetDeliveryResponse);
+  rpc UpdateDeliveryStatus (UpdateDeliveryStatusRequest) returns (UpdateDeliveryStatusResponse);
+}
+
+message Delivery {
+  string id = 1;
+  string order_id = 2;
+  string tracking_number = 3;
+  string courier_name = 4;
+  string status = 5;
+  string estimated_delivery_at = 6;
+  string delivered_at = 7;
+}
+
+message CreateDeliveryRequest {
+  string order_id = 1;
+  string courier_name = 2;
+  string shipping_address = 3;
+}
+
+message CreateDeliveryResponse {
+  Delivery delivery = 1;
+}
+
+message GetDeliveryRequest {
+  string id = 1;
+}
+
+message GetDeliveryResponse {
+  Delivery delivery = 1;
+}
+
+message UpdateDeliveryStatusRequest {
+  string id = 1;
+  string status = 2;
+  string location = 3;
+}
+
+message UpdateDeliveryStatusResponse {
+  Delivery delivery = 1;
+}
