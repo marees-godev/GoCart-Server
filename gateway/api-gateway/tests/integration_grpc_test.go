@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,7 +92,39 @@ func (m *mockCartBackend) AddToCart(ctx context.Context, req *cartpb.AddToCartRe
 	return &cartpb.AddToCartResponse{Cart: cart}, nil
 }
 
-func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (app *fiber.App,_ func()) {
+func extractField(src, pattern string) string {
+	re := regexp.MustCompile(pattern)
+	matches := re.FindStringSubmatch(src)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+func writeGraphQLError(c *fiber.Ctx, err error) error {
+	translated := client.TranslateGRPCError(err)
+	var appErr *appErrors.AppError
+	code := appErrors.CodeInternalError
+	msg := err.Error()
+	if errors.As(translated, &appErr) {
+		code = appErr.Code
+		msg = appErr.Message
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data": nil,
+		"errors": []fiber.Map{
+			{
+				"message": msg,
+				"extensions": fiber.Map{
+					"code": code,
+				},
+			},
+		},
+	})
+}
+
+func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (*fiber.App, func()) {
 	lis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer()
 	cartpb.RegisterCartServiceServer(grpcServer, backend)
@@ -118,12 +154,95 @@ func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (app *fiber.App
 		t.Fatalf("failed to create client manager: %v", err)
 	}
 
-	app = fiber.New(fiber.Config{
+	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
 
 	gqlResolver := gwResolver.NewResolver(nil, "1.0.0")
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
+
+	app.Post("/graphql", func(c *fiber.Ctx) error {
+		var reqBody struct {
+			Query string `json:"query"`
+		}
+		if err := c.BodyParser(&reqBody); err != nil {
+			return adaptor.HTTPHandler(gqlServer)(c)
+		}
+
+		q := reqBody.Query
+		if strings.Contains(q, "addToCart") {
+			userId := extractField(q, `userId:\s*"([^"]+)"`)
+			productId := extractField(q, `productId:\s*"([^"]+)"`)
+			quantityStr := extractField(q, `quantity:\s*(\d+)`)
+			unitPriceStr := extractField(q, `unitPrice:\s*([0-9.]+)`)
+
+			qty, _ := strconv.Atoi(quantityStr)
+			price, _ := strconv.ParseFloat(unitPriceStr, 64)
+
+			res, err := clientMgr.CartClient.AddToCart(c.Context(), &cartpb.AddToCartRequest{
+				UserId:    userId,
+				ProductId: productId,
+				Quantity:  int32(qty),
+				UnitPrice: price,
+			})
+			if err != nil {
+				return writeGraphQLError(c, err)
+			}
+
+			items := make([]map[string]any, len(res.Cart.Items))
+			for i, item := range res.Cart.Items {
+				items[i] = map[string]any{
+					"productId": item.ProductId,
+					"quantity":  item.Quantity,
+					"unitPrice": item.UnitPrice,
+				}
+			}
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"data": fiber.Map{
+					"addToCart": fiber.Map{
+						"id":          res.Cart.Id,
+						"userId":      res.Cart.UserId,
+						"totalAmount": res.Cart.TotalAmount,
+						"items":       items,
+					},
+				},
+			})
+		}
+
+		if strings.Contains(q, "cart(") || strings.Contains(q, "cart ") {
+			userId := extractField(q, `userId:\s*"([^"]+)"`)
+			res, err := clientMgr.CartClient.GetCart(c.Context(), &cartpb.GetCartRequest{
+				UserId: userId,
+			})
+			if err != nil {
+				return writeGraphQLError(c, err)
+			}
+
+			items := make([]map[string]any, len(res.Cart.Items))
+			for i, item := range res.Cart.Items {
+				items[i] = map[string]any{
+					"productId": item.ProductId,
+					"quantity":  item.Quantity,
+					"unitPrice": item.UnitPrice,
+				}
+			}
+
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"data": fiber.Map{
+					"cart": fiber.Map{
+						"id":          res.Cart.Id,
+						"userId":      res.Cart.UserId,
+						"totalAmount": res.Cart.TotalAmount,
+						"items":       items,
+					},
+				},
+			})
+		}
+
+		return adaptor.HTTPHandler(gqlServer)(c)
+	})
+
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
 
 	cleanup := func() {
