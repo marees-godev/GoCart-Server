@@ -180,7 +180,7 @@ func TestUpdateUser_Success(t *testing.T) {
 	req := dto.UpdateUserRequest{
 		Email:          &newEmail,
 		FirstName:      &newFirst,
-		Phone:          &newPhone,
+		PhoneNumber:    &newPhone,
 		AlternatePhone: &altPhone,
 		DateOfBirth:    &dob,
 		Gender:         &gender,

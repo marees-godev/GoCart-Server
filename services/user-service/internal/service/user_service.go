@@ -114,7 +114,7 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 		user.LastName = strings.TrimSpace(*req.LastName)
 	}
 
-	if phone := req.GetPhone(); phone != nil {
+	if phone := req.GetPhoneNumber(); phone != nil {
 		user.Phone = phone
 	}
 

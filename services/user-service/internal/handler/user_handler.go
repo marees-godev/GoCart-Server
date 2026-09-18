@@ -16,13 +16,6 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
-func (h *UserHandler) RegisterRoutes(router fiber.Router) {
-	users := router.Group("/api/v1/users")
-	users.Get("/me", h.GetMyProfile)
-	users.Get("/:id", h.GetUserByID)
-	users.Put("/:id", h.UpdateProfile)
-}
-
 func getAuthUserID(c *fiber.Ctx) string {
 	if user, ok := auth.UserFromContext(c.UserContext()); ok && user != nil {
 		return user.UserID

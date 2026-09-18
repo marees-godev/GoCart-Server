@@ -20,7 +20,6 @@ type UpdateUserRequest struct {
 	EmailAddress   *string `json:"email_address,omitempty"`
 	FirstName      *string `json:"first_name,omitempty"`
 	LastName       *string `json:"last_name,omitempty"`
-	Phone          *string `json:"phone,omitempty"`
 	PhoneNumber    *string `json:"phone_number,omitempty"`
 	AlternatePhone *string `json:"alternate_phone,omitempty"`
 	DateOfBirth    *string `json:"date_of_birth,omitempty"`
@@ -37,11 +36,11 @@ func (r *UpdateUserRequest) GetEmail() *string {
 	return r.Email
 }
 
-func (r *UpdateUserRequest) GetPhone() *string {
+func (r *UpdateUserRequest) GetPhoneNumber() *string {
 	if r.PhoneNumber != nil && *r.PhoneNumber != "" {
 		return r.PhoneNumber
 	}
-	return r.Phone
+	return r.PhoneNumber
 }
 
 func (r *UpdateUserRequest) GetBio() *string {
@@ -67,7 +66,7 @@ func (r *UpdateUserRequest) Validate() error {
 		}
 	}
 
-	phone := r.GetPhone()
+	phone := r.GetPhoneNumber()
 	if phone != nil {
 		trimmed := strings.TrimSpace(*phone)
 		if trimmed != "" && !phoneRegex.MatchString(trimmed) {
