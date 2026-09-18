@@ -118,6 +118,10 @@ func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (app *fiber.App
 		t.Fatalf("failed to create client manager: %v", err)
 	}
 
+	app = fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
+
 	gqlResolver := gwResolver.NewResolver(nil, "1.0.0")
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))
