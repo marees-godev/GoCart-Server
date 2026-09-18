@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package gocart.return.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/return;returns";
+
+service ReturnService {
+  rpc RequestReturn (RequestReturnRequest) returns (RequestReturnResponse);
+  rpc GetReturn (GetReturnRequest) returns (GetReturnResponse);
+  rpc UpdateReturnStatus (UpdateReturnStatusRequest) returns (UpdateReturnStatusResponse);
+}
+
+message ReturnOrder {
+  string id = 1;
+  string order_id = 2;
+  string user_id = 3;
+  string reason = 4;
+  string status = 5;
+  double refund_amount = 6;
+  string created_at = 7;
+}
+
+message RequestReturnRequest {
+  string order_id = 1;
+  string user_id = 2;
+  string reason = 3;
+  repeated string item_ids = 4;
+}
+
+message RequestReturnResponse {
+  ReturnOrder return_order = 1;
+}
+
+message GetReturnRequest {
+  string id = 1;
+}
+
+message GetReturnResponse {
+  ReturnOrder return_order = 1;
+}
+
+message UpdateReturnStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message UpdateReturnStatusResponse {
+  ReturnOrder return_order = 1;
+}

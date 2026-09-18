@@ -1,0 +1,20 @@
+go 1.25.0
+
+use (
+	.
+	./gateway/api-gateway
+	./services/auth-service
+	./services/cart-service
+	./services/category-service
+	./services/delivery-service
+	./services/inventory-service
+	./services/merchant-service
+	./services/notification-service
+	./services/order-service
+	./services/payment-service
+	./services/product-service
+	./services/rating-service
+	./services/return-service
+	./services/store-service
+	./services/user-service
+)

@@ -1,0 +1,74 @@
+name: Manual Service Deployment to Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Microservice to deploy'
+        required: true
+        type: choice
+        options:
+          - api-gateway
+          - auth-service
+          - cart-service
+          - category-service
+          - delivery-service
+          - inventory-service
+          - merchant-service
+          - notification-service
+          - order-service
+          - payment-service
+          - product-service
+          - rating-service
+          - return-service
+          - store-service
+          - user-service
+      environment:
+        description: 'Target Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    name: Trigger Render Deploy (${{ inputs.service }} -> ${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          SERVICE_NAME: ${{ inputs.service }}
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          SERVICE_KEY=$(echo "$SERVICE_NAME" | tr '-' '_' | tr '[:lower:]' '[:upper:]')
+          
+          if [ "$TARGET_ENV" = "production" ]; then
+            HOOK_VAR_NAME="RENDER_${SERVICE_KEY}_PROD_HOOK"
+            FALLBACK_HOOK="${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+          else
+            HOOK_VAR_NAME="RENDER_${SERVICE_KEY}_STAGING_HOOK"
+            FALLBACK_HOOK="${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+          fi
+          
+          HOOK_URL="${!HOOK_VAR_NAME}"
+          if [ -z "$HOOK_URL" ]; then
+            HOOK_URL="$FALLBACK_HOOK"
+          fi
+
+          if [ -n "$HOOK_URL" ]; then
+            echo "Triggering Render $TARGET_ENV deployment for $SERVICE_NAME..."
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$HOOK_URL")
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+              echo "Deployment triggered successfully for $SERVICE_NAME (HTTP $HTTP_STATUS)"
+            else
+              echo "Render deploy hook returned error status: $HTTP_STATUS"
+              exit 1
+            fi
+          else
+            echo "Error: No Render deploy hook secret found for $SERVICE_NAME in $TARGET_ENV!"
+            exit 1
+          fi
+
