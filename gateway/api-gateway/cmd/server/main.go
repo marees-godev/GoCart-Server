@@ -65,6 +65,14 @@ func main() {
 	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
 	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
+	if cfg.RateLimit.Enabled {
+		rateLimiter := middleware.NewRateLimiter(middleware.RateLimiterConfig{
+			MaxRequests: cfg.RateLimit.Max,
+			Window:      cfg.RateLimit.Window,
+		})
+		app.Use(adaptor.HTTPMiddleware(rateLimiter.Middleware))
+	}
+
 	// 4. Register Health and Readiness endpoints
 	healthHandler := health.NewHandler(cfg.App.Name)
 	healthHandler.Register(app)

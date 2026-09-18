@@ -15,6 +15,7 @@ const (
 	CodeUnprocessableEntity = "UNPROCESSABLE_ENTITY"
 	CodeInternalError       = "INTERNAL_SERVER_ERROR"
 	CodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
+	CodeTooManyRequests     = "TOO_MANY_REQUESTS"
 )
 
 type ErrorDetail struct {
@@ -140,6 +141,13 @@ func ServiceUnavailable(message string) *AppError {
 		message = "Service temporarily unavailable"
 	}
 	return New(CodeServiceUnavailable, message, http.StatusServiceUnavailable)
+}
+
+func TooManyRequests(message string) *AppError {
+	if message == "" {
+		message = "Too many requests"
+	}
+	return New(CodeTooManyRequests, message, http.StatusTooManyRequests)
 }
 
 func AsAppError(err error) *AppError {

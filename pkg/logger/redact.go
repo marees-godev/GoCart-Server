@@ -10,10 +10,13 @@ var sensitiveKeys = map[string]struct{}{
 	"password_hash":      {},
 	"old_password":       {},
 	"new_password":       {},
+	"pass":               {},
 	"token":              {},
 	"access_token":       {},
 	"refresh_token":      {},
 	"token_hash":         {},
+	"jwt":                {},
+	"id_token":           {},
 	"secret":             {},
 	"client_secret":      {},
 	"api_key":            {},
@@ -21,6 +24,8 @@ var sensitiveKeys = map[string]struct{}{
 	"auth_header":        {},
 	"credit_card":        {},
 	"card_number":        {},
+	"card_exp":           {},
+	"card_expiry":        {},
 	"cvv":                {},
 	"cvc":                {},
 	"pin":                {},
@@ -74,5 +79,11 @@ func isSensitiveKey(key string) bool {
 
 func isSensitiveValue(val string) bool {
 	lowerVal := strings.ToLower(val)
-	return strings.HasPrefix(lowerVal, "bearer ")
+	if strings.HasPrefix(lowerVal, "bearer ") {
+		return true
+	}
+	if strings.HasPrefix(lowerVal, "eyj") && strings.Count(val, ".") == 2 {
+		return true
+	}
+	return false
 }

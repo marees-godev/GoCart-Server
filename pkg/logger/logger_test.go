@@ -69,17 +69,27 @@ func TestRedactSensitiveKeys(t *testing.T) {
 	}{
 		{"password", "my-secret-pass", "[REDACTED]"},
 		{"password_hash", "$2a$12$...", "[REDACTED]"},
+		{"new_password", "new-secret-123", "[REDACTED]"},
 		{"access_token", "jwt.token.here", "[REDACTED]"},
+		{"refresh_token", "refresh-token-xyz", "[REDACTED]"},
+		{"jwt", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.doNotLeakThisSignature", "[REDACTED]"},
 		{"credit_card", "4111222233334444", "[REDACTED]"},
+		{"card_number", "4111222233334444", "[REDACTED]"},
 		{"cvv", "123", "[REDACTED]"},
+		{"cvc", "999", "[REDACTED]"},
+		{"pin", "1234", "[REDACTED]"},
+		{"payment_credential", "secret-payment-payload", "[REDACTED]"},
+		{"raw_jwt_value", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.doNotLeakThisSignature", "[REDACTED]"},
+		{"bearer_auth_header", "Bearer eyJhbGciOi...", "[REDACTED]"},
 		{"email", "user@test.com", "user@test.com"},
 		{"username", "john_doe", "john_doe"},
+		{"request_id", "req-123", "req-123"},
 	}
 
 	for _, tc := range testCases {
 		attr := RedactAttr(nil, slog.String(tc.key, tc.val))
 		if attr.Value.String() != tc.expected {
-			t.Errorf("Key '%s': expected '%s', got '%s'", tc.key, tc.expected, attr.Value.String())
+			t.Errorf("Key '%s' with value '%s': expected '%s', got '%s'", tc.key, tc.val, tc.expected, attr.Value.String())
 		}
 	}
 }
