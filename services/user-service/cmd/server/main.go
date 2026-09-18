@@ -17,6 +17,10 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/router"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/service"
 )
 
 func main() {
@@ -93,6 +97,12 @@ func main() {
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
+
+	userRepo := repository.NewUserRepository(db.Pool)
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.NewUserHandler(userService)
+
+	router.SetupRoutes(app, userHandler)
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
