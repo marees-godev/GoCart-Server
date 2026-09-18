@@ -23,7 +23,7 @@ func setupTestApp() *fiber.App {
 	healthHandler := health.NewHandler("api-gateway")
 	healthHandler.Register(app)
 
-	gqlResolver := gwResolver.NewResolver(nil, "1.0.0")
+	gqlResolver := gwResolver.NewResolver(nil,"1.0.0")
 	gqlServer := gwGraphQL.NewServer(gqlResolver)
 
 	app.All("/graphql", adaptor.HTTPHandler(gqlServer))

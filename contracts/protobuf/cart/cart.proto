@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package gocart.cart.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart;cart";
+
+service CartService {
+  rpc GetCart (GetCartRequest) returns (GetCartResponse);
+  rpc AddToCart (AddToCartRequest) returns (AddToCartResponse);
+  rpc RemoveFromCart (RemoveFromCartRequest) returns (RemoveFromCartResponse);
+  rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
+}
+
+message CartItem {
+  string id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+}
+
+message Cart {
+  string id = 1;
+  string user_id = 2;
+  repeated CartItem items = 3;
+  double total_amount = 4;
+}
+
+message GetCartRequest {
+  string user_id = 1;
+}
+
+message GetCartResponse {
+  Cart cart = 1;
+}
+
+message AddToCartRequest {
+  string user_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+}
+
+message AddToCartResponse {
+  Cart cart = 1;
+}
+
+message RemoveFromCartRequest {
+  string user_id = 1;
+  string product_id = 2;
+}
+
+message RemoveFromCartResponse {
+  Cart cart = 1;
+}
+
+message ClearCartRequest {
+  string user_id = 1;
+}
+
+message ClearCartResponse {
+  bool success = 1;
+}

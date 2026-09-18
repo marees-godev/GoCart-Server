@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package gocart.inventory.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory;inventory";
+
+service InventoryService {
+  rpc GetStock (GetStockRequest) returns (GetStockResponse);
+  rpc ReserveStock (ReserveStockRequest) returns (ReserveStockResponse);
+  rpc ReleaseStock (ReleaseStockRequest) returns (ReleaseStockResponse);
+  rpc UpdateStock (UpdateStockRequest) returns (UpdateStockResponse);
+}
+
+message StockItem {
+  string product_id = 1;
+  int32 available_quantity = 2;
+  int32 reserved_quantity = 3;
+}
+
+message GetStockRequest {
+  string product_id = 1;
+}
+
+message GetStockResponse {
+  StockItem stock = 1;
+}
+
+message ReservationItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message ReserveStockRequest {
+  string order_id = 1;
+  repeated ReservationItem items = 2;
+}
+
+message ReserveStockResponse {
+  string reservation_id = 1;
+  bool success = 2;
+}
+
+message ReleaseStockRequest {
+  string reservation_id = 1;
+}
+
+message ReleaseStockResponse {
+  bool success = 1;
+}
+
+message UpdateStockRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message UpdateStockResponse {
+  StockItem stock = 1;
+}

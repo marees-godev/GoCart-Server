@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -14,6 +15,7 @@ type Config struct {
 	Logger                      LoggerConfig
 	Tracing                     TracingConfig
 	GraphQL                     GraphQLConfig
+	GRPC                        GRPCConfig
 	JWT                         JWTConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
@@ -51,7 +53,26 @@ type TracingConfig struct {
 }
 
 type GraphQLConfig struct {
-	PlaygroundEnabled bool
+	PlaygroundEnabled    bool
+	IntrospectionEnabled bool
+}
+
+type GRPCConfig struct {
+	DefaultTimeout          time.Duration
+	AuthServiceAddr         string
+	UserServiceAddr         string
+	ProductServiceAddr      string
+	CategoryServiceAddr     string
+	StoreServiceAddr        string
+	MerchantServiceAddr     string
+	CartServiceAddr         string
+	InventoryServiceAddr    string
+	OrderServiceAddr        string
+	PaymentServiceAddr      string
+	DeliveryServiceAddr     string
+	ReturnServiceAddr       string
+	RatingServiceAddr       string
+	NotificationServiceAddr string
 }
 
 type JWTConfig struct {
@@ -96,7 +117,25 @@ func LoadEnv() *Config {
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
 		GraphQL: GraphQLConfig{
-			PlaygroundEnabled: GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true),
+			PlaygroundEnabled:    GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true),
+			IntrospectionEnabled: introEnabled,
+		},
+		GRPC: GRPCConfig{
+			DefaultTimeout:          GetEnvAsDuration("GRPC_DEFAULT_TIMEOUT", 5*time.Second),
+			AuthServiceAddr:         GetEnv("AUTH_SERVICE_GRPC_ADDR", "localhost:50051"),
+			UserServiceAddr:         GetEnv("USER_SERVICE_GRPC_ADDR", "localhost:50052"),
+			ProductServiceAddr:      GetEnv("PRODUCT_SERVICE_GRPC_ADDR", "localhost:50053"),
+			CategoryServiceAddr:     GetEnv("CATEGORY_SERVICE_GRPC_ADDR", "localhost:50054"),
+			StoreServiceAddr:        GetEnv("STORE_SERVICE_GRPC_ADDR", "localhost:50055"),
+			MerchantServiceAddr:     GetEnv("MERCHANT_SERVICE_GRPC_ADDR", "localhost:50056"),
+			CartServiceAddr:         GetEnv("CART_SERVICE_GRPC_ADDR", "localhost:50057"),
+			InventoryServiceAddr:    GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
+			OrderServiceAddr:        GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059"),
+			PaymentServiceAddr:      GetEnv("PAYMENT_SERVICE_GRPC_ADDR", "localhost:50060"),
+			DeliveryServiceAddr:     GetEnv("DELIVERY_SERVICE_GRPC_ADDR", "localhost:50061"),
+			ReturnServiceAddr:       GetEnv("RETURN_SERVICE_GRPC_ADDR", "localhost:50062"),
+			RatingServiceAddr:       GetEnv("RATING_SERVICE_GRPC_ADDR", "localhost:50063"),
+			NotificationServiceAddr: GetEnv("NOTIFICATION_SERVICE_GRPC_ADDR", "localhost:50064"),
 		},
 		JWT: JWTConfig{
 			Secret: GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
@@ -139,4 +178,16 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
 }

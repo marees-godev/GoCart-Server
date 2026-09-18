@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package gocart.payment.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment;payment";
+
+service PaymentService {
+  rpc ProcessPayment (ProcessPaymentRequest) returns (ProcessPaymentResponse);
+  rpc GetPayment (GetPaymentRequest) returns (GetPaymentResponse);
+  rpc CreateRefund (CreateRefundRequest) returns (CreateRefundResponse);
+}
+
+message Payment {
+  string id = 1;
+  string order_id = 2;
+  double amount = 3;
+  string currency = 4;
+  string payment_method = 5;
+  string status = 6;
+  string transaction_reference = 7;
+  string created_at = 8;
+}
+
+message ProcessPaymentRequest {
+  string order_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string payment_method = 4;
+}
+
+message ProcessPaymentResponse {
+  Payment payment = 1;
+}
+
+message GetPaymentRequest {
+  string id = 1;
+}
+
+message GetPaymentResponse {
+  Payment payment = 1;
+}
+
+message CreateRefundRequest {
+  string payment_id = 1;
+  double amount = 2;
+  string reason = 3;
+}
+
+message CreateRefundResponse {
+  string refund_id = 1;
+  string status = 2;
+  double amount = 3;
+}

@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package gocart.order.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/order;order";
+
+service OrderService {
+  rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
+  rpc GetOrder (GetOrderRequest) returns (GetOrderResponse);
+  rpc ListOrders (ListOrdersRequest) returns (ListOrdersResponse);
+  rpc UpdateOrderStatus (UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
+}
+
+message OrderItem {
+  string id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+}
+
+message Order {
+  string id = 1;
+  string user_id = 2;
+  string status = 3;
+  repeated OrderItem items = 4;
+  double total_amount = 5;
+  string shipping_address = 6;
+  string created_at = 7;
+}
+
+message CreateOrderRequest {
+  string user_id = 1;
+  string cart_id = 2;
+  string shipping_address = 3;
+}
+
+message CreateOrderResponse {
+  Order order = 1;
+}
+
+message GetOrderRequest {
+  string id = 1;
+}
+
+message GetOrderResponse {
+  Order order = 1;
+}
+
+message ListOrdersRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+  int32 total = 2;
+}
+
+message UpdateOrderStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message UpdateOrderStatusResponse {
+  Order order = 1;
+}

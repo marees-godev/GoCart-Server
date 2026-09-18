@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package gocart.rating.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating;rating";
+
+service RatingService {
+  rpc AddRating (AddRatingRequest) returns (AddRatingResponse);
+  rpc GetProductRatings (GetProductRatingsRequest) returns (GetProductRatingsResponse);
+}
+
+message Rating {
+  string id = 1;
+  string product_id = 2;
+  string user_id = 3;
+  int32 rating = 4;
+  string comment = 5;
+  string created_at = 6;
+}
+
+message AddRatingRequest {
+  string product_id = 1;
+  string user_id = 2;
+  int32 rating = 3;
+  string comment = 4;
+}
+
+message AddRatingResponse {
+  Rating rating = 1;
+}
+
+message GetProductRatingsRequest {
+  string product_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetProductRatingsResponse {
+  repeated Rating ratings = 1;
+  double average_rating = 2;
+  int32 total = 3;
+}
