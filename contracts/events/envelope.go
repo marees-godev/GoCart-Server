@@ -10,6 +10,7 @@ import (
 
 // Standard Event Type Constants
 const (
+	EventTypeUserRegistered             = "UserRegistered"
 	EventTypeOrderCreated               = "OrderCreated"
 	EventTypePaymentSuccessful          = "PaymentSuccessful"
 	EventTypePaymentFailed              = "PaymentFailed"

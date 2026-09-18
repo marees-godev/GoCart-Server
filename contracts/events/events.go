@@ -61,3 +61,13 @@ type InventoryReservationFailedEvent struct {
 	Reason    string    `json:"reason"`
 	FailedAt  time.Time `json:"failed_at"`
 }
+
+// UserRegisteredEvent represents the payload for UserRegistered domain event.
+type UserRegisteredEvent struct {
+	UserID    string    `json:"user_id"`
+	Email     string    `json:"email"`
+	Phone     string    `json:"phone,omitempty"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+}
+

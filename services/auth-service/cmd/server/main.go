@@ -15,8 +15,12 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
 )
 
 func main() {
@@ -93,6 +97,13 @@ func main() {
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
+
+	// Initialize repositories, services, and handlers
+	outboxStore := outbox.NewStore()
+	authRepo := repository.NewAuthRepository(db, outboxStore)
+	authService := service.NewAuthService(authRepo)
+	authHandler := handler.NewAuthHandler(authService)
+	authHandler.RegisterRoutes(app)
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
