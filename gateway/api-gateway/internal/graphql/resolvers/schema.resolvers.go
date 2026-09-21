@@ -7,6 +7,7 @@ package resolvers
 import (
 	"context"
 
+	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/generated"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
@@ -16,31 +17,55 @@ import (
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
-	if r.Clients == nil || r.Clients.UserClient == nil {
-		return nil, appErrors.Internal(nil, "user client unavailable")
+	if r.Clients == nil {
+		return nil, appErrors.Internal(nil, "clients unavailable")
 	}
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	res, err := r.Clients.UserClient.Login(ctx, &userpb.LoginRequest{
-		Email:    input.Email,
-		Password: input.Password,
-	})
-	if err != nil {
-		return nil, err
+	if r.Clients.AuthClient != nil {
+		res, err := r.Clients.AuthClient.Login(ctx, &authpb.LoginRequest{
+			Email:    input.Email,
+			Password: input.Password,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var user *model.User
+		if res.UserId != "" && r.Clients.UserClient != nil {
+			uRes, _ := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
+			if uRes != nil {
+				user = toModelUser(uRes.User)
+			}
+		}
+		return &model.AuthPayload{
+			Token: res.AccessToken,
+			User:  user,
+		}, nil
 	}
 
-	return &model.AuthPayload{
-		Token: res.Token,
-		User:  toModelUser(res.User),
-	}, nil
+	if r.Clients.UserClient != nil {
+		res, err := r.Clients.UserClient.Login(ctx, &userpb.LoginRequest{
+			Email:    input.Email,
+			Password: input.Password,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &model.AuthPayload{
+			Token: res.Token,
+			User:  toModelUser(res.User),
+		}, nil
+	}
+
+	return nil, appErrors.Internal(nil, "auth client unavailable")
 }
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
-	if r.Clients == nil || r.Clients.UserClient == nil {
-		return nil, appErrors.Internal(nil, "user client unavailable")
+	if r.Clients == nil {
+		return nil, appErrors.Internal(nil, "clients unavailable")
 	}
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
@@ -55,20 +80,46 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		ln = *input.LastName
 	}
 
-	res, err := r.Clients.UserClient.Register(ctx, &userpb.RegisterRequest{
-		Email:     input.Email,
-		Password:  input.Password,
-		FirstName: fn,
-		LastName:  ln,
-	})
-	if err != nil {
-		return nil, err
+	if r.Clients.AuthClient != nil {
+		res, err := r.Clients.AuthClient.Register(ctx, &authpb.RegisterRequest{
+			Email:     input.Email,
+			Password:  input.Password,
+			FirstName: fn,
+			LastName:  ln,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var user *model.User
+		if res.UserId != "" && r.Clients.UserClient != nil {
+			uRes, _ := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
+			if uRes != nil {
+				user = toModelUser(uRes.User)
+			}
+		}
+		return &model.AuthPayload{
+			Token: res.AccessToken,
+			User:  user,
+		}, nil
 	}
 
-	return &model.AuthPayload{
-		Token: res.Token,
-		User:  toModelUser(res.User),
-	}, nil
+	if r.Clients.UserClient != nil {
+		res, err := r.Clients.UserClient.Register(ctx, &userpb.RegisterRequest{
+			Email:     input.Email,
+			Password:  input.Password,
+			FirstName: fn,
+			LastName:  ln,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &model.AuthPayload{
+			Token: res.Token,
+			User:  toModelUser(res.User),
+		}, nil
+	}
+
+	return nil, appErrors.Internal(nil, "auth client unavailable")
 }
 
 // Health is the resolver for the health field.

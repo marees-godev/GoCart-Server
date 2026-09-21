@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -10,6 +11,7 @@ import (
 )
 
 type Clients struct {
+	AuthClient auth.AuthServiceClient
 	UserClient  userpb.UserServiceClient
 	StoreClient store.StoreServiceClient
 	conns       []*grpc.ClientConn
@@ -22,19 +24,31 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 	}
 	opts = append(opts, extraOpts...)
 
+	authAddr := cfg.GRPC.AuthServiceAddr
+	if authAddr == "" {
+		authAddr = "localhost:50051"
+	}
+	authConn, err := grpc.NewClient(authAddr, opts...)
+	if err != nil {
+		return nil, err
+	}
+
 	userConn, err := grpc.NewClient(cfg.UserServiceAddr, opts...)
 	if err != nil {
+		authConn.Close()
 		return nil, err
 	}
 
 	productConn, err := grpc.NewClient(cfg.ProductServiceAddr, opts...)
 	if err != nil {
+		authConn.Close()
 		userConn.Close()
 		return nil, err
 	}
 
 	cartConn, err := grpc.NewClient(cfg.CartServiceAddr, opts...)
 	if err != nil {
+		authConn.Close()
 		userConn.Close()
 		productConn.Close()
 		return nil, err
@@ -42,6 +56,7 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 
 	orderConn, err := grpc.NewClient(cfg.OrderServiceAddr, opts...)
 	if err != nil {
+		authConn.Close()
 		userConn.Close()
 		productConn.Close()
 		cartConn.Close()
@@ -58,10 +73,11 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 	}
 
 	return &Clients{
+		AuthClient: auth.NewAuthServiceClient(authConn),
 		UserClient:  userpb.NewUserServiceClient(userConn),
 		StoreClient: store.NewStoreServiceClient(storeConn),
 		conns: []*grpc.ClientConn{
-			userConn, productConn, cartConn, orderConn, storeConn,
+			authConn, userConn, productConn, cartConn, orderConn, storeConn,
 		},
 	}, nil
 }
@@ -69,6 +85,7 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 func NewClientsWithServices(
 	u userpb.UserServiceClient,
 	extraServices ...any,
+	opts ...auth.AuthServiceClient,
 ) *Clients {
 	c := &Clients{
 		UserClient: u,
@@ -77,6 +94,10 @@ func NewClientsWithServices(
 		if s, ok := svc.(store.StoreServiceClient); ok {
 			c.StoreClient = s
 		}
+	}
+	return c
+	if len(opts) > 0 {
+		c.AuthClient = opts[0]
 	}
 	return c
 }
