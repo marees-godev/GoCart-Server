@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 )
 
@@ -20,7 +20,7 @@ func RequestID(next http.Handler) http.Handler {
 			reqID = r.Header.Get(HeaderXCorrelationID)
 		}
 		if reqID == "" {
-			reqID = uuid.New().String()
+			reqID = uuid.Must(uuid.NewV7()).String()
 		}
 
 		ctx := logger.WithRequestID(r.Context(), reqID)

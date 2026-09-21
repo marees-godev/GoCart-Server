@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -119,8 +119,8 @@ func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 func TestLogin_Success(t *testing.T) {
 	svc, mockRepo, cfg := setupTestService()
 
-	userID := uuid.New()
-	credID := uuid.New()
+	userID := uuid.Must(uuid.NewV7())
+	credID := uuid.Must(uuid.NewV7())
 	rawPassword := "StrongPassword123!"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
 
@@ -210,8 +210,8 @@ func TestLogin_InvalidEmailOrPassword_GenericResponse(t *testing.T) {
 	rawPassword := "StrongPassword123!"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
 	mockRepo.byEmail["user@example.com"] = &model.AuthCredential{
-		ID:           uuid.New(),
-		UserID:       uuid.New(),
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "user@example.com",
 		PasswordHash: string(hashedPassword),
 		Role:         "customer",
@@ -254,21 +254,21 @@ func TestLogin_InactiveOrLockedAccount(t *testing.T) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
 
 	// Inactive account
-	inactiveID := uuid.New()
+	inactiveID := uuid.Must(uuid.NewV7())
 	mockRepo.byEmail["inactive@example.com"] = &model.AuthCredential{
 		ID:           inactiveID,
-		UserID:       uuid.New(),
+		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "inactive@example.com",
 		PasswordHash: string(hashedPassword),
 		IsActive:     false,
 	}
 
 	// Locked account
-	lockedID := uuid.New()
+	lockedID := uuid.Must(uuid.NewV7())
 	futureLock := time.Now().Add(10 * time.Minute)
 	mockRepo.byEmail["locked@example.com"] = &model.AuthCredential{
 		ID:           lockedID,
-		UserID:       uuid.New(),
+		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "locked@example.com",
 		PasswordHash: string(hashedPassword),
 		IsActive:     true,
@@ -305,8 +305,8 @@ func TestLogin_InactiveOrLockedAccount(t *testing.T) {
 func TestLogin_LockoutAfterFailedAttempts(t *testing.T) {
 	svc, mockRepo, _ := setupTestService()
 
-	credID := uuid.New()
-	userID := uuid.New()
+	credID := uuid.Must(uuid.NewV7())
+	userID := uuid.Must(uuid.NewV7())
 	rawPassword := "StrongPassword123!"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
 

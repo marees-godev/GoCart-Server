@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 // Standard Event Type Constants
@@ -39,7 +39,7 @@ func NewEventEnvelope(eventType, source string, payload interface{}) (*EventEnve
 	}
 
 	return &EventEnvelope{
-		EventID:      uuid.New().String(),
+		EventID:      uuid.Must(uuid.NewV7()).String(),
 		EventType:    eventType,
 		EventVersion: "1.0",
 		Source:       source,

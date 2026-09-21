@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,7 +22,7 @@ func NewStore() *Store { return &Store{} }
 func (s *Store) Insert(ctx context.Context, tx pgx.Tx, evt *Event) error {
 	id := evt.ID
 	if id == uuid.Nil {
-		id = uuid.New()
+		id = uuid.Must(uuid.NewV7())
 	}
 
 	_, err := tx.Exec(ctx, `

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -84,7 +84,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			}
 		}
 		if reqID == "" {
-			reqID = uuid.New().String()
+			reqID = uuid.Must(uuid.NewV7()).String()
 		}
 		md.Set(HeaderRequestID, reqID)
 		md.Set(HeaderCorrelationID, reqID)
@@ -110,7 +110,11 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 
 		st, _ := status.FromError(err)
 		grpcStatus := st.Code().String()
-		downstreamService := extractServiceName(cc.Target(), method)
+		targetStr := ""
+		if cc != nil {
+			targetStr = cc.Target()
+		}
+		downstreamService := extractServiceName(targetStr, method)
 
 		var userID, role string
 		if u, ok := auth.UserFromContext(ctx); ok && u != nil {
@@ -132,7 +136,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			logger.FromContext(ctx).Warn("Service-to-service gRPC call failed",
 				"method", method,
 				"downstream_service", downstreamService,
-				"target", cc.Target(),
+				"target", targetStr,
 				"grpc_status", grpcStatus,
 				"error_code", errorCode,
 				"request_id", reqID,
@@ -146,7 +150,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			logger.FromContext(ctx).Debug("Service-to-service gRPC call succeeded",
 				"method", method,
 				"downstream_service", downstreamService,
-				"target", cc.Target(),
+				"target", targetStr,
 				"grpc_status", grpcStatus,
 				"request_id", reqID,
 				"user_id", userID,
@@ -197,7 +201,7 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 				reqID = cids[0]
 			}
 			if reqID == "" {
-				reqID = uuid.New().String()
+				reqID = uuid.Must(uuid.NewV7()).String()
 			}
 			ctx = logger.WithRequestID(ctx, reqID)
 			ctx = logger.WithCorrelationID(ctx, reqID)

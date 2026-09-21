@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -113,7 +113,7 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 
 	// 2. Insert refresh token
 	if refreshToken.ID == uuid.Nil {
-		refreshToken.ID = uuid.New()
+		refreshToken.ID = uuid.Must(uuid.NewV7())
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at)
@@ -138,10 +138,10 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 
 func (r *postgresAuthRepository) CreateCredential(ctx context.Context, cred *model.AuthCredential) error {
 	if cred.ID == uuid.Nil {
-		cred.ID = uuid.New()
+		cred.ID = uuid.Must(uuid.NewV7())
 	}
 	if cred.UserID == uuid.Nil {
-		cred.UserID = uuid.New()
+		cred.UserID = uuid.Must(uuid.NewV7())
 	}
 	query := `
 		INSERT INTO auth_credentials (id, user_id, email, phone, password_hash, role, email_verified, is_active, created_at, updated_at)

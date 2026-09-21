@@ -3,7 +3,7 @@ package outbox
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 // Status represents the lifecycle state of an outbox event.
