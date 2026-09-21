@@ -10,9 +10,11 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Storage  StorageConfig
 }
 
 type AppConfig struct {
@@ -22,6 +24,10 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
+	Port string
+}
+
+type GRPCConfig struct {
 	Port string
 }
 
@@ -44,6 +50,15 @@ type TracingConfig struct {
 	OTLPEndpoint string
 }
 
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Bucket          string
+	PublicURLPrefix string
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("services/store-service/.env")
@@ -58,6 +73,9 @@ func LoadEnv() *Config {
 		},
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "7500"),
+		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50055"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("DATABASE_URL", ""),
@@ -74,6 +92,14 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Storage: StorageConfig{
+			Endpoint:        GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3"),
+			Region:          GetEnv("S3_REGION", "ap-south-1"),
+			AccessKeyID:     GetEnv("S3_ACCESS_KEY_ID", ""),
+			SecretAccessKey: GetEnv("S3_SECRET_ACCESS_KEY", ""),
+			Bucket:          GetEnv("S3_BUCKET", "stores"),
+			PublicURLPrefix: GetEnv("S3_PUBLIC_URL_PREFIX", ""),
 		},
 	}
 }

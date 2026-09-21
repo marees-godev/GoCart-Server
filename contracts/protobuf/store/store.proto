@@ -8,19 +8,32 @@ service StoreService {
   rpc GetStore (GetStoreRequest) returns (GetStoreResponse);
   rpc ListStores (ListStoresRequest) returns (ListStoresResponse);
   rpc CreateStore (CreateStoreRequest) returns (CreateStoreResponse);
+  rpc UpdateStore (UpdateStoreRequest) returns (UpdateStoreResponse);
+  rpc GetUploadUrl (GetUploadUrlRequest) returns (GetUploadUrlResponse);
 }
 
 message Store {
   string id = 1;
   string merchant_id = 2;
   string name = 3;
-  string description = 4;
-  bool is_active = 5;
-  string created_at = 6;
+  string slug = 4;
+  string description = 5;
+  string logo_url = 6;
+  string banner_url = 7;
+  string address = 8;
+  string approval_status = 9;
+  bool publish_status = 10;
+  string rejection_reason = 11;
+  string kyc_status = 12;
+  string bank_account_details = 13;
+  double avg_store_rating = 14;
+  string created_at = 15;
+  string updated_at = 16;
 }
 
 message GetStoreRequest {
   string id = 1;
+  string merchant_id = 2;
 }
 
 message GetStoreResponse {
@@ -42,8 +55,44 @@ message CreateStoreRequest {
   string merchant_id = 1;
   string name = 2;
   string description = 3;
+  string logo_url = 4;
+  string banner_url = 5;
+  string address = 6;
+  string bank_account_details = 7;
 }
 
 message CreateStoreResponse {
   Store store = 1;
 }
+
+message UpdateStoreRequest {
+  string id = 1;
+  string merchant_id = 2;
+  optional string name = 3;
+  optional string description = 4;
+  optional string logo_url = 5;
+  optional string banner_url = 6;
+  optional string address = 7;
+  optional bool publish_status = 8;
+  optional string bank_account_details = 9;
+}
+
+message UpdateStoreResponse {
+  Store store = 1;
+}
+
+message GetUploadUrlRequest {
+  string merchant_id = 1;
+  string image_type = 2;
+  string filename = 3;
+  string content_type = 4;
+}
+
+message GetUploadUrlResponse {
+  string upload_url = 1;
+  string public_url = 2;
+  string key = 3;
+  int32 expires_in_seconds = 4;
+}
+
+

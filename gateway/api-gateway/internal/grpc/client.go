@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -9,8 +10,9 @@ import (
 )
 
 type Clients struct {
-	UserClient userpb.UserServiceClient
-	conns      []*grpc.ClientConn
+	UserClient  userpb.UserServiceClient
+	StoreClient store.StoreServiceClient
+	conns       []*grpc.ClientConn
 }
 
 func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, error) {
@@ -46,20 +48,37 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
+	storeConn, err := grpc.NewClient(cfg.GRPC.StoreServiceAddr, opts...)
+	if err != nil {
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		return nil, err
+	}
+
 	return &Clients{
-		UserClient: userpb.NewUserServiceClient(userConn),
+		UserClient:  userpb.NewUserServiceClient(userConn),
+		StoreClient: store.NewStoreServiceClient(storeConn),
 		conns: []*grpc.ClientConn{
-			userConn, productConn, cartConn, orderConn,
+			userConn, productConn, cartConn, orderConn, storeConn,
 		},
 	}, nil
 }
 
 func NewClientsWithServices(
 	u userpb.UserServiceClient,
+	extraServices ...any,
 ) *Clients {
-	return &Clients{
+	c := &Clients{
 		UserClient: u,
 	}
+	for _, svc := range extraServices {
+		if s, ok := svc.(store.StoreServiceClient); ok {
+			c.StoreClient = s
+		}
+	}
+	return c
 }
 
 func (c *Clients) Close() {

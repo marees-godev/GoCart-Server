@@ -13,6 +13,40 @@ type AuthPayload struct {
 	User  *User  `json:"user"`
 }
 
+type BankAccount struct {
+	AccountHolderName *string `json:"accountHolderName,omitempty"`
+	AccountNumber     *string `json:"accountNumber,omitempty"`
+	RoutingNumber     *string `json:"routingNumber,omitempty"`
+	BankName          *string `json:"bankName,omitempty"`
+	AccountType       *string `json:"accountType,omitempty"`
+	BranchCode        *string `json:"branchCode,omitempty"`
+}
+
+type BankAccountInput struct {
+	AccountHolderName string  `json:"accountHolderName"`
+	AccountNumber     string  `json:"accountNumber"`
+	RoutingNumber     *string `json:"routingNumber,omitempty"`
+	BankName          string  `json:"bankName"`
+	AccountType       *string `json:"accountType,omitempty"`
+	BranchCode        *string `json:"branchCode,omitempty"`
+}
+
+type CreateStoreInput struct {
+	Name               string            `json:"name"`
+	Description        *string           `json:"description,omitempty"`
+	LogoURL            *string           `json:"logoUrl,omitempty"`
+	BannerURL          *string           `json:"bannerUrl,omitempty"`
+	Address            *string           `json:"address,omitempty"`
+	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
+	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+}
+
+type GenerateStoreUploadURLInput struct {
+	ImageType   string  `json:"imageType"`
+	Filename    string  `json:"filename"`
+	ContentType *string `json:"contentType,omitempty"`
+}
+
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -29,6 +63,50 @@ type RegisterInput struct {
 	Password  string  `json:"password"`
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
+}
+
+type Store struct {
+	ID                 string       `json:"id"`
+	MerchantID         string       `json:"merchantId"`
+	Name               string       `json:"name"`
+	Slug               string       `json:"slug"`
+	Description        *string      `json:"description,omitempty"`
+	LogoURL            *string      `json:"logoUrl,omitempty"`
+	BannerURL          *string      `json:"bannerUrl,omitempty"`
+	Address            *string      `json:"address,omitempty"`
+	ApprovalStatus     string       `json:"approvalStatus"`
+	PublishStatus      bool         `json:"publishStatus"`
+	RejectionReason    *string      `json:"rejectionReason,omitempty"`
+	KycStatus          string       `json:"kycStatus"`
+	BankAccount        *BankAccount `json:"bankAccount,omitempty"`
+	BankAccountDetails *string      `json:"bankAccountDetails,omitempty"`
+	AvgStoreRating     float64      `json:"avgStoreRating"`
+	CreatedAt          string       `json:"createdAt"`
+	UpdatedAt          string       `json:"updatedAt"`
+}
+
+type StoreList struct {
+	Stores []*Store `json:"stores"`
+	Total  int      `json:"total"`
+}
+
+type StoreUploadURLPayload struct {
+	UploadURL        string `json:"uploadUrl"`
+	PublicURL        string `json:"publicUrl"`
+	Key              string `json:"key"`
+	ExpiresInSeconds int    `json:"expiresInSeconds"`
+}
+
+type UpdateStoreInput struct {
+	ID                 *string           `json:"id,omitempty"`
+	Name               *string           `json:"name,omitempty"`
+	Description        *string           `json:"description,omitempty"`
+	LogoURL            *string           `json:"logoUrl,omitempty"`
+	BannerURL          *string           `json:"bannerUrl,omitempty"`
+	Address            *string           `json:"address,omitempty"`
+	PublishStatus      *bool             `json:"publishStatus,omitempty"`
+	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
+	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
 }
 
 type User struct {
