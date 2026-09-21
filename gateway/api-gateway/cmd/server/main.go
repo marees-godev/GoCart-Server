@@ -33,8 +33,6 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
-	log.Info("Starting API Gateway", "service", cfg.App.Name, "version", cfg.App.Version, "env", cfg.App.Environment)
-
 	// 2. Initialize distributed tracing if enabled
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
