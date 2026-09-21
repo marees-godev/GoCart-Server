@@ -25,13 +25,18 @@ type AddToCartInput struct {
 type Address struct {
 	ID           string  `json:"id"`
 	UserID       string  `json:"userId"`
-	AddressLine1 string  `json:"addressLine1"`
-	AddressLine2 *string `json:"addressLine2,omitempty"`
+	Label        *string `json:"label,omitempty"`
+	FullName     *string `json:"fullName,omitempty"`
+	PhoneNumber  *string `json:"phoneNumber,omitempty"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  string  `json:"addressLine"`
 	City         string  `json:"city"`
 	State        string  `json:"state"`
-	CountryID    string  `json:"countryId"`
 	PostalCode   string  `json:"postalCode"`
+	Country      string  `json:"country"`
 	IsDefault    bool    `json:"isDefault"`
+	CreatedAt    *string `json:"createdAt,omitempty"`
+	UpdatedAt    *string `json:"updatedAt,omitempty"`
 }
 
 type AuthPayload struct {
@@ -86,12 +91,15 @@ type CategoryList struct {
 }
 
 type CreateAddressInput struct {
-	AddressLine1 string  `json:"addressLine1"`
-	AddressLine2 *string `json:"addressLine2,omitempty"`
+	Label        *string `json:"label,omitempty"`
+	FullName     string  `json:"fullName"`
+	PhoneNumber  string  `json:"phoneNumber"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  string  `json:"addressLine"`
 	City         string  `json:"city"`
 	State        string  `json:"state"`
-	CountryID    string  `json:"countryId"`
 	PostalCode   string  `json:"postalCode"`
+	Country      string  `json:"country"`
 	IsDefault    *bool   `json:"isDefault,omitempty"`
 }
 
@@ -347,6 +355,19 @@ type StoreUploadURLPayload struct {
 	PublicURL        string `json:"publicUrl"`
 	Key              string `json:"key"`
 	ExpiresInSeconds int    `json:"expiresInSeconds"`
+}
+
+type UpdateAddressInput struct {
+	Label        *string `json:"label,omitempty"`
+	FullName     *string `json:"fullName,omitempty"`
+	PhoneNumber  *string `json:"phoneNumber,omitempty"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  *string `json:"addressLine,omitempty"`
+	City         *string `json:"city,omitempty"`
+	State        *string `json:"state,omitempty"`
+	PostalCode   *string `json:"postalCode,omitempty"`
+	Country      *string `json:"country,omitempty"`
+	IsDefault    *bool   `json:"isDefault,omitempty"`
 }
 
 type UpdateProductInput struct {

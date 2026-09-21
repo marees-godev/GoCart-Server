@@ -59,6 +59,85 @@ func (m *mockUserClient) Register(ctx context.Context, in *userpb.RegisterReques
 	}, nil
 }
 
+func (m *mockUserClient) CreateUserAddress(ctx context.Context, in *userpb.CreateUserAddressRequest, opts ...grpc.CallOption) (*userpb.CreateUserAddressResponse, error) {
+	return &userpb.CreateUserAddressResponse{
+		Address: &userpb.Address{
+			Id:          "addr-1",
+			UserId:      in.UserId,
+			AddressLine: in.AddressLine,
+			City:        in.City,
+			State:       in.State,
+			PostalCode:  in.PostalCode,
+			Country:     in.Country,
+			IsDefault:   in.IsDefault,
+		},
+	}, nil
+}
+
+func (m *mockUserClient) ListUserAddresses(ctx context.Context, in *userpb.ListUserAddressesRequest, opts ...grpc.CallOption) (*userpb.ListUserAddressesResponse, error) {
+	return &userpb.ListUserAddressesResponse{
+		Addresses: []*userpb.Address{
+			{
+				Id:          "addr-1",
+				UserId:      in.UserId,
+				AddressLine: "100 Main St",
+				City:        "Austin",
+				State:       "TX",
+				PostalCode:  "78701",
+				Country:     "United States",
+				IsDefault:   true,
+			},
+		},
+	}, nil
+}
+
+func (m *mockUserClient) GetUserAddress(ctx context.Context, in *userpb.GetUserAddressRequest, opts ...grpc.CallOption) (*userpb.GetUserAddressResponse, error) {
+	return &userpb.GetUserAddressResponse{
+		Address: &userpb.Address{
+			Id:          in.AddressId,
+			UserId:      in.UserId,
+			AddressLine: "100 Main St",
+			City:        "Austin",
+			State:       "TX",
+			PostalCode:  "78701",
+			Country:     "United States",
+			IsDefault:   true,
+		},
+	}, nil
+}
+
+func (m *mockUserClient) UpdateUserAddress(ctx context.Context, in *userpb.UpdateUserAddressRequest, opts ...grpc.CallOption) (*userpb.UpdateUserAddressResponse, error) {
+	return &userpb.UpdateUserAddressResponse{
+		Address: &userpb.Address{
+			Id:          in.AddressId,
+			UserId:      in.UserId,
+			AddressLine: "Updated Line",
+			City:        "Austin",
+			State:       "TX",
+			PostalCode:  "78701",
+			Country:     "United States",
+			IsDefault:   true,
+		},
+	}, nil
+}
+
+func (m *mockUserClient) DeleteUserAddress(ctx context.Context, in *userpb.DeleteUserAddressRequest, opts ...grpc.CallOption) (*userpb.DeleteUserAddressResponse, error) {
+	return &userpb.DeleteUserAddressResponse{
+		Success: true,
+	}, nil
+}
+
+func (m *mockUserClient) SetDefaultUserAddress(ctx context.Context, in *userpb.SetDefaultUserAddressRequest, opts ...grpc.CallOption) (*userpb.SetDefaultUserAddressResponse, error) {
+	return &userpb.SetDefaultUserAddressResponse{
+		Address: &userpb.Address{
+			Id:        in.AddressId,
+			UserId:    in.UserId,
+			IsDefault: true,
+		},
+	}, nil
+}
+
+
 func setupTestApp(introEnabled bool) *fiber.App {
 	clients := gatewayGRPC.NewClientsWithServices(
 		&mockUserClient{},
