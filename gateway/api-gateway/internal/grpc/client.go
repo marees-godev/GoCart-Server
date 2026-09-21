@@ -85,7 +85,6 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 func NewClientsWithServices(
 	u userpb.UserServiceClient,
 	extraServices ...any,
-	opts ...auth.AuthServiceClient,
 ) *Clients {
 	c := &Clients{
 		UserClient: u,
@@ -94,10 +93,9 @@ func NewClientsWithServices(
 		if s, ok := svc.(store.StoreServiceClient); ok {
 			c.StoreClient = s
 		}
-	}
-	return c
-	if len(opts) > 0 {
-		c.AuthClient = opts[0]
+		if a, ok := svc.(auth.AuthServiceClient); ok {
+			c.AuthClient = a
+		}
 	}
 	return c
 }

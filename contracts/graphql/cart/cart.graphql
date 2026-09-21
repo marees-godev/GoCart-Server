@@ -1,0 +1,30 @@
+type CartItem {
+  id: ID!
+  productId: String!
+  quantity: Int!
+  unitPrice: Float!
+}
+
+type Cart {
+  id: ID!
+  userId: String!
+  items: [CartItem!]!
+  totalAmount: Float!
+}
+
+input AddToCartInput {
+  userId: String!
+  productId: String!
+  quantity: Int!
+  unitPrice: Float!
+}
+
+extend type Query {
+  cart(userId: ID!): Cart @auth
+}
+
+extend type Mutation {
+  addToCart(input: AddToCartInput!): Cart @auth
+  removeFromCart(userId: ID!, productId: ID!): Cart @auth
+  clearCart(userId: ID!): Boolean! @auth
+}
