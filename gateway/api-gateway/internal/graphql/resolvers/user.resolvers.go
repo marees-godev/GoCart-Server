@@ -6,7 +6,6 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
@@ -16,12 +15,145 @@ import (
 
 // UpdateUser is the resolver for the updateUser field.
 func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input model.UpdateUserInput) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: UpdateUser - updateUser"))
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.GetUserRequest{Id: id}
+	res, err := r.Clients.UserClient.GetUser(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return toModelUser(res.User), nil
 }
 
 // CreateUserAddress is the resolver for the createUserAddress field.
 func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string, input model.CreateAddressInput) (*model.Address, error) {
-	panic(fmt.Errorf("not implemented: CreateUserAddress - createUserAddress"))
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	label := ""
+	if input.Label != nil {
+		label = *input.Label
+	}
+	emailAddress := ""
+	if input.EmailAddress != nil {
+		emailAddress = *input.EmailAddress
+	}
+	isDefault := false
+	if input.IsDefault != nil {
+		isDefault = *input.IsDefault
+	}
+
+	req := &userpb.CreateUserAddressRequest{
+		UserId:       userID,
+		Label:        label,
+		FullName:     input.FullName,
+		PhoneNumber:  input.PhoneNumber,
+		EmailAddress: emailAddress,
+		AddressLine:  input.AddressLine,
+		City:         input.City,
+		State:        input.State,
+		PostalCode:   input.PostalCode,
+		Country:      input.Country,
+		IsDefault:    isDefault,
+	}
+
+	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return toModelAddress(res.Address), nil
+}
+
+// UpdateUserAddress is the resolver for the updateUserAddress field.
+func (r *mutationResolver) UpdateUserAddress(ctx context.Context, id string, input model.UpdateAddressInput) (*model.Address, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.UpdateUserAddressRequest{
+		UserId:       authID,
+		AddressId:    id,
+		Label:        input.Label,
+		FullName:     input.FullName,
+		PhoneNumber:  input.PhoneNumber,
+		EmailAddress: input.EmailAddress,
+		AddressLine:  input.AddressLine,
+		City:         input.City,
+		State:        input.State,
+		PostalCode:   input.PostalCode,
+		Country:      input.Country,
+		IsDefault:    input.IsDefault,
+	}
+
+	res, err := r.Clients.UserClient.UpdateUserAddress(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return toModelAddress(res.Address), nil
+}
+
+// DeleteUserAddress is the resolver for the deleteUserAddress field.
+func (r *mutationResolver) DeleteUserAddress(ctx context.Context, id string) (bool, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return false, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return false, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.DeleteUserAddressRequest{
+		UserId:    authID,
+		AddressId: id,
+	}
+
+	res, err := r.Clients.UserClient.DeleteUserAddress(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	return res.Success, nil
+}
+
+// SetDefaultUserAddress is the resolver for the setDefaultUserAddress field.
+func (r *mutationResolver) SetDefaultUserAddress(ctx context.Context, id string) (*model.Address, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.SetDefaultUserAddressRequest{
+		UserId:    authID,
+		AddressId: id,
+	}
+
+	res, err := r.Clients.UserClient.SetDefaultUserAddress(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return toModelAddress(res.Address), nil
 }
 
 // Me is the resolver for the me field.
@@ -30,13 +162,7 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 		return nil, appErrors.Internal(nil, "user client unavailable")
 	}
 
-	userId := ""
-	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
-		userId = userCtx.UserID
-	} else if legacyID, ok := ctx.Value("userID").(string); ok {
-		userId = legacyID
-	}
-
+	userId := getAuthUserIDFromCtx(ctx)
 	if userId == "" {
 		return nil, appErrors.Unauthorized("authentication required")
 	}
@@ -66,5 +192,56 @@ func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error
 
 // UserAddresses is the resolver for the userAddresses field.
 func (r *queryResolver) UserAddresses(ctx context.Context, userID string) ([]*model.Address, error) {
-	panic(fmt.Errorf("not implemented: UserAddresses - userAddresses"))
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	if userID == "" {
+		return nil, appErrors.BadRequest("user id is required")
+	}
+
+	res, err := r.Clients.UserClient.ListUserAddresses(ctx, &userpb.ListUserAddressesRequest{UserId: userID})
+	if err != nil {
+		return nil, err
+	}
+	return toModelAddressList(res.Addresses), nil
+}
+
+// UserAddress is the resolver for the userAddress field.
+func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Address, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("address id is required")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	res, err := r.Clients.UserClient.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+		UserId:    authID,
+		AddressId: id,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return toModelAddress(res.Address), nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func getAuthUserIDFromCtx(ctx context.Context) string {
+	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
+		return userCtx.UserID
+	}
+	if legacyID, ok := ctx.Value("userID").(string); ok {
+		return legacyID
+	}
+	return ""
 }
