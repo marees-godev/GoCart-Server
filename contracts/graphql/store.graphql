@@ -1,0 +1,90 @@
+extend type Query {
+  store(id: ID!): Store
+  myStore: Store @auth(requires: [MERCHANT])
+  stores(merchantId: ID, limit: Int, offset: Int): StoreList!
+}
+
+extend type Mutation {
+  createStore(input: CreateStoreInput!): Store! @auth(requires: [MERCHANT])
+  updateStore(input: UpdateStoreInput!): Store! @auth(requires: [MERCHANT])
+  generateStoreUploadUrl(input: GenerateStoreUploadUrlInput!): StoreUploadUrlPayload! @auth(requires: [MERCHANT])
+}
+
+type BankAccount {
+  accountHolderName: String
+  accountNumber: String
+  routingNumber: String
+  bankName: String
+  accountType: String
+  branchCode: String
+}
+
+type Store {
+  id: ID!
+  merchantId: ID!
+  name: String!
+  slug: String!
+  description: String
+  logoUrl: String
+  bannerUrl: String
+  address: String
+  approvalStatus: String!
+  publishStatus: Boolean!
+  rejectionReason: String
+  kycStatus: String!
+  bankAccount: BankAccount
+  bankAccountDetails: String
+  avgStoreRating: Float!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type StoreList {
+  stores: [Store!]!
+  total: Int!
+}
+
+type StoreUploadUrlPayload {
+  uploadUrl: String!
+  publicUrl: String!
+  key: String!
+  expiresInSeconds: Int!
+}
+
+input BankAccountInput {
+  accountHolderName: String!
+  accountNumber: String!
+  routingNumber: String
+  bankName: String!
+  accountType: String
+  branchCode: String
+}
+
+input GenerateStoreUploadUrlInput {
+  imageType: String! # "logo" or "banner"
+  filename: String!
+  contentType: String
+}
+
+input CreateStoreInput {
+  name: String!
+  description: String
+  logoUrl: String
+  bannerUrl: String
+  address: String
+  bankAccount: BankAccountInput
+  bankAccountDetails: String
+}
+
+input UpdateStoreInput {
+  id: ID
+  name: String
+  description: String
+  logoUrl: String
+  bannerUrl: String
+  address: String
+  publishStatus: Boolean
+  bankAccount: BankAccountInput
+  bankAccountDetails: String
+}
+
