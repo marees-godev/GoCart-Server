@@ -8,6 +8,32 @@ import (
 	"strconv"
 )
 
+type AddRatingInput struct {
+	ProductID string  `json:"productId"`
+	UserID    string  `json:"userId"`
+	Rating    int     `json:"rating"`
+	Comment   *string `json:"comment,omitempty"`
+}
+
+type AddToCartInput struct {
+	UserID    string  `json:"userId"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type Address struct {
+	ID           string  `json:"id"`
+	UserID       string  `json:"userId"`
+	AddressLine1 string  `json:"addressLine1"`
+	AddressLine2 *string `json:"addressLine2,omitempty"`
+	City         string  `json:"city"`
+	State        string  `json:"state"`
+	CountryID    string  `json:"countryId"`
+	PostalCode   string  `json:"postalCode"`
+	IsDefault    bool    `json:"isDefault"`
+}
+
 type AuthPayload struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
@@ -31,6 +57,78 @@ type BankAccountInput struct {
 	BranchCode        *string `json:"branchCode,omitempty"`
 }
 
+type Cart struct {
+	ID          string      `json:"id"`
+	UserID      string      `json:"userId"`
+	Items       []*CartItem `json:"items"`
+	TotalAmount float64     `json:"totalAmount"`
+}
+
+type CartItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type Category struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	ParentID    *string `json:"parentId,omitempty"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   *string `json:"createdAt,omitempty"`
+}
+
+type CategoryList struct {
+	Categories []*Category `json:"categories"`
+	Total      int         `json:"total"`
+}
+
+type CreateAddressInput struct {
+	AddressLine1 string  `json:"addressLine1"`
+	AddressLine2 *string `json:"addressLine2,omitempty"`
+	City         string  `json:"city"`
+	State        string  `json:"state"`
+	CountryID    string  `json:"countryId"`
+	PostalCode   string  `json:"postalCode"`
+	IsDefault    *bool   `json:"isDefault,omitempty"`
+}
+
+type CreateCategoryInput struct {
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	ParentID    *string `json:"parentId,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+type CreateDeliveryInput struct {
+	OrderID         string `json:"orderId"`
+	CourierName     string `json:"courierName"`
+	ShippingAddress string `json:"shippingAddress"`
+}
+
+type CreateMerchantInput struct {
+	UserID       string  `json:"userId"`
+	BusinessName string  `json:"businessName"`
+	TaxID        *string `json:"taxId,omitempty"`
+}
+
+type CreateOrderInput struct {
+	UserID          string `json:"userId"`
+	CartID          string `json:"cartId"`
+	ShippingAddress string `json:"shippingAddress"`
+}
+
+type CreateProductInput struct {
+	StoreID     string  `json:"storeId"`
+	CategoryID  string  `json:"categoryId"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Price       float64 `json:"price"`
+	Sku         string  `json:"sku"`
+}
+
 type CreateStoreInput struct {
 	Name               string            `json:"name"`
 	Description        *string           `json:"description,omitempty"`
@@ -39,6 +137,16 @@ type CreateStoreInput struct {
 	Address            *string           `json:"address,omitempty"`
 	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+}
+
+type Delivery struct {
+	ID                  string  `json:"id"`
+	OrderID             string  `json:"orderId"`
+	TrackingNumber      *string `json:"trackingNumber,omitempty"`
+	CourierName         string  `json:"courierName"`
+	Status              string  `json:"status"`
+	EstimatedDeliveryAt *string `json:"estimatedDeliveryAt,omitempty"`
+	DeliveredAt         *string `json:"deliveredAt,omitempty"`
 }
 
 type GenerateStoreUploadURLInput struct {
@@ -52,10 +160,113 @@ type LoginInput struct {
 	Password string `json:"password"`
 }
 
+type Merchant struct {
+	ID           string  `json:"id"`
+	UserID       string  `json:"userId"`
+	BusinessName string  `json:"businessName"`
+	Status       string  `json:"status"`
+	TaxID        *string `json:"taxId,omitempty"`
+	CreatedAt    *string `json:"createdAt,omitempty"`
+}
+
 type Mutation struct {
 }
 
+type Notification struct {
+	ID        string  `json:"id"`
+	UserID    string  `json:"userId"`
+	Channel   string  `json:"channel"`
+	Subject   string  `json:"subject"`
+	Content   string  `json:"content"`
+	Status    string  `json:"status"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+}
+
+type NotificationList struct {
+	Notifications []*Notification `json:"notifications"`
+	Total         int             `json:"total"`
+}
+
+type Order struct {
+	ID              string       `json:"id"`
+	UserID          string       `json:"userId"`
+	Status          string       `json:"status"`
+	Items           []*OrderItem `json:"items"`
+	TotalAmount     float64      `json:"totalAmount"`
+	ShippingAddress string       `json:"shippingAddress"`
+	CreatedAt       *string      `json:"createdAt,omitempty"`
+}
+
+type OrderItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type OrderList struct {
+	Orders []*Order `json:"orders"`
+	Total  int      `json:"total"`
+}
+
+type Payment struct {
+	ID                   string  `json:"id"`
+	OrderID              string  `json:"orderId"`
+	Amount               float64 `json:"amount"`
+	Currency             string  `json:"currency"`
+	PaymentMethod        string  `json:"paymentMethod"`
+	Status               string  `json:"status"`
+	TransactionReference *string `json:"transactionReference,omitempty"`
+	CreatedAt            *string `json:"createdAt,omitempty"`
+}
+
+type ProcessPaymentInput struct {
+	OrderID       string  `json:"orderId"`
+	Amount        float64 `json:"amount"`
+	Currency      string  `json:"currency"`
+	PaymentMethod string  `json:"paymentMethod"`
+}
+
+type Product struct {
+	ID          string   `json:"id"`
+	StoreID     string   `json:"storeId"`
+	CategoryID  string   `json:"categoryId"`
+	Name        string   `json:"name"`
+	Description *string  `json:"description,omitempty"`
+	Price       float64  `json:"price"`
+	Sku         string   `json:"sku"`
+	IsActive    bool     `json:"isActive"`
+	Images      []string `json:"images,omitempty"`
+	CreatedAt   *string  `json:"createdAt,omitempty"`
+}
+
+type ProductList struct {
+	Products []*Product `json:"products"`
+	Total    int        `json:"total"`
+}
+
+type ProductRatings struct {
+	Ratings       []*Rating `json:"ratings"`
+	AverageRating float64   `json:"averageRating"`
+	Total         int       `json:"total"`
+}
+
 type Query struct {
+}
+
+type Rating struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	UserID    string  `json:"userId"`
+	Rating    int     `json:"rating"`
+	Comment   *string `json:"comment,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+}
+
+type RefundPayload struct {
+	RefundID string  `json:"refundId"`
+	Status   string  `json:"status"`
+	Amount   float64 `json:"amount"`
 }
 
 type RegisterInput struct {
@@ -63,6 +274,47 @@ type RegisterInput struct {
 	Password  string  `json:"password"`
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
+}
+
+type RequestReturnInput struct {
+	OrderID string   `json:"orderId"`
+	UserID  string   `json:"userId"`
+	Reason  string   `json:"reason"`
+	ItemIds []string `json:"itemIds"`
+}
+
+type ReservationItemInput struct {
+	ProductID string `json:"productId"`
+	Quantity  int    `json:"quantity"`
+}
+
+type ReserveStockPayload struct {
+	ReservationID string `json:"reservationId"`
+	Success       bool   `json:"success"`
+}
+
+type ReturnOrder struct {
+	ID           string  `json:"id"`
+	OrderID      string  `json:"orderId"`
+	UserID       string  `json:"userId"`
+	Reason       string  `json:"reason"`
+	Status       string  `json:"status"`
+	RefundAmount float64 `json:"refundAmount"`
+	CreatedAt    *string `json:"createdAt,omitempty"`
+}
+
+type SendNotificationInput struct {
+	UserID     string  `json:"userId"`
+	Channel    string  `json:"channel"`
+	Subject    string  `json:"subject"`
+	Content    string  `json:"content"`
+	TemplateID *string `json:"templateId,omitempty"`
+}
+
+type StockItem struct {
+	ProductID         string `json:"productId"`
+	AvailableQuantity int    `json:"availableQuantity"`
+	ReservedQuantity  int    `json:"reservedQuantity"`
 }
 
 type Store struct {
@@ -97,6 +349,13 @@ type StoreUploadURLPayload struct {
 	ExpiresInSeconds int    `json:"expiresInSeconds"`
 }
 
+type UpdateProductInput struct {
+	Name        *string  `json:"name,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	Price       *float64 `json:"price,omitempty"`
+	IsActive    *bool    `json:"isActive,omitempty"`
+}
+
 type UpdateStoreInput struct {
 	ID                 *string           `json:"id,omitempty"`
 	Name               *string           `json:"name,omitempty"`
@@ -109,11 +368,18 @@ type UpdateStoreInput struct {
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
 }
 
+type UpdateUserInput struct {
+	FirstName *string `json:"firstName,omitempty"`
+	LastName  *string `json:"lastName,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
+}
+
 type User struct {
 	ID        string  `json:"id"`
 	Email     string  `json:"email"`
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
+	Phone     *string `json:"phone,omitempty"`
 	Role      *string `json:"role,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
 }

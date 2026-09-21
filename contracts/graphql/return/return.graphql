@@ -1,0 +1,25 @@
+type ReturnOrder {
+  id: ID!
+  orderId: String!
+  userId: String!
+  reason: String!
+  status: String!
+  refundAmount: Float!
+  createdAt: String
+}
+
+input RequestReturnInput {
+  orderId: String!
+  userId: String!
+  reason: String!
+  itemIds: [String!]!
+}
+
+extend type Query {
+  returnOrder(id: ID!): ReturnOrder @auth
+}
+
+extend type Mutation {
+  requestReturn(input: RequestReturnInput!): ReturnOrder @auth
+  updateReturnStatus(id: ID!, status: String!): ReturnOrder @auth(requires: [ADMIN, MERCHANT])
+}

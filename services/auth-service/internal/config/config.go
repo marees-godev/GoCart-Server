@@ -10,6 +10,7 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
@@ -23,6 +24,10 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
+	Port string
+}
+
+type GRPCConfig struct {
 	Port string
 }
 
@@ -64,6 +69,9 @@ func LoadEnv() *Config {
 		},
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "9451"),
+		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50051"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("DATABASE_URL", ""),

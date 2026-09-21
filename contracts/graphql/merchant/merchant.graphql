@@ -1,0 +1,23 @@
+type Merchant {
+  id: ID!
+  userId: String!
+  businessName: String!
+  status: String!
+  taxId: String
+  createdAt: String
+}
+
+input CreateMerchantInput {
+  userId: String!
+  businessName: String!
+  taxId: String
+}
+
+extend type Query {
+  merchant(id: ID!): Merchant @auth
+}
+
+extend type Mutation {
+  createMerchant(input: CreateMerchantInput!): Merchant @auth
+  updateMerchantStatus(id: ID!, status: String!): Merchant @auth(requires: [ADMIN])
+}
