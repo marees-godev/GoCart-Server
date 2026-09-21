@@ -27,8 +27,12 @@ func NewSchema(res *resolvers.Resolver, cfg ...*config.Config) (graphql.Executab
 					return nil, appErrors.Unauthorized("authentication required")
 				}
 
+				userRole := strings.ToUpper(strings.TrimSpace(user.Role))
+				if userRole == "ADMIN" {
+					return next(ctx)
+				}
+
 				if len(requires) > 0 {
-					userRole := strings.ToUpper(strings.TrimSpace(user.Role))
 					hasRole := false
 					for _, reqRole := range requires {
 						if userRole == string(reqRole) || strings.EqualFold(userRole, string(reqRole)) {

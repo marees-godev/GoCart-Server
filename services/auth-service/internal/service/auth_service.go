@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -100,7 +100,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 
 	tokenHash := hashToken(rawRefreshToken)
 	refreshTokenModel := &model.RefreshToken{
-		ID:        uuid.New(),
+		ID:        uuid.Must(uuid.NewV7()),
 		UserID:    cred.UserID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(RefreshTokenTTL),
@@ -115,7 +115,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	})
 
 	outboxEvt := &outbox.Event{
-		ID:            uuid.New(),
+		ID:            uuid.Must(uuid.NewV7()),
 		AggregateType: "auth",
 		AggregateID:   cred.UserID.String(),
 		EventType:     "UserLoggedIn",
@@ -151,8 +151,8 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, appErrors.Internal(err, "failed to hash password")
 	}
 
-	credID := uuid.New()
-	userID := uuid.New()
+	credID := uuid.Must(uuid.NewV7())
+	userID := uuid.Must(uuid.NewV7())
 	cred := &model.AuthCredential{
 		ID:            credID,
 		UserID:        userID,
@@ -189,7 +189,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	tokenHash := hashToken(rawRefreshToken)
 	refreshTokenModel := &model.RefreshToken{
-		ID:        uuid.New(),
+		ID:        uuid.Must(uuid.NewV7()),
 		UserID:    userID,
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(RefreshTokenTTL),
@@ -204,7 +204,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	})
 
 	outboxEvt := &outbox.Event{
-		ID:            uuid.New(),
+		ID:            uuid.Must(uuid.NewV7()),
 		AggregateType: "auth",
 		AggregateID:   userID.String(),
 		EventType:     "UserRegistered",

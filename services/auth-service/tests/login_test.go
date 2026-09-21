@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -54,12 +54,12 @@ func (m *mockRepoForGRPC) RevokeRefreshToken(ctx context.Context, id uuid.UUID) 
 }
 
 func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
-	userID := uuid.New()
+	userID := uuid.Must(uuid.NewV7())
 	rawPassword := "Password123!"
 	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
 
 	user := &model.AuthCredential{
-		ID:           uuid.New(),
+		ID:           uuid.Must(uuid.NewV7()),
 		UserID:       userID,
 		Email:        "user@example.com",
 		PasswordHash: string(hashed),

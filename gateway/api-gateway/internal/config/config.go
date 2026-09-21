@@ -23,6 +23,8 @@ type Config struct {
 	CartServiceAddr             string
 	OrderServiceAddr            string
 	GraphQLIntrospectionEnabled bool
+	AdminAPIKey                 string
+	AdminUserID                 string
 }
 
 type AppConfig struct {
@@ -158,6 +160,8 @@ func LoadEnv() *Config {
 		CartServiceAddr:             cartServiceAddr,
 		OrderServiceAddr:            orderServiceAddr,
 		GraphQLIntrospectionEnabled: introEnabled,
+		AdminAPIKey:                 GetEnv("ADMIN_API_KEY", ""),
+		AdminUserID:                 GetEnv("ADMIN_USER_ID", "admin"),
 	}
 }
 

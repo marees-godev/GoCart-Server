@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 )
 
@@ -80,8 +80,8 @@ func TestRollbackSQLStructure(t *testing.T) {
 
 func TestAuthModelSecurityAndFields(t *testing.T) {
 	cred := model.AuthCredential{
-		ID:               uuid.New(),
-		UserID:           uuid.New(),
+		ID:               uuid.Must(uuid.NewV7()),
+		UserID:           uuid.Must(uuid.NewV7()),
 		Email:            "test@example.com",
 		PasswordHash:     "$2a$12$securehash",
 		Role:             "customer",
