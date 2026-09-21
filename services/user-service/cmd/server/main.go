@@ -102,7 +102,11 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService)
 
-	router.SetupRoutes(app, userHandler)
+	addressRepo := repository.NewAddressRepository(db.Pool)
+	addressService := service.NewAddressService(addressRepo, userRepo)
+	addressHandler := handler.NewAddressHandler(addressService)
+
+	router.SetupRoutes(app, userHandler, addressHandler)
 
 	go func() {
 		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
