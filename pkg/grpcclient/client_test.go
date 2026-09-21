@@ -85,6 +85,7 @@ func middlewareGetRequestID(ctx context.Context) string {
 }
 
 func setupBufconnServer(t *testing.T, srv *mockInventoryServer) (*grpc.Server, *bufconn.Listener) {
+	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
 	s := grpc.NewServer(grpc.UnaryInterceptor(UnaryServerInterceptor()))
 	inventory.RegisterInventoryServiceServer(s, srv)
@@ -168,7 +169,7 @@ func TestContextPropagation_UntrustedClientIdentityStripped(t *testing.T) {
 	// Case 1: Unauthenticated request attempting to inject identity via outgoing metadata
 	spoofedMD := metadata.Pairs(
 		HeaderUserID, "hacked-user-id",
-		HeaderUserRole, "super-admin",
+		HeaderUserRole, "admin",
 		HeaderUserEmail, "evil@attacker.com",
 	)
 	unauthCtx := metadata.NewOutgoingContext(context.Background(), spoofedMD)

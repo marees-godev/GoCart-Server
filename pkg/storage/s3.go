@@ -14,7 +14,7 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
@@ -175,7 +175,7 @@ func (s *S3Client) GenerateKey(prefix, filename string) string {
 	ext := path.Ext(filename)
 	cleanPrefix := strings.Trim(prefix, "/")
 	timestamp := time.Now().Format("20060102")
-	id := uuid.New().String()
+	id := uuid.Must(uuid.NewV7()).String()
 	if cleanPrefix != "" {
 		return fmt.Sprintf("%s/%s/%s%s", cleanPrefix, timestamp, id, ext)
 	}

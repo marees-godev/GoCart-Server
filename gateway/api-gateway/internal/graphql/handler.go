@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofrs/uuid/v5"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -24,8 +26,9 @@ import (
 type contextKey string
 
 const (
-	userIDKey   contextKey = "userID"
-	userRoleKey contextKey = "userRole"
+	userIDKey       contextKey = "userID"
+	userRoleKey     contextKey = "userRole"
+	HeaderXAdminKey string     = "X-Admin-Key"
 )
 
 type GraphQLRequest struct {
@@ -133,18 +136,65 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	authHeader := r.Header.Get("Authorization")
-	secret := "gocart-secret-key-change-in-production"
-	if h.cfg != nil && h.cfg.JWT.Secret != "" {
-		secret = h.cfg.JWT.Secret
-	}
+	adminKey := r.Header.Get(HeaderXAdminKey)
 
-	if authHeader != "" {
-		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+	if adminKey != "" {
+		expectedKey := ""
+		adminID := ""
+		if h.cfg != nil {
+			expectedKey = h.cfg.AdminAPIKey
+			adminID = h.cfg.AdminUserID
+		}
+		if adminID == "" {
+			adminID = "admin"
+		}
+
+		if expectedKey != "" && adminKey == expectedKey {
+			userCtx := &auth.UserContext{
+				UserID: adminID,
+				Role:   "ADMIN",
+			}
 			ctx = auth.WithUser(ctx, userCtx)
 			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+
+			reqID := middleware.GetRequestID(ctx)
+			if reqID == "" {
+				reqID = r.Header.Get(middleware.HeaderXRequestID)
+				if reqID == "" {
+					reqID = r.Header.Get(middleware.HeaderXCorrelationID)
+				}
+				if reqID == "" {
+					reqID = uuid.Must(uuid.NewV7()).String()
+				}
+				ctx = logger.WithRequestID(ctx, reqID)
+				ctx = logger.WithCorrelationID(ctx, reqID)
+			}
 			r = r.WithContext(ctx)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			appErr := appErrors.Unauthorized("invalid admin API key")
+			gqlErr := pkgGraphQL.FormatError(ctx, appErr)
+			_ = json.NewEncoder(w).Encode(pkgGraphQL.GraphQLErrorResponse{
+				Errors: []pkgGraphQL.GraphQLError{gqlErr},
+			})
+			return
+		}
+	} else {
+		authHeader := r.Header.Get("Authorization")
+		secret := "gocart-secret-key-change-in-production"
+		if h.cfg != nil && h.cfg.JWT.Secret != "" {
+			secret = h.cfg.JWT.Secret
+		}
+
+		if authHeader != "" {
+			if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+				ctx = auth.WithUser(ctx, userCtx)
+				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+				r = r.WithContext(ctx)
+			}
 		}
 	}
 
@@ -157,32 +207,76 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		ctx = c.Context()
 	}
 
-	authHeader := c.Get("Authorization")
-	secret := "gocart-secret-key-change-in-production"
-	if h.cfg != nil && h.cfg.JWT.Secret != "" {
-		secret = h.cfg.JWT.Secret
-	}
+	adminKey := c.Get(HeaderXAdminKey)
 
-	if authHeader != "" {
-		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+	if adminKey != "" {
+		expectedKey := ""
+		adminID := ""
+		if h.cfg != nil {
+			expectedKey = h.cfg.AdminAPIKey
+			adminID = h.cfg.AdminUserID
+		}
+		if adminID == "" {
+			adminID = "admin"
+		}
+
+		if expectedKey != "" && adminKey == expectedKey {
+			userCtx := &auth.UserContext{
+				UserID: adminID,
+				Role:   "ADMIN",
+			}
 			ctx = auth.WithUser(ctx, userCtx)
 			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
-			c.SetUserContext(ctx)
-		}
-	} else if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
-		ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
-		ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
-		c.SetUserContext(ctx)
-	} else {
-		if legacyID, ok := ctx.Value(userIDKey).(string); ok && legacyID != "" {
-			legacyRole, _ := ctx.Value(userRoleKey).(string)
-			userCtx := &auth.UserContext{
-				UserID: legacyID,
-				Role:   legacyRole,
+
+			reqID := middleware.GetRequestID(ctx)
+			if reqID == "" {
+				reqID = c.Get(middleware.HeaderXRequestID)
+				if reqID == "" {
+					reqID = c.Get(middleware.HeaderXCorrelationID)
+				}
+				if reqID == "" {
+					reqID = uuid.Must(uuid.NewV7()).String()
+				}
+				ctx = logger.WithRequestID(ctx, reqID)
+				ctx = logger.WithCorrelationID(ctx, reqID)
 			}
-			ctx = auth.WithUser(ctx, userCtx)
 			c.SetUserContext(ctx)
+		} else {
+			appErr := appErrors.Unauthorized("invalid admin API key")
+			gqlErr := pkgGraphQL.FormatError(ctx, appErr)
+			return c.Status(http.StatusUnauthorized).JSON(pkgGraphQL.GraphQLErrorResponse{
+				Errors: []pkgGraphQL.GraphQLError{gqlErr},
+			})
+		}
+	} else {
+		authHeader := c.Get("Authorization")
+		secret := "gocart-secret-key-change-in-production"
+		if h.cfg != nil && h.cfg.JWT.Secret != "" {
+			secret = h.cfg.JWT.Secret
+		}
+
+		if authHeader != "" {
+			if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+				ctx = auth.WithUser(ctx, userCtx)
+				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+				c.SetUserContext(ctx)
+			}
+		} else if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
+			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+			c.SetUserContext(ctx)
+		} else {
+			if legacyID, ok := ctx.Value(userIDKey).(string); ok && legacyID != "" {
+				legacyRole, _ := ctx.Value(userRoleKey).(string)
+				userCtx := &auth.UserContext{
+					UserID: legacyID,
+					Role:   legacyRole,
+				}
+				ctx = auth.WithUser(ctx, userCtx)
+				c.SetUserContext(ctx)
+			}
 		}
 	}
 

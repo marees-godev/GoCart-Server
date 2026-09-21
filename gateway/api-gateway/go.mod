@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/99designs/gqlgen v0.17.49
 	github.com/gofiber/fiber/v2 v2.52.6
+	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/marees-godev/GoCart-Server v0.0.0-00010101000000-000000000000
