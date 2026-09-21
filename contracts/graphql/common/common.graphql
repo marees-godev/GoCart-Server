@@ -1,0 +1,16 @@
+enum Role {
+  ADMIN
+  MERCHANT
+  CUSTOMER
+}
+
+directive @auth(requires: [Role!]) on FIELD_DEFINITION | OBJECT
+
+type Query {
+  health: String!
+  version: String!
+}
+
+type Mutation {
+  _empty: String
+}

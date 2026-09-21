@@ -1,0 +1,37 @@
+type OrderItem {
+  id: ID!
+  productId: String!
+  quantity: Int!
+  unitPrice: Float!
+}
+
+type Order {
+  id: ID!
+  userId: String!
+  status: String!
+  items: [OrderItem!]!
+  totalAmount: Float!
+  shippingAddress: String!
+  createdAt: String
+}
+
+type OrderList {
+  orders: [Order!]!
+  total: Int!
+}
+
+input CreateOrderInput {
+  userId: String!
+  cartId: String!
+  shippingAddress: String!
+}
+
+extend type Query {
+  order(id: ID!): Order @auth
+  orders(userId: String!, limit: Int, offset: Int): OrderList! @auth
+}
+
+extend type Mutation {
+  createOrder(input: CreateOrderInput!): Order @auth
+  updateOrderStatus(id: ID!, status: String!): Order @auth(requires: [ADMIN, MERCHANT])
+}

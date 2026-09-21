@@ -61,7 +61,7 @@ input BankAccountInput {
 }
 
 input GenerateStoreUploadUrlInput {
-  imageType: String! # "logo" or "banner"
+  imageType: String!
   filename: String!
   contentType: String
 }
@@ -87,4 +87,3 @@ input UpdateStoreInput {
   bankAccount: BankAccountInput
   bankAccountDetails: String
 }
-

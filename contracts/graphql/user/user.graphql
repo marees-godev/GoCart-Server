@@ -1,0 +1,48 @@
+type User {
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  phone: String
+  role: String
+  createdAt: String
+}
+
+type Address {
+  id: ID!
+  userId: String!
+  addressLine1: String!
+  addressLine2: String
+  city: String!
+  state: String!
+  countryId: String!
+  postalCode: String!
+  isDefault: Boolean!
+}
+
+input UpdateUserInput {
+  firstName: String
+  lastName: String
+  phone: String
+}
+
+input CreateAddressInput {
+  addressLine1: String!
+  addressLine2: String
+  city: String!
+  state: String!
+  countryId: String!
+  postalCode: String!
+  isDefault: Boolean
+}
+
+extend type Query {
+  me: User @auth
+  user(id: ID!): User @auth(requires: [ADMIN])
+  userAddresses(userId: ID!): [Address!]! @auth
+}
+
+extend type Mutation {
+  updateUser(id: ID!, input: UpdateUserInput!): User @auth
+  createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
+}

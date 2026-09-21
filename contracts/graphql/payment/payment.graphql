@@ -1,0 +1,32 @@
+type Payment {
+  id: ID!
+  orderId: String!
+  amount: Float!
+  currency: String!
+  paymentMethod: String!
+  status: String!
+  transactionReference: String
+  createdAt: String
+}
+
+type RefundPayload {
+  refundId: String!
+  status: String!
+  amount: Float!
+}
+
+input ProcessPaymentInput {
+  orderId: String!
+  amount: Float!
+  currency: String!
+  paymentMethod: String!
+}
+
+extend type Query {
+  payment(id: ID!): Payment @auth
+}
+
+extend type Mutation {
+  processPayment(input: ProcessPaymentInput!): Payment @auth
+  createRefund(paymentId: ID!, amount: Float!, reason: String): RefundPayload @auth(requires: [ADMIN, MERCHANT])
+}

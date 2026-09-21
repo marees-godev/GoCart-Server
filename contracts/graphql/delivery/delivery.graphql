@@ -1,0 +1,24 @@
+type Delivery {
+  id: ID!
+  orderId: String!
+  trackingNumber: String
+  courierName: String!
+  status: String!
+  estimatedDeliveryAt: String
+  deliveredAt: String
+}
+
+input CreateDeliveryInput {
+  orderId: String!
+  courierName: String!
+  shippingAddress: String!
+}
+
+extend type Query {
+  delivery(id: ID!): Delivery @auth
+}
+
+extend type Mutation {
+  createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
+  updateDeliveryStatus(id: ID!, status: String!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
+}

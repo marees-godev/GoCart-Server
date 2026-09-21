@@ -1,0 +1,29 @@
+type Rating {
+  id: ID!
+  productId: String!
+  userId: String!
+  rating: Int!
+  comment: String
+  createdAt: String
+}
+
+type ProductRatings {
+  ratings: [Rating!]!
+  averageRating: Float!
+  total: Int!
+}
+
+input AddRatingInput {
+  productId: String!
+  userId: String!
+  rating: Int!
+  comment: String
+}
+
+extend type Query {
+  productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
+}
+
+extend type Mutation {
+  addRating(input: AddRatingInput!): Rating @auth
+}

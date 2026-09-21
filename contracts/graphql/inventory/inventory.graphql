@@ -1,0 +1,25 @@
+type StockItem {
+  productId: ID!
+  availableQuantity: Int!
+  reservedQuantity: Int!
+}
+
+type ReserveStockPayload {
+  reservationId: String!
+  success: Boolean!
+}
+
+input ReservationItemInput {
+  productId: ID!
+  quantity: Int!
+}
+
+extend type Query {
+  stock(productId: ID!): StockItem
+}
+
+extend type Mutation {
+  reserveStock(orderId: ID!, items: [ReservationItemInput!]!): ReserveStockPayload @auth
+  releaseStock(reservationId: ID!): Boolean! @auth
+  updateStock(productId: ID!, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
+}

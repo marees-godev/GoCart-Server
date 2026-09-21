@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -17,6 +19,10 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
+	authGRPC "github.com/marees-godev/GoCart-Server/services/auth-service/internal/handler/grpc"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -94,20 +100,49 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
+	// 6. Initialize business logic layers & gRPC handler
+	authRepo := repository.NewAuthRepository(db.Pool)
+	authSvc := service.NewAuthService(authRepo, cfg)
+
+	// 7. Initialize gRPC server for all Auth operations
+	grpcServer := grpc.NewServer()
+	grpcHandler := authGRPC.NewAuthGRPCHandler(authSvc)
+	pb.RegisterAuthServiceServer(grpcServer, grpcHandler)
+
+	serverErr := make(chan error, 2)
+
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
-			log.Error("HTTP server failed", "error", err)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+		if err != nil {
+			log.Error("Failed to listen for gRPC", "error", err)
+			serverErr <- err
+			return
+		}
+		log.Info("gRPC service listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(lis); err != nil {
+			serverErr <- err
+		}
+	}()
 
+	select {
+	case err := <-serverErr:
+		log.Error("Server failed", "error", err)
+	case <-ctx.Done():
+		log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+	}
+
+	grpcServer.GracefulStop()
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
 }
+
