@@ -117,13 +117,18 @@ type Address struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	AddressLine1  string                 `protobuf:"bytes,3,opt,name=address_line1,json=addressLine1,proto3" json:"address_line1,omitempty"`
-	AddressLine2  string                 `protobuf:"bytes,4,opt,name=address_line2,json=addressLine2,proto3" json:"address_line2,omitempty"`
-	City          string                 `protobuf:"bytes,5,opt,name=city,proto3" json:"city,omitempty"`
-	State         string                 `protobuf:"bytes,6,opt,name=state,proto3" json:"state,omitempty"`
-	CountryId     string                 `protobuf:"bytes,7,opt,name=country_id,json=countryId,proto3" json:"country_id,omitempty"`
-	PostalCode    string                 `protobuf:"bytes,8,opt,name=postal_code,json=postalCode,proto3" json:"postal_code,omitempty"`
-	IsDefault     bool                   `protobuf:"varint,9,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	Label         string                 `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
+	FullName      string                 `protobuf:"bytes,4,opt,name=full_name,json=fullName,proto3" json:"full_name,omitempty"`
+	PhoneNumber   string                 `protobuf:"bytes,5,opt,name=phone_number,json=phoneNumber,proto3" json:"phone_number,omitempty"`
+	EmailAddress  string                 `protobuf:"bytes,6,opt,name=email_address,json=emailAddress,proto3" json:"email_address,omitempty"`
+	AddressLine   string                 `protobuf:"bytes,7,opt,name=address_line,json=addressLine,proto3" json:"address_line,omitempty"`
+	City          string                 `protobuf:"bytes,8,opt,name=city,proto3" json:"city,omitempty"`
+	State         string                 `protobuf:"bytes,9,opt,name=state,proto3" json:"state,omitempty"`
+	PostalCode    string                 `protobuf:"bytes,10,opt,name=postal_code,json=postalCode,proto3" json:"postal_code,omitempty"`
+	Country       string                 `protobuf:"bytes,11,opt,name=country,proto3" json:"country,omitempty"`
+	IsDefault     bool                   `protobuf:"varint,12,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -172,16 +177,37 @@ func (x *Address) GetUserId() string {
 	return ""
 }
 
-func (x *Address) GetAddressLine1() string {
+func (x *Address) GetLabel() string {
 	if x != nil {
-		return x.AddressLine1
+		return x.Label
 	}
 	return ""
 }
 
-func (x *Address) GetAddressLine2() string {
+func (x *Address) GetFullName() string {
 	if x != nil {
-		return x.AddressLine2
+		return x.FullName
+	}
+	return ""
+}
+
+func (x *Address) GetPhoneNumber() string {
+	if x != nil {
+		return x.PhoneNumber
+	}
+	return ""
+}
+
+func (x *Address) GetEmailAddress() string {
+	if x != nil {
+		return x.EmailAddress
+	}
+	return ""
+}
+
+func (x *Address) GetAddressLine() string {
+	if x != nil {
+		return x.AddressLine
 	}
 	return ""
 }
@@ -200,16 +226,16 @@ func (x *Address) GetState() string {
 	return ""
 }
 
-func (x *Address) GetCountryId() string {
+func (x *Address) GetPostalCode() string {
 	if x != nil {
-		return x.CountryId
+		return x.PostalCode
 	}
 	return ""
 }
 
-func (x *Address) GetPostalCode() string {
+func (x *Address) GetCountry() string {
 	if x != nil {
-		return x.PostalCode
+		return x.Country
 	}
 	return ""
 }
@@ -220,6 +246,21 @@ func (x *Address) GetIsDefault() bool {
 	}
 	return false
 }
+
+func (x *Address) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Address) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 
 type GetUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -424,39 +465,20 @@ func (x *UpdateUserResponse) GetUser() *User {
 type GetUserAddressRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetUserAddressRequest) Reset() {
 	*x = GetUserAddressRequest{}
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
 }
 
 func (x *GetUserAddressRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
+	return ""
 }
 
 func (*GetUserAddressRequest) ProtoMessage() {}
-
-func (x *GetUserAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetUserAddressRequest.ProtoReflect.Descriptor instead.
-func (*GetUserAddressRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{6}
-}
 
 func (x *GetUserAddressRequest) GetUserId() string {
 	if x != nil {
@@ -465,46 +487,33 @@ func (x *GetUserAddressRequest) GetUserId() string {
 	return ""
 }
 
+func (x *GetUserAddressRequest) GetAddressId() string {
+	if x != nil {
+		return x.AddressId
+	}
+	return ""
+}
+
 type GetUserAddressResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Addresses     []*Address             `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	Address       *Address               `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetUserAddressResponse) Reset() {
 	*x = GetUserAddressResponse{}
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
 }
 
 func (x *GetUserAddressResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
+	return ""
 }
 
 func (*GetUserAddressResponse) ProtoMessage() {}
 
-func (x *GetUserAddressResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[7]
+func (x *GetUserAddressResponse) GetAddress() *Address {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetUserAddressResponse.ProtoReflect.Descriptor instead.
-func (*GetUserAddressResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *GetUserAddressResponse) GetAddresses() []*Address {
-	if x != nil {
-		return x.Addresses
+		return x.Address
 	}
 	return nil
 }
@@ -512,46 +521,29 @@ func (x *GetUserAddressResponse) GetAddresses() []*Address {
 type CreateUserAddressRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	AddressLine1  string                 `protobuf:"bytes,2,opt,name=address_line1,json=addressLine1,proto3" json:"address_line1,omitempty"`
-	AddressLine2  string                 `protobuf:"bytes,3,opt,name=address_line2,json=addressLine2,proto3" json:"address_line2,omitempty"`
-	City          string                 `protobuf:"bytes,4,opt,name=city,proto3" json:"city,omitempty"`
-	State         string                 `protobuf:"bytes,5,opt,name=state,proto3" json:"state,omitempty"`
-	CountryId     string                 `protobuf:"bytes,6,opt,name=country_id,json=countryId,proto3" json:"country_id,omitempty"`
-	PostalCode    string                 `protobuf:"bytes,7,opt,name=postal_code,json=postalCode,proto3" json:"postal_code,omitempty"`
-	IsDefault     bool                   `protobuf:"varint,8,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	FullName      string                 `protobuf:"bytes,3,opt,name=full_name,json=fullName,proto3" json:"full_name,omitempty"`
+	PhoneNumber   string                 `protobuf:"bytes,4,opt,name=phone_number,json=phoneNumber,proto3" json:"phone_number,omitempty"`
+	EmailAddress  string                 `protobuf:"bytes,5,opt,name=email_address,json=emailAddress,proto3" json:"email_address,omitempty"`
+	AddressLine   string                 `protobuf:"bytes,6,opt,name=address_line,json=addressLine,proto3" json:"address_line,omitempty"`
+	City          string                 `protobuf:"bytes,7,opt,name=city,proto3" json:"city,omitempty"`
+	State         string                 `protobuf:"bytes,8,opt,name=state,proto3" json:"state,omitempty"`
+	PostalCode    string                 `protobuf:"bytes,9,opt,name=postal_code,json=postalCode,proto3" json:"postal_code,omitempty"`
+	Country       string                 `protobuf:"bytes,10,opt,name=country,proto3" json:"country,omitempty"`
+	IsDefault     bool                   `protobuf:"varint,11,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateUserAddressRequest) Reset() {
 	*x = CreateUserAddressRequest{}
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
 }
 
 func (x *CreateUserAddressRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
+	return ""
 }
 
 func (*CreateUserAddressRequest) ProtoMessage() {}
-
-func (x *CreateUserAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateUserAddressRequest.ProtoReflect.Descriptor instead.
-func (*CreateUserAddressRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{8}
-}
 
 func (x *CreateUserAddressRequest) GetUserId() string {
 	if x != nil {
@@ -560,16 +552,37 @@ func (x *CreateUserAddressRequest) GetUserId() string {
 	return ""
 }
 
-func (x *CreateUserAddressRequest) GetAddressLine1() string {
+func (x *CreateUserAddressRequest) GetLabel() string {
 	if x != nil {
-		return x.AddressLine1
+		return x.Label
 	}
 	return ""
 }
 
-func (x *CreateUserAddressRequest) GetAddressLine2() string {
+func (x *CreateUserAddressRequest) GetFullName() string {
 	if x != nil {
-		return x.AddressLine2
+		return x.FullName
+	}
+	return ""
+}
+
+func (x *CreateUserAddressRequest) GetPhoneNumber() string {
+	if x != nil {
+		return x.PhoneNumber
+	}
+	return ""
+}
+
+func (x *CreateUserAddressRequest) GetEmailAddress() string {
+	if x != nil {
+		return x.EmailAddress
+	}
+	return ""
+}
+
+func (x *CreateUserAddressRequest) GetAddressLine() string {
+	if x != nil {
+		return x.AddressLine
 	}
 	return ""
 }
@@ -588,16 +601,16 @@ func (x *CreateUserAddressRequest) GetState() string {
 	return ""
 }
 
-func (x *CreateUserAddressRequest) GetCountryId() string {
+func (x *CreateUserAddressRequest) GetPostalCode() string {
 	if x != nil {
-		return x.CountryId
+		return x.PostalCode
 	}
 	return ""
 }
 
-func (x *CreateUserAddressRequest) GetPostalCode() string {
+func (x *CreateUserAddressRequest) GetCountry() string {
 	if x != nil {
-		return x.PostalCode
+		return x.Country
 	}
 	return ""
 }
@@ -618,33 +631,13 @@ type CreateUserAddressResponse struct {
 
 func (x *CreateUserAddressResponse) Reset() {
 	*x = CreateUserAddressResponse{}
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
 }
 
 func (x *CreateUserAddressResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
+	return ""
 }
 
 func (*CreateUserAddressResponse) ProtoMessage() {}
-
-func (x *CreateUserAddressResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_user_user_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateUserAddressResponse.ProtoReflect.Descriptor instead.
-func (*CreateUserAddressResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{9}
-}
 
 func (x *CreateUserAddressResponse) GetAddress() *Address {
 	if x != nil {
@@ -653,7 +646,179 @@ func (x *CreateUserAddressResponse) GetAddress() *Address {
 	return nil
 }
 
+type ListUserAddressesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUserAddressesRequest) Reset() {
+	*x = ListUserAddressesRequest{}
+}
+
+func (x *ListUserAddressesRequest) String() string {
+	return ""
+}
+
+func (*ListUserAddressesRequest) ProtoMessage() {}
+
+func (x *ListUserAddressesRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ListUserAddressesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Addresses     []*Address             `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUserAddressesResponse) Reset() {
+	*x = ListUserAddressesResponse{}
+}
+
+func (x *ListUserAddressesResponse) String() string {
+	return ""
+}
+
+func (*ListUserAddressesResponse) ProtoMessage() {}
+
+func (x *ListUserAddressesResponse) GetAddresses() []*Address {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
+type UpdateUserAddressRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"`
+	Label         *string                `protobuf:"bytes,3,opt,name=label,proto3,oneof" json:"label,omitempty"`
+	FullName      *string                `protobuf:"bytes,4,opt,name=full_name,json=fullName,proto3,oneof" json:"full_name,omitempty"`
+	PhoneNumber   *string                `protobuf:"bytes,5,opt,name=phone_number,json=phoneNumber,proto3,oneof" json:"phone_number,omitempty"`
+	EmailAddress  *string                `protobuf:"bytes,6,opt,name=email_address,json=emailAddress,proto3,oneof" json:"email_address,omitempty"`
+	AddressLine   *string                `protobuf:"bytes,7,opt,name=address_line,json=addressLine,proto3,oneof" json:"address_line,omitempty"`
+	City          *string                `protobuf:"bytes,8,opt,name=city,proto3,oneof" json:"city,omitempty"`
+	State         *string                `protobuf:"bytes,9,opt,name=state,proto3,oneof" json:"state,omitempty"`
+	PostalCode    *string                `protobuf:"bytes,10,opt,name=postal_code,json=postalCode,proto3,oneof" json:"postal_code,omitempty"`
+	Country       *string                `protobuf:"bytes,11,opt,name=country,proto3,oneof" json:"country,omitempty"`
+	IsDefault     *bool                  `protobuf:"varint,12,opt,name=is_default,json=isDefault,proto3,oneof" json:"is_default,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserAddressRequest) Reset() {
+	*x = UpdateUserAddressRequest{}
+}
+
+func (x *UpdateUserAddressRequest) String() string {
+	return ""
+}
+
+func (*UpdateUserAddressRequest) ProtoMessage() {}
+
+type UpdateUserAddressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Address       *Address               `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserAddressResponse) Reset() {
+	*x = UpdateUserAddressResponse{}
+}
+
+func (x *UpdateUserAddressResponse) String() string {
+	return ""
+}
+
+func (*UpdateUserAddressResponse) ProtoMessage() {}
+
+func (x *UpdateUserAddressResponse) GetAddress() *Address {
+	if x != nil {
+		return x.Address
+	}
+	return nil
+}
+
+type DeleteUserAddressRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserAddressRequest) Reset() {
+	*x = DeleteUserAddressRequest{}
+}
+
+func (x *DeleteUserAddressRequest) String() string {
+	return ""
+}
+
+func (*DeleteUserAddressRequest) ProtoMessage() {}
+
+type DeleteUserAddressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserAddressResponse) Reset() {
+	*x = DeleteUserAddressResponse{}
+}
+
+func (x *DeleteUserAddressResponse) String() string {
+	return ""
+}
+
+func (*DeleteUserAddressResponse) ProtoMessage() {}
+
+type SetDefaultUserAddressRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	AddressId     string                 `protobuf:"bytes,2,opt,name=address_id,json=addressId,proto3" json:"address_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultUserAddressRequest) Reset() {
+	*x = SetDefaultUserAddressRequest{}
+}
+
+func (x *SetDefaultUserAddressRequest) String() string {
+	return ""
+}
+
+func (*SetDefaultUserAddressRequest) ProtoMessage() {}
+
+type SetDefaultUserAddressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Address       *Address               `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultUserAddressResponse) Reset() {
+	*x = SetDefaultUserAddressResponse{}
+}
+
+func (x *SetDefaultUserAddressResponse) String() string {
+	return ""
+}
+
+func (*SetDefaultUserAddressResponse) ProtoMessage() {}
+
+
 var File_contracts_protobuf_user_user_proto protoreflect.FileDescriptor
+
 
 const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\n" +
