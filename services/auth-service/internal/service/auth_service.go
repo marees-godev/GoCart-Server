@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -35,35 +36,43 @@ type AuthService interface {
 }
 
 type authService struct {
-	repo repository.AuthRepository
-	cfg  *config.Config
+	repo   repository.AuthRepository
+	cfg    *config.Config
+	logger *slog.Logger
 }
 
-func NewAuthService(repo repository.AuthRepository, cfg *config.Config) AuthService {
+func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger) AuthService {
 	return &authService{
-		repo: repo,
-		cfg:  cfg,
+		repo:   repo,
+		cfg:    cfg,
+		logger: log,
 	}
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
+
 	if req == nil || req.Email == "" || req.Password == "" {
+		s.logger.Warn("Login attempt failed: missing email or password")
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
 	cred, err := s.repo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Login attempt failed: user not found", "email", req.Email)
 			return nil, appErrors.Unauthorized("Invalid email or password")
 		}
+		s.logger.Error("Login failed: database query error", "email", req.Email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
 	}
 
 	if !cred.IsActive {
+		s.logger.Warn("Login attempt failed: account inactive", "user_id", cred.UserID.String(), "email", cred.Email)
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
 	if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
+		s.logger.Warn("Login attempt failed: account locked", "user_id", cred.UserID.String(), "email", cred.Email, "locked_until", cred.LockedUntil)
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
@@ -73,8 +82,14 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		if failedCount >= MaxFailedLoginAttempts {
 			t := time.Now().Add(AccountLockDuration)
 			lockedUntil = &t
+			s.logger.Warn("Account locked due to max failed login attempts", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount, "locked_until", t)
+		} else {
+			s.logger.Warn("Login attempt failed: invalid password", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount)
 		}
-		_ = s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
+		err = s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
+		if err != nil {
+			return nil, appErrors.Internal(err, "failed to update failed login")
+		}
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
@@ -90,11 +105,13 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		Email:  cred.Email,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
+		s.logger.Error("Login failed: access token generation error", "user_id", cred.UserID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate access token")
 	}
 
 	rawRefreshToken, err := generateRandomToken(32)
 	if err != nil {
+		s.logger.Error("Login failed: refresh token generation error", "user_id", cred.UserID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate refresh token")
 	}
 
@@ -137,17 +154,21 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 }
 
 func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error) {
+
 	if req == nil || req.Email == "" || req.Password == "" {
+		s.logger.Warn("Registration attempt failed: missing email or password")
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
 	existing, err := s.repo.GetByEmail(ctx, req.Email)
 	if err == nil && existing != nil {
+		s.logger.Warn("Registration failed: user already exists", "email", req.Email)
 		return nil, appErrors.Conflict("user with this email already exists")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		s.logger.Error("Registration failed: password hash error", "email", req.Email, "error", err)
 		return nil, appErrors.Internal(err, "failed to hash password")
 	}
 
@@ -164,7 +185,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	}
 
 	if err := s.repo.CreateCredential(ctx, cred); err != nil {
-		return nil, appErrors.Internal(err, "failed to create auth credential")
+		return nil, err
 	}
 
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
@@ -179,11 +200,13 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		Email:  cred.Email,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
+		s.logger.Error("Registration failed: generate token error", "user_id", userID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate access token")
 	}
 
 	rawRefreshToken, err := generateRandomToken(32)
 	if err != nil {
+		s.logger.Error("Registration failed: generate refresh token error", "user_id", userID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate refresh token")
 	}
 
@@ -213,7 +236,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	}
 
 	if err := s.repo.CreateLoginSession(ctx, refreshTokenModel, outboxEvt); err != nil {
-		return nil, appErrors.Internal(err, "failed to store registration session")
+		return nil, err
 	}
 
 	return &dto.LoginResponse{
@@ -226,12 +249,15 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 }
 
 func (s *authService) ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error) {
+
 	if req == nil || req.Token == "" {
+		s.logger.Warn("Token validation failed: missing token")
 		return &dto.ValidateTokenResponse{Valid: false}, nil
 	}
 
 	userCtx, err := auth.ValidateToken(req.Token, s.cfg.JWT.Secret)
 	if err != nil || userCtx == nil {
+		s.logger.Warn("Token validation failed: invalid or expired token", "error", err)
 		return &dto.ValidateTokenResponse{Valid: false}, nil
 	}
 
@@ -244,7 +270,9 @@ func (s *authService) ValidateToken(ctx context.Context, req *dto.ValidateTokenR
 }
 
 func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error) {
+
 	if req == nil || req.RefreshToken == "" {
+		s.logger.Warn("Refresh token failed: missing refresh token")
 		return nil, appErrors.BadRequest("refresh token is required")
 	}
 
@@ -252,12 +280,15 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	tok, err := s.repo.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Refresh token failed: token not found")
 			return nil, appErrors.Unauthorized("invalid refresh token")
 		}
+		s.logger.Error("Refresh token failed: database error", "error", err)
 		return nil, appErrors.Internal(err, "failed to query refresh token")
 	}
 
 	if tok.Revoked || time.Now().After(tok.ExpiresAt) {
+		s.logger.Warn("Refresh token failed: token revoked or expired", "user_id", tok.UserID.String(), "revoked", tok.Revoked, "expires_at", tok.ExpiresAt)
 		return nil, appErrors.Unauthorized("refresh token expired or revoked")
 	}
 
@@ -272,6 +303,7 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		Role:   "CUSTOMER",
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
+		s.logger.Error("Refresh token failed: generate access token error", "user_id", tok.UserID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate access token")
 	}
 

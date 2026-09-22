@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log/slog"
 
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
@@ -11,11 +12,13 @@ import (
 type AuthGRPCHandler struct {
 	pb.UnimplementedAuthServiceServer
 	authService service.AuthService
+	logger      *slog.Logger
 }
 
-func NewAuthGRPCHandler(authService service.AuthService) *AuthGRPCHandler {
+func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *AuthGRPCHandler {
 	return &AuthGRPCHandler{
 		authService: authService,
+		logger:      log,
 	}
 }
 
@@ -25,6 +28,7 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 		Password: req.GetPassword(),
 	})
 	if err != nil {
+		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -45,6 +49,7 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 		LastName:  req.GetLastName(),
 	})
 	if err != nil {
+		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -62,6 +67,7 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 		Token: req.GetToken(),
 	})
 	if err != nil {
+		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -78,6 +84,7 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 		RefreshToken: req.GetRefreshToken(),
 	})
 	if err != nil {
+		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, err
 	}
 

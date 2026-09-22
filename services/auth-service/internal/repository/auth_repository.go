@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -28,12 +29,14 @@ type AuthRepository interface {
 type postgresAuthRepository struct {
 	pool        *pgxpool.Pool
 	outboxStore *outbox.Store
+	logger      *slog.Logger
 }
 
-func NewAuthRepository(pool *pgxpool.Pool) AuthRepository {
+func NewAuthRepository(pool *pgxpool.Pool, log *slog.Logger) AuthRepository {
 	return &postgresAuthRepository{
 		pool:        pool,
 		outboxStore: outbox.NewStore(),
+		logger:      log,
 	}
 }
 
@@ -61,8 +64,10 @@ func (r *postgresAuthRepository) GetByEmail(ctx context.Context, email string) (
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Warn("User not found", "email", email)
 			return nil, ErrNotFound
 		}
+		r.logger.Error("Failed to get user by email", "email", email, "error", err)
 		return nil, fmt.Errorf("repository: get by email failed: %w", err)
 	}
 	return &cred, nil
@@ -76,6 +81,7 @@ func (r *postgresAuthRepository) UpdateFailedLogin(ctx context.Context, id uuid.
 	`
 	_, err := r.pool.Exec(ctx, query, failedCount, lockedUntil, id)
 	if err != nil {
+		r.logger.Error("Failed to update failed login", "id", id, "error", err)
 		return fmt.Errorf("repository: update failed login failed: %w", err)
 	}
 	return nil
@@ -89,6 +95,7 @@ func (r *postgresAuthRepository) ResetFailedLogin(ctx context.Context, id uuid.U
 	`
 	_, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
+		r.logger.Error("Failed to reset failed login", "id", id, "error", err)
 		return fmt.Errorf("repository: reset failed login failed: %w", err)
 	}
 	return nil
@@ -108,6 +115,7 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 		WHERE user_id = $1
 	`, refreshToken.UserID)
 	if err != nil {
+		r.logger.Error("Failed to reset counters in tx", "user_id", refreshToken.UserID, "error", err)
 		return fmt.Errorf("repository: reset counters in tx failed: %w", err)
 	}
 
@@ -120,17 +128,20 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 		VALUES ($1, $2, $3, $4, $5, NOW())
 	`, refreshToken.ID, refreshToken.UserID, refreshToken.TokenHash, refreshToken.ExpiresAt, refreshToken.Revoked)
 	if err != nil {
+		r.logger.Error("Failed to insert refresh token", "user_id", refreshToken.UserID, "error", err)
 		return fmt.Errorf("repository: insert refresh token failed: %w", err)
 	}
 
 	// 3. Insert outbox audit event if provided
 	if evt != nil {
 		if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+			r.logger.Error("Failed to insert outbox event", "event", evt, "error", err)
 			return fmt.Errorf("repository: insert outbox event failed: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit tx", "error", err)
 		return fmt.Errorf("repository: commit tx failed: %w", err)
 	}
 	return nil
@@ -149,6 +160,7 @@ func (r *postgresAuthRepository) CreateCredential(ctx context.Context, cred *mod
 	`
 	_, err := r.pool.Exec(ctx, query, cred.ID, cred.UserID, cred.Email, cred.Phone, cred.PasswordHash, cred.Role, cred.EmailVerified, cred.IsActive)
 	if err != nil {
+		r.logger.Error("Failed to create credential", "error", err)
 		return fmt.Errorf("repository: create credential failed: %w", err)
 	}
 	return nil
@@ -172,8 +184,10 @@ func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash 
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Warn("Refresh token not found", "token_hash", tokenHash)
 			return nil, ErrNotFound
 		}
+		r.logger.Error("Failed to get refresh token", "token_hash", tokenHash, "error", err)
 		return nil, fmt.Errorf("repository: get refresh token failed: %w", err)
 	}
 	return &tok, nil
@@ -187,6 +201,7 @@ func (r *postgresAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid
 	`
 	_, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
+		r.logger.Error("Failed to revoke refresh token", "id", id, "error", err)
 		return fmt.Errorf("repository: revoke refresh token failed: %w", err)
 	}
 	return nil

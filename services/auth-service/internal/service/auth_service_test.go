@@ -112,7 +112,7 @@ func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 			ExpiryMinutes: 15,
 		},
 	}
-	svc := NewAuthService(mockRepo, cfg)
+	svc := NewAuthService(mockRepo, cfg, nil)
 	return svc, mockRepo, cfg
 }
 
