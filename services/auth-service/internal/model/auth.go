@@ -6,13 +6,34 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
+type Role string
+
+const (
+	RoleCustomer Role = "CUSTOMER"
+	RoleMerchant Role = "MERCHANT"
+	RoleAdmin    Role = "ADMIN"
+)
+
+func (r Role) String() string {
+	return string(r)
+}
+
+func (r Role) IsValid() bool {
+	switch r {
+	case RoleCustomer, RoleMerchant, RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
+
 type AuthCredential struct {
 	ID               uuid.UUID  `json:"id" db:"id"`
 	UserID           uuid.UUID  `json:"user_id" db:"user_id"`
 	Email            string     `json:"email" db:"email"`
 	Phone            *string    `json:"phone,omitempty" db:"phone"`
 	PasswordHash     string     `json:"-" db:"password_hash"`
-	Role             string     `json:"role" db:"role"`
+	Role             Role       `json:"role" db:"role"`
 	EmailVerified    bool       `json:"email_verified" db:"email_verified"`
 	IsActive         bool       `json:"is_active" db:"is_active"`
 	FailedLoginCount int        `json:"failed_login_count" db:"failed_login_count"`

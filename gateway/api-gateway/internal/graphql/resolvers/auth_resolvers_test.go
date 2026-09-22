@@ -39,7 +39,7 @@ func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest,
 			Email:     "customer@example.com",
 			FirstName: "John",
 			LastName:  "Doe",
-			Role:      "CUSTOMER",
+			Role:      string(model.RoleCustomer),
 		},
 	}, nil
 }
@@ -93,8 +93,8 @@ func TestRegisterResolver_Customer(t *testing.T) {
 	}
 
 	// Verify payload.User is populated
-	if payload.User == nil || payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
-		t.Errorf("expected payload user role CUSTOMER, got %+v", payload.User)
+	if payload.User == nil || payload.User.Role == nil || *payload.User.Role != string(model.RoleCustomer) {
+		t.Errorf("expected payload user role %s, got %+v", model.RoleCustomer, payload.User)
 	}
 }
 
@@ -150,8 +150,8 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 	if payload.User == nil {
 		t.Fatal("expected non-null user in AuthPayload")
 	}
-	if payload.User.Role == nil || *payload.User.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got '%v'", payload.User.Role)
+	if payload.User.Role == nil || *payload.User.Role != string(model.RoleMerchant) {
+		t.Errorf("expected role %s, got '%v'", model.RoleMerchant, payload.User.Role)
 	}
 	if payload.User.Email != "merchant@example.com" {
 		t.Errorf("expected email 'merchant@example.com', got '%s'", payload.User.Email)

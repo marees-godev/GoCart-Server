@@ -56,11 +56,11 @@ func (m *mockAuthRepository) GetByEmail(ctx context.Context, email string) (*mod
 	return &c, nil
 }
 
-func (m *mockAuthRepository) GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error) {
+func (m *mockAuthRepository) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
 	if m.getByEmailErr != nil {
 		return nil, m.getByEmailErr
 	}
-	key := email + ":" + role
+	key := email + ":" + role.String()
 	cred, ok := m.byEmailRole[key]
 	if !ok {
 		return nil, repository.ErrNotFound
@@ -100,7 +100,7 @@ func (m *mockAuthRepository) CreateCredential(ctx context.Context, cred *model.A
 		m.byEmailRole = make(map[string]*model.AuthCredential)
 	}
 	m.byEmail[cred.Email] = cred
-	m.byEmailRole[cred.Email+":"+cred.Role] = cred
+	m.byEmailRole[cred.Email+":"+cred.Role.String()] = cred
 	return nil
 }
 
@@ -148,7 +148,7 @@ func TestLogin_Success(t *testing.T) {
 		UserID:           userID,
 		Email:            "user@example.com",
 		PasswordHash:     string(hashedPassword),
-		Role:             "customer",
+		Role:             model.RoleCustomer,
 		IsActive:         true,
 		FailedLoginCount: 0,
 	}
@@ -188,8 +188,8 @@ func TestLogin_Success(t *testing.T) {
 	if claims.Subject != userID.String() {
 		t.Errorf("expected sub %s, got %s", userID.String(), claims.Subject)
 	}
-	if claims.Role != "customer" {
-		t.Errorf("expected role customer, got %s", claims.Role)
+	if claims.Role != model.RoleCustomer.String() {
+		t.Errorf("expected role %s, got %s", model.RoleCustomer, claims.Role)
 	}
 	if claims.ID == "" {
 		t.Error("expected jti claim to be populated")
@@ -233,7 +233,7 @@ func TestLogin_InvalidEmailOrPassword_GenericResponse(t *testing.T) {
 		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "user@example.com",
 		PasswordHash: string(hashedPassword),
-		Role:         "customer",
+		Role:         model.RoleCustomer,
 		IsActive:     true,
 	}
 
@@ -380,8 +380,8 @@ func TestRegister_Customer_Success(t *testing.T) {
 	if cred == nil {
 		t.Fatal("expected credential stored in repository")
 	}
-	if cred.Role != "CUSTOMER" {
-		t.Errorf("expected role CUSTOMER, got %s", cred.Role)
+	if cred.Role != model.RoleCustomer {
+		t.Errorf("expected role %s, got %s", model.RoleCustomer, cred.Role)
 	}
 
 	// Verify outbox event
@@ -422,8 +422,8 @@ func TestRegister_Merchant_Success(t *testing.T) {
 	if cred == nil {
 		t.Fatal("expected credential stored in repository")
 	}
-	if cred.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got %s", cred.Role)
+	if cred.Role != model.RoleMerchant {
+		t.Errorf("expected role %s, got %s", model.RoleMerchant, cred.Role)
 	}
 
 	// Verify outbox event

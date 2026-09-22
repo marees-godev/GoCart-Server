@@ -18,7 +18,7 @@ var ErrNotFound = errors.New("record not found")
 
 type AuthRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.AuthCredential, error)
-	GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error)
+	GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error)
 	UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error
 	ResetFailedLogin(ctx context.Context, id uuid.UUID) error
 	CreateLoginSession(ctx context.Context, refreshToken *model.RefreshToken, evt *outbox.Event) error
@@ -77,7 +77,7 @@ func (r *postgresAuthRepository) GetByEmail(ctx context.Context, email string) (
 	return &cred, nil
 }
 
-func (r *postgresAuthRepository) GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error) {
+func (r *postgresAuthRepository) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
 	query := `
 		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
 		FROM auth_credentials
@@ -85,7 +85,7 @@ func (r *postgresAuthRepository) GetByEmailAndRole(ctx context.Context, email, r
 		LIMIT 1
 	`
 	var cred model.AuthCredential
-	err := r.pool.QueryRow(ctx, query, email, role).Scan(
+	err := r.pool.QueryRow(ctx, query, email, role.String()).Scan(
 		&cred.ID,
 		&cred.UserID,
 		&cred.Email,

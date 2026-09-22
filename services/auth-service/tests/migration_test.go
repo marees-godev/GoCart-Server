@@ -84,7 +84,7 @@ func TestAuthModelSecurityAndFields(t *testing.T) {
 		UserID:           uuid.Must(uuid.NewV7()),
 		Email:            "test@example.com",
 		PasswordHash:     "$2a$12$securehash",
-		Role:             "customer",
+		Role:             model.RoleCustomer,
 		EmailVerified:    true,
 		IsActive:         true,
 		FailedLoginCount: 3,

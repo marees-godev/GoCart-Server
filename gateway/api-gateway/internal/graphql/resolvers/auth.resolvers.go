@@ -99,9 +99,9 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 			}
 		}
 		if user == nil && res.UserId != "" {
-			role := "CUSTOMER"
+			role := string(model.RoleCustomer)
 			if isMerchant {
-				role = "MERCHANT"
+				role = string(model.RoleMerchant)
 			}
 			user = &model.User{
 				ID:        res.UserId,

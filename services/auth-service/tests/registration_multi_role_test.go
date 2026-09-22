@@ -38,8 +38,8 @@ func (r *inMemoryAuthRepo) GetByEmail(ctx context.Context, email string) (*model
 	return nil, repository.ErrNotFound
 }
 
-func (r *inMemoryAuthRepo) GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error) {
-	key := strings.ToLower(email) + ":" + strings.ToUpper(role)
+func (r *inMemoryAuthRepo) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
+	key := strings.ToLower(email) + ":" + strings.ToUpper(role.String())
 	cred, ok := r.byEmailRole[key]
 	if !ok {
 		return nil, repository.ErrNotFound
@@ -48,7 +48,7 @@ func (r *inMemoryAuthRepo) GetByEmailAndRole(ctx context.Context, email, role st
 }
 
 func (r *inMemoryAuthRepo) CreateCredential(ctx context.Context, cred *model.AuthCredential) error {
-	key := strings.ToLower(cred.Email) + ":" + strings.ToUpper(cred.Role)
+	key := strings.ToLower(cred.Email) + ":" + strings.ToUpper(cred.Role.String())
 	if _, exists := r.byEmailRole[key]; exists {
 		return appErrors.Conflict("user with this email and role already exists")
 	}
@@ -109,8 +109,8 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		t.Fatalf("expected valid token and userId for customer, got %+v", custResp)
 	}
 
-	custCred, _ := repo.GetByEmailAndRole(ctx, testEmail, "CUSTOMER")
-	if custCred == nil || custCred.Role != "CUSTOMER" {
+	custCred, _ := repo.GetByEmailAndRole(ctx, testEmail, model.RoleCustomer)
+	if custCred == nil || custCred.Role != model.RoleCustomer {
 		t.Fatalf("expected CUSTOMER credential to be saved in repository")
 	}
 
@@ -132,8 +132,8 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		t.Errorf("expected distinct UserIds for customer and merchant, got identical: %s", custResp.UserId)
 	}
 
-	merchCred, _ := repo.GetByEmailAndRole(ctx, testEmail, "MERCHANT")
-	if merchCred == nil || merchCred.Role != "MERCHANT" {
+	merchCred, _ := repo.GetByEmailAndRole(ctx, testEmail, model.RoleMerchant)
+	if merchCred == nil || merchCred.Role != model.RoleMerchant {
 		t.Fatalf("expected MERCHANT credential to be saved in repository")
 	}
 
