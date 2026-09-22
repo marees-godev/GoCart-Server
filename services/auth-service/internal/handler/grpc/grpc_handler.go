@@ -16,6 +16,9 @@ type AuthGRPCHandler struct {
 }
 
 func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *AuthGRPCHandler {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &AuthGRPCHandler{
 		authService: authService,
 		logger:      log,

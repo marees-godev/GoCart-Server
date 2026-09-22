@@ -33,6 +33,9 @@ type postgresAuthRepository struct {
 }
 
 func NewAuthRepository(pool *pgxpool.Pool, log *slog.Logger) AuthRepository {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &postgresAuthRepository{
 		pool:        pool,
 		outboxStore: outbox.NewStore(),

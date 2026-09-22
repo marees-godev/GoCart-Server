@@ -42,6 +42,9 @@ type authService struct {
 }
 
 func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger) AuthService {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &authService{
 		repo:   repo,
 		cfg:    cfg,
