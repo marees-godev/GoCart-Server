@@ -46,10 +46,11 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 
 func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Register(ctx, &dto.RegisterRequest{
-		Email:     req.GetEmail(),
-		Password:  req.GetPassword(),
-		FirstName: req.GetFirstName(),
-		LastName:  req.GetLastName(),
+		Email:      req.GetEmail(),
+		Password:   req.GetPassword(),
+		FirstName:  req.GetFirstName(),
+		LastName:   req.GetLastName(),
+		IsMerchant: req.GetIsMerchant(),
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))

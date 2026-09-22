@@ -2235,6 +2235,7 @@ input RegisterInput {
   password: String!
   firstName: String
   lastName: String
+  isMerchant: Boolean
 }
 
 extend type Mutation {
@@ -17559,7 +17560,7 @@ func (ec *executionContext) unmarshalInputRegisterInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email", "password", "firstName", "lastName"}
+	fieldsInOrder := [...]string{"email", "password", "firstName", "lastName", "isMerchant"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -17594,6 +17595,13 @@ func (ec *executionContext) unmarshalInputRegisterInput(ctx context.Context, obj
 				return it, err
 			}
 			it.LastName = data
+		case "isMerchant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isMerchant"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsMerchant = data
 		}
 	}
 

@@ -104,7 +104,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID: cred.UserID.String(),
-		Role:   cred.Role,
+		Role:   cred.Role.String(),
 		Email:  cred.Email,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
@@ -130,7 +130,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	eventPayload, _ := json.Marshal(map[string]any{
 		"user_id":      cred.UserID.String(),
 		"email":        cred.Email,
-		"role":         cred.Role,
+		"role":         cred.Role.String(),
 		"logged_in_at": time.Now().UTC(),
 	})
 
@@ -163,10 +163,15 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	existing, err := s.repo.GetByEmail(ctx, req.Email)
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+
+	existing, err := s.repo.GetByEmailAndRole(ctx, req.Email, role)
 	if err == nil && existing != nil {
-		s.logger.Warn("Registration failed: user already exists", "email", req.Email)
-		return nil, appErrors.Conflict("user with this email already exists")
+		s.logger.Warn("Registration failed: user with email and role already exists", "email", req.Email, "role", role.String())
+		return nil, appErrors.Conflict("user with this email and role already exists")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -182,7 +187,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		UserID:        userID,
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
-		Role:          "CUSTOMER",
+		Role:          role,
 		EmailVerified: false,
 		IsActive:      true,
 	}
@@ -199,7 +204,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID: userID.String(),
-		Role:   cred.Role,
+		Role:   cred.Role.String(),
 		Email:  cred.Email,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
@@ -225,16 +230,23 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	eventPayload, _ := json.Marshal(map[string]any{
 		"user_id":       userID.String(),
 		"email":         cred.Email,
-		"role":          cred.Role,
+		"role":          cred.Role.String(),
 		"registered_at": time.Now().UTC(),
 	})
+
+	eventType := "UserRegistered"
+	topic := "auth.user.registered"
+	if role == model.RoleMerchant {
+		eventType = "MerchantRegistered"
+		topic = "auth.merchant.registered"
+	}
 
 	outboxEvt := &outbox.Event{
 		ID:            uuid.Must(uuid.NewV7()),
 		AggregateType: "auth",
 		AggregateID:   userID.String(),
-		EventType:     "UserRegistered",
-		Topic:         "auth.user.registered",
+		EventType:     eventType,
+		Topic:         topic,
 		Payload:       eventPayload,
 	}
 
@@ -303,7 +315,7 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID: tok.UserID.String(),
-		Role:   "CUSTOMER",
+		Role:   model.RoleCustomer.String(),
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
 		s.logger.Error("Refresh token failed: generate access token error", "user_id", tok.UserID.String(), "error", err)

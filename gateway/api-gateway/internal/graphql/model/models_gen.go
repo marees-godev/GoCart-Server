@@ -278,10 +278,11 @@ type RefundPayload struct {
 }
 
 type RegisterInput struct {
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
+	Email      string  `json:"email"`
+	Password   string  `json:"password"`
+	FirstName  *string `json:"firstName,omitempty"`
+	LastName   *string `json:"lastName,omitempty"`
+	IsMerchant *bool   `json:"isMerchant,omitempty"`
 }
 
 type RequestReturnInput struct {
