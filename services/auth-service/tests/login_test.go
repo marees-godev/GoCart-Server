@@ -74,8 +74,8 @@ func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
 			ExpiryMinutes: 15,
 		},
 	}
-	svc := service.NewAuthService(repo, cfg)
-	grpcHandler := authGRPC.NewAuthGRPCHandler(svc)
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
 
 	loginResp, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
 		Email:    "user@example.com",
@@ -123,8 +123,8 @@ func TestGRPCLogin_InvalidCredentials(t *testing.T) {
 	cfg := &config.Config{
 		JWT: config.JWTConfig{Secret: "secret"},
 	}
-	svc := service.NewAuthService(repo, cfg)
-	grpcHandler := authGRPC.NewAuthGRPCHandler(svc)
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
 
 	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
 		Email:    "nonexistent@example.com",
