@@ -29,6 +29,13 @@ func (m *mockRepoForGRPC) GetByEmail(ctx context.Context, email string) (*model.
 	return nil, repository.ErrNotFound
 }
 
+func (m *mockRepoForGRPC) GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error) {
+	if m.user != nil && m.user.Email == email && m.user.Role == role {
+		return m.user, nil
+	}
+	return nil, repository.ErrNotFound
+}
+
 func (m *mockRepoForGRPC) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
 	return nil
 }

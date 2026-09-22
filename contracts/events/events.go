@@ -61,3 +61,19 @@ type InventoryReservationFailedEvent struct {
 	Reason    string    `json:"reason"`
 	FailedAt  time.Time `json:"failed_at"`
 }
+
+// UserRegisteredEvent represents the payload for auth.user.registered domain event.
+type UserRegisteredEvent struct {
+	UserID       string    `json:"user_id"`
+	Email        string    `json:"email"`
+	Role         string    `json:"role"`
+	RegisteredAt time.Time `json:"registered_at"`
+}
+
+// MerchantRegisteredEvent represents the payload for auth.merchant.registered domain event.
+type MerchantRegisteredEvent struct {
+	UserID       string    `json:"user_id"`
+	Email        string    `json:"email"`
+	Role         string    `json:"role"`
+	RegisteredAt time.Time `json:"registered_at"`
+}

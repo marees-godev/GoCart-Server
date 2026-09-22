@@ -115,3 +115,25 @@ func TestTokenModelsFields(t *testing.T) {
 		t.Errorf("PasswordResetToken TokenHash must exist and be ignored in json output")
 	}
 }
+
+func TestCompoundUniqueMigrationSQL(t *testing.T) {
+	migrationPath := filepath.Join("..", "migrations", "000003_email_role_unique.sql")
+	content, err := os.ReadFile(migrationPath)
+	if err != nil {
+		t.Fatalf("failed to read migration file: %v", err)
+	}
+
+	sql := string(content)
+
+	requiredStrings := []string{
+		"ALTER TABLE auth_credentials DROP CONSTRAINT IF EXISTS auth_credentials_email_key",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_credentials_email_role ON auth_credentials (LOWER(email), role)",
+	}
+
+	for _, str := range requiredStrings {
+		if !strings.Contains(sql, str) {
+			t.Errorf("000003 migration missing required SQL: %s", str)
+		}
+	}
+}
+

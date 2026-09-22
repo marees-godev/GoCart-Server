@@ -20,6 +20,7 @@ import (
 
 type mockAuthRepository struct {
 	byEmail           map[string]*model.AuthCredential
+	byEmailRole       map[string]*model.AuthCredential
 	failedCountMap    map[uuid.UUID]int
 	lockedUntilMap    map[uuid.UUID]*time.Time
 	refreshTokens     []*model.RefreshToken
@@ -31,6 +32,7 @@ type mockAuthRepository struct {
 func newMockAuthRepository() *mockAuthRepository {
 	return &mockAuthRepository{
 		byEmail:        make(map[string]*model.AuthCredential),
+		byEmailRole:    make(map[string]*model.AuthCredential),
 		failedCountMap: make(map[uuid.UUID]int),
 		lockedUntilMap: make(map[uuid.UUID]*time.Time),
 	}
@@ -51,6 +53,19 @@ func (m *mockAuthRepository) GetByEmail(ctx context.Context, email string) (*mod
 	if lu, ok := m.lockedUntilMap[cred.ID]; ok {
 		c.LockedUntil = lu
 	}
+	return &c, nil
+}
+
+func (m *mockAuthRepository) GetByEmailAndRole(ctx context.Context, email, role string) (*model.AuthCredential, error) {
+	if m.getByEmailErr != nil {
+		return nil, m.getByEmailErr
+	}
+	key := email + ":" + role
+	cred, ok := m.byEmailRole[key]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	c := *cred
 	return &c, nil
 }
 
@@ -81,7 +96,11 @@ func (m *mockAuthRepository) CreateCredential(ctx context.Context, cred *model.A
 	if m.byEmail == nil {
 		m.byEmail = make(map[string]*model.AuthCredential)
 	}
+	if m.byEmailRole == nil {
+		m.byEmailRole = make(map[string]*model.AuthCredential)
+	}
 	m.byEmail[cred.Email] = cred
+	m.byEmailRole[cred.Email+":"+cred.Role] = cred
 	return nil
 }
 
@@ -335,3 +354,140 @@ func TestLogin_LockoutAfterFailedAttempts(t *testing.T) {
 		t.Error("expected locked_until to be set in future")
 	}
 }
+
+func TestRegister_Customer_Success(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	req := &dto.RegisterRequest{
+		Email:      "customer@example.com",
+		Password:   "Password123!",
+		FirstName:  "John",
+		LastName:   "Doe",
+		IsMerchant: false,
+	}
+
+	resp, err := svc.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful registration, got err: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" || resp.UserID == "" {
+		t.Errorf("expected populated response fields, got %+v", resp)
+	}
+
+	// Verify credential in mock repo has role CUSTOMER
+	cred := mockRepo.byEmail["customer@example.com"]
+	if cred == nil {
+		t.Fatal("expected credential stored in repository")
+	}
+	if cred.Role != "CUSTOMER" {
+		t.Errorf("expected role CUSTOMER, got %s", cred.Role)
+	}
+
+	// Verify outbox event
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
+	}
+	evt := mockRepo.outboxEvents[0]
+	if evt.EventType != "UserRegistered" {
+		t.Errorf("expected EventType UserRegistered, got %s", evt.EventType)
+	}
+	if evt.Topic != "auth.user.registered" {
+		t.Errorf("expected Topic auth.user.registered, got %s", evt.Topic)
+	}
+}
+
+func TestRegister_Merchant_Success(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	req := &dto.RegisterRequest{
+		Email:      "merchant@example.com",
+		Password:   "Password123!",
+		FirstName:  "Jane",
+		LastName:   "Merchant",
+		IsMerchant: true,
+	}
+
+	resp, err := svc.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful registration, got err: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" || resp.UserID == "" {
+		t.Errorf("expected populated response fields, got %+v", resp)
+	}
+
+	// Verify credential in mock repo has role MERCHANT
+	cred := mockRepo.byEmail["merchant@example.com"]
+	if cred == nil {
+		t.Fatal("expected credential stored in repository")
+	}
+	if cred.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %s", cred.Role)
+	}
+
+	// Verify outbox event
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
+	}
+	evt := mockRepo.outboxEvents[0]
+	if evt.EventType != "MerchantRegistered" {
+		t.Errorf("expected EventType MerchantRegistered, got %s", evt.EventType)
+	}
+	if evt.Topic != "auth.merchant.registered" {
+		t.Errorf("expected Topic auth.merchant.registered, got %s", evt.Topic)
+	}
+}
+
+func TestRegister_CompoundUniqueness_SameEmailBothRoles(t *testing.T) {
+	svc, _, _ := setupTestService()
+
+	email := "shared@example.com"
+
+	// 1. Register as CUSTOMER -> should succeed
+	custReq := &dto.RegisterRequest{
+		Email:      email,
+		Password:   "Password123!",
+		IsMerchant: false,
+	}
+	custResp, err := svc.Register(context.Background(), custReq)
+	if err != nil {
+		t.Fatalf("expected customer registration to succeed, got: %v", err)
+	}
+
+	// 2. Register same email as MERCHANT -> should also succeed
+	merchReq := &dto.RegisterRequest{
+		Email:      email,
+		Password:   "Password123!",
+		IsMerchant: true,
+	}
+	merchResp, err := svc.Register(context.Background(), merchReq)
+	if err != nil {
+		t.Fatalf("expected merchant registration with same email to succeed, got: %v", err)
+	}
+
+	if custResp.UserID == merchResp.UserID {
+		t.Error("expected different user IDs for customer and merchant credentials")
+	}
+
+	// 3. Registering again as CUSTOMER -> should fail with 409 Conflict
+	_, err = svc.Register(context.Background(), custReq)
+	if err == nil {
+		t.Fatal("expected conflict error when re-registering as customer")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 409 {
+		t.Errorf("expected HTTP 409 Conflict, got %d", appErr.HTTPStatus)
+	}
+
+	// 4. Registering again as MERCHANT -> should fail with 409 Conflict
+	_, err = svc.Register(context.Background(), merchReq)
+	if err == nil {
+		t.Fatal("expected conflict error when re-registering as merchant")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 409 {
+		t.Errorf("expected HTTP 409 Conflict, got %d", appErr.HTTPStatus)
+	}
+}
+

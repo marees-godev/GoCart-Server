@@ -163,10 +163,15 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	existing, err := s.repo.GetByEmail(ctx, req.Email)
+	role := "CUSTOMER"
+	if req.IsMerchant {
+		role = "MERCHANT"
+	}
+
+	existing, err := s.repo.GetByEmailAndRole(ctx, req.Email, role)
 	if err == nil && existing != nil {
-		s.logger.Warn("Registration failed: user already exists", "email", req.Email)
-		return nil, appErrors.Conflict("user with this email already exists")
+		s.logger.Warn("Registration failed: user with email and role already exists", "email", req.Email, "role", role)
+		return nil, appErrors.Conflict("user with this email and role already exists")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -182,7 +187,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		UserID:        userID,
 		Email:         req.Email,
 		PasswordHash:  string(hashedPassword),
-		Role:          "CUSTOMER",
+		Role:          role,
 		EmailVerified: false,
 		IsActive:      true,
 	}
@@ -229,12 +234,19 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		"registered_at": time.Now().UTC(),
 	})
 
+	eventType := "UserRegistered"
+	topic := "auth.user.registered"
+	if role == "MERCHANT" {
+		eventType = "MerchantRegistered"
+		topic = "auth.merchant.registered"
+	}
+
 	outboxEvt := &outbox.Event{
 		ID:            uuid.Must(uuid.NewV7()),
 		AggregateType: "auth",
 		AggregateID:   userID.String(),
-		EventType:     "UserRegistered",
-		Topic:         "auth.user.registered",
+		EventType:     eventType,
+		Topic:         topic,
 		Payload:       eventPayload,
 	}
 

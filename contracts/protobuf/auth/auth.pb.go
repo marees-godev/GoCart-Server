@@ -79,6 +79,7 @@ type RegisterRequest struct {
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	FirstName     string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName      string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	IsMerchant    bool                   `protobuf:"varint,5,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -139,6 +140,13 @@ func (x *RegisterRequest) GetLastName() string {
 		return x.LastName
 	}
 	return ""
+}
+
+func (x *RegisterRequest) GetIsMerchant() bool {
+	if x != nil {
+		return x.IsMerchant
+	}
+	return false
 }
 
 type ValidateTokenRequest struct {
