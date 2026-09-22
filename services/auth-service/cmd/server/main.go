@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
@@ -101,12 +102,12 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	// 6. Initialize business logic layers & gRPC handler
-	authRepo := repository.NewAuthRepository(db.Pool)
-	authSvc := service.NewAuthService(authRepo, cfg)
+	authRepo := repository.NewAuthRepository(db.Pool, log)
+	authSvc := service.NewAuthService(authRepo, cfg, log)
 
 	// 7. Initialize gRPC server for all Auth operations
-	grpcServer := grpc.NewServer()
-	grpcHandler := authGRPC.NewAuthGRPCHandler(authSvc)
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
+	grpcHandler := authGRPC.NewAuthGRPCHandler(authSvc, log)
 	pb.RegisterAuthServiceServer(grpcServer, grpcHandler)
 
 	serverErr := make(chan error, 2)
@@ -115,6 +116,7 @@ func main() {
 		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			serverErr <- err
+			return
 		}
 	}()
 
