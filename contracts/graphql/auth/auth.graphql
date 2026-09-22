@@ -13,6 +13,7 @@ input RegisterInput {
   password: String!
   firstName: String
   lastName: String
+  isMerchant: Boolean
 }
 
 extend type Mutation {

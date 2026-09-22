@@ -78,21 +78,37 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		ln = *input.LastName
 	}
 
+	isMerchant := input.IsMerchant != nil && *input.IsMerchant
+
 	if r.Clients.AuthClient != nil {
 		res, err := r.Clients.AuthClient.Register(ctx, &authpb.RegisterRequest{
-			Email:     input.Email,
-			Password:  input.Password,
-			FirstName: fn,
-			LastName:  ln,
+			Email:      input.Email,
+			Password:   input.Password,
+			FirstName:  fn,
+			LastName:   ln,
+			IsMerchant: isMerchant,
 		})
 		if err != nil {
 			return nil, err
 		}
 		var user *model.User
-		if res.UserId != "" && r.Clients.UserClient != nil {
+		if res.UserId != "" && !isMerchant && r.Clients.UserClient != nil {
 			uRes, _ := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
 			if uRes != nil {
 				user = toModelUser(uRes.User)
+			}
+		}
+		if user == nil && res.UserId != "" {
+			role := string(model.RoleCustomer)
+			if isMerchant {
+				role = string(model.RoleMerchant)
+			}
+			user = &model.User{
+				ID:        res.UserId,
+				Email:     input.Email,
+				FirstName: &fn,
+				LastName:  &ln,
+				Role:      &role,
 			}
 		}
 		return &model.AuthPayload{

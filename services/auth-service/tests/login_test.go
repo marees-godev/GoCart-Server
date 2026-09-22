@@ -29,6 +29,13 @@ func (m *mockRepoForGRPC) GetByEmail(ctx context.Context, email string) (*model.
 	return nil, repository.ErrNotFound
 }
 
+func (m *mockRepoForGRPC) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
+	if m.user != nil && m.user.Email == email && m.user.Role == role {
+		return m.user, nil
+	}
+	return nil, repository.ErrNotFound
+}
+
 func (m *mockRepoForGRPC) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
 	return nil
 }
@@ -63,7 +70,7 @@ func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
 		UserID:       userID,
 		Email:        "user@example.com",
 		PasswordHash: string(hashed),
-		Role:         "customer",
+		Role:         model.RoleCustomer,
 		IsActive:     true,
 	}
 
@@ -110,8 +117,8 @@ func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
 	if claims.Subject != userID.String() {
 		t.Errorf("expected sub claim %s, got %s", userID.String(), claims.Subject)
 	}
-	if claims.Role != "customer" {
-		t.Errorf("expected role claim customer, got %s", claims.Role)
+	if claims.Role != model.RoleCustomer.String() {
+		t.Errorf("expected role claim %s, got %s", model.RoleCustomer, claims.Role)
 	}
 	if claims.ID == "" {
 		t.Error("expected jti claim to be present")
