@@ -24,8 +24,26 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
-	req := &userpb.GetUserRequest{Id: id}
-	res, err := r.Clients.UserClient.GetUser(ctx, req)
+	firstName := ""
+	if input.FirstName != nil {
+		firstName = *input.FirstName
+	}
+	lastName := ""
+	if input.LastName != nil {
+		lastName = *input.LastName
+	}
+	phone := ""
+	if input.Phone != nil {
+		phone = *input.Phone
+	}
+
+	req := &userpb.UpdateUserRequest{
+		Id:        id,
+		FirstName: firstName,
+		LastName:  lastName,
+		Phone:     phone,
+	}
+	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -245,3 +263,8 @@ func getAuthUserIDFromCtx(ctx context.Context) string {
 	}
 	return ""
 }
+
+func (r *Resolver) User(ctx context.Context, id string) (interface{}, error) {
+	return r.Query().User(ctx, id)
+}
+

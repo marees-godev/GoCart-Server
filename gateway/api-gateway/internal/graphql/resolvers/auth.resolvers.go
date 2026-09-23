@@ -115,3 +115,8 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 
 	return nil, appErrors.Internal(nil, "auth client unavailable")
 }
+
+func (r *Resolver) Me(ctx context.Context) (interface{}, error) {
+	return r.Query().Me(ctx)
+}
+
