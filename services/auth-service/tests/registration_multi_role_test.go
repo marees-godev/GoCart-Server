@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -106,6 +107,25 @@ func (r *inMemoryAuthRepo) RevokeRefreshToken(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
+type mockMerchantClient struct {
+	merchantpb.MerchantServiceClient
+	createdMerchants []*merchantpb.CreateMerchantRequest
+}
+
+func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.CreateMerchantRequest, opts ...grpc.CallOption) (*merchantpb.CreateMerchantResponse, error) {
+	m.createdMerchants = append(m.createdMerchants, in)
+	return &merchantpb.CreateMerchantResponse{
+		Merchant: &merchantpb.Merchant{
+			Id:            in.UserId,
+			UserId:        in.UserId,
+			BusinessName:  in.BusinessName,
+			BusinessEmail: in.BusinessEmail,
+			FirstName:     in.FirstName,
+			LastName:      in.LastName,
+		},
+	}, nil
+}
+
 func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 	repo := newInMemoryAuthRepo()
 	cfg := &config.Config{
@@ -114,7 +134,8 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 			ExpiryMinutes: 15,
 		},
 	}
-	authSvc := service.NewAuthService(repo, cfg, nil, &mockUserServiceClient{})
+	mockMerchant := &mockMerchantClient{}
+	authSvc := service.NewAuthService(repo, cfg, nil, &mockUserServiceClient{}, mockMerchant)
 	handler := authGRPC.NewAuthGRPCHandler(authSvc, nil)
 
 	ctx := context.Background()
@@ -162,6 +183,17 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 	merchCred, _ := repo.GetByEmailAndRole(ctx, testEmail, model.RoleMerchant)
 	if merchCred == nil || merchCred.Role != model.RoleMerchant {
 		t.Fatalf("expected MERCHANT credential to be saved in repository")
+	}
+
+	// Verify merchant service CreateMerchant was called
+	if len(mockMerchant.createdMerchants) != 1 {
+		t.Fatalf("expected 1 call to merchant service CreateMerchant, got %d", len(mockMerchant.createdMerchants))
+	}
+	if mockMerchant.createdMerchants[0].UserId != merchResp.UserId {
+		t.Errorf("expected merchant ID %s, got %s", merchResp.UserId, mockMerchant.createdMerchants[0].UserId)
+	}
+	if mockMerchant.createdMerchants[0].BusinessName != "John Merchant" {
+		t.Errorf("expected business name John Merchant, got %s", mockMerchant.createdMerchants[0].BusinessName)
 	}
 
 	// 3. Registering john@example.com again as a CUSTOMER -> Fails with 409 Conflict

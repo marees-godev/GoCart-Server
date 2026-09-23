@@ -16,7 +16,14 @@ const (
 	EventTypeInventoryReserved          = "InventoryReserved"
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
+	EventTypeUserRegistered             = "UserRegistered"
 )
+
+// Standard Topic Constants
+const (
+	TopicUserRegistered = "gocart.auth.user-registered"
+)
+
 
 // EventEnvelope is the standard envelope for all domain events across GoCart.
 type EventEnvelope struct {

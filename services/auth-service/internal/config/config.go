@@ -8,14 +8,19 @@ import (
 )
 
 type Config struct {
-	App            AppConfig
-	HTTP           HTTPConfig
-	GRPC           GRPCConfig
-	Database       DatabaseConfig
-	Logger         LoggerConfig
-	Tracing        TracingConfig
-	JWT            JWTConfig
+	App             AppConfig
+	HTTP            HTTPConfig
+	GRPC            GRPCConfig
+	Database        DatabaseConfig
+	Logger          LoggerConfig
+	Tracing         TracingConfig
+	JWT             JWTConfig
 	UserServiceAddr string
+	Services        ServicesConfig
+}
+
+type ServicesConfig struct {
+	MerchantServiceURL string
 }
 
 type AppConfig struct {
@@ -95,6 +100,9 @@ func LoadEnv() *Config {
 			ExpiryMinutes: GetEnvAsInt("JWT_EXPIRY_MINUTES", 60),
 		},
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
+		Services: ServicesConfig{
+			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),
+		},
 	}
 }
 

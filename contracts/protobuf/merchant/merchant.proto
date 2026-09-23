@@ -6,8 +6,12 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/me
 
 service MerchantService {
   rpc GetMerchant (GetMerchantRequest) returns (GetMerchantResponse);
+  rpc GetMerchantByUserID (GetMerchantByUserIDRequest) returns (GetMerchantResponse);
+  rpc ListMerchants (ListMerchantsRequest) returns (ListMerchantsResponse);
   rpc CreateMerchant (CreateMerchantRequest) returns (CreateMerchantResponse);
+  rpc UpdateMerchant (UpdateMerchantRequest) returns (UpdateMerchantResponse);
   rpc UpdateMerchantStatus (UpdateMerchantStatusRequest) returns (UpdateMerchantStatusResponse);
+  rpc DeleteMerchant (DeleteMerchantRequest) returns (DeleteMerchantResponse);
 }
 
 message Merchant {
@@ -17,31 +21,79 @@ message Merchant {
   string status = 4;
   string tax_id = 5;
   string created_at = 6;
+  string business_email = 7;
+  string business_phone = 8;
+  string rejection_reason = 9;
+  string updated_at = 10;
+  string first_name = 11;
+  string last_name = 12;
 }
 
 message GetMerchantRequest {
   string id = 1;
 }
 
+message GetMerchantByUserIDRequest {
+  string user_id = 1;
+}
+
 message GetMerchantResponse {
   Merchant merchant = 1;
+}
+
+message ListMerchantsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  string status = 3;
+}
+
+message ListMerchantsResponse {
+  repeated Merchant merchants = 1;
+  int32 total = 2;
 }
 
 message CreateMerchantRequest {
   string user_id = 1;
   string business_name = 2;
   string tax_id = 3;
+  string business_email = 4;
+  string business_phone = 5;
+  string first_name = 6;
+  string last_name = 7;
 }
 
 message CreateMerchantResponse {
   Merchant merchant = 1;
 }
 
+message UpdateMerchantRequest {
+  string id = 1;
+  string business_name = 2;
+  string business_email = 3;
+  string business_phone = 4;
+  string tax_id = 5;
+  string first_name = 6;
+  string last_name = 7;
+}
+
+message UpdateMerchantResponse {
+  Merchant merchant = 1;
+}
+
 message UpdateMerchantStatusRequest {
   string id = 1;
   string status = 2;
+  string rejection_reason = 3;
 }
 
 message UpdateMerchantStatusResponse {
   Merchant merchant = 1;
+}
+
+message DeleteMerchantRequest {
+  string id = 1;
+}
+
+message DeleteMerchantResponse {
+  bool success = 1;
 }

@@ -312,6 +312,11 @@ type AuthResponse struct {
 	TokenType     string                 `protobuf:"bytes,3,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
 	ExpiresIn     int64                  `protobuf:"varint,4,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	UserId        string                 `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role          string                 `protobuf:"bytes,6,opt,name=role,proto3" json:"role,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,7,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	BusinessEmail string                 `protobuf:"bytes,8,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
+	FirstName     string                 `protobuf:"bytes,9,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      string                 `protobuf:"bytes,10,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -381,6 +386,41 @@ func (x *AuthResponse) GetUserId() string {
 	return ""
 }
 
+func (x *AuthResponse) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetBusinessEmail() string {
+	if x != nil {
+		return x.BusinessEmail
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetLastName() string {
+	if x != nil {
+		return x.LastName
+	}
+	return ""
+}
+
 var File_contracts_protobuf_auth_auth_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
@@ -388,13 +428,15 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"\x7f\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"\xa0\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
-	"\tlast_name\x18\x04 \x01(\tR\blastName\",\n" +
+	"\tlast_name\x18\x04 \x01(\tR\blastName\x12\x1f\n" +
+	"\vis_merchant\x18\x05 \x01(\bR\n" +
+	"isMerchant\",\n" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"p\n" +
 	"\x15ValidateTokenResponse\x12\x14\n" +
@@ -403,7 +445,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x12\n" +
 	"\x04role\x18\x04 \x01(\tR\x04role\":\n" +
 	"\x13RefreshTokenRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\xad\x01\n" +
+	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\xc5\x02\n" +
 	"\fAuthResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -411,7 +453,15 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"token_type\x18\x03 \x01(\tR\ttokenType\x12\x1d\n" +
 	"\n" +
 	"expires_in\x18\x04 \x01(\x03R\texpiresIn\x12\x17\n" +
-	"\auser_id\x18\x05 \x01(\tR\x06userId2\xce\x02\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x12\n" +
+	"\x04role\x18\x06 \x01(\tR\x04role\x12\x1f\n" +
+	"\vmerchant_id\x18\a \x01(\tR\n" +
+	"merchantId\x12%\n" +
+	"\x0ebusiness_email\x18\b \x01(\tR\rbusinessEmail\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\t \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\n" +
+	" \x01(\tR\blastName2\xce\x02\n" +
 	"\vAuthService\x12C\n" +
 	"\x05Login\x12\x1c.gocart.auth.v1.LoginRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12I\n" +
 	"\bRegister\x12\x1f.gocart.auth.v1.RegisterRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12\\\n" +

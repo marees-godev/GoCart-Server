@@ -104,7 +104,7 @@ func main() {
 		defer grpcClients.Close()
 	}
 
-	gqlResolver := gwResolver.NewResolver(grpcClients, cfg.App.Version)
+	gqlResolver := gwResolver.NewResolverWithManager(grpcClients, clientMgr, cfg.App.Version)
 	gqlSchema, err := gwGraphQL.NewSchema(gqlResolver)
 	if err != nil {
 		log.Error("Failed to initialize GraphQL schema", "error", err)

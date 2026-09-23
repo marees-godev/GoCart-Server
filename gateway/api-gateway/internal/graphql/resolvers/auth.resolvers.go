@@ -7,6 +7,7 @@ package resolvers
 import (
 	"context"
 	"time"
+	"strings"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
@@ -16,50 +17,85 @@ import (
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
-	if r.Clients == nil {
-		return nil, appErrors.Internal(nil, "clients unavailable")
-	}
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	if r.Clients.AuthClient != nil {
-		res, err := r.Clients.AuthClient.Login(ctx, &authpb.LoginRequest{
-			Email:    input.Email,
-			Password: input.Password,
-		})
-		if err != nil {
-			return nil, err
-		}
-		var user *model.User
-		if res.UserId != "" && r.Clients.UserClient != nil {
-			uRes, _ := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
-			if uRes != nil {
-				user = toModelUser(uRes.User)
-			}
-		}
-		if user == nil && res.UserId != "" {
-			now := time.Now().UTC().Format(time.RFC3339)
-			user = &model.User{
-				ID:        res.UserId,
-				Email:     input.Email,
-				CreatedAt: &now,
-			}
-		}
-		return &model.AuthPayload{
-			Token: res.AccessToken,
-			User:  user,
-		}, nil
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
 	}
 
-	return nil, appErrors.Internal(nil, "auth client unavailable")
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.Login(ctx, &authpb.LoginRequest{
+		Email:    input.Email,
+		Password: input.Password,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var userClient userpb.UserServiceClient
+	if r.Clients != nil && r.Clients.UserClient != nil {
+		userClient = r.Clients.UserClient
+	} else if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
+		userClient = r.ClientMgr.UserClient
+	}
+
+	var user *model.User
+	if res.UserId != "" && userClient != nil {
+		uRes, _ := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
+		if uRes != nil {
+			user = toModelUser(uRes.User)
+		}
+	}
+	if user == nil && res.UserId != "" {
+		now := time.Now().UTC().Format(time.RFC3339)
+		user = &model.User{
+			ID:        res.UserId,
+			Email:     input.Email,
+			CreatedAt: &now,
+		}
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		User:  user,
+	}
+	if res.Role != "" {
+		rStr := res.Role
+		payload.Role = &rStr
+	}
+	if res.FirstName != "" {
+		fnStr := res.FirstName
+		payload.FirstName = &fnStr
+	} else if user != nil && user.FirstName != nil {
+		payload.FirstName = user.FirstName
+	}
+	if res.LastName != "" {
+		lnStr := res.LastName
+		payload.LastName = &lnStr
+	} else if user != nil && user.LastName != nil {
+		payload.LastName = user.LastName
+	}
+	if res.MerchantId != "" {
+		mID := res.MerchantId
+		payload.MerchantID = &mID
+	}
+	if res.BusinessEmail != "" {
+		bEmail := res.BusinessEmail
+		payload.BusinessEmail = &bEmail
+	}
+	return payload, nil
 }
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
-	if r.Clients == nil {
-		return nil, appErrors.Internal(nil, "clients unavailable")
-	}
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
@@ -79,39 +115,118 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 
 	isMerchant := input.IsMerchant != nil && *input.IsMerchant
 
-	if r.Clients.AuthClient != nil {
-		res, err := r.Clients.AuthClient.Register(ctx, &authpb.RegisterRequest{
-			Email:      input.Email,
-			Password:   input.Password,
-			FirstName:  fn,
-			LastName:   ln,
-			IsMerchant: isMerchant,
-		})
-		if err != nil {
-			return nil, err
-		}
-		var user *model.User
-		if res.UserId != "" && !isMerchant && r.Clients.UserClient != nil {
-			uRes, _ := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
-			if uRes != nil {
-				user = toModelUser(uRes.User)
-			}
-		}
-		if user == nil && res.UserId != "" {
-			now := time.Now().UTC().Format(time.RFC3339)
-			user = &model.User{
-				ID:        res.UserId,
-				Email:     input.Email,
-				FirstName: &fn,
-				LastName:  &ln,
-				CreatedAt: &now,
-			}
-		}
-		return &model.AuthPayload{
-			Token: res.AccessToken,
-			User:  user,
-		}, nil
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
 	}
 
-	return nil, appErrors.Internal(nil, "auth client unavailable")
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.Register(ctx, &authpb.RegisterRequest{
+		Email:      input.Email,
+		Password:   input.Password,
+		FirstName:  fn,
+		LastName:   ln,
+		IsMerchant: isMerchant,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var userClient userpb.UserServiceClient
+	if r.Clients != nil && r.Clients.UserClient != nil {
+		userClient = r.Clients.UserClient
+	} else if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
+		userClient = r.ClientMgr.UserClient
+	}
+
+	var user *model.User
+	if res.UserId != "" && !isMerchant && userClient != nil {
+		uRes, _ := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
+		if uRes != nil {
+			user = toModelUser(uRes.User)
+		}
+	}
+	if user == nil && res.UserId != "" {
+		now := time.Now().UTC().Format(time.RFC3339)
+		user = &model.User{
+			ID:        res.UserId,
+			Email:     input.Email,
+			FirstName: &fn,
+			LastName:  &ln,
+			CreatedAt: &now,
+		}
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		User:  user,
+	}
+
+	if res.Role != "" {
+		rStr := res.Role
+		payload.Role = &rStr
+	} else {
+		role := string(model.RoleCustomer)
+		if isMerchant {
+			role = string(model.RoleMerchant)
+		}
+		payload.Role = &role
+	}
+
+	if res.FirstName != "" {
+		fnStr := res.FirstName
+		payload.FirstName = &fnStr
+	} else if fn != "" {
+		payload.FirstName = &fn
+	}
+
+	if res.LastName != "" {
+		lnStr := res.LastName
+		payload.LastName = &lnStr
+	} else if ln != "" {
+		payload.LastName = &ln
+	}
+
+	if res.MerchantId != "" {
+		mID := res.MerchantId
+		payload.MerchantID = &mID
+	}
+
+	if res.BusinessEmail != "" {
+		bEmail := res.BusinessEmail
+		payload.BusinessEmail = &bEmail
+	} else if isMerchant {
+		payload.BusinessEmail = &input.Email
+	}
+
+	if isMerchant {
+		var mID string
+		if payload.MerchantID != nil {
+			mID = *payload.MerchantID
+		}
+		bEmail := input.Email
+		if payload.BusinessEmail != nil {
+			bEmail = *payload.BusinessEmail
+		}
+		bName := strings.TrimSpace(fn + " " + ln)
+		if bName == "" {
+			bName = input.Email
+		}
+		status := "PENDING"
+		payload.Merchant = &model.Merchant{
+			MerchantID:    mID,
+			BusinessName:  bName,
+			FirstName:     payload.FirstName,
+			LastName:      payload.LastName,
+			BusinessEmail: &bEmail,
+			Status:        status,
+		}
+	}
+
+	return payload, nil
 }
