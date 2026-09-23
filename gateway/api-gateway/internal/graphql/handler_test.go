@@ -12,15 +12,36 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
+	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"google.golang.org/grpc"
 )
 
 const testJWTSecret = "gocart-secret-key-change-in-production"
 
-type mockUserClient struct{}
+type mockAuthClient struct {
+	authpb.AuthServiceClient
+}
+
+func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opts ...grpc.CallOption) (*authpb.AuthResponse, error) {
+	return &authpb.AuthResponse{
+		AccessToken: "jwt-mock-token",
+		UserId:      "u-100",
+	}, nil
+}
+
+func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpc.CallOption) (*authpb.AuthResponse, error) {
+	return &authpb.AuthResponse{
+		AccessToken: "jwt-mock-register-token",
+		UserId:      "u-101",
+	}, nil
+}
+
+type mockUserClient struct {
+	userpb.UserServiceClient
+}
 
 func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest, opts ...grpc.CallOption) (*userpb.GetUserResponse, error) {
 	return &userpb.GetUserResponse{
@@ -29,32 +50,7 @@ func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest,
 			Email:     "user@example.com",
 			FirstName: "Jane",
 			LastName:  "Doe",
-			Role:      "CUSTOMER",
 			CreatedAt: "2026-01-01T00:00:00Z",
-		},
-	}, nil
-}
-
-func (m *mockUserClient) Login(ctx context.Context, in *userpb.LoginRequest, opts ...grpc.CallOption) (*userpb.AuthResponse, error) {
-	return &userpb.AuthResponse{
-		Token: "jwt-mock-token",
-		User: &userpb.User{
-			Id:    "u-100",
-			Email: in.Email,
-			Role:  "CUSTOMER",
-		},
-	}, nil
-}
-
-func (m *mockUserClient) Register(ctx context.Context, in *userpb.RegisterRequest, opts ...grpc.CallOption) (*userpb.AuthResponse, error) {
-	return &userpb.AuthResponse{
-		Token: "jwt-mock-register-token",
-		User: &userpb.User{
-			Id:        "u-101",
-			Email:     in.Email,
-			FirstName: in.FirstName,
-			LastName:  in.LastName,
-			Role:      "CUSTOMER",
 		},
 	}, nil
 }
@@ -141,6 +137,7 @@ func (m *mockUserClient) SetDefaultUserAddress(ctx context.Context, in *userpb.S
 func setupTestApp(introEnabled bool) *fiber.App {
 	clients := gatewayGRPC.NewClientsWithServices(
 		&mockUserClient{},
+		&mockAuthClient{},
 	)
 
 	resolver := gwResolver.NewResolver(clients)
@@ -399,7 +396,7 @@ func TestHandleMutation_Register(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `mutation { register(input: {email: "new@gocart.com", password: "password123", firstName: "Jane"}) { token user { id email } } }`,
+		"query": `mutation { register(input: {email: "new@gocart.com", password: "password123", firstName: "Jane", lastName: "Doe"}) { token user { id email } } }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 

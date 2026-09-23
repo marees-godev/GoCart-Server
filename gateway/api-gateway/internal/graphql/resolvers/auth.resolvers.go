@@ -6,10 +6,11 @@ package resolvers
 
 import (
 	"context"
+	"time"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
@@ -37,23 +38,17 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 				user = toModelUser(uRes.User)
 			}
 		}
+		if user == nil && res.UserId != "" {
+			now := time.Now().UTC().Format(time.RFC3339)
+			user = &model.User{
+				ID:        res.UserId,
+				Email:     input.Email,
+				CreatedAt: &now,
+			}
+		}
 		return &model.AuthPayload{
 			Token: res.AccessToken,
 			User:  user,
-		}, nil
-	}
-
-	if r.Clients.UserClient != nil {
-		res, err := r.Clients.UserClient.Login(ctx, &userpb.LoginRequest{
-			Email:    input.Email,
-			Password: input.Password,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &model.AuthPayload{
-			Token: res.Token,
-			User:  toModelUser(res.User),
 		}, nil
 	}
 
@@ -78,6 +73,10 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		ln = *input.LastName
 	}
 
+	if fn == "" || ln == "" {
+		return nil, appErrors.BadRequest("first_name and last_name are required")
+	}
+
 	isMerchant := input.IsMerchant != nil && *input.IsMerchant
 
 	if r.Clients.AuthClient != nil {
@@ -99,37 +98,18 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 			}
 		}
 		if user == nil && res.UserId != "" {
-			role := string(model.RoleCustomer)
-			if isMerchant {
-				role = string(model.RoleMerchant)
-			}
+			now := time.Now().UTC().Format(time.RFC3339)
 			user = &model.User{
 				ID:        res.UserId,
 				Email:     input.Email,
 				FirstName: &fn,
 				LastName:  &ln,
-				Role:      &role,
+				CreatedAt: &now,
 			}
 		}
 		return &model.AuthPayload{
 			Token: res.AccessToken,
 			User:  user,
-		}, nil
-	}
-
-	if r.Clients.UserClient != nil {
-		res, err := r.Clients.UserClient.Register(ctx, &userpb.RegisterRequest{
-			Email:     input.Email,
-			Password:  input.Password,
-			FirstName: fn,
-			LastName:  ln,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &model.AuthPayload{
-			Token: res.Token,
-			User:  toModelUser(res.User),
 		}, nil
 	}
 

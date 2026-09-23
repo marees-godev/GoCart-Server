@@ -23,6 +23,7 @@ type AuthRepository interface {
 	ResetFailedLogin(ctx context.Context, id uuid.UUID) error
 	CreateLoginSession(ctx context.Context, refreshToken *model.RefreshToken, evt *outbox.Event) error
 	CreateCredential(ctx context.Context, cred *model.AuthCredential) error
+	DeleteCredential(ctx context.Context, id uuid.UUID) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
 }
@@ -199,6 +200,15 @@ func (r *postgresAuthRepository) CreateCredential(ctx context.Context, cred *mod
 	if err != nil {
 		r.logger.Error("Failed to create credential", "error", err)
 		return fmt.Errorf("repository: create credential failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) DeleteCredential(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM auth_credentials WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("repository: delete credential failed: %w", err)
 	}
 	return nil
 }

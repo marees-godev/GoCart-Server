@@ -5,12 +5,14 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/model"
 )
 
 type UserRepository interface {
+	CreateUser(ctx context.Context, user *model.User) error
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
@@ -25,9 +27,43 @@ func NewUserRepository(pool *pgxpool.Pool) UserRepository {
 	return &pgUserRepository{pool: pool}
 }
 
+func (r *pgUserRepository) CreateUser(ctx context.Context, user *model.User) error {
+	if user == nil {
+		return appErrors.BadRequest("user model cannot be nil")
+	}
+	query := `
+		INSERT INTO users (id, email, first_name, last_name, status, created_at, updated_at)
+		VALUES (
+			$1::uuid,
+			$2,
+			$3,
+			$4,
+			COALESCE(NULLIF($5, ''), 'active'),
+			NOW(),
+			NOW()
+		)
+		RETURNING created_at, updated_at
+	`
+	err := r.pool.QueryRow(ctx, query,
+		user.ID,
+		user.Email,
+		user.FirstName,
+		user.LastName,
+		user.Status,
+	).Scan(&user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return appErrors.Conflict("user with this email already exists")
+		}
+		return appErrors.Internal(err, "failed to create user")
+	}
+	return nil
+}
+
 func (r *pgUserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
 	query := `
-		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, role, status, created_at, updated_at
+		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, status, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -38,13 +74,12 @@ func (r *pgUserRepository) GetByID(ctx context.Context, id string) (*model.User,
 		&u.Email,
 		&u.FirstName,
 		&u.LastName,
-		&u.Phone,
+		&u.PhoneNumber,
 		&u.AlternatePhone,
 		&u.DateOfBirth,
 		&u.Gender,
 		&u.Bio,
 		&u.AvatarURL,
-		&u.Role,
 		&u.Status,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -60,7 +95,7 @@ func (r *pgUserRepository) GetByID(ctx context.Context, id string) (*model.User,
 
 func (r *pgUserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	query := `
-		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, role, status, created_at, updated_at
+		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, status, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -71,13 +106,12 @@ func (r *pgUserRepository) GetByEmail(ctx context.Context, email string) (*model
 		&u.Email,
 		&u.FirstName,
 		&u.LastName,
-		&u.Phone,
+		&u.PhoneNumber,
 		&u.AlternatePhone,
 		&u.DateOfBirth,
 		&u.Gender,
 		&u.Bio,
 		&u.AvatarURL,
-		&u.Role,
 		&u.Status,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -93,7 +127,7 @@ func (r *pgUserRepository) GetByEmail(ctx context.Context, email string) (*model
 
 func (r *pgUserRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
 	query := `
-		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, role, status, created_at, updated_at
+		SELECT id, username, email, first_name, last_name, phone, alternate_phone, date_of_birth, gender, bio, avatar_url, status, created_at, updated_at
 		FROM users
 		WHERE username = $1
 	`
@@ -104,13 +138,12 @@ func (r *pgUserRepository) GetByUsername(ctx context.Context, username string) (
 		&u.Email,
 		&u.FirstName,
 		&u.LastName,
-		&u.Phone,
+		&u.PhoneNumber,
 		&u.AlternatePhone,
 		&u.DateOfBirth,
 		&u.Gender,
 		&u.Bio,
 		&u.AvatarURL,
-		&u.Role,
 		&u.Status,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -136,7 +169,7 @@ func (r *pgUserRepository) UpdateUser(ctx context.Context, user *model.User) err
 		user.Email,
 		user.FirstName,
 		user.LastName,
-		user.Phone,
+		user.PhoneNumber,
 		user.AlternatePhone,
 		user.DateOfBirth,
 		user.Gender,

@@ -116,7 +116,6 @@ func setupAddressTestService() (service.AddressService, *mockUserRepository, *mo
 		Email:     "user1@example.com",
 		FirstName: "Alex",
 		LastName:  "Morgan",
-		Role:      "customer",
 		Status:    "active",
 	}
 	user2 := &model.User{
@@ -124,7 +123,6 @@ func setupAddressTestService() (service.AddressService, *mockUserRepository, *mo
 		Email:     "user2@example.com",
 		FirstName: "Jane",
 		LastName:  "Smith",
-		Role:      "customer",
 		Status:    "active",
 	}
 	userRepo.users[user.ID] = user

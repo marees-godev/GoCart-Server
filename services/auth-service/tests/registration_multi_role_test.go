@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
@@ -15,7 +16,23 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
+	"google.golang.org/grpc"
 )
+
+type mockUserServiceClient struct {
+	userpb.UserServiceClient
+}
+
+func (m *mockUserServiceClient) CreateUser(ctx context.Context, req *userpb.CreateUserRequest, opts ...grpc.CallOption) (*userpb.CreateUserResponse, error) {
+	return &userpb.CreateUserResponse{
+		User: &userpb.User{
+			Id:        req.Id,
+			Email:     req.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+		},
+	}, nil
+}
 
 type inMemoryAuthRepo struct {
 	byEmailRole  map[string]*model.AuthCredential
@@ -56,6 +73,16 @@ func (r *inMemoryAuthRepo) CreateCredential(ctx context.Context, cred *model.Aut
 	return nil
 }
 
+func (r *inMemoryAuthRepo) DeleteCredential(ctx context.Context, id uuid.UUID) error {
+	for k, cred := range r.byEmailRole {
+		if cred.ID == id {
+			delete(r.byEmailRole, k)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (r *inMemoryAuthRepo) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
 	return nil
 }
@@ -87,7 +114,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 			ExpiryMinutes: 15,
 		},
 	}
-	authSvc := service.NewAuthService(repo, cfg, nil)
+	authSvc := service.NewAuthService(repo, cfg, nil, &mockUserServiceClient{})
 	handler := authGRPC.NewAuthGRPCHandler(authSvc, nil)
 
 	ctx := context.Background()

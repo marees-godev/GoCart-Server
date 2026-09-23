@@ -7,9 +7,8 @@ package resolvers
 import (
 	"context"
 
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
-	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
@@ -24,8 +23,26 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
-	req := &userpb.GetUserRequest{Id: id}
-	res, err := r.Clients.UserClient.GetUser(ctx, req)
+	firstName := ""
+	if input.FirstName != nil {
+		firstName = *input.FirstName
+	}
+	lastName := ""
+	if input.LastName != nil {
+		lastName = *input.LastName
+	}
+	phone := ""
+	if input.Phone != nil {
+		phone = *input.Phone
+	}
+
+	req := &userpb.UpdateUserRequest{
+		Id:        id,
+		FirstName: firstName,
+		LastName:  lastName,
+		Phone:     phone,
+	}
+	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -228,20 +245,4 @@ func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Addr
 		return nil, err
 	}
 	return toModelAddress(res.Address), nil
-}
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func getAuthUserIDFromCtx(ctx context.Context) string {
-	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
-		return userCtx.UserID
-	}
-	if legacyID, ok := ctx.Value("userID").(string); ok {
-		return legacyID
-	}
-	return ""
 }

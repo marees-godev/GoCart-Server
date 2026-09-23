@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
 )
@@ -32,7 +33,7 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{
@@ -54,7 +55,7 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{
@@ -72,7 +73,7 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.ValidateTokenResponse{
@@ -89,7 +90,7 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{

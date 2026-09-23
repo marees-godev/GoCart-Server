@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -158,5 +162,76 @@ func AsAppError(err error) *AppError {
 	if errors.As(err, &appErr) {
 		return appErr
 	}
-	return Internal(err, "An internal server error occurred")
+	if st, ok := status.FromError(err); ok {
+		switch st.Code() {
+		case codes.InvalidArgument:
+			return BadRequest(st.Message())
+		case codes.NotFound:
+			return NotFound(st.Message())
+		case codes.AlreadyExists:
+			return Conflict(st.Message())
+		case codes.Unauthenticated:
+			return Unauthorized(st.Message())
+		case codes.PermissionDenied:
+			return Forbidden(st.Message())
+		case codes.ResourceExhausted:
+			return TooManyRequests(st.Message())
+		case codes.Unavailable:
+			return ServiceUnavailable(st.Message())
+		case codes.Unknown:
+			msg := st.Message()
+			if strings.Contains(msg, "already exists") {
+				return Conflict(msg)
+			}
+			if strings.Contains(msg, "required") || strings.Contains(msg, "invalid") {
+				return BadRequest(msg)
+			}
+			return Internal(err, msg)
+		}
+	}
+	return Internal(err, err.Error())
+}
+
+// MapAppErrorToGRPC converts an application error into an equivalent gRPC status error.
+// If err is nil, it returns nil.
+// If err is already a gRPC status error, it is returned directly.
+func MapAppErrorToGRPC(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := status.FromError(err); ok {
+		var appErr *AppError
+		if !errors.As(err, &appErr) {
+			return err
+		}
+	}
+	appErr := AsAppError(err)
+	switch appErr.Code {
+	case CodeNotFound:
+		return status.Error(codes.NotFound, appErr.Message)
+	case CodeUnauthorized:
+		return status.Error(codes.Unauthenticated, appErr.Message)
+	case CodeForbidden:
+		return status.Error(codes.PermissionDenied, appErr.Message)
+	case CodeBadRequest, CodeUnprocessableEntity:
+		return status.Error(codes.InvalidArgument, appErr.Message)
+	case CodeConflict:
+		return status.Error(codes.AlreadyExists, appErr.Message)
+	case CodeTooManyRequests:
+		return status.Error(codes.ResourceExhausted, appErr.Message)
+	case CodeServiceUnavailable:
+		return status.Error(codes.Unavailable, appErr.Message)
+	default:
+		return status.Error(codes.Internal, appErr.Message)
+	}
+}
+
+// ToGRPC converts an error into an equivalent gRPC status error.
+func ToGRPC(err error) error {
+	return MapAppErrorToGRPC(err)
+}
+
+// ToGRPC converts the AppError into an equivalent gRPC status error.
+func (e *AppError) ToGRPC() error {
+	return MapAppErrorToGRPC(e)
 }

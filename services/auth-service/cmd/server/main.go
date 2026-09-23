@@ -102,8 +102,15 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	// 6. Initialize business logic layers & gRPC handler
+	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, 5*time.Second)
+	if err != nil {
+		log.Error("Failed to initialize required user service client", "addr", cfg.UserServiceAddr, "error", err)
+		os.Exit(1)
+	}
+	defer userConn.Close()
+
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient)
 
 	// 7. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
