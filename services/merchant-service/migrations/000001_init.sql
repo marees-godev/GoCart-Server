@@ -1,12 +1,20 @@
+DO $$ BEGIN
+    CREATE TYPE merchant_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 CREATE TABLE IF NOT EXISTS merchants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE,
     business_name VARCHAR(255) NOT NULL,
-    business_email VARCHAR(255),
-    business_phone VARCHAR(20),
-    tax_id VARCHAR(100),
-    status VARCHAR(50) NOT NULL DEFAULT 'REGISTERED',
-    rejection_reason TEXT,
+    first_name VARCHAR(100) NOT NULL DEFAULT '',
+    last_name VARCHAR(100) NOT NULL DEFAULT '',
+    business_email VARCHAR(255) NOT NULL DEFAULT '',
+    business_phone VARCHAR(20) NOT NULL DEFAULT '',
+    tax_id VARCHAR(100) NOT NULL DEFAULT '',
+    status merchant_status NOT NULL DEFAULT 'PENDING',
+    rejection_reason TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -24,5 +32,6 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_merchants_status ON merchants(status);
+CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
 CREATE INDEX IF NOT EXISTS idx_merchants_business_email ON merchants(business_email);
 CREATE INDEX IF NOT EXISTS idx_merchant_outbox_status_created ON outbox_events(status, created_at);

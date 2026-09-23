@@ -208,10 +208,12 @@ func (r *postgresAuthRepository) DeleteCredential(ctx context.Context, id uuid.U
 	query := `DELETE FROM auth_credentials WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
+		r.logger.Error("Failed to delete credential", "id", id, "error", err)
 		return fmt.Errorf("repository: delete credential failed: %w", err)
 	}
 	return nil
 }
+
 
 func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
 	query := `

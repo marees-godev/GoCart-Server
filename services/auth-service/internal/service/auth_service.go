@@ -9,12 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
@@ -22,6 +25,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -39,13 +43,14 @@ type AuthService interface {
 }
 
 type authService struct {
-	repo       repository.AuthRepository
-	cfg        *config.Config
-	logger     *slog.Logger
-	userClient userpb.UserServiceClient
+	repo           repository.AuthRepository
+	cfg            *config.Config
+	logger         *slog.Logger
+	userClient     userpb.UserServiceClient
+	merchantClient merchantpb.MerchantServiceClient
 }
 
-func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger, userClient ...userpb.UserServiceClient) AuthService {
+func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger, clients ...any) AuthService {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -54,8 +59,16 @@ func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slo
 		cfg:    cfg,
 		logger: log,
 	}
-	if len(userClient) > 0 {
-		s.userClient = userClient[0]
+	for _, c := range clients {
+		if c == nil {
+			continue
+		}
+		switch client := c.(type) {
+		case userpb.UserServiceClient:
+			s.userClient = client
+		case merchantpb.MerchantServiceClient:
+			s.merchantClient = client
+		}
 	}
 	return s
 }
@@ -161,6 +174,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		TokenType:    "Bearer",
 		ExpiresIn:    int(accessTTL.Seconds()),
 		UserID:       cred.UserID.String(),
+		Role:         cred.Role.String(),
 	}, nil
 }
 
@@ -207,23 +221,73 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, err
 	}
 
-	_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-		Id:        userID.String(),
-		Email:     cred.Email,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-	})
-	if err != nil {
-		_ = s.repo.DeleteCredential(ctx, credID)
-		if st, ok := status.FromError(err); ok {
-			switch st.Code() {
-			case codes.AlreadyExists:
-				return nil, appErrors.Conflict("user with this email already exists")
-			case codes.InvalidArgument:
-				return nil, appErrors.BadRequest(st.Message())
+	var merchantID string
+	var businessEmail string
+	if role == model.RoleMerchant {
+		mClient := s.merchantClient
+		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
+			var err error
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			if err != nil {
+				s.logger.Error("Failed to connect to merchant service", "error", err)
+				_ = s.repo.DeleteCredential(ctx, credID)
+				return nil, appErrors.Internal(err, "failed to connect to merchant service")
+			}
+			s.merchantClient = mClient
+		}
+
+		if mClient != nil {
+			businessName := strings.TrimSpace(req.BusinessName)
+			if businessName == "" {
+				businessName = strings.TrimSpace(req.FirstName + " " + req.LastName)
+			}
+			if businessName == "" {
+				businessName = req.Email
+			}
+
+			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+				"x-user-id", userID.String(),
+				"x-user-role", "MERCHANT",
+			))
+
+			createReq := &merchantpb.CreateMerchantRequest{
+				UserId:        userID.String(),
+				FirstName:     req.FirstName,
+				LastName:      req.LastName,
+				BusinessEmail: req.Email,
+				BusinessName:  businessName,
+			}
+
+			mResp, err := mClient.CreateMerchant(mCtx, createReq)
+			if err != nil {
+				s.logger.Error("Failed to create merchant profile in merchant service", "user_id", userID.String(), "error", err)
+				_ = s.repo.DeleteCredential(ctx, credID)
+				return nil, appErrors.Internal(err, "failed to create merchant profile")
+			}
+			if mResp != nil && mResp.Merchant != nil {
+				merchantID = mResp.Merchant.Id
+				businessEmail = mResp.Merchant.BusinessEmail
 			}
 		}
-		return nil, appErrors.Internal(err, "failed to create user record in user service")
+	} else {
+		_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Id:        userID.String(),
+			Email:     cred.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+		})
+		if err != nil {
+			_ = s.repo.DeleteCredential(ctx, credID)
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
+				case codes.AlreadyExists:
+					return nil, appErrors.Conflict("user with this email already exists")
+				case codes.InvalidArgument:
+					return nil, appErrors.BadRequest(st.Message())
+				}
+			}
+			return nil, appErrors.Internal(err, "failed to create user record in user service")
+		}
 	}
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
 	if ttlMinutes <= 0 {
@@ -284,11 +348,16 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	}
 
 	return &dto.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: rawRefreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    int(accessTTL.Seconds()),
-		UserID:       userID.String(),
+		AccessToken:   accessToken,
+		RefreshToken:  rawRefreshToken,
+		TokenType:     "Bearer",
+		ExpiresIn:     int(accessTTL.Seconds()),
+		UserID:        userID.String(),
+		Role:          cred.Role.String(),
+		MerchantID:    merchantID,
+		BusinessEmail: businessEmail,
+		FirstName:     req.FirstName,
+		LastName:      req.LastName,
 	}, nil
 }
 

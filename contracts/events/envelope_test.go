@@ -60,3 +60,53 @@ func TestEventEnvelopeSerialization(t *testing.T) {
 		t.Errorf("expected ProductID prod-1, got %s", restoredPayload.Items[0].ProductID)
 	}
 }
+
+func TestUserRegisteredEventSerialization(t *testing.T) {
+	now := time.Now().UTC()
+	payload := events.UserRegisteredEvent{
+		UserID:       "usr-merch-12345",
+		Email:        "merchant@example.com",
+		Role:         "MERCHANT",
+		BusinessName: "Acme Supplies",
+		Phone:        "+1234567890",
+		CreatedAt:    now,
+	}
+
+	env, err := events.NewEventEnvelope(events.EventTypeUserRegistered, "auth-service", payload)
+	if err != nil {
+		t.Fatalf("failed to create event envelope: %v", err)
+	}
+
+	if env.EventType != events.EventTypeUserRegistered {
+		t.Errorf("expected EventType %s, got %s", events.EventTypeUserRegistered, env.EventType)
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		t.Fatalf("failed to marshal envelope: %v", err)
+	}
+
+	unmarshaledEnv, err := events.UnmarshalEnvelope(bytes)
+	if err != nil {
+		t.Fatalf("failed to unmarshal envelope: %v", err)
+	}
+
+	var restored events.UserRegisteredEvent
+	if err := unmarshaledEnv.UnmarshalData(&restored); err != nil {
+		t.Fatalf("failed to unmarshal UserRegisteredEvent: %v", err)
+	}
+
+	if restored.UserID != payload.UserID {
+		t.Errorf("expected UserID %s, got %s", payload.UserID, restored.UserID)
+	}
+	if restored.Email != payload.Email {
+		t.Errorf("expected Email %s, got %s", payload.Email, restored.Email)
+	}
+	if restored.Role != payload.Role {
+		t.Errorf("expected Role %s, got %s", payload.Role, restored.Role)
+	}
+	if restored.BusinessName != payload.BusinessName {
+		t.Errorf("expected BusinessName %s, got %s", payload.BusinessName, restored.BusinessName)
+	}
+}
+

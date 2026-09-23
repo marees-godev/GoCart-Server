@@ -42,6 +42,7 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 		TokenType:    resp.TokenType,
 		ExpiresIn:    int64(resp.ExpiresIn),
 		UserId:       resp.UserID,
+		Role:         resp.Role,
 	}, nil
 }
 
@@ -59,11 +60,16 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 	}
 
 	return &pb.AuthResponse{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
-		TokenType:    resp.TokenType,
-		ExpiresIn:    int64(resp.ExpiresIn),
-		UserId:       resp.UserID,
+		AccessToken:   resp.AccessToken,
+		RefreshToken:  resp.RefreshToken,
+		TokenType:     resp.TokenType,
+		ExpiresIn:     int64(resp.ExpiresIn),
+		UserId:        resp.UserID,
+		Role:          resp.Role,
+		MerchantId:    resp.MerchantID,
+		BusinessEmail: resp.BusinessEmail,
+		FirstName:     resp.FirstName,
+		LastName:      resp.LastName,
 	}, nil
 }
 

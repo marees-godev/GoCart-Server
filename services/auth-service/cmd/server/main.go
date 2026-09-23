@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
@@ -109,8 +110,19 @@ func main() {
 	}
 	defer userConn.Close()
 
+	var merchantClient merchantpb.MerchantServiceClient
+	if cfg.Services.MerchantServiceURL != "" {
+		mClient, conn, err := grpcclient.NewMerchantClient(cfg.Services.MerchantServiceURL, 5*time.Second)
+		if err != nil {
+			log.Warn("Failed to initialize merchant service gRPC client", "error", err)
+		} else {
+			defer conn.Close()
+			merchantClient = mClient
+		}
+	}
+
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient)
 
 	// 7. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))

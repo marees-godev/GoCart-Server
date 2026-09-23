@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -18,6 +20,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type mockAuthRepository struct {
@@ -107,14 +110,16 @@ func (m *mockAuthRepository) CreateCredential(ctx context.Context, cred *model.A
 }
 
 func (m *mockAuthRepository) DeleteCredential(ctx context.Context, id uuid.UUID) error {
-	for k, v := range m.byEmail {
-		if v.ID == id {
-			delete(m.byEmail, k)
+	for email, cred := range m.byEmail {
+		if cred.ID == id {
+			delete(m.byEmail, email)
+			delete(m.byEmailRole, cred.Email+":"+cred.Role.String())
 			break
 		}
 	}
 	return nil
 }
+
 
 func (m *mockAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
 	for _, rt := range m.refreshTokens {
@@ -617,6 +622,142 @@ func TestRegister_UserServiceUnavailable(t *testing.T) {
 	appErr := appErrors.AsAppError(err)
 	if appErr.Code != appErrors.CodeServiceUnavailable {
 		t.Fatalf("expected ServiceUnavailable code, got: %s", appErr.Code)
+	}
+}
+
+type mockMerchantClient struct {
+	merchantpb.MerchantServiceClient
+	createdReqs []*merchantpb.CreateMerchantRequest
+	capturedCtx context.Context
+	createErr   error
+}
+
+func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.CreateMerchantRequest, opts ...grpc.CallOption) (*merchantpb.CreateMerchantResponse, error) {
+	m.capturedCtx = ctx
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	m.createdReqs = append(m.createdReqs, in)
+	return &merchantpb.CreateMerchantResponse{
+		Merchant: &merchantpb.Merchant{
+			Id:            in.UserId,
+			UserId:        in.UserId,
+			BusinessName:  in.BusinessName,
+			BusinessEmail: in.BusinessEmail,
+			FirstName:     in.FirstName,
+			LastName:      in.LastName,
+		},
+	}, nil
+}
+
+func TestRegister_CallsMerchantService_WhenIsMerchantTrue(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockMerchant := &mockMerchantClient{}
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, mockMerchant)
+
+	req := &dto.RegisterRequest{
+		Email:        "merchant@example.com",
+		Password:     "Password123!",
+		FirstName:    "Jane",
+		LastName:     "Doe",
+		BusinessName: "Jane's Superstore",
+		IsMerchant:   true,
+	}
+
+	resp, err := svc.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful registration, got: %v", err)
+	}
+
+	if len(mockMerchant.createdReqs) != 1 {
+		t.Fatalf("expected 1 call to merchant service CreateMerchant, got %d", len(mockMerchant.createdReqs))
+	}
+
+	created := mockMerchant.createdReqs[0]
+	if created.UserId != resp.UserID {
+		t.Errorf("expected merchant ID %s, got %s", resp.UserID, created.UserId)
+	}
+	if created.BusinessName != "Jane's Superstore" {
+		t.Errorf("expected business name Jane's Superstore, got %s", created.BusinessName)
+	}
+	if created.BusinessEmail != "merchant@example.com" {
+		t.Errorf("expected email merchant@example.com, got %s", created.BusinessEmail)
+	}
+	if created.FirstName != "Jane" || created.LastName != "Doe" {
+		t.Errorf("expected name Jane Doe, got %s %s", created.FirstName, created.LastName)
+	}
+
+	md, ok := metadata.FromOutgoingContext(mockMerchant.capturedCtx)
+	if !ok {
+		t.Fatal("expected outgoing metadata in context")
+	}
+	if vals := md.Get("x-user-role"); len(vals) == 0 || vals[0] != "MERCHANT" {
+		t.Errorf("expected role MERCHANT in metadata, got %v", vals)
+	}
+	if vals := md.Get("x-user-id"); len(vals) == 0 || vals[0] != resp.UserID {
+		t.Errorf("expected user id %s in metadata, got %v", resp.UserID, vals)
+	}
+}
+
+func TestRegister_DoesNotCallMerchantService_WhenIsMerchantFalse(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockMerchant := &mockMerchantClient{}
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, mockMerchant)
+
+	req := &dto.RegisterRequest{
+		Email:      "customer@example.com",
+		Password:   "Password123!",
+		FirstName:  "John",
+		LastName:   "Customer",
+		IsMerchant: false,
+	}
+
+	_, err := svc.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful customer registration, got: %v", err)
+	}
+
+	if len(mockMerchant.createdReqs) != 0 {
+		t.Errorf("expected 0 calls to merchant service, got %d", len(mockMerchant.createdReqs))
+	}
+}
+
+func TestRegister_ReturnsError_WhenMerchantServiceFails(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockMerchant := &mockMerchantClient{
+		createErr: errors.New("merchant service connection timeout"),
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, mockMerchant)
+
+	req := &dto.RegisterRequest{
+		Email:      "merchant@example.com",
+		Password:   "Password123!",
+		FirstName:  "Jane",
+		LastName:   "Merchant",
+		IsMerchant: true,
+	}
+
+	_, err := svc.Register(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected registration to fail when merchant service fails, got nil")
 	}
 }
 
