@@ -28,6 +28,11 @@ func (m *mockUserRepository) Create(ctx context.Context, u *model.User) error {
 	return nil
 }
 
+func (m *mockUserRepository) CreateUser(ctx context.Context, u *model.User) error {
+	m.users[u.ID] = u
+	return nil
+}
+
 func (m *mockUserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
 	u, exists := m.users[id]
 	if !exists {

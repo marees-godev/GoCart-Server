@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 

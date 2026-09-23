@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     retry_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    published_at TIMESTAMPTZ
+    published_at TIMESTAMPTZS
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_credentials_email ON auth_credentials(email);

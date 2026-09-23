@@ -95,10 +95,10 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
-	userServiceAddr := GetEnv("USER_SERVICE_ADDR", "localhost:5050")
-	productServiceAddr := GetEnv("PRODUCT_SERVICE_ADDR", "localhost:7070")
-	cartServiceAddr := GetEnv("CART_SERVICE_ADDR", "localhost:8181")
-	orderServiceAddr := GetEnv("ORDER_SERVICE_ADDR", "localhost:8500")
+	userServiceAddr := GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052"))
+	productServiceAddr := GetEnv("PRODUCT_SERVICE_GRPC_ADDR", GetEnv("PRODUCT_SERVICE_ADDR", "localhost:50053"))
+	cartServiceAddr := GetEnv("CART_SERVICE_GRPC_ADDR", GetEnv("CART_SERVICE_ADDR", "localhost:50057"))
+	orderServiceAddr := GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059"))
 	introEnabled := GetEnvAsBool("GRAPHQL_INTROSPECTION_ENABLED", GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true))
 
 	return &Config{

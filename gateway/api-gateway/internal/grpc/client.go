@@ -1,17 +1,17 @@
 package grpc
 
 import (
-	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Clients struct {
-	AuthClient auth.AuthServiceClient
+	AuthClient  auth.AuthServiceClient
 	UserClient  userpb.UserServiceClient
 	StoreClient store.StoreServiceClient
 	conns       []*grpc.ClientConn
@@ -33,20 +33,41 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
-	userConn, err := grpc.NewClient(cfg.UserServiceAddr, opts...)
+	userAddr := cfg.GRPC.UserServiceAddr
+	if userAddr == "" {
+		userAddr = cfg.UserServiceAddr
+	}
+	if userAddr == "" {
+		userAddr = "localhost:50052"
+	}
+	userConn, err := grpc.NewClient(userAddr, opts...)
 	if err != nil {
 		authConn.Close()
 		return nil, err
 	}
 
-	productConn, err := grpc.NewClient(cfg.ProductServiceAddr, opts...)
+	productAddr := cfg.GRPC.ProductServiceAddr
+	if productAddr == "" {
+		productAddr = cfg.ProductServiceAddr
+	}
+	if productAddr == "" {
+		productAddr = "localhost:50053"
+	}
+	productConn, err := grpc.NewClient(productAddr, opts...)
 	if err != nil {
 		authConn.Close()
 		userConn.Close()
 		return nil, err
 	}
 
-	cartConn, err := grpc.NewClient(cfg.CartServiceAddr, opts...)
+	cartAddr := cfg.GRPC.CartServiceAddr
+	if cartAddr == "" {
+		cartAddr = cfg.CartServiceAddr
+	}
+	if cartAddr == "" {
+		cartAddr = "localhost:50057"
+	}
+	cartConn, err := grpc.NewClient(cartAddr, opts...)
 	if err != nil {
 		authConn.Close()
 		userConn.Close()
@@ -54,7 +75,14 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
-	orderConn, err := grpc.NewClient(cfg.OrderServiceAddr, opts...)
+	orderAddr := cfg.GRPC.OrderServiceAddr
+	if orderAddr == "" {
+		orderAddr = cfg.OrderServiceAddr
+	}
+	if orderAddr == "" {
+		orderAddr = "localhost:50059"
+	}
+	orderConn, err := grpc.NewClient(orderAddr, opts...)
 	if err != nil {
 		authConn.Close()
 		userConn.Close()
@@ -63,7 +91,11 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
-	storeConn, err := grpc.NewClient(cfg.GRPC.StoreServiceAddr, opts...)
+	storeAddr := cfg.GRPC.StoreServiceAddr
+	if storeAddr == "" {
+		storeAddr = "localhost:50055"
+	}
+	storeConn, err := grpc.NewClient(storeAddr, opts...)
 	if err != nil {
 		userConn.Close()
 		productConn.Close()
@@ -73,7 +105,7 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 	}
 
 	return &Clients{
-		AuthClient: auth.NewAuthServiceClient(authConn),
+		AuthClient:  auth.NewAuthServiceClient(authConn),
 		UserClient:  userpb.NewUserServiceClient(userConn),
 		StoreClient: store.NewStoreServiceClient(storeConn),
 		conns: []*grpc.ClientConn{

@@ -56,6 +56,16 @@ func (r *inMemoryAuthRepo) CreateCredential(ctx context.Context, cred *model.Aut
 	return nil
 }
 
+func (r *inMemoryAuthRepo) DeleteCredential(ctx context.Context, id uuid.UUID) error {
+	for k, cred := range r.byEmailRole {
+		if cred.ID == id {
+			delete(r.byEmailRole, k)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (r *inMemoryAuthRepo) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
 	return nil
 }

@@ -2,11 +2,15 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type AuthGRPCHandler struct {
@@ -25,6 +29,29 @@ func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *Auth
 	}
 }
 
+func mapAppErrorToGRPC(err error) error {
+	if err == nil {
+		return nil
+	}
+	appErr := appErrors.AsAppError(err)
+	switch appErr.Code {
+	case appErrors.CodeNotFound:
+		return status.Error(codes.NotFound, appErr.Message)
+	case appErrors.CodeUnauthorized:
+		return status.Error(codes.Unauthenticated, appErr.Message)
+	case appErrors.CodeForbidden:
+		return status.Error(codes.PermissionDenied, appErr.Message)
+	case appErrors.CodeBadRequest:
+		return status.Error(codes.InvalidArgument, appErr.Message)
+	case appErrors.CodeConflict:
+		return status.Error(codes.AlreadyExists, appErr.Message)
+	case appErrors.CodeServiceUnavailable:
+		return status.Error(codes.Unavailable, appErr.Message)
+	default:
+		return status.Error(codes.Internal, appErr.Message)
+	}
+}
+
 func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Login(ctx, &dto.LoginRequest{
 		Email:    req.GetEmail(),
@@ -32,7 +59,7 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, mapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{
@@ -45,6 +72,7 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 }
 
 func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
+	fmt.Println("comess::")
 	resp, err := h.authService.Register(ctx, &dto.RegisterRequest{
 		Email:      req.GetEmail(),
 		Password:   req.GetPassword(),
@@ -54,7 +82,7 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, mapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{
@@ -72,7 +100,7 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, mapAppErrorToGRPC(err)
 	}
 
 	return &pb.ValidateTokenResponse{
@@ -89,7 +117,7 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
-		return nil, err
+		return nil, mapAppErrorToGRPC(err)
 	}
 
 	return &pb.AuthResponse{

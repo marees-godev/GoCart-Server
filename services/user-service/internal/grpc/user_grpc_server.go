@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -85,6 +86,35 @@ func toProtoAddress(a *model.Address) *userpb.Address {
 	}
 }
 
+func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserRequest) (*userpb.CreateUserResponse, error) {
+	if req == nil || req.GetId() == "" || req.GetEmail() == "" || req.GetFirstName() == "" || req.GetLastName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "id, email, first_name, and last_name are required")
+	}
+
+	createReq := dto.CreateUserRequest{
+		ID:        req.GetId(),
+		Email:     req.GetEmail(),
+		FirstName: req.GetFirstName(),
+		LastName:  req.GetLastName(),
+	}
+
+	u, err := s.userService.CreateUser(ctx, createReq)
+	if err != nil {
+		return nil, mapAppErrorToGRPC(err)
+	}
+	c := &userpb.CreateUserResponse{
+		User: &userpb.User{
+			Id:        u.ID,
+			Email:     u.Email,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			CreatedAt: u.CreatedAt.String(),
+		},
+	}
+	fmt.Println("User created successfully -------->", c)
+	return c, nil
+}
+
 func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
 	if req == nil || req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
@@ -95,9 +125,9 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 		return nil, mapAppErrorToGRPC(err)
 	}
 
-	phone := ""
-	if u.Phone != nil {
-		phone = *u.Phone
+	phonenumber := ""
+	if u.PhoneNumber != nil {
+		phonenumber = *u.PhoneNumber
 	}
 
 	return &userpb.GetUserResponse{
@@ -106,8 +136,7 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 			Email:     u.Email,
 			FirstName: u.FirstName,
 			LastName:  u.LastName,
-			Phone:     phone,
-			Role:      u.Role,
+			Phone:     phonenumber,
 			CreatedAt: u.CreatedAt.String(),
 		},
 	}, nil
@@ -138,8 +167,8 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 	}
 
 	phone := ""
-	if u.Phone != nil {
-		phone = *u.Phone
+	if u.PhoneNumber != nil {
+		phone = *u.PhoneNumber
 	}
 
 	return &userpb.UpdateUserResponse{
@@ -149,7 +178,6 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 			FirstName: u.FirstName,
 			LastName:  u.LastName,
 			Phone:     phone,
-			Role:      u.Role,
 			CreatedAt: u.CreatedAt.String(),
 		},
 	}, nil

@@ -14,6 +14,30 @@ var (
 	phoneRegex = regexp.MustCompile(`^\+?[0-9]{7,15}$`)
 )
 
+type CreateUserRequest struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+func (r *CreateUserRequest) Validate() error {
+	if strings.TrimSpace(r.ID) == "" {
+		return errors.BadRequest("user ID is required")
+	}
+	trimmedEmail := strings.TrimSpace(r.Email)
+	if trimmedEmail == "" || !emailRegex.MatchString(trimmedEmail) {
+		return errors.BadRequest("invalid email address format")
+	}
+	if strings.TrimSpace(r.FirstName) == "" {
+		return errors.BadRequest("first_name is required")
+	}
+	if strings.TrimSpace(r.LastName) == "" {
+		return errors.BadRequest("last_name is required")
+	}
+	return nil
+}
+
 type UpdateUserRequest struct {
 	Username       *string `json:"username,omitempty"`
 	Email          *string `json:"email,omitempty"`
@@ -118,7 +142,6 @@ type UserResponse struct {
 	Gender         *string `json:"gender,omitempty"`
 	Bio            *string `json:"bio,omitempty"`
 	AvatarURL      *string `json:"avatar_url,omitempty"`
-	Role           string  `json:"role"`
 	Status         string  `json:"status"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
@@ -141,13 +164,12 @@ func ToUserResponse(u *model.User) *UserResponse {
 		EmailAddress:   u.Email,
 		FirstName:      u.FirstName,
 		LastName:       u.LastName,
-		PhoneNumber:    u.Phone,
+		PhoneNumber:    u.PhoneNumber,
 		AlternatePhone: u.AlternatePhone,
 		DateOfBirth:    dobStr,
 		Gender:         u.Gender,
 		Bio:            u.Bio,
 		AvatarURL:      u.AvatarURL,
-		Role:           u.Role,
 		Status:         u.Status,
 		CreatedAt:      u.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      u.UpdatedAt.Format(time.RFC3339),

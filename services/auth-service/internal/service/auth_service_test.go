@@ -8,6 +8,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/golang-jwt/jwt/v5"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -16,6 +17,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc"
 )
 
 type mockAuthRepository struct {
@@ -101,6 +103,16 @@ func (m *mockAuthRepository) CreateCredential(ctx context.Context, cred *model.A
 	}
 	m.byEmail[cred.Email] = cred
 	m.byEmailRole[cred.Email+":"+cred.Role.String()] = cred
+	return nil
+}
+
+func (m *mockAuthRepository) DeleteCredential(ctx context.Context, id uuid.UUID) error {
+	for k, v := range m.byEmail {
+		if v.ID == id {
+			delete(m.byEmail, k)
+			break
+		}
+	}
 	return nil
 }
 
@@ -491,3 +503,91 @@ func TestRegister_CompoundUniqueness_SameEmailBothRoles(t *testing.T) {
 	}
 }
 
+
+type mockUserServiceClient struct {
+	createdUsers []*userpb.CreateUserRequest
+	createErr    error
+}
+
+func (m *mockUserServiceClient) CreateUser(ctx context.Context, req *userpb.CreateUserRequest, opts ...grpc.CallOption) (*userpb.CreateUserResponse, error) {
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	m.createdUsers = append(m.createdUsers, req)
+	return &userpb.CreateUserResponse{
+		User: &userpb.User{
+			Id:        req.Id,
+			Email:     req.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+		},
+	}, nil
+}
+
+func (m *mockUserServiceClient) GetUser(ctx context.Context, in *userpb.GetUserRequest, opts ...grpc.CallOption) (*userpb.GetUserResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) UpdateUser(ctx context.Context, in *userpb.UpdateUserRequest, opts ...grpc.CallOption) (*userpb.UpdateUserResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) CreateUserAddress(ctx context.Context, in *userpb.CreateUserAddressRequest, opts ...grpc.CallOption) (*userpb.CreateUserAddressResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) ListUserAddresses(ctx context.Context, in *userpb.ListUserAddressesRequest, opts ...grpc.CallOption) (*userpb.ListUserAddressesResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) GetUserAddress(ctx context.Context, in *userpb.GetUserAddressRequest, opts ...grpc.CallOption) (*userpb.GetUserAddressResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) UpdateUserAddress(ctx context.Context, in *userpb.UpdateUserAddressRequest, opts ...grpc.CallOption) (*userpb.UpdateUserAddressResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) DeleteUserAddress(ctx context.Context, in *userpb.DeleteUserAddressRequest, opts ...grpc.CallOption) (*userpb.DeleteUserAddressResponse, error) {
+	return nil, nil
+}
+func (m *mockUserServiceClient) SetDefaultUserAddress(ctx context.Context, in *userpb.SetDefaultUserAddressRequest, opts ...grpc.CallOption) (*userpb.SetDefaultUserAddressResponse, error) {
+	return nil, nil
+}
+
+func TestRegister_SuccessWithUserService(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockUserClient := &mockUserServiceClient{}
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient)
+
+	req := &dto.RegisterRequest{
+		Email:     "newuser@example.com",
+		Password:  "StrongPassword123!",
+		FirstName: "John",
+		LastName:  "Doe",
+	}
+
+	resp, err := svc.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful registration, got err: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.UserID == "" {
+		t.Error("expected non-empty access token and user ID")
+	}
+
+	if len(mockUserClient.createdUsers) != 1 {
+		t.Fatalf("expected 1 call to user service CreateUser, got %d", len(mockUserClient.createdUsers))
+	}
+
+	created := mockUserClient.createdUsers[0]
+	if created.Email != req.Email {
+		t.Errorf("expected email %s, got %s", req.Email, created.Email)
+	}
+	if created.FirstName != "John" || created.LastName != "Doe" {
+		t.Errorf("expected name John Doe, got %s %s", created.FirstName, created.LastName)
+	}
+	if created.Id != resp.UserID {
+		t.Errorf("expected gRPC user id %s to match response user id %s", created.Id, resp.UserID)
+	}
+}

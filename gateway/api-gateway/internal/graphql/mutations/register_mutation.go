@@ -3,20 +3,19 @@ package mutation
 import (
 	"context"
 
-	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
 func (m *MutationResolver) Register(ctx context.Context, email, password, firstName, lastName string) (interface{}, error) {
-	if m.Clients == nil || m.Clients.UserClient == nil {
-		return nil, appErrors.Internal(nil, "user client unavailable")
+	if m.Clients == nil || m.Clients.AuthClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
 	}
 	if email == "" || password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	res, err := m.Clients.UserClient.Register(ctx, &userpb.RegisterRequest{
+	res, err := m.Clients.AuthClient.Register(ctx, &auth.RegisterRequest{
 		Email:     email,
 		Password:  password,
 		FirstName: firstName,
@@ -27,7 +26,12 @@ func (m *MutationResolver) Register(ctx context.Context, email, password, firstN
 	}
 
 	return map[string]interface{}{
-		"token": res.Token,
-		"user":  maps.MapUser(res.User),
+		"token": res.AccessToken,
+		"user": map[string]interface{}{
+			"id":        res.UserId,
+			"email":     email,
+			"firstName": firstName,
+			"lastName":  lastName,
+		},
 	}, nil
 }

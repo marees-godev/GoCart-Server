@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	HTTP     HTTPConfig
-	GRPC     GRPCConfig
-	Database DatabaseConfig
-	Logger   LoggerConfig
-	Tracing  TracingConfig
-	JWT      JWTConfig
+	App            AppConfig
+	HTTP           HTTPConfig
+	GRPC           GRPCConfig
+	Database       DatabaseConfig
+	Logger         LoggerConfig
+	Tracing        TracingConfig
+	JWT            JWTConfig
+	UserServiceAddr string
 }
 
 type AppConfig struct {
@@ -93,6 +94,7 @@ func LoadEnv() *Config {
 			Secret:        GetEnv("JWT_SECRET", "super-secret-jwt-key"),
 			ExpiryMinutes: GetEnvAsInt("JWT_EXPIRY_MINUTES", 60),
 		},
+		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 	}
 }
 

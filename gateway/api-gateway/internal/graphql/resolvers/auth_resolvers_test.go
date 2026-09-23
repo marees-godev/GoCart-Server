@@ -7,7 +7,7 @@ import (
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	grpcPkg "google.golang.org/grpc"
 )
 
@@ -39,7 +39,7 @@ func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest,
 			Email:     "customer@example.com",
 			FirstName: "John",
 			LastName:  "Doe",
-			Role:      string(model.RoleCustomer),
+			CreatedAt: "2026-09-23T10:00:00Z",
 		},
 	}, nil
 }
@@ -93,8 +93,11 @@ func TestRegisterResolver_Customer(t *testing.T) {
 	}
 
 	// Verify payload.User is populated
-	if payload.User == nil || payload.User.Role == nil || *payload.User.Role != string(model.RoleCustomer) {
-		t.Errorf("expected payload user role %s, got %+v", model.RoleCustomer, payload.User)
+	if payload.User == nil || payload.User.ID != "user-uuid-123" {
+		t.Errorf("expected payload user with ID 'user-uuid-123', got %+v", payload.User)
+	}
+	if payload.User.CreatedAt == nil || *payload.User.CreatedAt != "2026-09-23T10:00:00Z" {
+		t.Errorf("expected payload user with CreatedAt '2026-09-23T10:00:00Z', got %+v", payload.User)
 	}
 }
 
@@ -146,12 +149,12 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 		t.Errorf("expected UserClient.GetUser not to be called for merchant")
 	}
 
-	// Verify payload.User is populated with MERCHANT role and not null
+	// Verify payload.User is populated and not null
 	if payload.User == nil {
 		t.Fatal("expected non-null user in AuthPayload")
 	}
-	if payload.User.Role == nil || *payload.User.Role != string(model.RoleMerchant) {
-		t.Errorf("expected role %s, got '%v'", model.RoleMerchant, payload.User.Role)
+	if payload.User.ID != "user-uuid-123" {
+		t.Errorf("expected user ID 'user-uuid-123', got '%s'", payload.User.ID)
 	}
 	if payload.User.Email != "merchant@example.com" {
 		t.Errorf("expected email 'merchant@example.com', got '%s'", payload.User.Email)

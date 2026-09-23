@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -158,5 +162,32 @@ func AsAppError(err error) *AppError {
 	if errors.As(err, &appErr) {
 		return appErr
 	}
-	return Internal(err, "An internal server error occurred")
+	if st, ok := status.FromError(err); ok {
+		switch st.Code() {
+		case codes.InvalidArgument:
+			return BadRequest(st.Message())
+		case codes.NotFound:
+			return NotFound(st.Message())
+		case codes.AlreadyExists:
+			return Conflict(st.Message())
+		case codes.Unauthenticated:
+			return Unauthorized(st.Message())
+		case codes.PermissionDenied:
+			return Forbidden(st.Message())
+		case codes.ResourceExhausted:
+			return TooManyRequests(st.Message())
+		case codes.Unavailable:
+			return ServiceUnavailable(st.Message())
+		case codes.Unknown:
+			msg := st.Message()
+			if strings.Contains(msg, "already exists") {
+				return Conflict(msg)
+			}
+			if strings.Contains(msg, "required") || strings.Contains(msg, "invalid") {
+				return BadRequest(msg)
+			}
+			return Internal(err, msg)
+		}
+	}
+	return Internal(err, err.Error())
 }

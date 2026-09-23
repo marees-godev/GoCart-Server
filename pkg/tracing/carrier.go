@@ -36,11 +36,18 @@ func InjectMessageContext(ctx context.Context, headers map[string]string) {
 }
 
 func ExtractMessageContext(ctx context.Context, headers map[string]string) context.Context {
-	if headers == nil {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if len(headers) == 0 {
 		return ctx
 	}
 	carrier := MapCarrier(headers)
-	return otel.GetTextMapPropagator().Extract(ctx, carrier)
+	resCtx := otel.GetTextMapPropagator().Extract(ctx, carrier)
+	if resCtx == nil {
+		return ctx
+	}
+	return resCtx
 }
 
 type ByteMapCarrier map[string][]byte
@@ -73,9 +80,16 @@ func InjectByteMessageContext(ctx context.Context, headers map[string][]byte) {
 }
 
 func ExtractByteMessageContext(ctx context.Context, headers map[string][]byte) context.Context {
-	if headers == nil {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if len(headers) == 0 {
 		return ctx
 	}
 	carrier := ByteMapCarrier(headers)
-	return otel.GetTextMapPropagator().Extract(ctx, carrier)
+	resCtx := otel.GetTextMapPropagator().Extract(ctx, carrier)
+	if resCtx == nil {
+		return ctx
+	}
+	return resCtx
 }
