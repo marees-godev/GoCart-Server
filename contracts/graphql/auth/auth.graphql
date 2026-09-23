@@ -1,6 +1,12 @@
 type AuthPayload {
   token: String!
   user: User!
+  merchantId: ID
+  businessEmail: String
+  firstName: String
+  lastName: String
+  role: String
+  merchant: Merchant
 }
 
 input LoginInput {

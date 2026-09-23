@@ -25,6 +25,7 @@ type Config struct {
 	ProductServiceAddr          string
 	CartServiceAddr             string
 	OrderServiceAddr            string
+	MerchantServiceURL          string
 	GraphQLIntrospectionEnabled bool
 	AdminAPIKey                 string
 	AdminUserID                 string
@@ -45,6 +46,7 @@ type ServicesConfig struct {
 	ProductServiceAddr string
 	CartServiceAddr    string
 	OrderServiceAddr   string
+	MerchantServiceURL string
 }
 
 type LoggerConfig struct {
@@ -102,6 +104,7 @@ func LoadEnv() *Config {
 	productServiceAddr := GetEnv("PRODUCT_SERVICE_GRPC_ADDR", GetEnv("PRODUCT_SERVICE_ADDR", "localhost:50053"))
 	cartServiceAddr := GetEnv("CART_SERVICE_GRPC_ADDR", GetEnv("CART_SERVICE_ADDR", "localhost:50057"))
 	orderServiceAddr := GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059"))
+	merchantServiceURL := GetEnv("MERCHANT_SERVICE_URL", "http://localhost:7600")
 	introEnabled := GetEnvAsBool("GRAPHQL_INTROSPECTION_ENABLED", GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true))
 
 	return &Config{
@@ -118,6 +121,7 @@ func LoadEnv() *Config {
 			ProductServiceAddr: productServiceAddr,
 			CartServiceAddr:    cartServiceAddr,
 			OrderServiceAddr:   orderServiceAddr,
+			MerchantServiceURL: merchantServiceURL,
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),
@@ -190,6 +194,7 @@ func LoadEnv() *Config {
 		ProductServiceAddr:          productServiceAddr,
 		CartServiceAddr:             cartServiceAddr,
 		OrderServiceAddr:            orderServiceAddr,
+		MerchantServiceURL:          merchantServiceURL,
 		GraphQLIntrospectionEnabled: introEnabled,
 		AdminAPIKey:                 GetEnv("ADMIN_API_KEY", ""),
 		AdminUserID:                 GetEnv("ADMIN_USER_ID", "admin"),

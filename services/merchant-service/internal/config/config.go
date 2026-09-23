@@ -3,17 +3,25 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
+
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
 }
+
+type GRPCConfig struct {
+	Port string
+}
+
 
 type AppConfig struct {
 	Name        string
@@ -58,6 +66,9 @@ func LoadEnv() *Config {
 		},
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "7600"),
+		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50056"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("DATABASE_URL", ""),
@@ -108,3 +119,22 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 	}
 	return val
 }
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			result = append(result, t)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
+}
+

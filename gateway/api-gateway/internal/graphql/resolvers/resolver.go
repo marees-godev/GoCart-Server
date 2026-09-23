@@ -3,13 +3,15 @@ package resolvers
 import (
 	"context"
 
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 )
 
 type Resolver struct {
-	Clients *grpc.Clients
-	Version string
+	Clients   *grpc.Clients
+	ClientMgr *client.ClientManager
+	Version   string
 }
 
 func NewResolver(clients *grpc.Clients, version ...string) *Resolver {
@@ -21,6 +23,17 @@ func NewResolver(clients *grpc.Clients, version ...string) *Resolver {
 		Clients: clients,
 		Version: v,
 	}
+}
+
+func NewResolverWithManager(clients *grpc.Clients, clientMgr *client.ClientManager, version ...string) *Resolver {
+	r := NewResolver(clients, version...)
+	r.ClientMgr = clientMgr
+	return r
+}
+
+func (r *Resolver) SetClientManager(mgr *client.ClientManager) *Resolver {
+	r.ClientMgr = mgr
+	return r
 }
 
 func (r *Resolver) Health(ctx context.Context) (string, error) {

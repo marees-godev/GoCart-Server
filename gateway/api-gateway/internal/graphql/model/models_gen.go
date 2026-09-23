@@ -40,8 +40,14 @@ type Address struct {
 }
 
 type AuthPayload struct {
-	Token string `json:"token"`
-	User  *User  `json:"user"`
+	Token         string    `json:"token"`
+	User          *User     `json:"user"`
+	MerchantID    *string   `json:"merchantId,omitempty"`
+	BusinessEmail *string   `json:"businessEmail,omitempty"`
+	FirstName     *string   `json:"firstName,omitempty"`
+	LastName      *string   `json:"lastName,omitempty"`
+	Role          *string   `json:"role,omitempty"`
+	Merchant      *Merchant `json:"merchant,omitempty"`
 }
 
 type BankAccount struct {
@@ -116,12 +122,6 @@ type CreateDeliveryInput struct {
 	ShippingAddress string `json:"shippingAddress"`
 }
 
-type CreateMerchantInput struct {
-	UserID       string  `json:"userId"`
-	BusinessName string  `json:"businessName"`
-	TaxID        *string `json:"taxId,omitempty"`
-}
-
 type CreateOrderInput struct {
 	UserID          string `json:"userId"`
 	CartID          string `json:"cartId"`
@@ -169,12 +169,24 @@ type LoginInput struct {
 }
 
 type Merchant struct {
-	ID           string  `json:"id"`
-	UserID       string  `json:"userId"`
-	BusinessName string  `json:"businessName"`
-	Status       string  `json:"status"`
-	TaxID        *string `json:"taxId,omitempty"`
-	CreatedAt    *string `json:"createdAt,omitempty"`
+	ID              string  `json:"id"`
+	MerchantID      string  `json:"merchantId"`
+	UserID          *string `json:"userId,omitempty"`
+	BusinessName    string  `json:"businessName"`
+	FirstName       *string `json:"firstName,omitempty"`
+	LastName        *string `json:"lastName,omitempty"`
+	BusinessEmail   *string `json:"businessEmail,omitempty"`
+	BusinessPhone   *string `json:"businessPhone,omitempty"`
+	TaxID           *string `json:"taxId,omitempty"`
+	Status          string  `json:"status"`
+	RejectionReason *string `json:"rejectionReason,omitempty"`
+	CreatedAt       *string `json:"createdAt,omitempty"`
+	UpdatedAt       *string `json:"updatedAt,omitempty"`
+}
+
+type MerchantList struct {
+	Merchants []*Merchant `json:"merchants"`
+	Total     int         `json:"total"`
 }
 
 type Mutation struct {
@@ -369,6 +381,15 @@ type UpdateAddressInput struct {
 	PostalCode   *string `json:"postalCode,omitempty"`
 	Country      *string `json:"country,omitempty"`
 	IsDefault    *bool   `json:"isDefault,omitempty"`
+}
+
+type UpdateMerchantInput struct {
+	BusinessName  *string `json:"businessName,omitempty"`
+	FirstName     *string `json:"firstName,omitempty"`
+	LastName      *string `json:"lastName,omitempty"`
+	BusinessEmail *string `json:"businessEmail,omitempty"`
+	BusinessPhone *string `json:"businessPhone,omitempty"`
+	TaxID         *string `json:"taxId,omitempty"`
 }
 
 type UpdateProductInput struct {

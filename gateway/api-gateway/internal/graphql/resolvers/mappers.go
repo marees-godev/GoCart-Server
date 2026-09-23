@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 )
 
@@ -19,6 +20,55 @@ func toModelUser(u *userpb.User) *model.User {
 		LastName:  &ln,
 		CreatedAt: &ca,
 	}
+}
+
+func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
+	if m == nil {
+		return nil
+	}
+	res := &model.Merchant{
+		ID:           m.Id,
+		MerchantID:   m.Id,
+		BusinessName: m.BusinessName,
+		Status:       m.Status,
+	}
+	if m.UserId != "" {
+		uid := m.UserId
+		res.UserID = &uid
+	}
+	if m.FirstName != "" {
+		fn := m.FirstName
+		res.FirstName = &fn
+	}
+	if m.LastName != "" {
+		ln := m.LastName
+		res.LastName = &ln
+	}
+	if m.CreatedAt != "" {
+		ca := m.CreatedAt
+		res.CreatedAt = &ca
+	}
+	if m.UpdatedAt != "" {
+		ua := m.UpdatedAt
+		res.UpdatedAt = &ua
+	}
+	if m.TaxId != "" {
+		tid := m.TaxId
+		res.TaxID = &tid
+	}
+	if m.BusinessEmail != "" {
+		be := m.BusinessEmail
+		res.BusinessEmail = &be
+	}
+	if m.BusinessPhone != "" {
+		bp := m.BusinessPhone
+		res.BusinessPhone = &bp
+	}
+	if m.RejectionReason != "" {
+		rr := m.RejectionReason
+		res.RejectionReason = &rr
+	}
+	return res
 }
 
 func toModelAddress(a *userpb.Address) *model.Address {

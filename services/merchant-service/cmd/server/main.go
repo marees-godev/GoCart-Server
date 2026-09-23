@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,14 +12,22 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/config"
+	merchantGRPC "github.com/marees-godev/GoCart-Server/services/merchant-service/internal/grpc"
+	merchantMiddleware "github.com/marees-godev/GoCart-Server/services/merchant-service/internal/middleware"
+	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/service"
+	"google.golang.org/grpc"
 )
+
 
 func main() {
 	cfg := config.LoadEnv()
@@ -78,10 +88,15 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize repository & service
+	merchantRepo := repository.NewMerchantRepository(db)
+	merchantService := service.NewMerchantService(merchantRepo, log)
+
+	// 6. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
+
 
 	app.Use(adaptor.HTTPMiddleware(middleware.Recovery))
 	app.Use(adaptor.HTTPMiddleware(middleware.RequestID))
@@ -94,8 +109,32 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
+	// 8. Setup gRPC server with logging/tracing and ownership middleware
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+			merchantMiddleware.UnaryOwnershipInterceptor(merchantRepo),
+		),
+	)
+	merchantGRPCServer := merchantGRPC.NewMerchantGRPCServer(merchantService)
+	merchantpb.RegisterMerchantServiceServer(grpcServer, merchantGRPCServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen on gRPC port", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("gRPC Service listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			log.Error("gRPC server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		log.Info("HTTP Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -105,6 +144,7 @@ func main() {
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
+	grpcServer.GracefulStop()
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
 	}
