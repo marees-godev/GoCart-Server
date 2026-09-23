@@ -135,8 +135,13 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	ctx := r.Context()
 	adminKey := r.Header.Get(HeaderXAdminKey)
+
 
 	if adminKey != "" {
 		expectedKey := ""
@@ -307,7 +312,19 @@ func (h *Handler) HandlePlayground(c *fiber.Ctx) error {
 func (h *Handler) RegisterRoutes(app *fiber.App) {
 	app.Post("/query", h.HandleQuery)
 	app.Get("/query", h.HandlePlayground)
-	app.Get("/playground", h.HandlePlayground)
+	app.Options("/query", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+
 	app.Post("/graphql", h.HandleQuery)
 	app.Get("/graphql", h.HandlePlayground)
+	app.Options("/graphql", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+
+	app.Get("/playground", h.HandlePlayground)
+	app.Options("/playground", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
 }
+
