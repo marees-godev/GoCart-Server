@@ -22,6 +22,14 @@ func newMockRepo() *mockUserRepository {
 	}
 }
 
+func (m *mockUserRepository) CreateUser(ctx context.Context, user *model.User) error {
+	if m.users == nil {
+		m.users = make(map[string]*model.User)
+	}
+	m.users[user.ID] = user
+	return nil
+}
+
 func (m *mockUserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
 	u, exists := m.users[id]
 	if !exists {
@@ -60,7 +68,7 @@ func (m *mockUserRepository) UpdateUser(ctx context.Context, user *model.User) e
 	existing.Email = user.Email
 	existing.FirstName = user.FirstName
 	existing.LastName = user.LastName
-	existing.Phone = user.Phone
+	existing.PhoneNumber = user.PhoneNumber
 	existing.AlternatePhone = user.AlternatePhone
 	existing.DateOfBirth = user.DateOfBirth
 	existing.Gender = user.Gender
@@ -79,7 +87,6 @@ func TestGetUser_Success(t *testing.T) {
 		Email:     "test@example.com",
 		FirstName: "John",
 		LastName:  "Doe",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -116,7 +123,6 @@ func TestGetUser_InactiveStatus(t *testing.T) {
 		Email:     "inactive@example.com",
 		FirstName: "Jane",
 		LastName:  "Doe",
-		Role:      "customer",
 		Status:    "suspended",
 	}
 	repo.users[user.ID] = user
@@ -140,7 +146,6 @@ func TestGetUserByID_Success(t *testing.T) {
 		Email:     "byid@example.com",
 		FirstName: "Alice",
 		LastName:  "Smith",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -163,7 +168,6 @@ func TestUpdateUser_Success(t *testing.T) {
 		Email:     "old@example.com",
 		FirstName: "Bob",
 		LastName:  "Marley",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -199,8 +203,8 @@ func TestUpdateUser_Success(t *testing.T) {
 	if updated.FirstName != "Robert" {
 		t.Errorf("expected updated first_name Robert, got %s", updated.FirstName)
 	}
-	if updated.Phone == nil || *updated.Phone != "+1234567890" {
-		t.Errorf("expected updated phone +1234567890, got %v", updated.Phone)
+	if updated.PhoneNumber == nil || *updated.PhoneNumber != "+1234567890" {
+		t.Errorf("expected updated phone +1234567890, got %v", updated.PhoneNumber)
 	}
 	if updated.AlternatePhone == nil || *updated.AlternatePhone != "+19876543210" {
 		t.Errorf("expected updated alt phone +19876543210, got %v", updated.AlternatePhone)
@@ -228,7 +232,6 @@ func TestUpdateUser_CannotModifyAnotherUser(t *testing.T) {
 		Email:     "target@example.com",
 		FirstName: "Target",
 		LastName:  "User",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -258,7 +261,6 @@ func TestUpdateUser_ProtectedFieldsPreserved(t *testing.T) {
 		Email:     "prot@example.com",
 		FirstName: "Sam",
 		LastName:  "Altman",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -277,9 +279,6 @@ func TestUpdateUser_ProtectedFieldsPreserved(t *testing.T) {
 	if updated.ID != "user-prot" {
 		t.Errorf("user_id changed to %s", updated.ID)
 	}
-	if updated.Role != "customer" {
-		t.Errorf("role changed to %s", updated.Role)
-	}
 	if updated.Status != "active" {
 		t.Errorf("status changed to %s", updated.Status)
 	}
@@ -294,7 +293,6 @@ func TestUpdateUser_InvalidInput(t *testing.T) {
 		Email:     "valid@example.com",
 		FirstName: "Val",
 		LastName:  "Id",
-		Role:      "customer",
 		Status:    "active",
 	}
 	repo.users[user.ID] = user
@@ -321,13 +319,11 @@ func TestUpdateUser_EmailConflict(t *testing.T) {
 	user1 := &model.User{
 		ID:     "user-1",
 		Email:  "user1@example.com",
-		Role:   "customer",
 		Status: "active",
 	}
 	user2 := &model.User{
 		ID:     "user-2",
 		Email:  "user2@example.com",
-		Role:   "customer",
 		Status: "active",
 	}
 	repo.users[user1.ID] = user1

@@ -12,6 +12,7 @@ import (
 )
 
 type UserService interface {
+	CreateUser(ctx context.Context, req dto.CreateUserRequest) (*model.User, error)
 	GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error)
 	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error)
@@ -23,6 +24,32 @@ type userService struct {
 
 func NewUserService(repo repository.UserRepository) UserService {
 	return &userService{repo: repo}
+}
+
+func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest) (*model.User, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existing, err := s.repo.GetByEmail(ctx, req.Email)
+	if err == nil && existing != nil {
+		return nil, errors.Conflict("user with this email already exists")
+	}
+
+
+	newUser := &model.User{
+		ID:        req.ID,
+		Email:     strings.TrimSpace(req.Email),
+		FirstName: strings.TrimSpace(req.FirstName),
+		LastName:  strings.TrimSpace(req.LastName),
+		Status:    "active",
+	}
+
+	if err := s.repo.CreateUser(ctx, newUser); err != nil {
+		return nil, err
+	}
+
+	return newUser, nil
 }
 
 func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error) {
@@ -114,8 +141,8 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 		user.LastName = strings.TrimSpace(*req.LastName)
 	}
 
-	if phone := req.GetPhoneNumber(); phone != nil {
-		user.Phone = phone
+	if phonenumber := req.GetPhoneNumber(); phonenumber != nil {
+		user.PhoneNumber = phonenumber
 	}
 
 	if req.AlternatePhone != nil {

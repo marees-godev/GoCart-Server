@@ -42,6 +42,10 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
 		md, ok := metadata.FromOutgoingContext(ctx)
 		if !ok {
 			md = metadata.New(nil)
@@ -192,6 +196,10 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
 		md, ok := metadata.FromIncomingContext(ctx)
 		if ok {
 			var reqID string

@@ -402,7 +402,6 @@ type User struct {
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
 	Phone     *string `json:"phone,omitempty"`
-	Role      *string `json:"role,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
 }
 

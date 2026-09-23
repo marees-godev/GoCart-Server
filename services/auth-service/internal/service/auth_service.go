@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -20,6 +21,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -36,20 +39,25 @@ type AuthService interface {
 }
 
 type authService struct {
-	repo   repository.AuthRepository
-	cfg    *config.Config
-	logger *slog.Logger
+	repo       repository.AuthRepository
+	cfg        *config.Config
+	logger     *slog.Logger
+	userClient userpb.UserServiceClient
 }
 
-func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger) AuthService {
+func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger, userClient ...userpb.UserServiceClient) AuthService {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &authService{
+	s := &authService{
 		repo:   repo,
 		cfg:    cfg,
 		logger: log,
 	}
+	if len(userClient) > 0 {
+		s.userClient = userClient[0]
+	}
+	return s
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -157,9 +165,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 }
 
 func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error) {
-
 	if req == nil || req.Email == "" || req.Password == "" {
-		s.logger.Warn("Registration attempt failed: missing email or password")
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
@@ -192,10 +198,33 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		IsActive:      true,
 	}
 
+	if s.userClient == nil {
+		s.logger.Error("Registration failed: user service client is not available")
+		return nil, appErrors.ServiceUnavailable("user service unavailable")
+	}
+
 	if err := s.repo.CreateCredential(ctx, cred); err != nil {
 		return nil, err
 	}
 
+	_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+		Id:        userID.String(),
+		Email:     cred.Email,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+	})
+	if err != nil {
+		_ = s.repo.DeleteCredential(ctx, credID)
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.AlreadyExists:
+				return nil, appErrors.Conflict("user with this email already exists")
+			case codes.InvalidArgument:
+				return nil, appErrors.BadRequest(st.Message())
+			}
+		}
+		return nil, appErrors.Internal(err, "failed to create user record in user service")
+	}
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
 	if ttlMinutes <= 0 {
 		ttlMinutes = 15

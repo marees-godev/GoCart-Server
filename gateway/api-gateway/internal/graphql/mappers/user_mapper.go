@@ -1,6 +1,6 @@
 package maps
 
-import "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+import userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 
 func MapUser(u *userpb.User) map[string]interface{} {
 	if u == nil {
@@ -11,7 +11,6 @@ func MapUser(u *userpb.User) map[string]interface{} {
 		"email":     u.Email,
 		"firstName": u.FirstName,
 		"lastName":  u.LastName,
-		"role":      u.Role,
 		"createdAt": u.CreatedAt,
 	}
 }

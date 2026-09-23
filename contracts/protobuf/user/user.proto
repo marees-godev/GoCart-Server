@@ -5,6 +5,7 @@ package gocart.user.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/user;user";
 
 service UserService {
+  rpc CreateUser (CreateUserRequest) returns (CreateUserResponse);
   rpc GetUser (GetUserRequest) returns (GetUserResponse);
   rpc UpdateUser (UpdateUserRequest) returns (UpdateUserResponse);
   rpc CreateUserAddress (CreateUserAddressRequest) returns (CreateUserAddressResponse);
@@ -21,8 +22,7 @@ message User {
   string first_name = 3;
   string last_name = 4;
   string phone = 5;
-  string role = 6;
-  string created_at = 7;
+  string created_at = 6;
 }
 
 message Address {
@@ -40,6 +40,17 @@ message Address {
   bool is_default = 12;
   string created_at = 13;
   string updated_at = 14;
+}
+
+message CreateUserRequest {
+  string id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message CreateUserResponse {
+  User user = 1;
 }
 
 message GetUserRequest {
@@ -132,4 +143,3 @@ message SetDefaultUserAddressRequest {
 message SetDefaultUserAddressResponse {
   Address address = 1;
 }
-

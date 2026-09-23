@@ -4,7 +4,6 @@ type User {
   firstName: String
   lastName: String
   phone: String
-  role: String
   createdAt: String
 }
 
