@@ -104,10 +104,10 @@ func main() {
 	// 6. Initialize business logic layers & gRPC handler
 	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, 5*time.Second)
 	if err != nil {
-		log.Warn("Failed to create user service gRPC client", "addr", cfg.UserServiceAddr, "error", err)
-	} else if userConn != nil {
-		defer userConn.Close()
+		log.Error("Failed to initialize required user service client", "addr", cfg.UserServiceAddr, "error", err)
+		os.Exit(1)
 	}
+	defer userConn.Close()
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
 	authSvc := service.NewAuthService(authRepo, cfg, log, userClient)

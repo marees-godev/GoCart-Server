@@ -198,29 +198,32 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		IsActive:      true,
 	}
 
+	if s.userClient == nil {
+		s.logger.Error("Registration failed: user service client is not available")
+		return nil, appErrors.ServiceUnavailable("user service unavailable")
+	}
+
 	if err := s.repo.CreateCredential(ctx, cred); err != nil {
 		return nil, err
 	}
 
-	if s.userClient != nil {
-		_, err := s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-			Id:        userID.String(),
-			Email:     cred.Email,
-			FirstName: req.FirstName,
-			LastName:  req.LastName,
-		})
-		if err != nil {
-			_ = s.repo.DeleteCredential(ctx, credID)
-			if st, ok := status.FromError(err); ok {
-				switch st.Code() {
-				case codes.AlreadyExists:
-					return nil, appErrors.Conflict("user with this email already exists")
-				case codes.InvalidArgument:
-					return nil, appErrors.BadRequest(st.Message())
-				}
+	_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+		Id:        userID.String(),
+		Email:     cred.Email,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+	})
+	if err != nil {
+		_ = s.repo.DeleteCredential(ctx, credID)
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.AlreadyExists:
+				return nil, appErrors.Conflict("user with this email already exists")
+			case codes.InvalidArgument:
+				return nil, appErrors.BadRequest(st.Message())
 			}
-			return nil, appErrors.Internal(err, "failed to create user record in user service")
 		}
+		return nil, appErrors.Internal(err, "failed to create user record in user service")
 	}
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
 	if ttlMinutes <= 0 {

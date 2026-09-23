@@ -143,7 +143,7 @@ func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 			ExpiryMinutes: 15,
 		},
 	}
-	svc := NewAuthService(mockRepo, cfg, nil)
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{})
 	return svc, mockRepo, cfg
 }
 
@@ -591,3 +591,32 @@ func TestRegister_SuccessWithUserService(t *testing.T) {
 		t.Errorf("expected gRPC user id %s to match response user id %s", created.Id, resp.UserID)
 	}
 }
+
+func TestRegister_UserServiceUnavailable(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil)
+
+	req := &dto.RegisterRequest{
+		Email:     "newuser@example.com",
+		Password:  "StrongPassword123!",
+		FirstName: "John",
+		LastName:  "Doe",
+	}
+
+	_, err := svc.Register(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected error when userClient is nil, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Fatalf("expected ServiceUnavailable code, got: %s", appErr.Code)
+	}
+}
+

@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -23,27 +22,6 @@ func NewUserGRPCServer(userService service.UserService, addressService service.A
 	return &UserGRPCServer{
 		userService:    userService,
 		addressService: addressService,
-	}
-}
-
-func mapAppErrorToGRPC(err error) error {
-	if err == nil {
-		return nil
-	}
-	appErr := appErrors.AsAppError(err)
-	switch appErr.Code {
-	case appErrors.CodeNotFound:
-		return status.Error(codes.NotFound, appErr.Message)
-	case appErrors.CodeUnauthorized:
-		return status.Error(codes.Unauthenticated, appErr.Message)
-	case appErrors.CodeForbidden:
-		return status.Error(codes.PermissionDenied, appErr.Message)
-	case appErrors.CodeBadRequest:
-		return status.Error(codes.InvalidArgument, appErr.Message)
-	case appErrors.CodeConflict:
-		return status.Error(codes.AlreadyExists, appErr.Message)
-	default:
-		return status.Error(codes.Internal, appErr.Message)
 	}
 }
 
@@ -100,9 +78,10 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 
 	u, err := s.userService.CreateUser(ctx, createReq)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
-	c := &userpb.CreateUserResponse{
+
+	return &userpb.CreateUserResponse{
 		User: &userpb.User{
 			Id:        u.ID,
 			Email:     u.Email,
@@ -110,9 +89,7 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 			LastName:  u.LastName,
 			CreatedAt: u.CreatedAt.String(),
 		},
-	}
-	fmt.Println("User created successfully -------->", c)
-	return c, nil
+	}, nil
 }
 
 func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
@@ -122,7 +99,7 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 
 	u, err := s.userService.GetUserByID(ctx, req.Id)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	phonenumber := ""
@@ -163,7 +140,7 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 
 	u, err := s.userService.UpdateUser(ctx, req.Id, req.Id, updateReq)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	phone := ""
@@ -220,7 +197,7 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 
 	addr, err := s.addressService.CreateAddress(ctx, req.UserId, createReq)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &userpb.CreateUserAddressResponse{
@@ -235,7 +212,7 @@ func (s *UserGRPCServer) ListUserAddresses(ctx context.Context, req *userpb.List
 
 	addresses, err := s.addressService.ListAddresses(ctx, req.UserId)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	protoAddresses := make([]*userpb.Address, len(addresses))
@@ -255,7 +232,7 @@ func (s *UserGRPCServer) GetUserAddress(ctx context.Context, req *userpb.GetUser
 
 	addr, err := s.addressService.GetAddress(ctx, req.UserId, req.AddressId)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &userpb.GetUserAddressResponse{
@@ -283,7 +260,7 @@ func (s *UserGRPCServer) UpdateUserAddress(ctx context.Context, req *userpb.Upda
 
 	addr, err := s.addressService.UpdateAddress(ctx, req.UserId, req.AddressId, updateReq)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &userpb.UpdateUserAddressResponse{
@@ -297,7 +274,7 @@ func (s *UserGRPCServer) DeleteUserAddress(ctx context.Context, req *userpb.Dele
 	}
 
 	if err := s.addressService.DeleteAddress(ctx, req.UserId, req.AddressId); err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &userpb.DeleteUserAddressResponse{
@@ -312,7 +289,7 @@ func (s *UserGRPCServer) SetDefaultUserAddress(ctx context.Context, req *userpb.
 
 	addr, err := s.addressService.SetDefaultAddress(ctx, req.UserId, req.AddressId)
 	if err != nil {
-		return nil, mapAppErrorToGRPC(err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &userpb.SetDefaultUserAddressResponse{
