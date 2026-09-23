@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -25,8 +25,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -269,25 +269,25 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 				businessEmail = mResp.Merchant.BusinessEmail
 			}
 		}
-	}
-
-	_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-		Id:        userID.String(),
-		Email:     cred.Email,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-	})
-	if err != nil {
-		_ = s.repo.DeleteCredential(ctx, credID)
-		if st, ok := status.FromError(err); ok {
-			switch st.Code() {
-			case codes.AlreadyExists:
-				return nil, appErrors.Conflict("user with this email already exists")
-			case codes.InvalidArgument:
-				return nil, appErrors.BadRequest(st.Message())
+	} else {
+		_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Id:        userID.String(),
+			Email:     cred.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+		})
+		if err != nil {
+			_ = s.repo.DeleteCredential(ctx, credID)
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
+				case codes.AlreadyExists:
+					return nil, appErrors.Conflict("user with this email already exists")
+				case codes.InvalidArgument:
+					return nil, appErrors.BadRequest(st.Message())
+				}
 			}
+			return nil, appErrors.Internal(err, "failed to create user record in user service")
 		}
-		return nil, appErrors.Internal(err, "failed to create user record in user service")
 	}
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
 	if ttlMinutes <= 0 {
