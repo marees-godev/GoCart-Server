@@ -56,6 +56,11 @@ func PlaygroundHandler(title, endpoint string) http.Handler {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if r.Method == http.MethodGet && r.URL.Query().Get("query") == "" {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{
@@ -66,3 +71,4 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	s.srv.ServeHTTP(w, r)
 }
+

@@ -3,9 +3,11 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 )
 
 type Config struct {
@@ -18,6 +20,7 @@ type Config struct {
 	GRPC                        GRPCConfig
 	JWT                         JWTConfig
 	RateLimit                   RateLimitConfig
+	CORS                        middleware.CORSConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -155,6 +158,34 @@ func LoadEnv() *Config {
 			Max:     GetEnvAsInt("RATE_LIMIT_MAX_REQUESTS", 1000),
 			Window:  GetEnvAsDuration("RATE_LIMIT_WINDOW", time.Minute),
 		},
+		CORS: func() middleware.CORSConfig {
+			origins := GetEnvAsStringSlice("CORS_ALLOWED_ORIGINS", []string{"*"})
+			hasWildcard := false
+			for _, o := range origins {
+				if o == "*" {
+					hasWildcard = true
+					break
+				}
+			}
+			defaultAllowCredentials := false
+			if !hasWildcard {
+				defaultAllowCredentials = true
+			}
+			allowCredentials := GetEnvAsBool("CORS_ALLOW_CREDENTIALS", defaultAllowCredentials)
+			if hasWildcard && allowCredentials {
+				allowCredentials = false
+			}
+
+			return middleware.CORSConfig{
+				AllowedOrigins:   origins,
+				AllowedMethods:   GetEnvAsStringSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}),
+				AllowedHeaders:   GetEnvAsStringSlice("CORS_ALLOWED_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID", "X-Admin-Key"}),
+				ExposedHeaders:   GetEnvAsStringSlice("CORS_EXPOSED_HEADERS", []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers"}),
+				AllowCredentials: allowCredentials,
+				MaxAge:           GetEnvAsInt("CORS_MAX_AGE", 86400),
+			}
+		}(),
+
 		UserServiceAddr:             userServiceAddr,
 		ProductServiceAddr:          productServiceAddr,
 		CartServiceAddr:             cartServiceAddr,
@@ -207,3 +238,23 @@ func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	}
 	return d
 }
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
+}
+
