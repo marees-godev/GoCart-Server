@@ -47,6 +47,8 @@ services:
         # value injected via Render secret; keep key only
       - key: CART_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
+      - key: USER_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
       - key: INVENTORY_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
       - key: RATINGS_SERVICE_DATABASE_URL
