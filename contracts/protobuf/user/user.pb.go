@@ -29,6 +29,7 @@ type User struct {
 	LastName      string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
 	Phone         string                 `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -101,6 +102,13 @@ func (x *User) GetPhone() string {
 func (x *User) GetCreatedAt() string {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *User) GetStatus() string {
+	if x != nil {
+		return x.Status
 	}
 	return ""
 }
@@ -1285,11 +1293,435 @@ func (x *SetDefaultUserAddressResponse) GetAddress() *Address {
 	return nil
 }
 
+type DeactivateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason        *string                `protobuf:"bytes,2,opt,name=reason,proto3,oneof" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivateUserRequest) Reset() {
+	*x = DeactivateUserRequest{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivateUserRequest) ProtoMessage() {}
+
+func (x *DeactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*DeactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeactivateUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DeactivateUserRequest) GetReason() string {
+	if x != nil && x.Reason != nil {
+		return *x.Reason
+	}
+	return ""
+}
+
+type DeactivateUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivateUserResponse) Reset() {
+	*x = DeactivateUserResponse{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivateUserResponse) ProtoMessage() {}
+
+func (x *DeactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*DeactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DeactivateUserResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeactivateUserResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DeactivateUserResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type DeleteUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason        *string                `protobuf:"bytes,2,opt,name=reason,proto3,oneof" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserRequest) Reset() {
+	*x = DeleteUserRequest{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserRequest) ProtoMessage() {}
+
+func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
+func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *DeleteUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DeleteUserRequest) GetReason() string {
+	if x != nil && x.Reason != nil {
+		return *x.Reason
+	}
+	return ""
+}
+
+type DeleteUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserResponse) Reset() {
+	*x = DeleteUserResponse{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserResponse) ProtoMessage() {}
+
+func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserResponse.ProtoReflect.Descriptor instead.
+func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *DeleteUserResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeleteUserResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DeleteUserResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type ReactivateUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserRequest) Reset() {
+	*x = ReactivateUserRequest{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserRequest) ProtoMessage() {}
+
+func (x *ReactivateUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserRequest.ProtoReflect.Descriptor instead.
+func (*ReactivateUserRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReactivateUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type ReactivateUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReactivateUserResponse) Reset() {
+	*x = ReactivateUserResponse{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReactivateUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReactivateUserResponse) ProtoMessage() {}
+
+func (x *ReactivateUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReactivateUserResponse.ProtoReflect.Descriptor instead.
+func (*ReactivateUserResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ReactivateUserResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ReactivateUserResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ReactivateUserResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type ProcessExpiredDeactivationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RetentionDays *int32                 `protobuf:"varint,1,opt,name=retention_days,json=retentionDays,proto3,oneof" json:"retention_days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProcessExpiredDeactivationsRequest) Reset() {
+	*x = ProcessExpiredDeactivationsRequest{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessExpiredDeactivationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessExpiredDeactivationsRequest) ProtoMessage() {}
+
+func (x *ProcessExpiredDeactivationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessExpiredDeactivationsRequest.ProtoReflect.Descriptor instead.
+func (*ProcessExpiredDeactivationsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ProcessExpiredDeactivationsRequest) GetRetentionDays() int32 {
+	if x != nil && x.RetentionDays != nil {
+		return *x.RetentionDays
+	}
+	return 0
+}
+
+type ProcessExpiredDeactivationsResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProcessedCount int32                  `protobuf:"varint,1,opt,name=processed_count,json=processedCount,proto3" json:"processed_count,omitempty"`
+	Message        string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ProcessExpiredDeactivationsResponse) Reset() {
+	*x = ProcessExpiredDeactivationsResponse{}
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessExpiredDeactivationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessExpiredDeactivationsResponse) ProtoMessage() {}
+
+func (x *ProcessExpiredDeactivationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_user_user_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProcessExpiredDeactivationsResponse.ProtoReflect.Descriptor instead.
+func (*ProcessExpiredDeactivationsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_user_user_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ProcessExpiredDeactivationsResponse) GetProcessedCount() int32 {
+	if x != nil {
+		return x.ProcessedCount
+	}
+	return 0
+}
+
+func (x *ProcessExpiredDeactivationsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_contracts_protobuf_user_user_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/user/user.proto\x12\x0egocart.user.v1\"\x9d\x01\n" +
+	"\"contracts/protobuf/user/user.proto\x12\x0egocart.user.v1\"\xb5\x01\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1d\n" +
@@ -1298,7 +1730,8 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12\x14\n" +
 	"\x05phone\x18\x05 \x01(\tR\x05phone\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\tR\tcreatedAt\"\x92\x03\n" +
+	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x16\n" +
+	"\x06status\x18\a \x01(\tR\x06status\"\x92\x03\n" +
 	"\aAddress\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
@@ -1408,13 +1841,47 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\n" +
 	"address_id\x18\x02 \x01(\tR\taddressId\"R\n" +
 	"\x1dSetDefaultUserAddressResponse\x121\n" +
-	"\aaddress\x18\x01 \x01(\v2\x17.gocart.user.v1.AddressR\aaddress2\x82\a\n" +
+	"\aaddress\x18\x01 \x01(\v2\x17.gocart.user.v1.AddressR\aaddress\"O\n" +
+	"\x15DeactivateUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\x06reason\x18\x02 \x01(\tH\x00R\x06reason\x88\x01\x01B\t\n" +
+	"\a_reason\"d\n" +
+	"\x16DeactivateUserResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"K\n" +
+	"\x11DeleteUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\x06reason\x18\x02 \x01(\tH\x00R\x06reason\x88\x01\x01B\t\n" +
+	"\a_reason\"`\n" +
+	"\x12DeleteUserResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"'\n" +
+	"\x15ReactivateUserRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"d\n" +
+	"\x16ReactivateUserResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"c\n" +
+	"\"ProcessExpiredDeactivationsRequest\x12*\n" +
+	"\x0eretention_days\x18\x01 \x01(\x05H\x00R\rretentionDays\x88\x01\x01B\x11\n" +
+	"\x0f_retention_days\"h\n" +
+	"#ProcessExpiredDeactivationsResponse\x12'\n" +
+	"\x0fprocessed_count\x18\x01 \x01(\x05R\x0eprocessedCount\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xa2\n" +
+	"\n" +
 	"\vUserService\x12S\n" +
 	"\n" +
 	"CreateUser\x12!.gocart.user.v1.CreateUserRequest\x1a\".gocart.user.v1.CreateUserResponse\x12J\n" +
 	"\aGetUser\x12\x1e.gocart.user.v1.GetUserRequest\x1a\x1f.gocart.user.v1.GetUserResponse\x12S\n" +
 	"\n" +
-	"UpdateUser\x12!.gocart.user.v1.UpdateUserRequest\x1a\".gocart.user.v1.UpdateUserResponse\x12h\n" +
+	"UpdateUser\x12!.gocart.user.v1.UpdateUserRequest\x1a\".gocart.user.v1.UpdateUserResponse\x12_\n" +
+	"\x0eDeactivateUser\x12%.gocart.user.v1.DeactivateUserRequest\x1a&.gocart.user.v1.DeactivateUserResponse\x12_\n" +
+	"\x0eReactivateUser\x12%.gocart.user.v1.ReactivateUserRequest\x1a&.gocart.user.v1.ReactivateUserResponse\x12S\n" +
+	"\n" +
+	"DeleteUser\x12!.gocart.user.v1.DeleteUserRequest\x1a\".gocart.user.v1.DeleteUserResponse\x12\x86\x01\n" +
+	"\x1bProcessExpiredDeactivations\x122.gocart.user.v1.ProcessExpiredDeactivationsRequest\x1a3.gocart.user.v1.ProcessExpiredDeactivationsResponse\x12h\n" +
 	"\x11CreateUserAddress\x12(.gocart.user.v1.CreateUserAddressRequest\x1a).gocart.user.v1.CreateUserAddressResponse\x12h\n" +
 	"\x11ListUserAddresses\x12(.gocart.user.v1.ListUserAddressesRequest\x1a).gocart.user.v1.ListUserAddressesResponse\x12_\n" +
 	"\x0eGetUserAddress\x12%.gocart.user.v1.GetUserAddressRequest\x1a&.gocart.user.v1.GetUserAddressResponse\x12h\n" +
@@ -1434,28 +1901,36 @@ func file_contracts_protobuf_user_user_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_user_user_proto_rawDescData
 }
 
-var file_contracts_protobuf_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_contracts_protobuf_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_contracts_protobuf_user_user_proto_goTypes = []any{
-	(*User)(nil),                          // 0: gocart.user.v1.User
-	(*Address)(nil),                       // 1: gocart.user.v1.Address
-	(*CreateUserRequest)(nil),             // 2: gocart.user.v1.CreateUserRequest
-	(*CreateUserResponse)(nil),            // 3: gocart.user.v1.CreateUserResponse
-	(*GetUserRequest)(nil),                // 4: gocart.user.v1.GetUserRequest
-	(*GetUserResponse)(nil),               // 5: gocart.user.v1.GetUserResponse
-	(*UpdateUserRequest)(nil),             // 6: gocart.user.v1.UpdateUserRequest
-	(*UpdateUserResponse)(nil),            // 7: gocart.user.v1.UpdateUserResponse
-	(*CreateUserAddressRequest)(nil),      // 8: gocart.user.v1.CreateUserAddressRequest
-	(*CreateUserAddressResponse)(nil),     // 9: gocart.user.v1.CreateUserAddressResponse
-	(*ListUserAddressesRequest)(nil),      // 10: gocart.user.v1.ListUserAddressesRequest
-	(*ListUserAddressesResponse)(nil),     // 11: gocart.user.v1.ListUserAddressesResponse
-	(*GetUserAddressRequest)(nil),         // 12: gocart.user.v1.GetUserAddressRequest
-	(*GetUserAddressResponse)(nil),        // 13: gocart.user.v1.GetUserAddressResponse
-	(*UpdateUserAddressRequest)(nil),      // 14: gocart.user.v1.UpdateUserAddressRequest
-	(*UpdateUserAddressResponse)(nil),     // 15: gocart.user.v1.UpdateUserAddressResponse
-	(*DeleteUserAddressRequest)(nil),      // 16: gocart.user.v1.DeleteUserAddressRequest
-	(*DeleteUserAddressResponse)(nil),     // 17: gocart.user.v1.DeleteUserAddressResponse
-	(*SetDefaultUserAddressRequest)(nil),  // 18: gocart.user.v1.SetDefaultUserAddressRequest
-	(*SetDefaultUserAddressResponse)(nil), // 19: gocart.user.v1.SetDefaultUserAddressResponse
+	(*User)(nil),                                // 0: gocart.user.v1.User
+	(*Address)(nil),                             // 1: gocart.user.v1.Address
+	(*CreateUserRequest)(nil),                   // 2: gocart.user.v1.CreateUserRequest
+	(*CreateUserResponse)(nil),                  // 3: gocart.user.v1.CreateUserResponse
+	(*GetUserRequest)(nil),                      // 4: gocart.user.v1.GetUserRequest
+	(*GetUserResponse)(nil),                     // 5: gocart.user.v1.GetUserResponse
+	(*UpdateUserRequest)(nil),                   // 6: gocart.user.v1.UpdateUserRequest
+	(*UpdateUserResponse)(nil),                  // 7: gocart.user.v1.UpdateUserResponse
+	(*CreateUserAddressRequest)(nil),            // 8: gocart.user.v1.CreateUserAddressRequest
+	(*CreateUserAddressResponse)(nil),           // 9: gocart.user.v1.CreateUserAddressResponse
+	(*ListUserAddressesRequest)(nil),            // 10: gocart.user.v1.ListUserAddressesRequest
+	(*ListUserAddressesResponse)(nil),           // 11: gocart.user.v1.ListUserAddressesResponse
+	(*GetUserAddressRequest)(nil),               // 12: gocart.user.v1.GetUserAddressRequest
+	(*GetUserAddressResponse)(nil),              // 13: gocart.user.v1.GetUserAddressResponse
+	(*UpdateUserAddressRequest)(nil),            // 14: gocart.user.v1.UpdateUserAddressRequest
+	(*UpdateUserAddressResponse)(nil),           // 15: gocart.user.v1.UpdateUserAddressResponse
+	(*DeleteUserAddressRequest)(nil),            // 16: gocart.user.v1.DeleteUserAddressRequest
+	(*DeleteUserAddressResponse)(nil),           // 17: gocart.user.v1.DeleteUserAddressResponse
+	(*SetDefaultUserAddressRequest)(nil),        // 18: gocart.user.v1.SetDefaultUserAddressRequest
+	(*SetDefaultUserAddressResponse)(nil),       // 19: gocart.user.v1.SetDefaultUserAddressResponse
+	(*DeactivateUserRequest)(nil),               // 20: gocart.user.v1.DeactivateUserRequest
+	(*DeactivateUserResponse)(nil),              // 21: gocart.user.v1.DeactivateUserResponse
+	(*DeleteUserRequest)(nil),                   // 22: gocart.user.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),                  // 23: gocart.user.v1.DeleteUserResponse
+	(*ReactivateUserRequest)(nil),               // 24: gocart.user.v1.ReactivateUserRequest
+	(*ReactivateUserResponse)(nil),              // 25: gocart.user.v1.ReactivateUserResponse
+	(*ProcessExpiredDeactivationsRequest)(nil),  // 26: gocart.user.v1.ProcessExpiredDeactivationsRequest
+	(*ProcessExpiredDeactivationsResponse)(nil), // 27: gocart.user.v1.ProcessExpiredDeactivationsResponse
 }
 var file_contracts_protobuf_user_user_proto_depIdxs = []int32{
 	0,  // 0: gocart.user.v1.CreateUserResponse.user:type_name -> gocart.user.v1.User
@@ -1469,23 +1944,31 @@ var file_contracts_protobuf_user_user_proto_depIdxs = []int32{
 	2,  // 8: gocart.user.v1.UserService.CreateUser:input_type -> gocart.user.v1.CreateUserRequest
 	4,  // 9: gocart.user.v1.UserService.GetUser:input_type -> gocart.user.v1.GetUserRequest
 	6,  // 10: gocart.user.v1.UserService.UpdateUser:input_type -> gocart.user.v1.UpdateUserRequest
-	8,  // 11: gocart.user.v1.UserService.CreateUserAddress:input_type -> gocart.user.v1.CreateUserAddressRequest
-	10, // 12: gocart.user.v1.UserService.ListUserAddresses:input_type -> gocart.user.v1.ListUserAddressesRequest
-	12, // 13: gocart.user.v1.UserService.GetUserAddress:input_type -> gocart.user.v1.GetUserAddressRequest
-	14, // 14: gocart.user.v1.UserService.UpdateUserAddress:input_type -> gocart.user.v1.UpdateUserAddressRequest
-	16, // 15: gocart.user.v1.UserService.DeleteUserAddress:input_type -> gocart.user.v1.DeleteUserAddressRequest
-	18, // 16: gocart.user.v1.UserService.SetDefaultUserAddress:input_type -> gocart.user.v1.SetDefaultUserAddressRequest
-	3,  // 17: gocart.user.v1.UserService.CreateUser:output_type -> gocart.user.v1.CreateUserResponse
-	5,  // 18: gocart.user.v1.UserService.GetUser:output_type -> gocart.user.v1.GetUserResponse
-	7,  // 19: gocart.user.v1.UserService.UpdateUser:output_type -> gocart.user.v1.UpdateUserResponse
-	9,  // 20: gocart.user.v1.UserService.CreateUserAddress:output_type -> gocart.user.v1.CreateUserAddressResponse
-	11, // 21: gocart.user.v1.UserService.ListUserAddresses:output_type -> gocart.user.v1.ListUserAddressesResponse
-	13, // 22: gocart.user.v1.UserService.GetUserAddress:output_type -> gocart.user.v1.GetUserAddressResponse
-	15, // 23: gocart.user.v1.UserService.UpdateUserAddress:output_type -> gocart.user.v1.UpdateUserAddressResponse
-	17, // 24: gocart.user.v1.UserService.DeleteUserAddress:output_type -> gocart.user.v1.DeleteUserAddressResponse
-	19, // 25: gocart.user.v1.UserService.SetDefaultUserAddress:output_type -> gocart.user.v1.SetDefaultUserAddressResponse
-	17, // [17:26] is the sub-list for method output_type
-	8,  // [8:17] is the sub-list for method input_type
+	20, // 11: gocart.user.v1.UserService.DeactivateUser:input_type -> gocart.user.v1.DeactivateUserRequest
+	24, // 12: gocart.user.v1.UserService.ReactivateUser:input_type -> gocart.user.v1.ReactivateUserRequest
+	22, // 13: gocart.user.v1.UserService.DeleteUser:input_type -> gocart.user.v1.DeleteUserRequest
+	26, // 14: gocart.user.v1.UserService.ProcessExpiredDeactivations:input_type -> gocart.user.v1.ProcessExpiredDeactivationsRequest
+	8,  // 15: gocart.user.v1.UserService.CreateUserAddress:input_type -> gocart.user.v1.CreateUserAddressRequest
+	10, // 16: gocart.user.v1.UserService.ListUserAddresses:input_type -> gocart.user.v1.ListUserAddressesRequest
+	12, // 17: gocart.user.v1.UserService.GetUserAddress:input_type -> gocart.user.v1.GetUserAddressRequest
+	14, // 18: gocart.user.v1.UserService.UpdateUserAddress:input_type -> gocart.user.v1.UpdateUserAddressRequest
+	16, // 19: gocart.user.v1.UserService.DeleteUserAddress:input_type -> gocart.user.v1.DeleteUserAddressRequest
+	18, // 20: gocart.user.v1.UserService.SetDefaultUserAddress:input_type -> gocart.user.v1.SetDefaultUserAddressRequest
+	3,  // 21: gocart.user.v1.UserService.CreateUser:output_type -> gocart.user.v1.CreateUserResponse
+	5,  // 22: gocart.user.v1.UserService.GetUser:output_type -> gocart.user.v1.GetUserResponse
+	7,  // 23: gocart.user.v1.UserService.UpdateUser:output_type -> gocart.user.v1.UpdateUserResponse
+	21, // 24: gocart.user.v1.UserService.DeactivateUser:output_type -> gocart.user.v1.DeactivateUserResponse
+	25, // 25: gocart.user.v1.UserService.ReactivateUser:output_type -> gocart.user.v1.ReactivateUserResponse
+	23, // 26: gocart.user.v1.UserService.DeleteUser:output_type -> gocart.user.v1.DeleteUserResponse
+	27, // 27: gocart.user.v1.UserService.ProcessExpiredDeactivations:output_type -> gocart.user.v1.ProcessExpiredDeactivationsResponse
+	9,  // 28: gocart.user.v1.UserService.CreateUserAddress:output_type -> gocart.user.v1.CreateUserAddressResponse
+	11, // 29: gocart.user.v1.UserService.ListUserAddresses:output_type -> gocart.user.v1.ListUserAddressesResponse
+	13, // 30: gocart.user.v1.UserService.GetUserAddress:output_type -> gocart.user.v1.GetUserAddressResponse
+	15, // 31: gocart.user.v1.UserService.UpdateUserAddress:output_type -> gocart.user.v1.UpdateUserAddressResponse
+	17, // 32: gocart.user.v1.UserService.DeleteUserAddress:output_type -> gocart.user.v1.DeleteUserAddressResponse
+	19, // 33: gocart.user.v1.UserService.SetDefaultUserAddress:output_type -> gocart.user.v1.SetDefaultUserAddressResponse
+	21, // [21:34] is the sub-list for method output_type
+	8,  // [8:21] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -1497,13 +1980,16 @@ func file_contracts_protobuf_user_user_proto_init() {
 		return
 	}
 	file_contracts_protobuf_user_user_proto_msgTypes[14].OneofWrappers = []any{}
+	file_contracts_protobuf_user_user_proto_msgTypes[20].OneofWrappers = []any{}
+	file_contracts_protobuf_user_user_proto_msgTypes[22].OneofWrappers = []any{}
+	file_contracts_protobuf_user_user_proto_msgTypes[26].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_user_user_proto_rawDesc), len(file_contracts_protobuf_user_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

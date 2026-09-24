@@ -10,6 +10,12 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+type AccountActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type AddRatingInput struct {
 	ProductID string  `json:"productId"`
 	UserID    string  `json:"userId"`
@@ -148,6 +154,14 @@ type CreateStoreInput struct {
 	Address            *string           `json:"address,omitempty"`
 	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+}
+
+type DeactivateAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type DeleteAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
 }
 
 type Delivery struct {
@@ -429,6 +443,7 @@ type User struct {
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
 	Phone     *string `json:"phone,omitempty"`
+	Status    *string `json:"status,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
 }
 

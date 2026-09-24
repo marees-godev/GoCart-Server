@@ -89,3 +89,49 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 	slog.InfoContext(ctx, "HTTP UpdateProfile succeeded", "user_id", user.ID)
 	return c.JSON(dto.ToUserResponse(user))
 }
+
+func (h *UserHandler) DeactivateAccount(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	authUserID := getAuthUserID(c)
+	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in HTTP DeactivateAccount")
+		err := errors.Unauthorized("missing authenticated user context")
+		return c.Status(err.HTTPStatus).JSON(err.ToResponse())
+	}
+
+	var req dto.DeactivateUserRequest
+	_ = c.BodyParser(&req)
+
+	res, err := h.userService.DeactivateUser(c.Context(), authUserID, authUserID, req)
+	if err != nil {
+		slog.WarnContext(ctx, "service error in HTTP DeactivateAccount", "user_id", authUserID, "error", err)
+		appErr := errors.AsAppError(err)
+		return c.Status(appErr.HTTPStatus).JSON(appErr.ToResponse())
+	}
+
+	slog.InfoContext(ctx, "HTTP DeactivateAccount succeeded", "user_id", authUserID)
+	return c.JSON(res)
+}
+
+func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
+	ctx := c.UserContext()
+	authUserID := getAuthUserID(c)
+	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in HTTP DeleteAccount")
+		err := errors.Unauthorized("missing authenticated user context")
+		return c.Status(err.HTTPStatus).JSON(err.ToResponse())
+	}
+
+	var req dto.DeleteUserRequest
+	_ = c.BodyParser(&req)
+
+	res, err := h.userService.DeleteUser(c.Context(), authUserID, authUserID, req)
+	if err != nil {
+		slog.WarnContext(ctx, "service error in HTTP DeleteAccount", "user_id", authUserID, "error", err)
+		appErr := errors.AsAppError(err)
+		return c.Status(appErr.HTTPStatus).JSON(appErr.ToResponse())
+	}
+
+	slog.InfoContext(ctx, "HTTP DeleteAccount succeeded", "user_id", authUserID)
+	return c.JSON(res)
+}

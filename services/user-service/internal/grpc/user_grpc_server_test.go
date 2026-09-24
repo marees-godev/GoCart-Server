@@ -45,3 +45,41 @@ func TestUserGRPCServer_CreateUser(t *testing.T) {
 		t.Errorf("expected email 'john.doe@example.com', got '%s'", unmarshaled.User.Email)
 	}
 }
+
+func TestUserGRPCServer_DeactivateUser(t *testing.T) {
+	server, _, _ := setupGRPCTestServer()
+
+	reason := "User requested break"
+	req := &userpb.DeactivateUserRequest{
+		Id:     "user-1",
+		Reason: &reason,
+	}
+
+	resp, err := server.DeactivateUser(context.Background(), req)
+	if err != nil {
+		t.Fatalf("DeactivateUser failed: %v", err)
+	}
+
+	if !resp.Success || resp.Status != "deactivated" {
+		t.Errorf("expected success with deactivated status, got %+v", resp)
+	}
+}
+
+func TestUserGRPCServer_DeleteUser(t *testing.T) {
+	server, _, _ := setupGRPCTestServer()
+
+	reason := "GDPR request"
+	req := &userpb.DeleteUserRequest{
+		Id:     "user-1",
+		Reason: &reason,
+	}
+
+	resp, err := server.DeleteUser(context.Background(), req)
+	if err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	if !resp.Success || resp.Status != "deleted" {
+		t.Errorf("expected success with deleted status, got %+v", resp)
+	}
+}

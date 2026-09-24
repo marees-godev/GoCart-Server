@@ -67,6 +67,47 @@ func (m *mockUserRepository) UpdateUser(ctx context.Context, u *model.User) erro
 	return nil
 }
 
+func (m *mockUserRepository) DeactivateUser(ctx context.Context, userID, performedBy string, reason *string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	if u.Status == "deleted" {
+		return appErrors.Forbidden("cannot deactivate a deleted account")
+	}
+	u.Status = "deactivated"
+	return nil
+}
+
+func (m *mockUserRepository) ReactivateUser(ctx context.Context, userID, performedBy string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	u.Status = "active"
+	return nil
+}
+
+func (m *mockUserRepository) DeleteUser(ctx context.Context, userID, performedBy string, reason *string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	u.Status = "deleted"
+	now := time.Now()
+	u.DeletedAt = &now
+	u.Email = "deleted_" + userID + "@deleted.local"
+	return nil
+}
+
+func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockUserRepository) GetUserAuditLogs(ctx context.Context, userID string) ([]*model.UserAuditLog, error) {
+	return nil, nil
+}
+
 
 type mockAddressRepository struct {
 	addresses map[string]*model.Address

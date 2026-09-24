@@ -23,6 +23,7 @@ import (
 	userGRPC "github.com/marees-godev/GoCart-Server/services/user-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/service"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -91,6 +92,9 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	addressRepo := repository.NewAddressRepository(db.Pool)
 	addressService := service.NewAddressService(addressRepo, userRepo)
+
+	retentionWorker := worker.NewRetentionWorker(userService, 1*time.Hour, 30*24*time.Hour)
+	retentionWorker.Start(ctx)
 
 	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService)
 

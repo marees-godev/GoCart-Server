@@ -47,6 +47,12 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AccountActionResponse struct {
+		Message func(childComplexity int) int
+		Status  func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	Address struct {
 		AddressLine  func(childComplexity int) int
 		City         func(childComplexity int) int
@@ -143,45 +149,46 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRating               func(childComplexity int, input model.AddRatingInput) int
-		AddToCart               func(childComplexity int, input model.AddToCartInput) int
-		ApproveStore            func(childComplexity int, id string) int
-		ClearCart               func(childComplexity int, userID string) int
-		CreateCategory          func(childComplexity int, input model.CreateCategoryInput) int
-		CreateDelivery          func(childComplexity int, input model.CreateDeliveryInput) int
-		CreateOrder             func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct           func(childComplexity int, input model.CreateProductInput) int
-		CreateRefund            func(childComplexity int, paymentID string, amount float64, reason *string) int
-		CreateStore             func(childComplexity int, input model.CreateStoreInput) int
-		CreateUserAddress       func(childComplexity int, userID string, input model.CreateAddressInput) int
-		DeleteMerchant          func(childComplexity int, id *string, merchantID *string) int
-		DeleteProduct           func(childComplexity int, id string) int
-		DeleteUserAddress       func(childComplexity int, id string) int
-		Empty                   func(childComplexity int) int
-		GenerateStoreUploadURL  func(childComplexity int, input model.GenerateStoreUploadURLInput) int
-		Login                   func(childComplexity int, input model.LoginInput) int
-		ProcessPayment          func(childComplexity int, input model.ProcessPaymentInput) int
-		Register                func(childComplexity int, input model.RegisterInput) int
-		RejectStore             func(childComplexity int, id string, reason string) int
-		ReleaseStock            func(childComplexity int, reservationID string) int
-		RemoveFromCart          func(childComplexity int, userID string, productID string) int
-		RequestReturn           func(childComplexity int, input model.RequestReturnInput) int
-		ResendVerificationEmail func(childComplexity int, email string) int
-		ReserveStock            func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
-		SendNotification        func(childComplexity int, input model.SendNotificationInput) int
-		SetDefaultUserAddress   func(childComplexity int, id string) int
-		SubmitStore             func(childComplexity int, id string) int
-		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
-		UpdateMerchant          func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
-		UpdateMerchantStatus    func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
-		UpdateOrderStatus       func(childComplexity int, id string, status string) int
-		UpdateProduct           func(childComplexity int, id string, input model.UpdateProductInput) int
-		UpdateReturnStatus      func(childComplexity int, id string, status string) int
-		UpdateStock             func(childComplexity int, productID string, quantity int) int
-		UpdateStore             func(childComplexity int, input model.UpdateStoreInput) int
-		UpdateUser              func(childComplexity int, id string, input model.UpdateUserInput) int
-		UpdateUserAddress       func(childComplexity int, id string, input model.UpdateAddressInput) int
-		VerifyEmail             func(childComplexity int, email string, otp string) int
+		AddRating              func(childComplexity int, input model.AddRatingInput) int
+		AddToCart              func(childComplexity int, input model.AddToCartInput) int
+		ApproveStore           func(childComplexity int, id string) int
+		ClearCart              func(childComplexity int, userID string) int
+		CreateCategory         func(childComplexity int, input model.CreateCategoryInput) int
+		CreateDelivery         func(childComplexity int, input model.CreateDeliveryInput) int
+		CreateOrder            func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct          func(childComplexity int, input model.CreateProductInput) int
+		CreateRefund           func(childComplexity int, paymentID string, amount float64, reason *string) int
+		CreateStore            func(childComplexity int, input model.CreateStoreInput) int
+		CreateUserAddress      func(childComplexity int, userID string, input model.CreateAddressInput) int
+		DeactivateAccount      func(childComplexity int, input *model.DeactivateAccountInput) int
+		DeleteAccount          func(childComplexity int, input *model.DeleteAccountInput) int
+		DeleteMerchant         func(childComplexity int, id *string, merchantID *string) int
+		DeleteProduct          func(childComplexity int, id string) int
+		DeleteUserAddress      func(childComplexity int, id string) int
+		Empty                  func(childComplexity int) int
+		GenerateStoreUploadURL func(childComplexity int, input model.GenerateStoreUploadURLInput) int
+		Login                  func(childComplexity int, input model.LoginInput) int
+		ProcessPayment         func(childComplexity int, input model.ProcessPaymentInput) int
+		ReactivateAccount      func(childComplexity int) int
+		Register               func(childComplexity int, input model.RegisterInput) int
+		RejectStore            func(childComplexity int, id string, reason string) int
+		ReleaseStock           func(childComplexity int, reservationID string) int
+		RemoveFromCart         func(childComplexity int, userID string, productID string) int
+		RequestReturn          func(childComplexity int, input model.RequestReturnInput) int
+		ReserveStock           func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
+		SendNotification       func(childComplexity int, input model.SendNotificationInput) int
+		SetDefaultUserAddress  func(childComplexity int, id string) int
+		SubmitStore            func(childComplexity int, id string) int
+		UpdateDeliveryStatus   func(childComplexity int, id string, status string, location *string) int
+		UpdateMerchant         func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
+		UpdateMerchantStatus   func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
+		UpdateOrderStatus      func(childComplexity int, id string, status string) int
+		UpdateProduct          func(childComplexity int, id string, input model.UpdateProductInput) int
+		UpdateReturnStatus     func(childComplexity int, id string, status string) int
+		UpdateStock            func(childComplexity int, productID string, quantity int) int
+		UpdateStore            func(childComplexity int, input model.UpdateStoreInput) int
+		UpdateUser             func(childComplexity int, id string, input model.UpdateUserInput) int
+		UpdateUserAddress      func(childComplexity int, id string, input model.UpdateAddressInput) int
 	}
 
 	Notification struct {
@@ -360,6 +367,7 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		LastName  func(childComplexity int) int
 		Phone     func(childComplexity int) int
+		Status    func(childComplexity int) int
 	}
 }
 
@@ -399,6 +407,9 @@ type MutationResolver interface {
 	ApproveStore(ctx context.Context, id string) (*model.Store, error)
 	RejectStore(ctx context.Context, id string, reason string) (*model.Store, error)
 	UpdateUser(ctx context.Context, id string, input model.UpdateUserInput) (*model.User, error)
+	DeactivateAccount(ctx context.Context, input *model.DeactivateAccountInput) (*model.AccountActionResponse, error)
+	ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error)
+	DeleteAccount(ctx context.Context, input *model.DeleteAccountInput) (*model.AccountActionResponse, error)
 	CreateUserAddress(ctx context.Context, userID string, input model.CreateAddressInput) (*model.Address, error)
 	UpdateUserAddress(ctx context.Context, id string, input model.UpdateAddressInput) (*model.Address, error)
 	DeleteUserAddress(ctx context.Context, id string) (bool, error)
@@ -451,6 +462,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AccountActionResponse.message":
+		if e.complexity.AccountActionResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.AccountActionResponse.Message(childComplexity), true
+
+	case "AccountActionResponse.status":
+		if e.complexity.AccountActionResponse.Status == nil {
+			break
+		}
+
+		return e.complexity.AccountActionResponse.Status(childComplexity), true
+
+	case "AccountActionResponse.success":
+		if e.complexity.AccountActionResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.AccountActionResponse.Success(childComplexity), true
 
 	case "Address.addressLine":
 		if e.complexity.Address.AddressLine == nil {
@@ -1039,6 +1071,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.CreateUserAddress(childComplexity, args["userId"].(string), args["input"].(model.CreateAddressInput)), true
 
+	case "Mutation.deactivateAccount":
+		if e.complexity.Mutation.DeactivateAccount == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deactivateAccount_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeactivateAccount(childComplexity, args["input"].(*model.DeactivateAccountInput)), true
+
+	case "Mutation.deleteAccount":
+		if e.complexity.Mutation.DeleteAccount == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteAccount_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteAccount(childComplexity, args["input"].(*model.DeleteAccountInput)), true
+
 	case "Mutation.deleteMerchant":
 		if e.complexity.Mutation.DeleteMerchant == nil {
 			break
@@ -1117,6 +1173,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.ProcessPayment(childComplexity, args["input"].(model.ProcessPaymentInput)), true
+
+	case "Mutation.reactivateAccount":
+		if e.complexity.Mutation.ReactivateAccount == nil {
+			break
+		}
+
+		return e.complexity.Mutation.ReactivateAccount(childComplexity), true
 
 	case "Mutation.register":
 		if e.complexity.Mutation.Register == nil {
@@ -2327,6 +2390,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.Phone(childComplexity), true
 
+	case "User.status":
+		if e.complexity.User.Status == nil {
+			break
+		}
+
+		return e.complexity.User.Status(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -2344,6 +2414,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateOrderInput,
 		ec.unmarshalInputCreateProductInput,
 		ec.unmarshalInputCreateStoreInput,
+		ec.unmarshalInputDeactivateAccountInput,
+		ec.unmarshalInputDeleteAccountInput,
 		ec.unmarshalInputGenerateStoreUploadUrlInput,
 		ec.unmarshalInputLoginInput,
 		ec.unmarshalInputProcessPaymentInput,
@@ -2968,6 +3040,7 @@ input UpdateStoreInput {
   firstName: String
   lastName: String
   phone: String
+  status: String
   createdAt: String
 }
 
@@ -2992,6 +3065,20 @@ input UpdateUserInput {
   firstName: String
   lastName: String
   phone: String
+}
+
+type AccountActionResponse {
+  success: Boolean!
+  message: String!
+  status: String!
+}
+
+input DeactivateAccountInput {
+  reason: String
+}
+
+input DeleteAccountInput {
+  reason: String
 }
 
 input CreateAddressInput {
@@ -3029,6 +3116,9 @@ extend type Query {
 
 extend type Mutation {
   updateUser(id: ID!, input: UpdateUserInput!): User @auth
+  deactivateAccount(input: DeactivateAccountInput): AccountActionResponse! @auth
+  reactivateAccount: AccountActionResponse! @auth
+  deleteAccount(input: DeleteAccountInput): AccountActionResponse! @auth
   createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
   updateUserAddress(id: ID!, input: UpdateAddressInput!): Address @auth
   deleteUserAddress(id: ID!): Boolean! @auth
@@ -3247,6 +3337,36 @@ func (ec *executionContext) field_Mutation_createUserAddress_args(ctx context.Co
 		}
 	}
 	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deactivateAccount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.DeactivateAccountInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalODeactivateAccountInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeactivateAccountInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteAccount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.DeleteAccountInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalODeleteAccountInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteAccountInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -4335,6 +4455,138 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _AccountActionResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.AccountActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AccountActionResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AccountActionResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AccountActionResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AccountActionResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.AccountActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AccountActionResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AccountActionResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AccountActionResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AccountActionResponse_status(ctx context.Context, field graphql.CollectedField, obj *model.AccountActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AccountActionResponse_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AccountActionResponse_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AccountActionResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Address_id(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Address_id(ctx, field)
 	if err != nil {
@@ -5026,6 +5278,8 @@ func (ec *executionContext) fieldContext_AuthPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_lastName(ctx, field)
 			case "phone":
 				return ec.fieldContext_User_phone(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			}
@@ -10227,6 +10481,8 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_lastName(ctx, field)
 			case "phone":
 				return ec.fieldContext_User_phone(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			}
@@ -10241,6 +10497,244 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deactivateAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deactivateAccount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeactivateAccount(rctx, fc.Args["input"].(*model.DeactivateAccountInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.AccountActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.AccountActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.AccountActionResponse)
+	fc.Result = res
+	return ec.marshalNAccountActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAccountActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deactivateAccount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AccountActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_AccountActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_AccountActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AccountActionResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deactivateAccount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_reactivateAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_reactivateAccount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ReactivateAccount(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.AccountActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.AccountActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.AccountActionResponse)
+	fc.Result = res
+	return ec.marshalNAccountActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAccountActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_reactivateAccount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AccountActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_AccountActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_AccountActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AccountActionResponse", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteAccount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteAccount(rctx, fc.Args["input"].(*model.DeleteAccountInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.AccountActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.AccountActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.AccountActionResponse)
+	fc.Result = res
+	return ec.marshalNAccountActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAccountActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteAccount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AccountActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_AccountActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_AccountActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AccountActionResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteAccount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -14449,6 +14943,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_lastName(ctx, field)
 			case "phone":
 				return ec.fieldContext_User_phone(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			}
@@ -14528,6 +15024,8 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_lastName(ctx, field)
 			case "phone":
 				return ec.fieldContext_User_phone(ctx, field)
+			case "status":
+				return ec.fieldContext_User_status(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			}
@@ -17046,6 +17544,47 @@ func (ec *executionContext) fieldContext_User_phone(_ context.Context, field gra
 	return fc, nil
 }
 
+func (ec *executionContext) _User_status(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_User_createdAt(ctx, field)
 	if err != nil {
@@ -19383,6 +19922,60 @@ func (ec *executionContext) unmarshalInputCreateStoreInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputDeactivateAccountInput(ctx context.Context, obj interface{}) (model.DeactivateAccountInput, error) {
+	var it model.DeactivateAccountInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"reason"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "reason":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Reason = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputDeleteAccountInput(ctx context.Context, obj interface{}) (model.DeleteAccountInput, error) {
+	var it model.DeleteAccountInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"reason"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "reason":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Reason = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputGenerateStoreUploadUrlInput(ctx context.Context, obj interface{}) (model.GenerateStoreUploadURLInput, error) {
 	var it model.GenerateStoreUploadURLInput
 	asMap := map[string]interface{}{}
@@ -20050,6 +20643,55 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var accountActionResponseImplementors = []string{"AccountActionResponse"}
+
+func (ec *executionContext) _AccountActionResponse(ctx context.Context, sel ast.SelectionSet, obj *model.AccountActionResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, accountActionResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AccountActionResponse")
+		case "success":
+			out.Values[i] = ec._AccountActionResponse_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._AccountActionResponse_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._AccountActionResponse_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var addressImplementors = []string{"Address"}
 
@@ -20824,6 +21466,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
 			})
+		case "deactivateAccount":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deactivateAccount(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reactivateAccount":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_reactivateAccount(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteAccount":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteAccount(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createUserAddress":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createUserAddress(ctx, field)
@@ -22436,6 +23099,8 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = ec._User_lastName(ctx, field, obj)
 		case "phone":
 			out.Values[i] = ec._User_phone(ctx, field, obj)
+		case "status":
+			out.Values[i] = ec._User_status(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._User_createdAt(ctx, field, obj)
 		default:
@@ -22786,6 +23451,20 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 // endregion **************************** object.gotpl ****************************
 
 // region    ***************************** type.gotpl *****************************
+
+func (ec *executionContext) marshalNAccountActionResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAccountActionResponse(ctx context.Context, sel ast.SelectionSet, v model.AccountActionResponse) graphql.Marshaler {
+	return ec._AccountActionResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAccountActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAccountActionResponse(ctx context.Context, sel ast.SelectionSet, v *model.AccountActionResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AccountActionResponse(ctx, sel, v)
+}
 
 func (ec *executionContext) unmarshalNAddRatingInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAddRatingInput(ctx context.Context, v interface{}) (model.AddRatingInput, error) {
 	res, err := ec.unmarshalInputAddRatingInput(ctx, v)
@@ -24014,6 +24693,22 @@ func (ec *executionContext) marshalOCategory2ᚖgithubᚗcomᚋmareesᚑgodevᚋ
 		return graphql.Null
 	}
 	return ec._Category(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalODeactivateAccountInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeactivateAccountInput(ctx context.Context, v interface{}) (*model.DeactivateAccountInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDeactivateAccountInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalODeleteAccountInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteAccountInput(ctx context.Context, v interface{}) (*model.DeleteAccountInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputDeleteAccountInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalODelivery2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx context.Context, sel ast.SelectionSet, v *model.Delivery) graphql.Marshaler {

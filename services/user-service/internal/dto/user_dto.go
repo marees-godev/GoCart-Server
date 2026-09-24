@@ -145,6 +145,24 @@ type UserResponse struct {
 	Status         string  `json:"status"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
+	DeactivatedAt  *string `json:"deactivated_at,omitempty"`
+	DeletedAt      *string `json:"deleted_at,omitempty"`
+}
+
+type DeactivateUserRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type ReactivateUserRequest struct{}
+
+type DeleteUserRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type AccountActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
 }
 
 func ToUserResponse(u *model.User) *UserResponse {
@@ -156,6 +174,18 @@ func ToUserResponse(u *model.User) *UserResponse {
 	if u.DateOfBirth != nil {
 		formatted := u.DateOfBirth.Format("2006-01-02")
 		dobStr = &formatted
+	}
+
+	var deactivatedAtStr *string
+	if u.DeactivatedAt != nil {
+		formatted := u.DeactivatedAt.Format(time.RFC3339)
+		deactivatedAtStr = &formatted
+	}
+
+	var deletedAtStr *string
+	if u.DeletedAt != nil {
+		formatted := u.DeletedAt.Format(time.RFC3339)
+		deletedAtStr = &formatted
 	}
 
 	return &UserResponse{
@@ -173,5 +203,7 @@ func ToUserResponse(u *model.User) *UserResponse {
 		Status:         u.Status,
 		CreatedAt:      u.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      u.UpdatedAt.Format(time.RFC3339),
+		DeactivatedAt:  deactivatedAtStr,
+		DeletedAt:      deletedAtStr,
 	}
 }

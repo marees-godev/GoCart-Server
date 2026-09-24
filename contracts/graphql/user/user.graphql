@@ -4,6 +4,7 @@ type User {
   firstName: String
   lastName: String
   phone: String
+  status: String
   createdAt: String
 }
 
@@ -28,6 +29,20 @@ input UpdateUserInput {
   firstName: String
   lastName: String
   phone: String
+}
+
+type AccountActionResponse {
+  success: Boolean!
+  message: String!
+  status: String!
+}
+
+input DeactivateAccountInput {
+  reason: String
+}
+
+input DeleteAccountInput {
+  reason: String
 }
 
 input CreateAddressInput {
@@ -65,6 +80,9 @@ extend type Query {
 
 extend type Mutation {
   updateUser(id: ID!, input: UpdateUserInput!): User @auth
+  deactivateAccount(input: DeactivateAccountInput): AccountActionResponse! @auth
+  reactivateAccount: AccountActionResponse! @auth
+  deleteAccount(input: DeleteAccountInput): AccountActionResponse! @auth
   createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
   updateUserAddress(id: ID!, input: UpdateAddressInput!): Address @auth
   deleteUserAddress(id: ID!): Boolean! @auth

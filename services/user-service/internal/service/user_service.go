@@ -17,6 +17,10 @@ type UserService interface {
 	GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error)
 	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error)
+	DeactivateUser(ctx context.Context, authUserID, targetUserID string, req dto.DeactivateUserRequest) (*dto.AccountActionResponse, error)
+	ReactivateUser(ctx context.Context, authUserID, targetUserID string) (*dto.AccountActionResponse, error)
+	DeleteUser(ctx context.Context, authUserID, targetUserID string, req dto.DeleteUserRequest) (*dto.AccountActionResponse, error)
+	ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error)
 }
 
 type userService struct {
@@ -74,6 +78,12 @@ func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID stri
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		if strings.EqualFold(user.Status, "deactivated") && user.DeactivatedAt != nil && time.Since(*user.DeactivatedAt) >= 30*24*time.Hour {
+			reason := "Automatic permanent deletion after 30 days of deactivation"
+			_ = s.repo.DeleteUser(ctx, user.ID, "SYSTEM", &reason)
+			slog.WarnContext(ctx, "deactivation grace period expired; permanently deleted", "user_id", idToFetch)
+			return nil, errors.Forbidden("account deactivation period of 30 days has expired; account has been permanently deleted")
+		}
 		slog.WarnContext(ctx, "user account not active in GetUser", "user_id", idToFetch, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
@@ -95,6 +105,12 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, 
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		if strings.EqualFold(user.Status, "deactivated") && user.DeactivatedAt != nil && time.Since(*user.DeactivatedAt) >= 30*24*time.Hour {
+			reason := "Automatic permanent deletion after 30 days of deactivation"
+			_ = s.repo.DeleteUser(ctx, user.ID, "SYSTEM", &reason)
+			slog.WarnContext(ctx, "deactivation grace period expired; permanently deleted", "user_id", id)
+			return nil, errors.Forbidden("account deactivation period of 30 days has expired; account has been permanently deleted")
+		}
 		slog.WarnContext(ctx, "user account not active in GetUserByID", "user_id", id, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
@@ -201,4 +217,113 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 
 	slog.InfoContext(ctx, "user updated successfully in UpdateUser", "user_id", user.ID)
 	return user, nil
+}
+
+func (s *userService) DeactivateUser(ctx context.Context, authUserID, targetUserID string, req dto.DeactivateUserRequest) (*dto.AccountActionResponse, error) {
+	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in DeactivateUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if targetUserID == "" {
+		targetUserID = authUserID
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "forbidden user deactivation attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.Forbidden("user cannot deactivate another user's account")
+	}
+
+	if err := s.repo.DeactivateUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
+		slog.ErrorContext(ctx, "failed to deactivate user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account deactivated successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account deactivated successfully",
+		Status:  "deactivated",
+	}, nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, authUserID, targetUserID string, req dto.DeleteUserRequest) (*dto.AccountActionResponse, error) {
+	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in DeleteUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if targetUserID == "" {
+		targetUserID = authUserID
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "forbidden user deletion attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.Forbidden("user cannot delete another user's account")
+	}
+
+	if err := s.repo.DeleteUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
+		slog.ErrorContext(ctx, "failed to delete user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account deleted successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account deleted successfully",
+		Status:  "deleted",
+	}, nil
+}
+
+func (s *userService) ReactivateUser(ctx context.Context, authUserID, targetUserID string) (*dto.AccountActionResponse, error) {
+	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in ReactivateUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if targetUserID == "" {
+		targetUserID = authUserID
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "forbidden user reactivation attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.Forbidden("user cannot reactivate another user's account")
+	}
+
+	if err := s.repo.ReactivateUser(ctx, targetUserID, authUserID); err != nil {
+		slog.ErrorContext(ctx, "failed to reactivate user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account reactivated successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account reactivated successfully",
+		Status:  "active",
+	}, nil
+}
+
+func (s *userService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
+	if retentionPeriod <= 0 {
+		retentionPeriod = 30 * 24 * time.Hour
+	}
+	cutoff := time.Now().UTC().Add(-retentionPeriod)
+	userIDs, err := s.repo.GetExpiredDeactivatedUserIDs(ctx, cutoff)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to get expired deactivated users", "cutoff", cutoff, "error", err)
+		return 0, err
+	}
+
+	processedCount := 0
+	reason := "Automatic permanent deletion after 30 days of deactivation"
+	for _, id := range userIDs {
+		if err := s.repo.DeleteUser(ctx, id, "SYSTEM", &reason); err != nil {
+			slog.ErrorContext(ctx, "failed to automatically soft-delete expired deactivated user", "user_id", id, "error", err)
+			continue
+		}
+		processedCount++
+	}
+
+	slog.InfoContext(ctx, "processed expired deactivations", "count", processedCount, "total_found", len(userIDs))
+	return processedCount, nil
 }

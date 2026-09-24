@@ -13,12 +13,14 @@ import (
 )
 
 type mockUserRepository struct {
-	users map[string]*model.User
+	users     map[string]*model.User
+	auditLogs []*model.UserAuditLog
 }
 
 func newMockRepo() *mockUserRepository {
 	return &mockUserRepository{
-		users: make(map[string]*model.User),
+		users:     make(map[string]*model.User),
+		auditLogs: make([]*model.UserAuditLog, 0),
 	}
 }
 
@@ -76,6 +78,116 @@ func (m *mockUserRepository) UpdateUser(ctx context.Context, user *model.User) e
 	existing.AvatarURL = user.AvatarURL
 	existing.UpdatedAt = time.Now()
 	return nil
+}
+
+func (m *mockUserRepository) DeactivateUser(ctx context.Context, userID, performedBy string, reason *string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	if u.Status == "deleted" {
+		return appErrors.Forbidden("cannot deactivate a deleted account")
+	}
+	if u.Status == "deactivated" {
+		return nil
+	}
+	now := time.Now()
+	u.Status = "deactivated"
+	u.DeactivatedAt = &now
+	u.UpdatedAt = now
+	m.auditLogs = append(m.auditLogs, &model.UserAuditLog{
+		ID:          "audit-" + userID,
+		UserID:      userID,
+		Action:      "DEACTIVATE",
+		PerformedBy: performedBy,
+		Reason:      reason,
+		CreatedAt:   now,
+	})
+	return nil
+}
+
+func (m *mockUserRepository) ReactivateUser(ctx context.Context, userID, performedBy string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	if u.Status == "deleted" {
+		return appErrors.Forbidden("cannot reactivate a deleted account")
+	}
+	if u.Status == "active" {
+		return nil
+	}
+	if u.DeactivatedAt != nil && time.Since(*u.DeactivatedAt) > 30*24*time.Hour {
+		reason := "30-day deactivation grace period expired"
+		_ = m.DeleteUser(ctx, userID, "SYSTEM", &reason)
+		return appErrors.Forbidden("account deactivation period of 30 days has expired; account has been permanently deleted")
+	}
+	now := time.Now()
+	u.Status = "active"
+	u.DeactivatedAt = nil
+	u.UpdatedAt = now
+	m.auditLogs = append(m.auditLogs, &model.UserAuditLog{
+		ID:          "audit-" + userID,
+		UserID:      userID,
+		Action:      "REACTIVATE",
+		PerformedBy: performedBy,
+		Reason:      nil,
+		CreatedAt:   now,
+	})
+	return nil
+}
+
+func (m *mockUserRepository) DeleteUser(ctx context.Context, userID, performedBy string, reason *string) error {
+	u, exists := m.users[userID]
+	if !exists {
+		return appErrors.NotFound("user not found")
+	}
+	if u.Status == "deleted" {
+		return nil
+	}
+	now := time.Now()
+	u.Email = "deleted_" + userID + "@deleted.local"
+	u.Username = nil
+	u.FirstName = "Deleted"
+	u.LastName = "User"
+	u.PhoneNumber = nil
+	u.AlternatePhone = nil
+	u.DateOfBirth = nil
+	u.Gender = nil
+	u.Bio = nil
+	u.AvatarURL = nil
+	u.Status = "deleted"
+	u.DeletedAt = &now
+	u.UpdatedAt = now
+	m.auditLogs = append(m.auditLogs, &model.UserAuditLog{
+		ID:          "audit-" + userID,
+		UserID:      userID,
+		Action:      "DELETE",
+		PerformedBy: performedBy,
+		Reason:      reason,
+		CreatedAt:   now,
+	})
+	return nil
+}
+
+func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error) {
+	var ids []string
+	for id, u := range m.users {
+		if u.Status == "deactivated" && u.DeactivatedAt != nil && !u.DeactivatedAt.After(cutoff) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func (m *mockUserRepository) GetUserAuditLogs(ctx context.Context, userID string) ([]*model.UserAuditLog, error) {
+	var results []*model.UserAuditLog
+	for _, l := range m.auditLogs {
+		if l.UserID == userID {
+			results = append(results, l)
+		}
+	}
+	return results, nil
 }
 
 func TestGetUser_Success(t *testing.T) {
@@ -341,5 +453,240 @@ func TestUpdateUser_EmailConflict(t *testing.T) {
 	appErr := appErrors.AsAppError(err)
 	if appErr.Code != appErrors.CodeConflict {
 		t.Errorf("expected CONFLICT code, got %s", appErr.Code)
+	}
+}
+
+func TestDeactivateUser_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-100",
+		Email:     "user100@example.com",
+		FirstName: "Active",
+		LastName:  "User",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	reason := "Taking a break"
+	res, err := svc.DeactivateUser(context.Background(), "user-100", "user-100", dto.DeactivateUserRequest{Reason: &reason})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !res.Success || res.Status != "deactivated" {
+		t.Errorf("expected success with deactivated status, got %+v", res)
+	}
+
+	updated, _ := repo.GetByID(context.Background(), "user-100")
+	if updated.Status != "deactivated" {
+		t.Errorf("expected status deactivated, got %s", updated.Status)
+	}
+
+	logs, _ := repo.GetUserAuditLogs(context.Background(), "user-100")
+	if len(logs) != 1 || logs[0].Action != "DEACTIVATE" {
+		t.Errorf("expected 1 DEACTIVATE audit log, got %+v", logs)
+	}
+}
+
+func TestDeactivateUser_Idempotent(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-101",
+		Email:     "user101@example.com",
+		FirstName: "Already",
+		LastName:  "Deactivated",
+		Status:    "deactivated",
+	}
+	repo.users[user.ID] = user
+
+	res, err := svc.DeactivateUser(context.Background(), "user-101", "user-101", dto.DeactivateUserRequest{})
+	if err != nil {
+		t.Fatalf("expected no error on repeated deactivation, got %v", err)
+	}
+	if !res.Success || res.Status != "deactivated" {
+		t.Errorf("expected success, got %+v", res)
+	}
+}
+
+func TestDeactivateUser_CannotDeactivateDeleted(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:     "user-102",
+		Email:  "deleted_user-102@deleted.local",
+		Status: "deleted",
+	}
+	repo.users[user.ID] = user
+
+	_, err := svc.DeactivateUser(context.Background(), "user-102", "user-102", dto.DeactivateUserRequest{})
+	if err == nil {
+		t.Fatal("expected error deactivating deleted user, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestDeactivateUser_ForbiddenOtherUser(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:     "user-103",
+		Email:  "user103@example.com",
+		Status: "active",
+	}
+	repo.users[user.ID] = user
+
+	_, err := svc.DeactivateUser(context.Background(), "attacker-id", "user-103", dto.DeactivateUserRequest{})
+	if err == nil {
+		t.Fatal("expected forbidden error modifying other user, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestDeleteUser_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	phone := "+1234567890"
+	bio := "My bio"
+	user := &model.User{
+		ID:          "user-200",
+		Email:       "user200@example.com",
+		FirstName:   "John",
+		LastName:    "Doe",
+		PhoneNumber: &phone,
+		Bio:         &bio,
+		Status:      "active",
+	}
+	repo.users[user.ID] = user
+
+	reason := "GDPR deletion request"
+	res, err := svc.DeleteUser(context.Background(), "user-200", "user-200", dto.DeleteUserRequest{Reason: &reason})
+	if err != nil {
+		t.Fatalf("expected no error deleting user, got %v", err)
+	}
+	if !res.Success || res.Status != "deleted" {
+		t.Errorf("expected success with deleted status, got %+v", res)
+	}
+
+	updated, _ := repo.GetByID(context.Background(), "user-200")
+	if updated.Status != "deleted" {
+		t.Errorf("expected status deleted, got %s", updated.Status)
+	}
+	if updated.Email != "deleted_user-200@deleted.local" {
+		t.Errorf("expected email to be anonymized, got %s", updated.Email)
+	}
+	if updated.FirstName != "Deleted" || updated.LastName != "User" {
+		t.Errorf("expected name to be anonymized, got %s %s", updated.FirstName, updated.LastName)
+	}
+	if updated.PhoneNumber != nil || updated.Bio != nil {
+		t.Errorf("expected personal data cleared, got phone=%v bio=%v", updated.PhoneNumber, updated.Bio)
+	}
+	if updated.DeletedAt == nil {
+		t.Errorf("expected DeletedAt to be set")
+	}
+
+	logs, _ := repo.GetUserAuditLogs(context.Background(), "user-200")
+	if len(logs) != 1 || logs[0].Action != "DELETE" {
+		t.Errorf("expected 1 DELETE audit log, got %+v", logs)
+	}
+}
+
+func TestDeleteUser_Idempotent(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:     "user-201",
+		Email:  "deleted_user-201@deleted.local",
+		Status: "deleted",
+	}
+	repo.users[user.ID] = user
+
+	res, err := svc.DeleteUser(context.Background(), "user-201", "user-201", dto.DeleteUserRequest{})
+	if err != nil {
+		t.Fatalf("expected no error on repeated deletion, got %v", err)
+	}
+	if !res.Success || res.Status != "deleted" {
+		t.Errorf("expected success with deleted status, got %+v", res)
+	}
+}
+
+func TestDeleteUser_FromDeactivated(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-202",
+		Email:     "user202@example.com",
+		FirstName: "Deactivated",
+		LastName:  "User",
+		Status:    "deactivated",
+	}
+	repo.users[user.ID] = user
+
+	res, err := svc.DeleteUser(context.Background(), "user-202", "user-202", dto.DeleteUserRequest{})
+	if err != nil {
+		t.Fatalf("expected no error deleting deactivated user, got %v", err)
+	}
+	if !res.Success || res.Status != "deleted" {
+		t.Errorf("expected success, got %+v", res)
+	}
+
+	updated, _ := repo.GetByID(context.Background(), "user-202")
+	if updated.Status != "deleted" {
+		t.Errorf("expected status deleted, got %s", updated.Status)
+	}
+}
+
+func TestDeactivatedUser_CannotPerformOperations(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-300",
+		Email:     "user300@example.com",
+		FirstName: "Deactivated",
+		LastName:  "Person",
+		Status:    "deactivated",
+	}
+	repo.users[user.ID] = user
+
+	// 1. GetUser fails
+	_, err := svc.GetUser(context.Background(), "user-300", "user-300")
+	if err == nil {
+		t.Fatal("expected forbidden error for GetUser on deactivated user, got nil")
+	}
+	if appErrors.AsAppError(err).Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErrors.AsAppError(err).Code)
+	}
+
+	// 2. GetUserByID fails
+	_, err = svc.GetUserByID(context.Background(), "user-300")
+	if err == nil {
+		t.Fatal("expected forbidden error for GetUserByID on deactivated user, got nil")
+	}
+	if appErrors.AsAppError(err).Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErrors.AsAppError(err).Code)
+	}
+
+	// 3. UpdateUser fails
+	newFirst := "NewName"
+	_, err = svc.UpdateUser(context.Background(), "user-300", "user-300", dto.UpdateUserRequest{FirstName: &newFirst})
+	if err == nil {
+		t.Fatal("expected forbidden error for UpdateUser on deactivated user, got nil")
+	}
+	if appErrors.AsAppError(err).Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErrors.AsAppError(err).Code)
 	}
 }

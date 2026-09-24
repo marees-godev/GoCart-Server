@@ -13,11 +13,13 @@ func toModelUser(u *userpb.User) *model.User {
 	fn := u.FirstName
 	ln := u.LastName
 	ca := u.CreatedAt
+	st := u.Status
 	return &model.User{
 		ID:        u.Id,
 		Email:     u.Email,
 		FirstName: &fn,
 		LastName:  &ln,
+		Status:    &st,
 		CreatedAt: &ca,
 	}
 }

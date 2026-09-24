@@ -6,6 +6,7 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -47,6 +48,77 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		return nil, err
 	}
 	return toModelUser(res.User), nil
+}
+
+// DeactivateAccount is the resolver for the deactivateAccount field.
+func (r *mutationResolver) DeactivateAccount(ctx context.Context, input *model.DeactivateAccountInput) (*model.AccountActionResponse, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var reason *string
+	if input != nil && input.Reason != nil {
+		reason = input.Reason
+	}
+
+	req := &userpb.DeactivateUserRequest{
+		Id:     authID,
+		Reason: reason,
+	}
+
+	res, err := r.Clients.UserClient.DeactivateUser(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+// ReactivateAccount is the resolver for the reactivateAccount field.
+func (r *mutationResolver) ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error) {
+	panic(fmt.Errorf("not implemented: ReactivateAccount - reactivateAccount"))
+}
+
+// DeleteAccount is the resolver for the deleteAccount field.
+func (r *mutationResolver) DeleteAccount(ctx context.Context, input *model.DeleteAccountInput) (*model.AccountActionResponse, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var reason *string
+	if input != nil && input.Reason != nil {
+		reason = input.Reason
+	}
+
+	req := &userpb.DeleteUserRequest{
+		Id:     authID,
+		Reason: reason,
+	}
+
+	res, err := r.Clients.UserClient.DeleteUser(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
 }
 
 // CreateUserAddress is the resolver for the createUserAddress field.

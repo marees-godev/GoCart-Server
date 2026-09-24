@@ -19,15 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_CreateUser_FullMethodName            = "/gocart.user.v1.UserService/CreateUser"
-	UserService_GetUser_FullMethodName               = "/gocart.user.v1.UserService/GetUser"
-	UserService_UpdateUser_FullMethodName            = "/gocart.user.v1.UserService/UpdateUser"
-	UserService_CreateUserAddress_FullMethodName     = "/gocart.user.v1.UserService/CreateUserAddress"
-	UserService_ListUserAddresses_FullMethodName     = "/gocart.user.v1.UserService/ListUserAddresses"
-	UserService_GetUserAddress_FullMethodName        = "/gocart.user.v1.UserService/GetUserAddress"
-	UserService_UpdateUserAddress_FullMethodName     = "/gocart.user.v1.UserService/UpdateUserAddress"
-	UserService_DeleteUserAddress_FullMethodName     = "/gocart.user.v1.UserService/DeleteUserAddress"
-	UserService_SetDefaultUserAddress_FullMethodName = "/gocart.user.v1.UserService/SetDefaultUserAddress"
+	UserService_CreateUser_FullMethodName                  = "/gocart.user.v1.UserService/CreateUser"
+	UserService_GetUser_FullMethodName                     = "/gocart.user.v1.UserService/GetUser"
+	UserService_UpdateUser_FullMethodName                  = "/gocart.user.v1.UserService/UpdateUser"
+	UserService_DeactivateUser_FullMethodName              = "/gocart.user.v1.UserService/DeactivateUser"
+	UserService_ReactivateUser_FullMethodName              = "/gocart.user.v1.UserService/ReactivateUser"
+	UserService_DeleteUser_FullMethodName                  = "/gocart.user.v1.UserService/DeleteUser"
+	UserService_ProcessExpiredDeactivations_FullMethodName = "/gocart.user.v1.UserService/ProcessExpiredDeactivations"
+	UserService_CreateUserAddress_FullMethodName           = "/gocart.user.v1.UserService/CreateUserAddress"
+	UserService_ListUserAddresses_FullMethodName           = "/gocart.user.v1.UserService/ListUserAddresses"
+	UserService_GetUserAddress_FullMethodName              = "/gocart.user.v1.UserService/GetUserAddress"
+	UserService_UpdateUserAddress_FullMethodName           = "/gocart.user.v1.UserService/UpdateUserAddress"
+	UserService_DeleteUserAddress_FullMethodName           = "/gocart.user.v1.UserService/DeleteUserAddress"
+	UserService_SetDefaultUserAddress_FullMethodName       = "/gocart.user.v1.UserService/SetDefaultUserAddress"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -37,6 +41,10 @@ type UserServiceClient interface {
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error)
+	DeactivateUser(ctx context.Context, in *DeactivateUserRequest, opts ...grpc.CallOption) (*DeactivateUserResponse, error)
+	ReactivateUser(ctx context.Context, in *ReactivateUserRequest, opts ...grpc.CallOption) (*ReactivateUserResponse, error)
+	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
+	ProcessExpiredDeactivations(ctx context.Context, in *ProcessExpiredDeactivationsRequest, opts ...grpc.CallOption) (*ProcessExpiredDeactivationsResponse, error)
 	CreateUserAddress(ctx context.Context, in *CreateUserAddressRequest, opts ...grpc.CallOption) (*CreateUserAddressResponse, error)
 	ListUserAddresses(ctx context.Context, in *ListUserAddressesRequest, opts ...grpc.CallOption) (*ListUserAddressesResponse, error)
 	GetUserAddress(ctx context.Context, in *GetUserAddressRequest, opts ...grpc.CallOption) (*GetUserAddressResponse, error)
@@ -77,6 +85,46 @@ func (c *userServiceClient) UpdateUser(ctx context.Context, in *UpdateUserReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateUserResponse)
 	err := c.cc.Invoke(ctx, UserService_UpdateUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DeactivateUser(ctx context.Context, in *DeactivateUserRequest, opts ...grpc.CallOption) (*DeactivateUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeactivateUserResponse)
+	err := c.cc.Invoke(ctx, UserService_DeactivateUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) ReactivateUser(ctx context.Context, in *ReactivateUserRequest, opts ...grpc.CallOption) (*ReactivateUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReactivateUserResponse)
+	err := c.cc.Invoke(ctx, UserService_ReactivateUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteUserResponse)
+	err := c.cc.Invoke(ctx, UserService_DeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) ProcessExpiredDeactivations(ctx context.Context, in *ProcessExpiredDeactivationsRequest, opts ...grpc.CallOption) (*ProcessExpiredDeactivationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProcessExpiredDeactivationsResponse)
+	err := c.cc.Invoke(ctx, UserService_ProcessExpiredDeactivations_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +198,10 @@ type UserServiceServer interface {
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error)
+	DeactivateUser(context.Context, *DeactivateUserRequest) (*DeactivateUserResponse, error)
+	ReactivateUser(context.Context, *ReactivateUserRequest) (*ReactivateUserResponse, error)
+	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
+	ProcessExpiredDeactivations(context.Context, *ProcessExpiredDeactivationsRequest) (*ProcessExpiredDeactivationsResponse, error)
 	CreateUserAddress(context.Context, *CreateUserAddressRequest) (*CreateUserAddressResponse, error)
 	ListUserAddresses(context.Context, *ListUserAddressesRequest) (*ListUserAddressesResponse, error)
 	GetUserAddress(context.Context, *GetUserAddressRequest) (*GetUserAddressResponse, error)
@@ -174,6 +226,18 @@ func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) 
 }
 func (UnimplementedUserServiceServer) UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUser not implemented")
+}
+func (UnimplementedUserServiceServer) DeactivateUser(context.Context, *DeactivateUserRequest) (*DeactivateUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeactivateUser not implemented")
+}
+func (UnimplementedUserServiceServer) ReactivateUser(context.Context, *ReactivateUserRequest) (*ReactivateUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReactivateUser not implemented")
+}
+func (UnimplementedUserServiceServer) DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteUser not implemented")
+}
+func (UnimplementedUserServiceServer) ProcessExpiredDeactivations(context.Context, *ProcessExpiredDeactivationsRequest) (*ProcessExpiredDeactivationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessExpiredDeactivations not implemented")
 }
 func (UnimplementedUserServiceServer) CreateUserAddress(context.Context, *CreateUserAddressRequest) (*CreateUserAddressResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateUserAddress not implemented")
@@ -264,6 +328,78 @@ func _UserService_UpdateUser_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).UpdateUser(ctx, req.(*UpdateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DeactivateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DeactivateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_DeactivateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DeactivateUser(ctx, req.(*DeactivateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_ReactivateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReactivateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ReactivateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ReactivateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ReactivateUser(ctx, req.(*ReactivateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).DeleteUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_DeleteUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_ProcessExpiredDeactivations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessExpiredDeactivationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ProcessExpiredDeactivations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ProcessExpiredDeactivations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ProcessExpiredDeactivations(ctx, req.(*ProcessExpiredDeactivationsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -394,6 +530,22 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUser",
 			Handler:    _UserService_UpdateUser_Handler,
+		},
+		{
+			MethodName: "DeactivateUser",
+			Handler:    _UserService_DeactivateUser_Handler,
+		},
+		{
+			MethodName: "ReactivateUser",
+			Handler:    _UserService_ReactivateUser_Handler,
+		},
+		{
+			MethodName: "DeleteUser",
+			Handler:    _UserService_DeleteUser_Handler,
+		},
+		{
+			MethodName: "ProcessExpiredDeactivations",
+			Handler:    _UserService_ProcessExpiredDeactivations_Handler,
 		},
 		{
 			MethodName: "CreateUserAddress",

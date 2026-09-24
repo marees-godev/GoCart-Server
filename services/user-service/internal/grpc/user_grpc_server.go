@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -92,6 +94,7 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 			FirstName: u.FirstName,
 			LastName:  u.LastName,
 			CreatedAt: u.CreatedAt.String(),
+			Status:    u.Status,
 		},
 	}, nil
 }
@@ -122,6 +125,7 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 			LastName:  u.LastName,
 			Phone:     phonenumber,
 			CreatedAt: u.CreatedAt.String(),
+			Status:    u.Status,
 		},
 	}, nil
 }
@@ -166,7 +170,98 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 			LastName:  u.LastName,
 			Phone:     phone,
 			CreatedAt: u.CreatedAt.String(),
+			Status:    u.Status,
 		},
+	}, nil
+}
+
+func (s *UserGRPCServer) DeactivateUser(ctx context.Context, req *userpb.DeactivateUserRequest) (*userpb.DeactivateUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC DeactivateUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+
+	var reason *string
+	if req.Reason != nil && *req.Reason != "" {
+		reason = req.Reason
+	}
+
+	res, err := s.userService.DeactivateUser(ctx, req.Id, req.Id, dto.DeactivateUserRequest{Reason: reason})
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC DeactivateUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC DeactivateUser succeeded", "user_id", req.Id)
+	return &userpb.DeactivateUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) DeleteUser(ctx context.Context, req *userpb.DeleteUserRequest) (*userpb.DeleteUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC DeleteUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+
+	var reason *string
+	if req.Reason != nil && *req.Reason != "" {
+		reason = req.Reason
+	}
+
+	res, err := s.userService.DeleteUser(ctx, req.Id, req.Id, dto.DeleteUserRequest{Reason: reason})
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC DeleteUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC DeleteUser succeeded", "user_id", req.Id)
+	return &userpb.DeleteUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) ReactivateUser(ctx context.Context, req *userpb.ReactivateUserRequest) (*userpb.ReactivateUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC ReactivateUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+
+	res, err := s.userService.ReactivateUser(ctx, req.Id, req.Id)
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC ReactivateUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC ReactivateUser succeeded", "user_id", req.Id)
+	return &userpb.ReactivateUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) ProcessExpiredDeactivations(ctx context.Context, req *userpb.ProcessExpiredDeactivationsRequest) (*userpb.ProcessExpiredDeactivationsResponse, error) {
+	retentionDays := 30
+	if req != nil && req.RetentionDays != nil && *req.RetentionDays > 0 {
+		retentionDays = int(*req.RetentionDays)
+	}
+
+	retentionPeriod := time.Duration(retentionDays) * 24 * time.Hour
+	count, err := s.userService.ProcessExpiredDeactivations(ctx, retentionPeriod)
+	if err != nil {
+		slog.ErrorContext(ctx, "service error in gRPC ProcessExpiredDeactivations", "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC ProcessExpiredDeactivations succeeded", "processed_count", count)
+	return &userpb.ProcessExpiredDeactivationsResponse{
+		ProcessedCount: int32(count),
+		Message:        fmt.Sprintf("successfully processed %d expired deactivated accounts", count),
 	}, nil
 }
 
