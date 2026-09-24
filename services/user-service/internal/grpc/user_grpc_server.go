@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log/slog"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -66,6 +67,7 @@ func toProtoAddress(a *model.Address) *userpb.Address {
 
 func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserRequest) (*userpb.CreateUserResponse, error) {
 	if req == nil || req.GetId() == "" || req.GetEmail() == "" || req.GetFirstName() == "" || req.GetLastName() == "" {
+		slog.WarnContext(ctx, "invalid arguments in gRPC CreateUser")
 		return nil, status.Error(codes.InvalidArgument, "id, email, first_name, and last_name are required")
 	}
 
@@ -78,9 +80,11 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 
 	u, err := s.userService.CreateUser(ctx, createReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "service error in gRPC CreateUser", "user_id", req.GetId(), "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC CreateUser succeeded", "user_id", u.ID)
 	return &userpb.CreateUserResponse{
 		User: &userpb.User{
 			Id:        u.ID,
@@ -94,11 +98,13 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 
 func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
 	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC GetUser")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
 	}
 
 	u, err := s.userService.GetUserByID(ctx, req.Id)
 	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC GetUser", "user_id", req.Id, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -107,6 +113,7 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 		phonenumber = *u.PhoneNumber
 	}
 
+	slog.InfoContext(ctx, "gRPC GetUser succeeded", "user_id", u.ID)
 	return &userpb.GetUserResponse{
 		User: &userpb.User{
 			Id:        u.ID,
@@ -121,6 +128,7 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 
 func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequest) (*userpb.UpdateUserResponse, error) {
 	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC UpdateUser")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
 	}
 
@@ -140,6 +148,7 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 
 	u, err := s.userService.UpdateUser(ctx, req.Id, req.Id, updateReq)
 	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC UpdateUser", "user_id", req.Id, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -148,6 +157,7 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 		phone = *u.PhoneNumber
 	}
 
+	slog.InfoContext(ctx, "gRPC UpdateUser succeeded", "user_id", u.ID)
 	return &userpb.UpdateUserResponse{
 		User: &userpb.User{
 			Id:        u.ID,
@@ -162,6 +172,7 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 
 func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.CreateUserAddressRequest) (*userpb.CreateUserAddressResponse, error) {
 	if req == nil {
+		slog.WarnContext(ctx, "missing request payload in gRPC CreateUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "request payload is required")
 	}
 
@@ -197,9 +208,11 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 
 	addr, err := s.addressService.CreateAddress(ctx, req.UserId, createReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "service error in gRPC CreateUserAddress", "user_id", req.UserId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC CreateUserAddress succeeded", "user_id", req.UserId, "address_id", addr.ID)
 	return &userpb.CreateUserAddressResponse{
 		Address: toProtoAddress(addr),
 	}, nil
@@ -207,11 +220,13 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 
 func (s *UserGRPCServer) ListUserAddresses(ctx context.Context, req *userpb.ListUserAddressesRequest) (*userpb.ListUserAddressesResponse, error) {
 	if req == nil || req.UserId == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC ListUserAddresses")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
 	}
 
 	addresses, err := s.addressService.ListAddresses(ctx, req.UserId)
 	if err != nil {
+		slog.ErrorContext(ctx, "service error in gRPC ListUserAddresses", "user_id", req.UserId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -220,6 +235,7 @@ func (s *UserGRPCServer) ListUserAddresses(ctx context.Context, req *userpb.List
 		protoAddresses[i] = toProtoAddress(a)
 	}
 
+	slog.InfoContext(ctx, "gRPC ListUserAddresses succeeded", "user_id", req.UserId, "count", len(protoAddresses))
 	return &userpb.ListUserAddressesResponse{
 		Addresses: protoAddresses,
 	}, nil
@@ -227,14 +243,17 @@ func (s *UserGRPCServer) ListUserAddresses(ctx context.Context, req *userpb.List
 
 func (s *UserGRPCServer) GetUserAddress(ctx context.Context, req *userpb.GetUserAddressRequest) (*userpb.GetUserAddressResponse, error) {
 	if req == nil || req.AddressId == "" {
+		slog.WarnContext(ctx, "missing address id in gRPC GetUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
 
 	addr, err := s.addressService.GetAddress(ctx, req.UserId, req.AddressId)
 	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC GetUserAddress", "user_id", req.UserId, "address_id", req.AddressId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC GetUserAddress succeeded", "user_id", req.UserId, "address_id", addr.ID)
 	return &userpb.GetUserAddressResponse{
 		Address: toProtoAddress(addr),
 	}, nil
@@ -242,6 +261,7 @@ func (s *UserGRPCServer) GetUserAddress(ctx context.Context, req *userpb.GetUser
 
 func (s *UserGRPCServer) UpdateUserAddress(ctx context.Context, req *userpb.UpdateUserAddressRequest) (*userpb.UpdateUserAddressResponse, error) {
 	if req == nil || req.AddressId == "" {
+		slog.WarnContext(ctx, "missing address id in gRPC UpdateUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
 
@@ -260,9 +280,11 @@ func (s *UserGRPCServer) UpdateUserAddress(ctx context.Context, req *userpb.Upda
 
 	addr, err := s.addressService.UpdateAddress(ctx, req.UserId, req.AddressId, updateReq)
 	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC UpdateUserAddress", "user_id", req.UserId, "address_id", req.AddressId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC UpdateUserAddress succeeded", "user_id", req.UserId, "address_id", addr.ID)
 	return &userpb.UpdateUserAddressResponse{
 		Address: toProtoAddress(addr),
 	}, nil
@@ -270,13 +292,16 @@ func (s *UserGRPCServer) UpdateUserAddress(ctx context.Context, req *userpb.Upda
 
 func (s *UserGRPCServer) DeleteUserAddress(ctx context.Context, req *userpb.DeleteUserAddressRequest) (*userpb.DeleteUserAddressResponse, error) {
 	if req == nil || req.AddressId == "" {
+		slog.WarnContext(ctx, "missing address id in gRPC DeleteUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
 
 	if err := s.addressService.DeleteAddress(ctx, req.UserId, req.AddressId); err != nil {
+		slog.WarnContext(ctx, "service error in gRPC DeleteUserAddress", "user_id", req.UserId, "address_id", req.AddressId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC DeleteUserAddress succeeded", "user_id", req.UserId, "address_id", req.AddressId)
 	return &userpb.DeleteUserAddressResponse{
 		Success: true,
 	}, nil
@@ -284,14 +309,17 @@ func (s *UserGRPCServer) DeleteUserAddress(ctx context.Context, req *userpb.Dele
 
 func (s *UserGRPCServer) SetDefaultUserAddress(ctx context.Context, req *userpb.SetDefaultUserAddressRequest) (*userpb.SetDefaultUserAddressResponse, error) {
 	if req == nil || req.AddressId == "" {
+		slog.WarnContext(ctx, "missing address id in gRPC SetDefaultUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
 
 	addr, err := s.addressService.SetDefaultAddress(ctx, req.UserId, req.AddressId)
 	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC SetDefaultUserAddress", "user_id", req.UserId, "address_id", req.AddressId, "error", err)
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC SetDefaultUserAddress succeeded", "user_id", req.UserId, "address_id", addr.ID)
 	return &userpb.SetDefaultUserAddressResponse{
 		Address: toProtoAddress(addr),
 	}, nil

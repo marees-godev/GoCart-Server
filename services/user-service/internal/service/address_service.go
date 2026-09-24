@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -54,37 +55,36 @@ func normalizeAddressLabel(labelInput *string) *string {
 
 func (s *addressService) CreateAddress(ctx context.Context, authUserID string, req dto.CreateAddressRequest) (*model.Address, error) {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in CreateAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
 	if err := req.Validate(); err != nil {
+		slog.WarnContext(ctx, "validation failed in CreateAddress", "user_id", authUserID, "error", err)
 		return nil, err
 	}
 
 	user, err := s.userRepo.GetByID(ctx, authUserID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get user in CreateAddress", "user_id", authUserID, "error", err)
 		return nil, err
 	}
 	if !strings.EqualFold(user.Status, "active") {
+		slog.WarnContext(ctx, "user account is not active in CreateAddress", "user_id", authUserID, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
 
 	count, err := s.repo.CountByUserID(ctx, authUserID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to count user addresses in CreateAddress", "user_id", authUserID, "error", err)
 		return nil, err
 	}
 
 	isDefault := false
-	if req.IsDefault != nil {
-		isDefault = *req.IsDefault
-	} else if count == 0 {
+	if count == 0 {
 		isDefault = true
-	}
-
-	if isDefault {
-		if err := s.repo.ClearDefaultAddresses(ctx, authUserID); err != nil {
-			return nil, err
-		}
+	} else if req.IsDefault != nil {
+		isDefault = *req.IsDefault
 	}
 
 	fullName := strings.TrimSpace(req.FullName)
@@ -116,60 +116,80 @@ func (s *addressService) CreateAddress(ctx context.Context, authUserID string, r
 	}
 
 	if err := s.repo.Create(ctx, addr); err != nil {
+		slog.ErrorContext(ctx, "failed to create address in repository in CreateAddress", "user_id", authUserID, "error", err)
 		return nil, err
 	}
 
+	slog.InfoContext(ctx, "address created successfully", "address_id", addr.ID, "user_id", authUserID, "is_default", addr.IsDefault)
 	return addr, nil
 }
 
 func (s *addressService) ListAddresses(ctx context.Context, authUserID string) ([]*model.Address, error) {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in ListAddresses")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	return s.repo.ListByUserID(ctx, authUserID)
+	addresses, err := s.repo.ListByUserID(ctx, authUserID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to list addresses in ListAddresses", "user_id", authUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "addresses listed successfully", "user_id", authUserID, "count", len(addresses))
+	return addresses, nil
 }
 
 func (s *addressService) GetAddress(ctx context.Context, authUserID string, addressID string) (*model.Address, error) {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in GetAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
 	if strings.TrimSpace(addressID) == "" {
+		slog.WarnContext(ctx, "missing address ID in GetAddress", "user_id", authUserID)
 		return nil, errors.BadRequest("address ID is required")
 	}
 
 	addr, err := s.repo.GetByID(ctx, addressID)
 	if err != nil {
+		slog.WarnContext(ctx, "failed to get address in GetAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
 	if addr.UserID != authUserID {
+		slog.WarnContext(ctx, "forbidden address access in GetAddress", "auth_user_id", authUserID, "owner_user_id", addr.UserID, "address_id", addressID)
 		return nil, errors.Forbidden("user cannot access another user's address")
 	}
 
+	slog.InfoContext(ctx, "address retrieved successfully", "address_id", addr.ID, "user_id", authUserID)
 	return addr, nil
 }
 
 func (s *addressService) UpdateAddress(ctx context.Context, authUserID string, addressID string, req dto.UpdateAddressRequest) (*model.Address, error) {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in UpdateAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
 	if strings.TrimSpace(addressID) == "" {
+		slog.WarnContext(ctx, "missing address ID in UpdateAddress", "user_id", authUserID)
 		return nil, errors.BadRequest("address ID is required")
 	}
 
 	if err := req.Validate(); err != nil {
+		slog.WarnContext(ctx, "validation failed in UpdateAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
 	existing, err := s.repo.GetByID(ctx, addressID)
 	if err != nil {
+		slog.WarnContext(ctx, "address not found for update in UpdateAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
 	if existing.UserID != authUserID {
+		slog.WarnContext(ctx, "forbidden address modification in UpdateAddress", "auth_user_id", authUserID, "owner_user_id", existing.UserID, "address_id", addressID)
 		return nil, errors.Forbidden("user cannot modify another user's address")
 	}
 
@@ -213,63 +233,86 @@ func (s *addressService) UpdateAddress(ctx context.Context, authUserID string, a
 	}
 
 	if req.IsDefault != nil {
-		if *req.IsDefault && !existing.IsDefault {
-			if err := s.repo.ClearDefaultAddresses(ctx, authUserID); err != nil {
-				return nil, err
-			}
+		if !*req.IsDefault && existing.IsDefault {
+			slog.WarnContext(ctx, "cannot unset default address directly in UpdateAddress", "user_id", authUserID, "address_id", addressID)
+			return nil, errors.BadRequest("cannot unset default address; set another address as default instead")
 		}
 		existing.IsDefault = *req.IsDefault
 	}
 
 	if err := s.repo.Update(ctx, existing); err != nil {
+		slog.ErrorContext(ctx, "failed to update address in repository in UpdateAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
+	slog.InfoContext(ctx, "address updated successfully", "address_id", existing.ID, "user_id", authUserID, "is_default", existing.IsDefault)
 	return existing, nil
 }
 
 func (s *addressService) DeleteAddress(ctx context.Context, authUserID string, addressID string) error {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in DeleteAddress")
 		return errors.Unauthorized("authenticated user context is required")
 	}
 
 	if strings.TrimSpace(addressID) == "" {
+		slog.WarnContext(ctx, "missing address ID in DeleteAddress", "user_id", authUserID)
 		return errors.BadRequest("address ID is required")
 	}
 
 	existing, err := s.repo.GetByID(ctx, addressID)
 	if err != nil {
+		slog.WarnContext(ctx, "address not found for deletion in DeleteAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return err
 	}
 
 	if existing.UserID != authUserID {
+		slog.WarnContext(ctx, "forbidden address deletion in DeleteAddress", "auth_user_id", authUserID, "owner_user_id", existing.UserID, "address_id", addressID)
 		return errors.Forbidden("user cannot delete another user's address")
 	}
 
-	return s.repo.Delete(ctx, addressID, authUserID)
+	if err := s.repo.Delete(ctx, addressID, authUserID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete address in repository in DeleteAddress", "user_id", authUserID, "address_id", addressID, "error", err)
+		return err
+	}
+
+	slog.InfoContext(ctx, "address deleted successfully", "address_id", addressID, "user_id", authUserID)
+	return nil
 }
 
 func (s *addressService) SetDefaultAddress(ctx context.Context, authUserID string, addressID string) (*model.Address, error) {
 	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in SetDefaultAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
 	if strings.TrimSpace(addressID) == "" {
+		slog.WarnContext(ctx, "missing address ID in SetDefaultAddress", "user_id", authUserID)
 		return nil, errors.BadRequest("address ID is required")
 	}
 
 	existing, err := s.repo.GetByID(ctx, addressID)
 	if err != nil {
+		slog.WarnContext(ctx, "address not found in SetDefaultAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
 	if existing.UserID != authUserID {
+		slog.WarnContext(ctx, "forbidden address default update in SetDefaultAddress", "auth_user_id", authUserID, "owner_user_id", existing.UserID, "address_id", addressID)
 		return nil, errors.Forbidden("user cannot modify another user's address")
 	}
 
 	if err := s.repo.SetDefaultAddress(ctx, addressID, authUserID); err != nil {
+		slog.ErrorContext(ctx, "failed to set default address in repository in SetDefaultAddress", "user_id", authUserID, "address_id", addressID, "error", err)
 		return nil, err
 	}
 
-	return s.repo.GetByID(ctx, addressID)
+	updated, err := s.repo.GetByID(ctx, addressID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to fetch updated address in SetDefaultAddress", "user_id", authUserID, "address_id", addressID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "default address set successfully", "address_id", addressID, "user_id", authUserID)
+	return updated, nil
 }
