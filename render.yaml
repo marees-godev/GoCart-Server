@@ -47,12 +47,21 @@ services:
         # value injected via Render secret; keep key only
       - key: CART_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
+      - key: USER_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
       - key: INVENTORY_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
       - key: RATINGS_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
       - key: NOTIFICATIONS_SERVICE_DATABASE_URL
         # value injected via Render secret; keep key only
+      # Store Service S3 Storage Configuration
+      - key: STORE_S3_ENDPOINT
+      - key: STORE_S3_REGION
+      - key: STORE_S3_ACCESS_KEY_ID
+      - key: STORE_S3_SECRET_ACCESS_KEY
+      - key: STORE_S3_BUCKET
+      - key: STORE_S3_PUBLIC_URL_PREFIX
       # External Redis Connection URL / Addr (Upstash / etc.)
       - key: REDIS_URL
         sync: false
