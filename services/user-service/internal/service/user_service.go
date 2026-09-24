@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -28,14 +29,15 @@ func NewUserService(repo repository.UserRepository) UserService {
 
 func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest) (*model.User, error) {
 	if err := req.Validate(); err != nil {
+		slog.WarnContext(ctx, "validation failed in CreateUser", "error", err)
 		return nil, err
 	}
 
 	existing, err := s.repo.GetByEmail(ctx, req.Email)
 	if err == nil && existing != nil {
+		slog.WarnContext(ctx, "user with email already exists in CreateUser", "email", req.Email)
 		return nil, errors.Conflict("user with this email already exists")
 	}
-
 
 	newUser := &model.User{
 		ID:        req.ID,
@@ -46,9 +48,11 @@ func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 	}
 
 	if err := s.repo.CreateUser(ctx, newUser); err != nil {
+		slog.ErrorContext(ctx, "failed to create user in repository in CreateUser", "user_id", req.ID, "email", req.Email, "error", err)
 		return nil, err
 	}
 
+	slog.InfoContext(ctx, "user created successfully in CreateUser", "user_id", newUser.ID, "email", newUser.Email)
 	return newUser, nil
 }
 
@@ -59,40 +63,49 @@ func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID stri
 	}
 
 	if idToFetch == "" {
+		slog.WarnContext(ctx, "missing user ID in GetUser")
 		return nil, errors.BadRequest("user ID is required")
 	}
 
 	user, err := s.repo.GetByID(ctx, idToFetch)
 	if err != nil {
+		slog.WarnContext(ctx, "failed to get user in GetUser", "user_id", idToFetch, "error", err)
 		return nil, err
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		slog.WarnContext(ctx, "user account not active in GetUser", "user_id", idToFetch, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
 
+	slog.InfoContext(ctx, "user fetched successfully in GetUser", "user_id", user.ID)
 	return user, nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, error) {
 	if strings.TrimSpace(id) == "" {
+		slog.WarnContext(ctx, "missing user ID in GetUserByID")
 		return nil, errors.BadRequest("user ID is required")
 	}
 
 	user, err := s.repo.GetByID(ctx, id)
 	if err != nil {
+		slog.WarnContext(ctx, "failed to get user in GetUserByID", "user_id", id, "error", err)
 		return nil, err
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		slog.WarnContext(ctx, "user account not active in GetUserByID", "user_id", id, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
 
+	slog.InfoContext(ctx, "user fetched successfully in GetUserByID", "user_id", user.ID)
 	return user, nil
 }
 
 func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error) {
 	if authUserID == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in UpdateUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
@@ -101,25 +114,30 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 	}
 
 	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "forbidden user modification in UpdateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
 		return nil, errors.Forbidden("user cannot modify another user's profile")
 	}
 
 	if err := req.Validate(); err != nil {
+		slog.WarnContext(ctx, "validation failed in UpdateUser", "user_id", targetUserID, "error", err)
 		return nil, err
 	}
 
 	user, err := s.repo.GetByID(ctx, targetUserID)
 	if err != nil {
+		slog.WarnContext(ctx, "failed to get user for update in UpdateUser", "user_id", targetUserID, "error", err)
 		return nil, err
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		slog.WarnContext(ctx, "user account not active in UpdateUser", "user_id", targetUserID, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
 
 	if newEmail := req.GetEmail(); newEmail != nil && *newEmail != "" && !strings.EqualFold(*newEmail, user.Email) {
 		existing, err := s.repo.GetByEmail(ctx, *newEmail)
 		if err == nil && existing != nil && existing.ID != user.ID {
+			slog.WarnContext(ctx, "email already in use in UpdateUser", "user_id", targetUserID, "email", *newEmail)
 			return nil, errors.Conflict("email address is already in use")
 		}
 		user.Email = *newEmail
@@ -128,6 +146,7 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 	if req.Username != nil && *req.Username != "" && (user.Username == nil || *user.Username != *req.Username) {
 		existing, err := s.repo.GetByUsername(ctx, *req.Username)
 		if err == nil && existing != nil && existing.ID != user.ID {
+			slog.WarnContext(ctx, "username already in use in UpdateUser", "user_id", targetUserID, "username", *req.Username)
 			return nil, errors.Conflict("username is already in use")
 		}
 		user.Username = req.Username
@@ -156,6 +175,7 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 		} else {
 			dob, err := time.Parse("2006-01-02", trimmed)
 			if err != nil {
+				slog.WarnContext(ctx, "invalid date_of_birth format in UpdateUser", "user_id", targetUserID, "error", err)
 				return nil, errors.BadRequest("invalid date_of_birth format")
 			}
 			user.DateOfBirth = &dob
@@ -175,8 +195,10 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 	}
 
 	if err := s.repo.UpdateUser(ctx, user); err != nil {
+		slog.ErrorContext(ctx, "failed to update user in repository in UpdateUser", "user_id", targetUserID, "error", err)
 		return nil, err
 	}
 
+	slog.InfoContext(ctx, "user updated successfully in UpdateUser", "user_id", user.ID)
 	return user, nil
 }

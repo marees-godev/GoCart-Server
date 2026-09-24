@@ -82,6 +82,24 @@ func (m *mockAddressRepository) Create(ctx context.Context, address *model.Addre
 	address.ID = fmt.Sprintf("addr-%d", m.idCounter)
 	address.CreatedAt = time.Now()
 	address.UpdatedAt = time.Now()
+
+	count := 0
+	for _, a := range m.addresses {
+		if a.UserID == address.UserID {
+			count++
+		}
+	}
+	if count == 0 {
+		address.IsDefault = true
+	}
+	if address.IsDefault {
+		for _, a := range m.addresses {
+			if a.UserID == address.UserID {
+				a.IsDefault = false
+			}
+		}
+	}
+
 	copy := *address
 	m.addresses[address.ID] = &copy
 	return nil
@@ -112,6 +130,13 @@ func (m *mockAddressRepository) Update(ctx context.Context, address *model.Addre
 	if !exists || existing.UserID != address.UserID {
 		return appErrors.NotFound("address not found")
 	}
+	if address.IsDefault {
+		for _, a := range m.addresses {
+			if a.UserID == address.UserID && a.ID != address.ID {
+				a.IsDefault = false
+			}
+		}
+	}
 	address.UpdatedAt = time.Now()
 	copy := *address
 	m.addresses[address.ID] = &copy
@@ -123,7 +148,23 @@ func (m *mockAddressRepository) Delete(ctx context.Context, id string, userID st
 	if !exists || existing.UserID != userID {
 		return appErrors.NotFound("address not found")
 	}
+	wasDefault := existing.IsDefault
 	delete(m.addresses, id)
+
+	if wasDefault {
+		var candidate *model.Address
+		for _, a := range m.addresses {
+			if a.UserID == userID {
+				if candidate == nil || a.UpdatedAt.After(candidate.UpdatedAt) {
+					candidate = a
+				}
+			}
+		}
+		if candidate != nil {
+			candidate.IsDefault = true
+			candidate.UpdatedAt = time.Now()
+		}
+	}
 	return nil
 }
 

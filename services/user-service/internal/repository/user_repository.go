@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -29,6 +30,7 @@ func NewUserRepository(pool *pgxpool.Pool) UserRepository {
 
 func (r *pgUserRepository) CreateUser(ctx context.Context, user *model.User) error {
 	if user == nil {
+		slog.WarnContext(ctx, "user model is nil in CreateUser")
 		return appErrors.BadRequest("user model cannot be nil")
 	}
 	query := `
@@ -54,10 +56,13 @@ func (r *pgUserRepository) CreateUser(ctx context.Context, user *model.User) err
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			slog.WarnContext(ctx, "user with email already exists in CreateUser", "email", user.Email)
 			return appErrors.Conflict("user with this email already exists")
 		}
+		slog.ErrorContext(ctx, "failed to create user in repository", "user_id", user.ID, "email", user.Email, "error", err)
 		return appErrors.Internal(err, "failed to create user")
 	}
+	slog.InfoContext(ctx, "user created in repository", "user_id", user.ID, "email", user.Email)
 	return nil
 }
 
@@ -86,10 +91,13 @@ func (r *pgUserRepository) GetByID(ctx context.Context, id string) (*model.User,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "user not found by id in repository", "user_id", id)
 			return nil, appErrors.NotFound("user not found")
 		}
+		slog.ErrorContext(ctx, "failed to query user by id in repository", "user_id", id, "error", err)
 		return nil, appErrors.Internal(err, "failed to query user by id")
 	}
+	slog.InfoContext(ctx, "user retrieved by id in repository", "user_id", u.ID)
 	return &u, nil
 }
 
@@ -118,10 +126,13 @@ func (r *pgUserRepository) GetByEmail(ctx context.Context, email string) (*model
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "user not found by email in repository", "email", email)
 			return nil, appErrors.NotFound("user not found")
 		}
+		slog.ErrorContext(ctx, "failed to query user by email in repository", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query user by email")
 	}
+	slog.InfoContext(ctx, "user retrieved by email in repository", "user_id", u.ID, "email", u.Email)
 	return &u, nil
 }
 
@@ -150,10 +161,13 @@ func (r *pgUserRepository) GetByUsername(ctx context.Context, username string) (
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "user not found by username in repository", "username", username)
 			return nil, appErrors.NotFound("user not found")
 		}
+		slog.ErrorContext(ctx, "failed to query user by username in repository", "username", username, "error", err)
 		return nil, appErrors.Internal(err, "failed to query user by username")
 	}
+	slog.InfoContext(ctx, "user retrieved by username in repository", "user_id", u.ID, "username", username)
 	return &u, nil
 }
 
@@ -179,9 +193,12 @@ func (r *pgUserRepository) UpdateUser(ctx context.Context, user *model.User) err
 	).Scan(&user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "user not found for update in repository", "user_id", user.ID)
 			return appErrors.NotFound("user not found")
 		}
+		slog.ErrorContext(ctx, "failed to update user profile in repository", "user_id", user.ID, "error", err)
 		return appErrors.Internal(err, "failed to update user profile")
 	}
+	slog.InfoContext(ctx, "user profile updated in repository", "user_id", user.ID)
 	return nil
 }
