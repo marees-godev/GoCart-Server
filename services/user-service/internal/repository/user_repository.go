@@ -40,7 +40,7 @@ func (r *pgUserRepository) CreateUser(ctx context.Context, user *model.User) err
 			$2,
 			$3,
 			$4,
-			COALESCE(NULLIF($5, ''), 'active'),
+			COALESCE(NULLIF($5, ''),'active')::user_status,
 			NOW(),
 			NOW()
 		)
