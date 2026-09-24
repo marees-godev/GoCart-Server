@@ -101,21 +101,38 @@ func (m *mockStoreRepository) IsSlugAvailable(ctx context.Context, slug string, 
 	return false, nil
 }
 
+func (m *mockStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error) {
+	existing, exists := m.stores[id]
+	if !exists {
+		return nil, appErrors.NotFound("store not found")
+	}
+	if existing.ApprovalStatus != expectedStatus {
+		return nil, appErrors.UnprocessableEntity("invalid state transition")
+	}
+	existing.ApprovalStatus = newStatus
+	existing.RejectionReason = rejectionReason
+	existing.UpdatedAt = time.Now()
+	m.stores[id] = existing
+	cp := *existing
+	return &cp, nil
+}
+
 func TestCreateStore_Success(t *testing.T) {
 	repo := newMockRepo()
 	svc := service.NewStoreService(repo)
 
 	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "merchant-123",
-		Role:   "MERCHANT",
+		Role:   auth.RoleMerchant,
 	})
 
 	bankDetails := `{"account_number":"123456789","bank_name":"Test Bank"}`
 	req := dto.CreateStoreRequest{
 		Name:               "Happy Shop",
+		BusinessEmail:      "happyshop@example.com",
+		BusinessPhone:      "+0 1234567890",
 		Description:        "At Happy Shop, we believe shopping should be simple, smart, and satisfying.",
 		LogoURL:            "https://example.com/logo.png",
-		BannerURL:          "https://example.com/banner.png",
 		Address:            "3rd Floor, Happy Shop, New Building, 123 street, c sector, NY, US",
 		BankAccountDetails: &bankDetails,
 	}
@@ -134,14 +151,17 @@ func TestCreateStore_Success(t *testing.T) {
 	if store.Slug != "happy-shop" {
 		t.Errorf("expected slug happy-shop, got %s", store.Slug)
 	}
-	if store.ApprovalStatus != "PENDING" {
-		t.Errorf("expected status PENDING, got %s", store.ApprovalStatus)
+	if store.BusinessEmail != "happyshop@example.com" {
+		t.Errorf("expected business_email happyshop@example.com, got %s", store.BusinessEmail)
 	}
-	if store.PublishStatus != false {
-		t.Errorf("expected publish_status false, got %v", store.PublishStatus)
+	if store.BusinessPhone != "+0 1234567890" {
+		t.Errorf("expected business_phone +0 1234567890, got %s", store.BusinessPhone)
 	}
-	if store.KYCStatus != "PENDING" {
-		t.Errorf("expected kyc_status PENDING, got %s", store.KYCStatus)
+	if store.ApprovalStatus != model.StoreStatusDraft {
+		t.Errorf("expected status %s, got %s", model.StoreStatusDraft, store.ApprovalStatus)
+	}
+	if store.IsVacationMode != false {
+		t.Errorf("expected is_vacation_mode false, got %v", store.IsVacationMode)
 	}
 	if store.Address != "3rd Floor, Happy Shop, New Building, 123 street, c sector, NY, US" {
 		t.Errorf("unexpected address: %s", store.Address)
@@ -155,7 +175,7 @@ func TestCreateStore_DeriveMerchantFromAuthContext(t *testing.T) {
 	// Auth context has authenticated merchant ID "auth-merchant"
 	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "auth-merchant",
-		Role:   "MERCHANT",
+		Role:   auth.RoleMerchant,
 	})
 
 	// Client sends spoofed "attacker-merchant" in body
@@ -191,6 +211,30 @@ func TestCreateStore_MissingMerchantContext(t *testing.T) {
 	appErr := appErrors.AsAppError(err)
 	if appErr.Code != appErrors.CodeUnauthorized {
 		t.Errorf("expected UNAUTHORIZED code, got %s", appErr.Code)
+	}
+}
+
+func TestCreateStore_NonMerchantForbidden(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	customerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "customer-1",
+		Role:   auth.RoleCustomer,
+	})
+
+	req := dto.CreateStoreRequest{
+		Name: "Customer Trying To Open Store",
+	}
+
+	_, err := svc.CreateStore(customerCtx, "", req)
+	if err == nil {
+		t.Fatal("expected forbidden error for customer creating store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
 	}
 }
 
@@ -235,8 +279,7 @@ func TestGetStore_Success(t *testing.T) {
 		Slug:           "electronics-hub",
 		Address:        "123 Tech Lane",
 		ApprovalStatus: "APPROVED",
-		PublishStatus:  true,
-		KYCStatus:      "VERIFIED",
+		IsVacationMode: false,
 		AvgStoreRating: 4.8,
 	}
 	_ = repo.Create(context.Background(), store)
@@ -290,30 +333,31 @@ func TestUpdateStore_Success(t *testing.T) {
 		Description:    "Old description",
 		Address:        "Old address",
 		ApprovalStatus: "APPROVED",
-		PublishStatus:  false,
-		KYCStatus:      "VERIFIED",
+		IsVacationMode: false,
 	}
 	_ = repo.Create(context.Background(), store)
 
 	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "merchant-200",
-		Role:   "MERCHANT",
+		Role:   auth.RoleMerchant,
 	})
 
 	newName := "Fashion Universe"
+	newEmail := "contact@fashionuniverse.com"
+	newPhone := "+1 9876543210"
 	newDesc := "Updated trendy fashion storefront"
 	newLogo := "https://example.com/new-logo.svg"
-	newBanner := "https://example.com/new-banner.jpg"
 	newAddress := "456 Fashion Ave, Suite 500, New York, NY"
-	publish := true
+	vacation := true
 
 	updateReq := dto.UpdateStoreRequest{
-		Name:          &newName,
-		Description:   &newDesc,
-		LogoURL:       &newLogo,
-		BannerURL:     &newBanner,
-		Address:       &newAddress,
-		PublishStatus: &publish,
+		Name:           &newName,
+		BusinessEmail:  &newEmail,
+		BusinessPhone:  &newPhone,
+		Description:    &newDesc,
+		LogoURL:        &newLogo,
+		Address:        &newAddress,
+		IsVacationMode: &vacation,
 	}
 
 	updated, err := svc.UpdateStore(authCtx, "", "store-200", updateReq)
@@ -324,20 +368,23 @@ func TestUpdateStore_Success(t *testing.T) {
 	if updated.Name != "Fashion Universe" {
 		t.Errorf("expected updated name Fashion Universe, got %s", updated.Name)
 	}
+	if updated.BusinessEmail != "contact@fashionuniverse.com" {
+		t.Errorf("expected updated business email, got %s", updated.BusinessEmail)
+	}
+	if updated.BusinessPhone != "+1 9876543210" {
+		t.Errorf("expected updated business phone, got %s", updated.BusinessPhone)
+	}
 	if updated.Description != "Updated trendy fashion storefront" {
 		t.Errorf("expected updated description, got %s", updated.Description)
 	}
 	if updated.LogoURL != "https://example.com/new-logo.svg" {
 		t.Errorf("expected updated logo, got %s", updated.LogoURL)
 	}
-	if updated.BannerURL != "https://example.com/new-banner.jpg" {
-		t.Errorf("expected updated banner, got %s", updated.BannerURL)
-	}
 	if updated.Address != "456 Fashion Ave, Suite 500, New York, NY" {
 		t.Errorf("expected updated address, got %s", updated.Address)
 	}
-	if !updated.PublishStatus {
-		t.Errorf("expected publish_status true, got %v", updated.PublishStatus)
+	if !updated.IsVacationMode {
+		t.Errorf("expected is_vacation_mode true, got %v", updated.IsVacationMode)
 	}
 }
 
@@ -358,7 +405,7 @@ func TestUpdateStore_OwnershipEnforcement(t *testing.T) {
 	// Attacker tries to modify "merchant-owner"'s store
 	attackerCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "merchant-attacker",
-		Role:   "MERCHANT",
+		Role:   auth.RoleMerchant,
 	})
 
 	hackedName := "Hacked Store"
@@ -434,5 +481,408 @@ func TestListStores(t *testing.T) {
 	}
 	if totalM1 != 1 || len(listM1) != 1 || listM1[0].MerchantID != "m1" {
 		t.Errorf("expected 1 store for m1, got total=%d", totalM1)
+	}
+}
+
+func TestSubmitStore_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Draft Store",
+		Slug:           "draft-store",
+		ApprovalStatus: model.StoreStatusDraft,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	submitted, err := svc.SubmitStore(authCtx, "", dto.SubmitStoreRequest{
+		StoreID: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected submit success, got %v", err)
+	}
+
+	if submitted.ApprovalStatus != model.StoreStatusPendingApproval {
+		t.Errorf("expected status %s, got %s", model.StoreStatusPendingApproval, submitted.ApprovalStatus)
+	}
+}
+
+func TestSubmitStore_InvalidState(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Already Approved Store",
+		Slug:           "already-approved",
+		ApprovalStatus: model.StoreStatusApproved,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.SubmitStore(authCtx, "", dto.SubmitStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error submitting already approved store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeUnprocessableEntity {
+		t.Errorf("expected UNPROCESSABLE_ENTITY code, got %s", appErr.Code)
+	}
+}
+
+func TestSubmitStore_OwnershipEnforcement(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "attacker-merchant",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "victim-merchant",
+		Name:           "Victim Store",
+		Slug:           "victim-store",
+		ApprovalStatus: model.StoreStatusDraft,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.SubmitStore(authCtx, "", dto.SubmitStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error submitting another merchant's store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestSubmitStore_MissingAuth(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Store",
+		Slug:           "store",
+		ApprovalStatus: model.StoreStatusDraft,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.SubmitStore(context.Background(), "", dto.SubmitStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeUnauthorized {
+		t.Errorf("expected UNAUTHORIZED code, got %s", appErr.Code)
+	}
+}
+
+func TestApproveStore_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	approved, err := svc.ApproveStore(adminCtx, "", dto.ApproveStoreRequest{
+		StoreID: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected approve success, got %v", err)
+	}
+
+	if approved.ApprovalStatus != model.StoreStatusApproved {
+		t.Errorf("expected status %s, got %s", model.StoreStatusApproved, approved.ApprovalStatus)
+	}
+}
+
+func TestApproveStore_NonAdminForbidden(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-2",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.ApproveStore(merchantCtx, "", dto.ApproveStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden error for non-admin approving store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestApproveStore_MerchantCannotApproveOwnStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.ApproveStore(adminCtx, "", dto.ApproveStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when merchant tries to approve own store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestApproveStore_InvalidStateTransition(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Draft Store",
+		Slug:           "draft-store",
+		ApprovalStatus: model.StoreStatusDraft,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.ApproveStore(adminCtx, "", dto.ApproveStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error approving a draft store without submission, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeUnprocessableEntity {
+		t.Errorf("expected UNPROCESSABLE_ENTITY code, got %s", appErr.Code)
+	}
+}
+
+func TestRejectStore_Success(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	rejected, err := svc.RejectStore(adminCtx, "", dto.RejectStoreRequest{
+		StoreID: "store-1",
+		Reason:  "KYC documents were blurry and unreadable.",
+	})
+	if err != nil {
+		t.Fatalf("expected reject success, got %v", err)
+	}
+
+	if rejected.ApprovalStatus != model.StoreStatusRejected {
+		t.Errorf("expected status %s, got %s", model.StoreStatusRejected, rejected.ApprovalStatus)
+	}
+	if rejected.RejectionReason == nil || *rejected.RejectionReason != "KYC documents were blurry and unreadable." {
+		t.Errorf("expected rejection reason persisted, got %v", rejected.RejectionReason)
+	}
+}
+
+func TestRejectStore_MissingReason(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.RejectStore(adminCtx, "", dto.RejectStoreRequest{
+		StoreID: "store-1",
+		Reason:  "   ",
+	})
+	if err == nil {
+		t.Fatal("expected error rejecting without reason, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BAD_REQUEST code, got %s", appErr.Code)
+	}
+}
+
+func TestRejectStore_NonAdminForbidden(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-2",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.RejectStore(merchantCtx, "", dto.RejectStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Rejection reason",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden error for non-admin rejecting store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestRejectStore_MerchantCannotRejectOwnStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.RejectStore(adminCtx, "", dto.RejectStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Some reason",
+	})
+	if err == nil {
+		t.Fatal("expected error when merchant tries to reject own store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestRejectStore_InvalidStateTransition(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Draft Store",
+		Slug:           "draft-store",
+		ApprovalStatus: model.StoreStatusDraft,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	_, err := svc.RejectStore(adminCtx, "", dto.RejectStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Invalid documents",
+	})
+	if err == nil {
+		t.Fatal("expected error rejecting draft store without submission, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeUnprocessableEntity {
+		t.Errorf("expected UNPROCESSABLE_ENTITY code, got %s", appErr.Code)
 	}
 }

@@ -18,12 +18,13 @@ var (
 type CreateStoreRequest struct {
 	MerchantID         string  `json:"merchant_id,omitempty"`
 	Name               string  `json:"name,omitempty"`
+	Slug               *string `json:"slug,omitempty"`
+	BusinessEmail      string  `json:"business_email,omitempty"`
+	BusinessPhone      string  `json:"business_phone,omitempty"`
 	Description        string  `json:"description,omitempty"`
 	LogoURL            string  `json:"logo_url,omitempty"`
-	BannerURL          string  `json:"banner_url,omitempty"`
 	Address            string  `json:"address,omitempty"`
 	BankAccountDetails *string `json:"bank_account_details,omitempty"`
-	Slug               *string `json:"slug,omitempty"`
 }
 
 func (r *CreateStoreRequest) GetName() string {
@@ -36,10 +37,6 @@ func (r *CreateStoreRequest) GetDescription() string {
 
 func (r *CreateStoreRequest) GetLogo() string {
 	return strings.TrimSpace(r.LogoURL)
-}
-
-func (r *CreateStoreRequest) GetBanner() string {
-	return strings.TrimSpace(r.BannerURL)
 }
 
 func (r *CreateStoreRequest) Validate() error {
@@ -61,11 +58,13 @@ type UpdateStoreRequest struct {
 	ID                 *string `json:"id,omitempty"`
 	MerchantID         *string `json:"merchant_id,omitempty"`
 	Name               *string `json:"name,omitempty"`
+	Slug               *string `json:"slug,omitempty"`
+	BusinessEmail      *string `json:"business_email,omitempty"`
+	BusinessPhone      *string `json:"business_phone,omitempty"`
 	Description        *string `json:"description,omitempty"`
 	LogoURL            *string `json:"logo_url,omitempty"`
-	BannerURL          *string `json:"banner_url,omitempty"`
 	Address            *string `json:"address,omitempty"`
-	PublishStatus      *bool   `json:"publish_status,omitempty"`
+	IsVacationMode     *bool   `json:"is_vacation_mode,omitempty"`
 	BankAccountDetails *string `json:"bank_account_details,omitempty"`
 }
 
@@ -85,10 +84,6 @@ func (r *UpdateStoreRequest) GetLogo() *string {
 	return r.LogoURL
 }
 
-func (r *UpdateStoreRequest) GetBanner() *string {
-	return r.BannerURL
-}
-
 func (r *UpdateStoreRequest) Validate() error {
 	if name := r.GetName(); name != nil {
 		if len(*name) < 2 || len(*name) > 255 {
@@ -106,14 +101,14 @@ type StoreResponse struct {
 	MerchantID         string  `json:"merchant_id"`
 	Name               string  `json:"name"`
 	Slug               string  `json:"slug"`
+	BusinessEmail      string  `json:"business_email"`
+	BusinessPhone      string  `json:"business_phone"`
 	Description        string  `json:"description"`
 	LogoURL            string  `json:"logo_url"`
-	BannerURL          string  `json:"banner_url"`
 	Address            string  `json:"address"`
+	IsVacationMode     bool    `json:"is_vacation_mode"`
 	ApprovalStatus     string  `json:"approval_status"`
-	PublishStatus      bool    `json:"publish_status"`
 	RejectionReason    *string `json:"rejection_reason,omitempty"`
-	KYCStatus          string  `json:"kyc_status"`
 	BankAccountDetails *string `json:"bank_account_details,omitempty"`
 	AvgStoreRating     float64 `json:"avg_store_rating"`
 	CreatedAt          string  `json:"created_at"`
@@ -130,14 +125,14 @@ func ToStoreResponse(s *model.Store) *StoreResponse {
 		MerchantID:         s.MerchantID,
 		Name:               s.Name,
 		Slug:               s.Slug,
+		BusinessEmail:      s.BusinessEmail,
+		BusinessPhone:      s.BusinessPhone,
 		Description:        s.Description,
 		LogoURL:            s.LogoURL,
-		BannerURL:          s.BannerURL,
 		Address:            s.Address,
+		IsVacationMode:     s.IsVacationMode,
 		ApprovalStatus:     s.ApprovalStatus,
-		PublishStatus:      s.PublishStatus,
 		RejectionReason:    s.RejectionReason,
-		KYCStatus:          s.KYCStatus,
 		BankAccountDetails: s.BankAccountDetails,
 		AvgStoreRating:     s.AvgStoreRating,
 		CreatedAt:          s.CreatedAt.Format(time.RFC3339),
@@ -165,14 +160,14 @@ func ToStorePB(s *model.Store) *storepb.Store {
 		MerchantId:         s.MerchantID,
 		Name:               s.Name,
 		Slug:               s.Slug,
+		BusinessEmail:      s.BusinessEmail,
+		BusinessPhone:      s.BusinessPhone,
 		Description:        s.Description,
 		LogoUrl:            s.LogoURL,
-		BannerUrl:          s.BannerURL,
 		Address:            s.Address,
+		IsVacationMode:     s.IsVacationMode,
 		ApprovalStatus:     s.ApprovalStatus,
-		PublishStatus:      s.PublishStatus,
 		RejectionReason:    rejectionReason,
-		KycStatus:          s.KYCStatus,
 		BankAccountDetails: bankDetails,
 		AvgStoreRating:     s.AvgStoreRating,
 		CreatedAt:          s.CreatedAt.Format(time.RFC3339),
@@ -192,11 +187,10 @@ func GenerateSlug(name string) string {
 
 type BankAccount struct {
 	AccountHolderName string  `json:"account_holder_name"`
+	BankName          string  `json:"bank_name"`
 	AccountNumber     string  `json:"account_number"`
 	RoutingNumber     *string `json:"routing_number,omitempty"`
-	BankName          string  `json:"bank_name"`
-	AccountType       *string `json:"account_type,omitempty"`
-	BranchCode        *string `json:"branch_code,omitempty"`
+	TaxID             *string `json:"tax_id,omitempty"`
 }
 
 type GetUploadURLRequest struct {
@@ -211,4 +205,44 @@ type GetUploadURLResponse struct {
 	PublicURL        string `json:"public_url"`
 	Key              string `json:"key"`
 	ExpiresInSeconds int32  `json:"expires_in_seconds"`
+}
+
+type SubmitStoreRequest struct {
+	StoreID    string `json:"store_id"`
+	MerchantID string `json:"merchant_id"`
+}
+
+func (r *SubmitStoreRequest) Validate() error {
+	if strings.TrimSpace(r.StoreID) == "" {
+		return errors.BadRequest("store_id is required")
+	}
+	return nil
+}
+
+type ApproveStoreRequest struct {
+	StoreID string `json:"store_id"`
+	AdminID string `json:"admin_id"`
+}
+
+func (r *ApproveStoreRequest) Validate() error {
+	if strings.TrimSpace(r.StoreID) == "" {
+		return errors.BadRequest("store_id is required")
+	}
+	return nil
+}
+
+type RejectStoreRequest struct {
+	StoreID string `json:"store_id"`
+	AdminID string `json:"admin_id"`
+	Reason  string `json:"rejection_reason"`
+}
+
+func (r *RejectStoreRequest) Validate() error {
+	if strings.TrimSpace(r.StoreID) == "" {
+		return errors.BadRequest("store_id is required")
+	}
+	if strings.TrimSpace(r.Reason) == "" {
+		return errors.BadRequest("rejection reason is mandatory")
+	}
+	return nil
 }

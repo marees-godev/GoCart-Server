@@ -25,7 +25,34 @@ services:
         value: "true"
       # External PostgreSQL Connection URL (Neon / Supabase / etc.)
       - key: DATABASE_URL
-        sync: false
+        # value injected via Render secret; keep key only
+        sync: true
+      - key: AUTH_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: PAYMENT_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: ORDER_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: DELIVERY_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: RETURNS_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: PRODUCT_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: CATEGORY_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: STORE_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: MERCHANT_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: CART_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: INVENTORY_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: RATINGS_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
+      - key: NOTIFICATIONS_SERVICE_DATABASE_URL
+        # value injected via Render secret; keep key only
       # External Redis Connection URL / Addr (Upstash / etc.)
       - key: REDIS_URL
         sync: false

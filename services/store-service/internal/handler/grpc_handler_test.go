@@ -98,6 +98,21 @@ func (m *mockStoreRepo) IsSlugAvailable(ctx context.Context, slug string, exclud
 	return false, nil
 }
 
+func (m *mockStoreRepo) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error) {
+	existing, ok := m.stores[id]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	if existing.ApprovalStatus != expectedStatus {
+		return nil, appErrors.UnprocessableEntity("invalid state transition")
+	}
+	existing.ApprovalStatus = newStatus
+	existing.RejectionReason = rejectionReason
+	m.stores[id] = existing
+	cp := *existing
+	return &cp, nil
+}
+
 func TestGRPCHandler_CreateStore(t *testing.T) {
 	repo := newMockRepo()
 	svc := service.NewStoreService(repo)
@@ -105,7 +120,7 @@ func TestGRPCHandler_CreateStore(t *testing.T) {
 
 	ctx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "merchant-10",
-		Role:   "MERCHANT",
+		Role:   auth.RoleMerchant,
 	})
 
 	req := &storepb.CreateStoreRequest{
@@ -199,3 +214,158 @@ func TestGRPCHandler_ListStores(t *testing.T) {
 		t.Errorf("expected 1 store, got total=%d", resp.Total)
 	}
 }
+
+func TestGRPCHandler_SubmitStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Draft Store",
+		Slug:           "draft-store",
+		ApprovalStatus: model.StoreStatusDraft,
+	})
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	resp, err := h.SubmitStore(ctx, &storepb.SubmitStoreRequest{
+		StoreId: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected SubmitStore success, got %v", err)
+	}
+	if resp.Store == nil || resp.Store.ApprovalStatus != model.StoreStatusPendingApproval {
+		t.Errorf("expected status %s, got %v", model.StoreStatusPendingApproval, resp.Store)
+	}
+}
+
+func TestGRPCHandler_ApproveStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	})
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	resp, err := h.ApproveStore(adminCtx, &storepb.ApproveStoreRequest{
+		StoreId: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected ApproveStore success, got %v", err)
+	}
+	if resp.Store == nil || resp.Store.ApprovalStatus != model.StoreStatusApproved {
+		t.Errorf("expected status %s, got %v", model.StoreStatusApproved, resp.Store)
+	}
+}
+
+func TestGRPCHandler_RejectStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	})
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	resp, err := h.RejectStore(adminCtx, &storepb.RejectStoreRequest{
+		StoreId:         "store-1",
+		RejectionReason: "Incomplete bank details",
+	})
+	if err != nil {
+		t.Fatalf("expected RejectStore success, got %v", err)
+	}
+	if resp.Store == nil || resp.Store.ApprovalStatus != model.StoreStatusRejected {
+		t.Errorf("expected status %s, got %v", model.StoreStatusRejected, resp.Store)
+	}
+	if resp.Store.RejectionReason != "Incomplete bank details" {
+		t.Errorf("expected rejection reason to match, got %s", resp.Store.RejectionReason)
+	}
+}
+
+func TestGRPCHandler_RejectStore_MissingReason(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	})
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	_, err := h.RejectStore(adminCtx, &storepb.RejectStoreRequest{
+		StoreId:         "store-1",
+		RejectionReason: "",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Errorf("expected INVALID_ARGUMENT status, got %v", err)
+	}
+}
+
+func TestGRPCHandler_ApproveStore_SelfApprovalDenied(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Pending Store",
+		Slug:           "pending-store",
+		ApprovalStatus: model.StoreStatusPendingApproval,
+	})
+
+	merchantAsAdminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	_, err := h.ApproveStore(merchantAsAdminCtx, &storepb.ApproveStoreRequest{
+		StoreId: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when merchant approves own store, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.PermissionDenied {
+		t.Errorf("expected PERMISSION_DENIED status, got %v", err)
+	}
+}
+

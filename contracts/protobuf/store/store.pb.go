@@ -27,14 +27,14 @@ type Store struct {
 	MerchantId         string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	Name               string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Slug               string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	Description        string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	LogoUrl            string                 `protobuf:"bytes,6,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
-	BannerUrl          string                 `protobuf:"bytes,7,opt,name=banner_url,json=bannerUrl,proto3" json:"banner_url,omitempty"`
-	Address            string                 `protobuf:"bytes,8,opt,name=address,proto3" json:"address,omitempty"`
-	ApprovalStatus     string                 `protobuf:"bytes,9,opt,name=approval_status,json=approvalStatus,proto3" json:"approval_status,omitempty"`
-	PublishStatus      bool                   `protobuf:"varint,10,opt,name=publish_status,json=publishStatus,proto3" json:"publish_status,omitempty"`
-	RejectionReason    string                 `protobuf:"bytes,11,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
-	KycStatus          string                 `protobuf:"bytes,12,opt,name=kyc_status,json=kycStatus,proto3" json:"kyc_status,omitempty"`
+	BusinessEmail      string                 `protobuf:"bytes,5,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
+	BusinessPhone      string                 `protobuf:"bytes,6,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
+	Description        string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	LogoUrl            string                 `protobuf:"bytes,8,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
+	Address            string                 `protobuf:"bytes,9,opt,name=address,proto3" json:"address,omitempty"`
+	IsVacationMode     bool                   `protobuf:"varint,10,opt,name=is_vacation_mode,json=isVacationMode,proto3" json:"is_vacation_mode,omitempty"`
+	ApprovalStatus     string                 `protobuf:"bytes,11,opt,name=approval_status,json=approvalStatus,proto3" json:"approval_status,omitempty"`
+	RejectionReason    string                 `protobuf:"bytes,12,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
 	BankAccountDetails string                 `protobuf:"bytes,13,opt,name=bank_account_details,json=bankAccountDetails,proto3" json:"bank_account_details,omitempty"`
 	AvgStoreRating     float64                `protobuf:"fixed64,14,opt,name=avg_store_rating,json=avgStoreRating,proto3" json:"avg_store_rating,omitempty"`
 	CreatedAt          string                 `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -101,6 +101,20 @@ func (x *Store) GetSlug() string {
 	return ""
 }
 
+func (x *Store) GetBusinessEmail() string {
+	if x != nil {
+		return x.BusinessEmail
+	}
+	return ""
+}
+
+func (x *Store) GetBusinessPhone() string {
+	if x != nil {
+		return x.BusinessPhone
+	}
+	return ""
+}
+
 func (x *Store) GetDescription() string {
 	if x != nil {
 		return x.Description
@@ -115,18 +129,18 @@ func (x *Store) GetLogoUrl() string {
 	return ""
 }
 
-func (x *Store) GetBannerUrl() string {
-	if x != nil {
-		return x.BannerUrl
-	}
-	return ""
-}
-
 func (x *Store) GetAddress() string {
 	if x != nil {
 		return x.Address
 	}
 	return ""
+}
+
+func (x *Store) GetIsVacationMode() bool {
+	if x != nil {
+		return x.IsVacationMode
+	}
+	return false
 }
 
 func (x *Store) GetApprovalStatus() string {
@@ -136,23 +150,9 @@ func (x *Store) GetApprovalStatus() string {
 	return ""
 }
 
-func (x *Store) GetPublishStatus() bool {
-	if x != nil {
-		return x.PublishStatus
-	}
-	return false
-}
-
 func (x *Store) GetRejectionReason() string {
 	if x != nil {
 		return x.RejectionReason
-	}
-	return ""
-}
-
-func (x *Store) GetKycStatus() string {
-	if x != nil {
-		return x.KycStatus
 	}
 	return ""
 }
@@ -397,11 +397,13 @@ type CreateStoreRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	MerchantId         string                 `protobuf:"bytes,1,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description        string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	LogoUrl            string                 `protobuf:"bytes,4,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
-	BannerUrl          string                 `protobuf:"bytes,5,opt,name=banner_url,json=bannerUrl,proto3" json:"banner_url,omitempty"`
-	Address            string                 `protobuf:"bytes,6,opt,name=address,proto3" json:"address,omitempty"`
-	BankAccountDetails string                 `protobuf:"bytes,7,opt,name=bank_account_details,json=bankAccountDetails,proto3" json:"bank_account_details,omitempty"`
+	Slug               *string                `protobuf:"bytes,3,opt,name=slug,proto3,oneof" json:"slug,omitempty"`
+	BusinessEmail      string                 `protobuf:"bytes,4,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
+	BusinessPhone      string                 `protobuf:"bytes,5,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
+	Description        string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	LogoUrl            string                 `protobuf:"bytes,7,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
+	Address            string                 `protobuf:"bytes,8,opt,name=address,proto3" json:"address,omitempty"`
+	BankAccountDetails string                 `protobuf:"bytes,9,opt,name=bank_account_details,json=bankAccountDetails,proto3" json:"bank_account_details,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -450,6 +452,27 @@ func (x *CreateStoreRequest) GetName() string {
 	return ""
 }
 
+func (x *CreateStoreRequest) GetSlug() string {
+	if x != nil && x.Slug != nil {
+		return *x.Slug
+	}
+	return ""
+}
+
+func (x *CreateStoreRequest) GetBusinessEmail() string {
+	if x != nil {
+		return x.BusinessEmail
+	}
+	return ""
+}
+
+func (x *CreateStoreRequest) GetBusinessPhone() string {
+	if x != nil {
+		return x.BusinessPhone
+	}
+	return ""
+}
+
 func (x *CreateStoreRequest) GetDescription() string {
 	if x != nil {
 		return x.Description
@@ -460,13 +483,6 @@ func (x *CreateStoreRequest) GetDescription() string {
 func (x *CreateStoreRequest) GetLogoUrl() string {
 	if x != nil {
 		return x.LogoUrl
-	}
-	return ""
-}
-
-func (x *CreateStoreRequest) GetBannerUrl() string {
-	if x != nil {
-		return x.BannerUrl
 	}
 	return ""
 }
@@ -534,12 +550,14 @@ type UpdateStoreRequest struct {
 	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	MerchantId         string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	Name               *string                `protobuf:"bytes,3,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Description        *string                `protobuf:"bytes,4,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	LogoUrl            *string                `protobuf:"bytes,5,opt,name=logo_url,json=logoUrl,proto3,oneof" json:"logo_url,omitempty"`
-	BannerUrl          *string                `protobuf:"bytes,6,opt,name=banner_url,json=bannerUrl,proto3,oneof" json:"banner_url,omitempty"`
-	Address            *string                `protobuf:"bytes,7,opt,name=address,proto3,oneof" json:"address,omitempty"`
-	PublishStatus      *bool                  `protobuf:"varint,8,opt,name=publish_status,json=publishStatus,proto3,oneof" json:"publish_status,omitempty"`
-	BankAccountDetails *string                `protobuf:"bytes,9,opt,name=bank_account_details,json=bankAccountDetails,proto3,oneof" json:"bank_account_details,omitempty"`
+	Slug               *string                `protobuf:"bytes,4,opt,name=slug,proto3,oneof" json:"slug,omitempty"`
+	BusinessEmail      *string                `protobuf:"bytes,5,opt,name=business_email,json=businessEmail,proto3,oneof" json:"business_email,omitempty"`
+	BusinessPhone      *string                `protobuf:"bytes,6,opt,name=business_phone,json=businessPhone,proto3,oneof" json:"business_phone,omitempty"`
+	Description        *string                `protobuf:"bytes,7,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	LogoUrl            *string                `protobuf:"bytes,8,opt,name=logo_url,json=logoUrl,proto3,oneof" json:"logo_url,omitempty"`
+	Address            *string                `protobuf:"bytes,9,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	IsVacationMode     *bool                  `protobuf:"varint,10,opt,name=is_vacation_mode,json=isVacationMode,proto3,oneof" json:"is_vacation_mode,omitempty"`
+	BankAccountDetails *string                `protobuf:"bytes,11,opt,name=bank_account_details,json=bankAccountDetails,proto3,oneof" json:"bank_account_details,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -595,6 +613,27 @@ func (x *UpdateStoreRequest) GetName() string {
 	return ""
 }
 
+func (x *UpdateStoreRequest) GetSlug() string {
+	if x != nil && x.Slug != nil {
+		return *x.Slug
+	}
+	return ""
+}
+
+func (x *UpdateStoreRequest) GetBusinessEmail() string {
+	if x != nil && x.BusinessEmail != nil {
+		return *x.BusinessEmail
+	}
+	return ""
+}
+
+func (x *UpdateStoreRequest) GetBusinessPhone() string {
+	if x != nil && x.BusinessPhone != nil {
+		return *x.BusinessPhone
+	}
+	return ""
+}
+
 func (x *UpdateStoreRequest) GetDescription() string {
 	if x != nil && x.Description != nil {
 		return *x.Description
@@ -609,13 +648,6 @@ func (x *UpdateStoreRequest) GetLogoUrl() string {
 	return ""
 }
 
-func (x *UpdateStoreRequest) GetBannerUrl() string {
-	if x != nil && x.BannerUrl != nil {
-		return *x.BannerUrl
-	}
-	return ""
-}
-
 func (x *UpdateStoreRequest) GetAddress() string {
 	if x != nil && x.Address != nil {
 		return *x.Address
@@ -623,9 +655,9 @@ func (x *UpdateStoreRequest) GetAddress() string {
 	return ""
 }
 
-func (x *UpdateStoreRequest) GetPublishStatus() bool {
-	if x != nil && x.PublishStatus != nil {
-		return *x.PublishStatus
+func (x *UpdateStoreRequest) GetIsVacationMode() bool {
+	if x != nil && x.IsVacationMode != nil {
+		return *x.IsVacationMode
 	}
 	return false
 }
@@ -817,28 +849,322 @@ func (x *GetUploadUrlResponse) GetExpiresInSeconds() int32 {
 	return 0
 }
 
+type SubmitStoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitStoreRequest) Reset() {
+	*x = SubmitStoreRequest{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitStoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitStoreRequest) ProtoMessage() {}
+
+func (x *SubmitStoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitStoreRequest.ProtoReflect.Descriptor instead.
+func (*SubmitStoreRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SubmitStoreRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *SubmitStoreRequest) GetMerchantId() string {
+	if x != nil {
+		return x.MerchantId
+	}
+	return ""
+}
+
+type SubmitStoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Store         *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitStoreResponse) Reset() {
+	*x = SubmitStoreResponse{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitStoreResponse) ProtoMessage() {}
+
+func (x *SubmitStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitStoreResponse.ProtoReflect.Descriptor instead.
+func (*SubmitStoreResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SubmitStoreResponse) GetStore() *Store {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+type ApproveStoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	AdminId       string                 `protobuf:"bytes,2,opt,name=admin_id,json=adminId,proto3" json:"admin_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveStoreRequest) Reset() {
+	*x = ApproveStoreRequest{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveStoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveStoreRequest) ProtoMessage() {}
+
+func (x *ApproveStoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveStoreRequest.ProtoReflect.Descriptor instead.
+func (*ApproveStoreRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ApproveStoreRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *ApproveStoreRequest) GetAdminId() string {
+	if x != nil {
+		return x.AdminId
+	}
+	return ""
+}
+
+type ApproveStoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Store         *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveStoreResponse) Reset() {
+	*x = ApproveStoreResponse{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveStoreResponse) ProtoMessage() {}
+
+func (x *ApproveStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveStoreResponse.ProtoReflect.Descriptor instead.
+func (*ApproveStoreResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ApproveStoreResponse) GetStore() *Store {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+type RejectStoreRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	StoreId         string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	AdminId         string                 `protobuf:"bytes,2,opt,name=admin_id,json=adminId,proto3" json:"admin_id,omitempty"`
+	RejectionReason string                 `protobuf:"bytes,3,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RejectStoreRequest) Reset() {
+	*x = RejectStoreRequest{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectStoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectStoreRequest) ProtoMessage() {}
+
+func (x *RejectStoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectStoreRequest.ProtoReflect.Descriptor instead.
+func (*RejectStoreRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RejectStoreRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *RejectStoreRequest) GetAdminId() string {
+	if x != nil {
+		return x.AdminId
+	}
+	return ""
+}
+
+func (x *RejectStoreRequest) GetRejectionReason() string {
+	if x != nil {
+		return x.RejectionReason
+	}
+	return ""
+}
+
+type RejectStoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Store         *Store                 `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectStoreResponse) Reset() {
+	*x = RejectStoreResponse{}
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectStoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectStoreResponse) ProtoMessage() {}
+
+func (x *RejectStoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_store_store_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectStoreResponse.ProtoReflect.Descriptor instead.
+func (*RejectStoreResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_store_store_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RejectStoreResponse) GetStore() *Store {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
 var File_contracts_protobuf_store_store_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"\n" +
-	"$contracts/protobuf/store/store.proto\x12\x0fgocart.store.v1\"\x8a\x04\n" +
+	"$contracts/protobuf/store/store.proto\x12\x0fgocart.store.v1\"\x9d\x04\n" +
 	"\x05Store\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
 	"merchantId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
-	"\x04slug\x18\x04 \x01(\tR\x04slug\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x19\n" +
-	"\blogo_url\x18\x06 \x01(\tR\alogoUrl\x12\x1d\n" +
-	"\n" +
-	"banner_url\x18\a \x01(\tR\tbannerUrl\x12\x18\n" +
-	"\aaddress\x18\b \x01(\tR\aaddress\x12'\n" +
-	"\x0fapproval_status\x18\t \x01(\tR\x0eapprovalStatus\x12%\n" +
-	"\x0epublish_status\x18\n" +
-	" \x01(\bR\rpublishStatus\x12)\n" +
-	"\x10rejection_reason\x18\v \x01(\tR\x0frejectionReason\x12\x1d\n" +
-	"\n" +
-	"kyc_status\x18\f \x01(\tR\tkycStatus\x120\n" +
+	"\x04slug\x18\x04 \x01(\tR\x04slug\x12%\n" +
+	"\x0ebusiness_email\x18\x05 \x01(\tR\rbusinessEmail\x12%\n" +
+	"\x0ebusiness_phone\x18\x06 \x01(\tR\rbusinessPhone\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\x12\x19\n" +
+	"\blogo_url\x18\b \x01(\tR\alogoUrl\x12\x18\n" +
+	"\aaddress\x18\t \x01(\tR\aaddress\x12(\n" +
+	"\x10is_vacation_mode\x18\n" +
+	" \x01(\bR\x0eisVacationMode\x12'\n" +
+	"\x0fapproval_status\x18\v \x01(\tR\x0eapprovalStatus\x12)\n" +
+	"\x10rejection_reason\x18\f \x01(\tR\x0frejectionReason\x120\n" +
 	"\x14bank_account_details\x18\r \x01(\tR\x12bankAccountDetails\x12(\n" +
 	"\x10avg_store_rating\x18\x0e \x01(\x01R\x0eavgStoreRating\x12\x1d\n" +
 	"\n" +
@@ -858,38 +1184,44 @@ const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"merchantId\"Z\n" +
 	"\x12ListStoresResponse\x12.\n" +
 	"\x06stores\x18\x01 \x03(\v2\x16.gocart.store.v1.StoreR\x06stores\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\xf1\x01\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\xc2\x02\n" +
 	"\x12CreateStoreRequest\x12\x1f\n" +
 	"\vmerchant_id\x18\x01 \x01(\tR\n" +
 	"merchantId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x19\n" +
-	"\blogo_url\x18\x04 \x01(\tR\alogoUrl\x12\x1d\n" +
-	"\n" +
-	"banner_url\x18\x05 \x01(\tR\tbannerUrl\x12\x18\n" +
-	"\aaddress\x18\x06 \x01(\tR\aaddress\x120\n" +
-	"\x14bank_account_details\x18\a \x01(\tR\x12bankAccountDetails\"C\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x17\n" +
+	"\x04slug\x18\x03 \x01(\tH\x00R\x04slug\x88\x01\x01\x12%\n" +
+	"\x0ebusiness_email\x18\x04 \x01(\tR\rbusinessEmail\x12%\n" +
+	"\x0ebusiness_phone\x18\x05 \x01(\tR\rbusinessPhone\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x19\n" +
+	"\blogo_url\x18\a \x01(\tR\alogoUrl\x12\x18\n" +
+	"\aaddress\x18\b \x01(\tR\aaddress\x120\n" +
+	"\x14bank_account_details\x18\t \x01(\tR\x12bankAccountDetailsB\a\n" +
+	"\x05_slug\"C\n" +
 	"\x13CreateStoreResponse\x12,\n" +
-	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"\xb8\x03\n" +
+	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"\xaa\x04\n" +
 	"\x12UpdateStoreRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
 	"merchantId\x12\x17\n" +
-	"\x04name\x18\x03 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
-	"\vdescription\x18\x04 \x01(\tH\x01R\vdescription\x88\x01\x01\x12\x1e\n" +
-	"\blogo_url\x18\x05 \x01(\tH\x02R\alogoUrl\x88\x01\x01\x12\"\n" +
-	"\n" +
-	"banner_url\x18\x06 \x01(\tH\x03R\tbannerUrl\x88\x01\x01\x12\x1d\n" +
-	"\aaddress\x18\a \x01(\tH\x04R\aaddress\x88\x01\x01\x12*\n" +
-	"\x0epublish_status\x18\b \x01(\bH\x05R\rpublishStatus\x88\x01\x01\x125\n" +
-	"\x14bank_account_details\x18\t \x01(\tH\x06R\x12bankAccountDetails\x88\x01\x01B\a\n" +
-	"\x05_nameB\x0e\n" +
+	"\x04name\x18\x03 \x01(\tH\x00R\x04name\x88\x01\x01\x12\x17\n" +
+	"\x04slug\x18\x04 \x01(\tH\x01R\x04slug\x88\x01\x01\x12*\n" +
+	"\x0ebusiness_email\x18\x05 \x01(\tH\x02R\rbusinessEmail\x88\x01\x01\x12*\n" +
+	"\x0ebusiness_phone\x18\x06 \x01(\tH\x03R\rbusinessPhone\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\a \x01(\tH\x04R\vdescription\x88\x01\x01\x12\x1e\n" +
+	"\blogo_url\x18\b \x01(\tH\x05R\alogoUrl\x88\x01\x01\x12\x1d\n" +
+	"\aaddress\x18\t \x01(\tH\x06R\aaddress\x88\x01\x01\x12-\n" +
+	"\x10is_vacation_mode\x18\n" +
+	" \x01(\bH\aR\x0eisVacationMode\x88\x01\x01\x125\n" +
+	"\x14bank_account_details\x18\v \x01(\tH\bR\x12bankAccountDetails\x88\x01\x01B\a\n" +
+	"\x05_nameB\a\n" +
+	"\x05_slugB\x11\n" +
+	"\x0f_business_emailB\x11\n" +
+	"\x0f_business_phoneB\x0e\n" +
 	"\f_descriptionB\v\n" +
-	"\t_logo_urlB\r\n" +
-	"\v_banner_urlB\n" +
+	"\t_logo_urlB\n" +
 	"\n" +
-	"\b_addressB\x11\n" +
-	"\x0f_publish_statusB\x17\n" +
+	"\b_addressB\x13\n" +
+	"\x11_is_vacation_modeB\x17\n" +
 	"\x15_bank_account_details\"C\n" +
 	"\x13UpdateStoreResponse\x12,\n" +
 	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"\x94\x01\n" +
@@ -906,14 +1238,34 @@ const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"\n" +
 	"public_url\x18\x02 \x01(\tR\tpublicUrl\x12\x10\n" +
 	"\x03key\x18\x03 \x01(\tR\x03key\x12,\n" +
-	"\x12expires_in_seconds\x18\x04 \x01(\x05R\x10expiresInSeconds2\xc7\x03\n" +
+	"\x12expires_in_seconds\x18\x04 \x01(\x05R\x10expiresInSeconds\"P\n" +
+	"\x12SubmitStoreRequest\x12\x19\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1f\n" +
+	"\vmerchant_id\x18\x02 \x01(\tR\n" +
+	"merchantId\"C\n" +
+	"\x13SubmitStoreResponse\x12,\n" +
+	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"K\n" +
+	"\x13ApproveStoreRequest\x12\x19\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x19\n" +
+	"\badmin_id\x18\x02 \x01(\tR\aadminId\"D\n" +
+	"\x14ApproveStoreResponse\x12,\n" +
+	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"u\n" +
+	"\x12RejectStoreRequest\x12\x19\n" +
+	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x19\n" +
+	"\badmin_id\x18\x02 \x01(\tR\aadminId\x12)\n" +
+	"\x10rejection_reason\x18\x03 \x01(\tR\x0frejectionReason\"C\n" +
+	"\x13RejectStoreResponse\x12,\n" +
+	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store2\xd8\x05\n" +
 	"\fStoreService\x12O\n" +
 	"\bGetStore\x12 .gocart.store.v1.GetStoreRequest\x1a!.gocart.store.v1.GetStoreResponse\x12U\n" +
 	"\n" +
 	"ListStores\x12\".gocart.store.v1.ListStoresRequest\x1a#.gocart.store.v1.ListStoresResponse\x12X\n" +
 	"\vCreateStore\x12#.gocart.store.v1.CreateStoreRequest\x1a$.gocart.store.v1.CreateStoreResponse\x12X\n" +
 	"\vUpdateStore\x12#.gocart.store.v1.UpdateStoreRequest\x1a$.gocart.store.v1.UpdateStoreResponse\x12[\n" +
-	"\fGetUploadUrl\x12$.gocart.store.v1.GetUploadUrlRequest\x1a%.gocart.store.v1.GetUploadUrlResponseBFZDgithub.com/marees-godev/GoCart-Server/contracts/protobuf/store;storeb\x06proto3"
+	"\fGetUploadUrl\x12$.gocart.store.v1.GetUploadUrlRequest\x1a%.gocart.store.v1.GetUploadUrlResponse\x12X\n" +
+	"\vSubmitStore\x12#.gocart.store.v1.SubmitStoreRequest\x1a$.gocart.store.v1.SubmitStoreResponse\x12[\n" +
+	"\fApproveStore\x12$.gocart.store.v1.ApproveStoreRequest\x1a%.gocart.store.v1.ApproveStoreResponse\x12X\n" +
+	"\vRejectStore\x12#.gocart.store.v1.RejectStoreRequest\x1a$.gocart.store.v1.RejectStoreResponseBFZDgithub.com/marees-godev/GoCart-Server/contracts/protobuf/store;storeb\x06proto3"
 
 var (
 	file_contracts_protobuf_store_store_proto_rawDescOnce sync.Once
@@ -927,7 +1279,7 @@ func file_contracts_protobuf_store_store_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_store_store_proto_rawDescData
 }
 
-var file_contracts_protobuf_store_store_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_contracts_protobuf_store_store_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_contracts_protobuf_store_store_proto_goTypes = []any{
 	(*Store)(nil),                // 0: gocart.store.v1.Store
 	(*GetStoreRequest)(nil),      // 1: gocart.store.v1.GetStoreRequest
@@ -940,27 +1292,42 @@ var file_contracts_protobuf_store_store_proto_goTypes = []any{
 	(*UpdateStoreResponse)(nil),  // 8: gocart.store.v1.UpdateStoreResponse
 	(*GetUploadUrlRequest)(nil),  // 9: gocart.store.v1.GetUploadUrlRequest
 	(*GetUploadUrlResponse)(nil), // 10: gocart.store.v1.GetUploadUrlResponse
+	(*SubmitStoreRequest)(nil),   // 11: gocart.store.v1.SubmitStoreRequest
+	(*SubmitStoreResponse)(nil),  // 12: gocart.store.v1.SubmitStoreResponse
+	(*ApproveStoreRequest)(nil),  // 13: gocart.store.v1.ApproveStoreRequest
+	(*ApproveStoreResponse)(nil), // 14: gocart.store.v1.ApproveStoreResponse
+	(*RejectStoreRequest)(nil),   // 15: gocart.store.v1.RejectStoreRequest
+	(*RejectStoreResponse)(nil),  // 16: gocart.store.v1.RejectStoreResponse
 }
 var file_contracts_protobuf_store_store_proto_depIdxs = []int32{
 	0,  // 0: gocart.store.v1.GetStoreResponse.store:type_name -> gocart.store.v1.Store
 	0,  // 1: gocart.store.v1.ListStoresResponse.stores:type_name -> gocart.store.v1.Store
 	0,  // 2: gocart.store.v1.CreateStoreResponse.store:type_name -> gocart.store.v1.Store
 	0,  // 3: gocart.store.v1.UpdateStoreResponse.store:type_name -> gocart.store.v1.Store
-	1,  // 4: gocart.store.v1.StoreService.GetStore:input_type -> gocart.store.v1.GetStoreRequest
-	3,  // 5: gocart.store.v1.StoreService.ListStores:input_type -> gocart.store.v1.ListStoresRequest
-	5,  // 6: gocart.store.v1.StoreService.CreateStore:input_type -> gocart.store.v1.CreateStoreRequest
-	7,  // 7: gocart.store.v1.StoreService.UpdateStore:input_type -> gocart.store.v1.UpdateStoreRequest
-	9,  // 8: gocart.store.v1.StoreService.GetUploadUrl:input_type -> gocart.store.v1.GetUploadUrlRequest
-	2,  // 9: gocart.store.v1.StoreService.GetStore:output_type -> gocart.store.v1.GetStoreResponse
-	4,  // 10: gocart.store.v1.StoreService.ListStores:output_type -> gocart.store.v1.ListStoresResponse
-	6,  // 11: gocart.store.v1.StoreService.CreateStore:output_type -> gocart.store.v1.CreateStoreResponse
-	8,  // 12: gocart.store.v1.StoreService.UpdateStore:output_type -> gocart.store.v1.UpdateStoreResponse
-	10, // 13: gocart.store.v1.StoreService.GetUploadUrl:output_type -> gocart.store.v1.GetUploadUrlResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	0,  // 4: gocart.store.v1.SubmitStoreResponse.store:type_name -> gocart.store.v1.Store
+	0,  // 5: gocart.store.v1.ApproveStoreResponse.store:type_name -> gocart.store.v1.Store
+	0,  // 6: gocart.store.v1.RejectStoreResponse.store:type_name -> gocart.store.v1.Store
+	1,  // 7: gocart.store.v1.StoreService.GetStore:input_type -> gocart.store.v1.GetStoreRequest
+	3,  // 8: gocart.store.v1.StoreService.ListStores:input_type -> gocart.store.v1.ListStoresRequest
+	5,  // 9: gocart.store.v1.StoreService.CreateStore:input_type -> gocart.store.v1.CreateStoreRequest
+	7,  // 10: gocart.store.v1.StoreService.UpdateStore:input_type -> gocart.store.v1.UpdateStoreRequest
+	9,  // 11: gocart.store.v1.StoreService.GetUploadUrl:input_type -> gocart.store.v1.GetUploadUrlRequest
+	11, // 12: gocart.store.v1.StoreService.SubmitStore:input_type -> gocart.store.v1.SubmitStoreRequest
+	13, // 13: gocart.store.v1.StoreService.ApproveStore:input_type -> gocart.store.v1.ApproveStoreRequest
+	15, // 14: gocart.store.v1.StoreService.RejectStore:input_type -> gocart.store.v1.RejectStoreRequest
+	2,  // 15: gocart.store.v1.StoreService.GetStore:output_type -> gocart.store.v1.GetStoreResponse
+	4,  // 16: gocart.store.v1.StoreService.ListStores:output_type -> gocart.store.v1.ListStoresResponse
+	6,  // 17: gocart.store.v1.StoreService.CreateStore:output_type -> gocart.store.v1.CreateStoreResponse
+	8,  // 18: gocart.store.v1.StoreService.UpdateStore:output_type -> gocart.store.v1.UpdateStoreResponse
+	10, // 19: gocart.store.v1.StoreService.GetUploadUrl:output_type -> gocart.store.v1.GetUploadUrlResponse
+	12, // 20: gocart.store.v1.StoreService.SubmitStore:output_type -> gocart.store.v1.SubmitStoreResponse
+	14, // 21: gocart.store.v1.StoreService.ApproveStore:output_type -> gocart.store.v1.ApproveStoreResponse
+	16, // 22: gocart.store.v1.StoreService.RejectStore:output_type -> gocart.store.v1.RejectStoreResponse
+	15, // [15:23] is the sub-list for method output_type
+	7,  // [7:15] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_store_store_proto_init() }
@@ -968,6 +1335,7 @@ func file_contracts_protobuf_store_store_proto_init() {
 	if File_contracts_protobuf_store_store_proto != nil {
 		return
 	}
+	file_contracts_protobuf_store_store_proto_msgTypes[5].OneofWrappers = []any{}
 	file_contracts_protobuf_store_store_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -975,7 +1343,7 @@ func file_contracts_protobuf_store_store_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_store_store_proto_rawDesc), len(file_contracts_protobuf_store_store_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -12,6 +12,16 @@ func MapStore(s *storepb.Store) *model.Store {
 		return nil
 	}
 
+	var email *string
+	if s.BusinessEmail != "" {
+		email = &s.BusinessEmail
+	}
+
+	var phone *string
+	if s.BusinessPhone != "" {
+		phone = &s.BusinessPhone
+	}
+
 	var desc *string
 	if s.Description != "" {
 		desc = &s.Description
@@ -20,11 +30,6 @@ func MapStore(s *storepb.Store) *model.Store {
 	var logo *string
 	if s.LogoUrl != "" {
 		logo = &s.LogoUrl
-	}
-
-	var banner *string
-	if s.BannerUrl != "" {
-		banner = &s.BannerUrl
 	}
 
 	var addr *string
@@ -52,14 +57,14 @@ func MapStore(s *storepb.Store) *model.Store {
 		MerchantID:         s.MerchantId,
 		Name:               s.Name,
 		Slug:               s.Slug,
+		BusinessEmail:      email,
+		BusinessPhone:      phone,
 		Description:        desc,
 		LogoURL:            logo,
-		BannerURL:          banner,
 		Address:            addr,
+		IsVacationMode:     s.IsVacationMode,
 		ApprovalStatus:     s.ApprovalStatus,
-		PublishStatus:      s.PublishStatus,
 		RejectionReason:    rej,
-		KycStatus:          s.KycStatus,
 		BankAccount:        bankAccount,
 		BankAccountDetails: bankRaw,
 		AvgStoreRating:     s.AvgStoreRating,
@@ -80,4 +85,3 @@ func SerializeBankAccount(account *model.BankAccountInput, rawDetails *string) s
 	}
 	return ""
 }
-
