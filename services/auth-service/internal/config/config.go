@@ -96,7 +96,7 @@ func LoadEnv() *Config {
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
 		JWT: JWTConfig{
-			Secret:        GetEnv("JWT_SECRET", "super-secret-jwt-key"),
+			Secret:        GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
 			ExpiryMinutes: GetEnvAsInt("JWT_EXPIRY_MINUTES", 60),
 		},
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),

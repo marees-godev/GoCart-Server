@@ -5,7 +5,6 @@ import (
 
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
-	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/service"
@@ -21,32 +20,6 @@ type StoreGRPCHandler struct {
 func NewStoreGRPCHandler(storeService service.StoreService) *StoreGRPCHandler {
 	return &StoreGRPCHandler{
 		storeService: storeService,
-	}
-}
-
-func toGRPCError(err error) error {
-	if err == nil {
-		return nil
-	}
-	appErr := errors.AsAppError(err)
-	if appErr == nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-	switch appErr.Code {
-	case errors.CodeBadRequest:
-		return status.Error(codes.InvalidArgument, appErr.Message)
-	case errors.CodeUnauthorized:
-		return status.Error(codes.Unauthenticated, appErr.Message)
-	case errors.CodeForbidden:
-		return status.Error(codes.PermissionDenied, appErr.Message)
-	case errors.CodeNotFound:
-		return status.Error(codes.NotFound, appErr.Message)
-	case errors.CodeConflict:
-		return status.Error(codes.AlreadyExists, appErr.Message)
-	case errors.CodeUnprocessableEntity:
-		return status.Error(codes.FailedPrecondition, appErr.Message)
-	default:
-		return status.Error(codes.Internal, appErr.ClientMessage())
 	}
 }
 
@@ -75,16 +48,18 @@ func (h *StoreGRPCHandler) CreateStore(ctx context.Context, req *storepb.CreateS
 	createReq := dto.CreateStoreRequest{
 		MerchantID:         merchantID,
 		Name:               req.Name,
+		Slug:               req.Slug,
+		BusinessEmail:      req.BusinessEmail,
+		BusinessPhone:      req.BusinessPhone,
 		Description:        req.Description,
 		LogoURL:            req.LogoUrl,
-		BannerURL:          req.BannerUrl,
 		Address:            req.Address,
 		BankAccountDetails: bankDetails,
 	}
 
 	store, err := h.storeService.CreateStore(ctx, merchantID, createReq)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &storepb.CreateStoreResponse{
@@ -101,7 +76,7 @@ func (h *StoreGRPCHandler) GetStore(ctx context.Context, req *storepb.GetStoreRe
 
 	store, err := h.storeService.GetStore(ctx, merchantID, req.Id)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &storepb.GetStoreResponse{
@@ -120,7 +95,7 @@ func (h *StoreGRPCHandler) ListStores(ctx context.Context, req *storepb.ListStor
 
 	stores, total, err := h.storeService.ListStores(ctx, merchantID, limit, offset)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	pbStores := make([]*storepb.Store, 0, len(stores))
@@ -143,17 +118,19 @@ func (h *StoreGRPCHandler) UpdateStore(ctx context.Context, req *storepb.UpdateS
 
 	updateReq := dto.UpdateStoreRequest{
 		Name:               req.Name,
+		Slug:               req.Slug,
+		BusinessEmail:      req.BusinessEmail,
+		BusinessPhone:      req.BusinessPhone,
 		Description:        req.Description,
 		LogoURL:            req.LogoUrl,
-		BannerURL:          req.BannerUrl,
 		Address:            req.Address,
-		PublishStatus:      req.PublishStatus,
+		IsVacationMode:     req.IsVacationMode,
 		BankAccountDetails: req.BankAccountDetails,
 	}
 
 	store, err := h.storeService.UpdateStore(ctx, merchantID, req.Id, updateReq)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &storepb.UpdateStoreResponse{
@@ -177,7 +154,7 @@ func (h *StoreGRPCHandler) GetUploadUrl(ctx context.Context, req *storepb.GetUpl
 
 	res, err := h.storeService.GetUploadURL(ctx, merchantID, uploadReq)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &storepb.GetUploadUrlResponse{
@@ -185,5 +162,82 @@ func (h *StoreGRPCHandler) GetUploadUrl(ctx context.Context, req *storepb.GetUpl
 		PublicUrl:        res.PublicURL,
 		Key:              res.Key,
 		ExpiresInSeconds: res.ExpiresInSeconds,
+	}, nil
+}
+
+func extractAdminID(ctx context.Context, fallbackID string) string {
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil && user.UserID != "" {
+		return user.UserID
+	}
+	if uID := grpcclient.GetUserID(ctx); uID != "" {
+		return uID
+	}
+	return fallbackID
+}
+
+func (h *StoreGRPCHandler) SubmitStore(ctx context.Context, req *storepb.SubmitStoreRequest) (*storepb.SubmitStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	submitReq := dto.SubmitStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: merchantID,
+	}
+
+	store, err := h.storeService.SubmitStore(ctx, merchantID, submitReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.SubmitStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) ApproveStore(ctx context.Context, req *storepb.ApproveStoreRequest) (*storepb.ApproveStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	approveReq := dto.ApproveStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+	}
+
+	store, err := h.storeService.ApproveStore(ctx, adminID, approveReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.ApproveStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) RejectStore(ctx context.Context, req *storepb.RejectStoreRequest) (*storepb.RejectStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	rejectReq := dto.RejectStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+		Reason:  req.RejectionReason,
+	}
+
+	store, err := h.storeService.RejectStore(ctx, adminID, rejectReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.RejectStoreResponse{
+		Store: dto.ToStorePB(store),
 	}, nil
 }

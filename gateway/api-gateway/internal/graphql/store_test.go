@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	gwResolvers "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -35,13 +37,13 @@ func (m *mockStoreClient) CreateStore(ctx context.Context, in *storepb.CreateSto
 		MerchantId:     in.MerchantId,
 		Name:           in.Name,
 		Slug:           "happy-shop",
+		BusinessEmail:  in.BusinessEmail,
+		BusinessPhone:  in.BusinessPhone,
 		Description:    in.Description,
 		LogoUrl:        in.LogoUrl,
-		BannerUrl:      in.BannerUrl,
 		Address:        in.Address,
+		IsVacationMode: false,
 		ApprovalStatus: "PENDING",
-		PublishStatus:  false,
-		KycStatus:      "PENDING",
 		AvgStoreRating: 0.0,
 		CreatedAt:      "2026-09-21T12:00:00Z",
 		UpdatedAt:      "2026-09-21T12:00:00Z",
@@ -68,8 +70,7 @@ func (m *mockStoreClient) GetStore(ctx context.Context, in *storepb.GetStoreRequ
 			Name:           "Happy Shop",
 			Slug:           "happy-shop",
 			ApprovalStatus: "APPROVED",
-			PublishStatus:  true,
-			KycStatus:      "VERIFIED",
+			IsVacationMode: false,
 			CreatedAt:      "2026-09-21T12:00:00Z",
 			UpdatedAt:      "2026-09-21T12:00:00Z",
 		},
@@ -92,14 +93,17 @@ func (m *mockStoreClient) UpdateStore(ctx context.Context, in *storepb.UpdateSto
 	if in.Name != nil {
 		name = *in.Name
 	}
+	vacation := false
+	if in.IsVacationMode != nil {
+		vacation = *in.IsVacationMode
+	}
 	s := &storepb.Store{
 		Id:             in.Id,
 		MerchantId:     in.MerchantId,
 		Name:           name,
 		Slug:           "happy-shop-updated",
 		ApprovalStatus: "APPROVED",
-		PublishStatus:  true,
-		KycStatus:      "VERIFIED",
+		IsVacationMode: vacation,
 		CreatedAt:      "2026-09-21T12:00:00Z",
 		UpdatedAt:      "2026-09-21T12:00:00Z",
 	}
@@ -113,6 +117,34 @@ func (m *mockStoreClient) GetUploadUrl(ctx context.Context, in *storepb.GetUploa
 		Key:              "logos/test.png",
 		ExpiresInSeconds: 900,
 	}, nil
+}
+
+func (m *mockStoreClient) SubmitStore(ctx context.Context, in *storepb.SubmitStoreRequest, opts ...grpc.CallOption) (*storepb.SubmitStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	s.ApprovalStatus = "PENDING_APPROVAL"
+	return &storepb.SubmitStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) ApproveStore(ctx context.Context, in *storepb.ApproveStoreRequest, opts ...grpc.CallOption) (*storepb.ApproveStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	s.ApprovalStatus = "APPROVED"
+	return &storepb.ApproveStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) RejectStore(ctx context.Context, in *storepb.RejectStoreRequest, opts ...grpc.CallOption) (*storepb.RejectStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	s.ApprovalStatus = "REJECTED"
+	s.RejectionReason = in.RejectionReason
+	return &storepb.RejectStoreResponse{Store: s}, nil
 }
 
 func setupStoreTestApp(t *testing.T) (*fiber.App, string) {
@@ -206,11 +238,11 @@ func TestStoreGraphQL_UpdateStore(t *testing.T) {
 			updateStore(input: {
 				id: "store-1"
 				name: "Happy Shop Updated"
-				publishStatus: true
+				isVacationMode: true
 			}) {
 				id
 				name
-				publishStatus
+				isVacationMode
 			}
 		}
 	`
@@ -366,3 +398,209 @@ func TestStoreGraphQL_GenerateUploadURL(t *testing.T) {
 		t.Errorf("invalid payload: %+v", payload)
 	}
 }
+
+func TestStoreGraphQL_SubmitStore(t *testing.T) {
+	app, token := setupStoreTestApp(t)
+
+	// Create store first
+	createQuery := `
+		mutation {
+			createStore(input: {
+				name: "Happy Shop"
+			}) {
+				id
+				approvalStatus
+			}
+		}
+	`
+	reqBody, _ := json.Marshal(map[string]interface{}{"query": createQuery})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	_, _ = app.Test(req)
+
+	// Submit store for approval
+	submitQuery := `
+		mutation {
+			submitStore(id: "store-1") {
+				id
+				approvalStatus
+			}
+		}
+	`
+	reqBody, _ = json.Marshal(map[string]interface{}{"query": submitQuery})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["submitStore"] == nil {
+		t.Fatalf("expected submitStore data, got: %+v", res)
+	}
+
+	submitted := data["submitStore"].(map[string]interface{})
+	if submitted["approvalStatus"] != "PENDING_APPROVAL" {
+		t.Errorf("expected PENDING_APPROVAL, got %v", submitted["approvalStatus"])
+	}
+}
+
+func TestStoreGraphQL_ApproveStore(t *testing.T) {
+	app, _ := setupStoreTestApp(t)
+
+	adminToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	}, "test-secret-key-12345", 3600*1000000000)
+
+	merchantToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "merchant-1",
+		Role:   "MERCHANT",
+	}, "test-secret-key-12345", 3600*1000000000)
+
+	// Create store
+	createQuery := `mutation { createStore(input: { name: "Happy Shop" }) { id } }`
+	reqBody, _ := json.Marshal(map[string]interface{}{"query": createQuery})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+merchantToken)
+	_, _ = app.Test(req)
+
+	// Approve store with Admin token
+	approveQuery := `
+		mutation {
+			approveStore(id: "store-1") {
+				id
+				approvalStatus
+			}
+		}
+	`
+	reqBody, _ = json.Marshal(map[string]interface{}{"query": approveQuery})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["approveStore"] == nil {
+		t.Fatalf("expected approveStore data, got: %+v", res)
+	}
+
+	approved := data["approveStore"].(map[string]interface{})
+	if approved["approvalStatus"] != "APPROVED" {
+		t.Errorf("expected APPROVED, got %v", approved["approvalStatus"])
+	}
+}
+
+func TestStoreGraphQL_RejectStore(t *testing.T) {
+	app, _ := setupStoreTestApp(t)
+
+	adminToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	}, "test-secret-key-12345", 3600*1000000000)
+
+	merchantToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "merchant-1",
+		Role:   "MERCHANT",
+	}, "test-secret-key-12345", 3600*1000000000)
+
+	// Create store
+	createQuery := `mutation { createStore(input: { name: "Happy Shop" }) { id } }`
+	reqBody, _ := json.Marshal(map[string]interface{}{"query": createQuery})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+merchantToken)
+	_, _ = app.Test(req)
+
+	// Reject store with Admin token
+	rejectQuery := `
+		mutation {
+			rejectStore(id: "store-1", reason: "Invalid bank account details") {
+				id
+				approvalStatus
+				rejectionReason
+			}
+		}
+	`
+	reqBody, _ = json.Marshal(map[string]interface{}{"query": rejectQuery})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["rejectStore"] == nil {
+		t.Fatalf("expected rejectStore data, got: %+v", res)
+	}
+
+	rejected := data["rejectStore"].(map[string]interface{})
+	if rejected["approvalStatus"] != "REJECTED" {
+		t.Errorf("expected REJECTED, got %v", rejected["approvalStatus"])
+	}
+	if rejected["rejectionReason"] != "Invalid bank account details" {
+		t.Errorf("expected rejection reason to match, got %v", rejected["rejectionReason"])
+	}
+}
+
+func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
+	app, token := setupStoreTestApp(t)
+
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	operations := `{"query":"mutation($input: CreateStoreInput!) { createStore(input: $input) { id name logoUrl } }","variables":{"input":{"name":"Multipart Store","logo":null}}}`
+	_ = w.WriteField("operations", operations)
+	_ = w.WriteField("map", `{"0":["variables.input.logo"]}`)
+
+	part, _ := w.CreateFormFile("0", "logo.png")
+	_, _ = part.Write([]byte("fake-png-binary-content"))
+	_ = w.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/graphql", &b)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["createStore"] == nil {
+		t.Fatalf("expected createStore data, got: %+v", res)
+	}
+
+	store := data["createStore"].(map[string]interface{})
+	if store["name"] != "Multipart Store" {
+		t.Errorf("expected Multipart Store, got %v", store["name"])
+	}
+}
+

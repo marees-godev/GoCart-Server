@@ -16,6 +16,12 @@ type contextKey string
 
 const userContextKey contextKey = "auth_user_context"
 
+const (
+	RoleCustomer = "CUSTOMER"
+	RoleMerchant = "MERCHANT"
+	RoleAdmin    = "ADMIN"
+)
+
 type UserContext struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"`

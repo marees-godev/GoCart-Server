@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
@@ -104,8 +105,22 @@ func main() {
 	storeService := service.NewStoreService(storeRepo, s3Client)
 	storeGRPCHandler := handler.NewStoreGRPCHandler(storeService)
 
-	// 6. Setup gRPC Server
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
+	// 6. Setup gRPC Server with role-based auth interceptor
+	storeMethodRoles := map[string][]string{
+		"/gocart.store.v1.StoreService/CreateStore":  {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/UpdateStore":  {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/SubmitStore":  {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/GetUploadUrl": {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/ApproveStore": {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/RejectStore":  {auth.RoleAdmin},
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+			grpcclient.UnaryRoleAuthInterceptor(storeMethodRoles),
+		),
+	)
 	storepb.RegisterStoreServiceServer(grpcServer, storeGRPCHandler)
 	reflection.Register(grpcServer)
 

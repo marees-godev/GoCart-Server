@@ -32,14 +32,25 @@ func (r *mutationResolver) CreateStore(ctx context.Context, input model.CreateSt
 		desc = *input.Description
 	}
 
-	logo := ""
-	if input.LogoURL != nil {
-		logo = *input.LogoURL
+	email := ""
+	if input.BusinessEmail != nil {
+		email = *input.BusinessEmail
 	}
 
-	banner := ""
-	if input.BannerURL != nil {
-		banner = *input.BannerURL
+	phone := ""
+	if input.BusinessPhone != nil {
+		phone = *input.BusinessPhone
+	}
+
+	logo := ""
+	if input.Logo != nil {
+		processed, err := processUpload(input.Logo)
+		if err != nil {
+			return nil, appErrors.BadRequest("failed to process logo file upload")
+		}
+		logo = processed
+	} else if input.LogoURL != nil {
+		logo = *input.LogoURL
 	}
 
 	addr := ""
@@ -52,9 +63,11 @@ func (r *mutationResolver) CreateStore(ctx context.Context, input model.CreateSt
 	res, err := r.Clients.StoreClient.CreateStore(ctx, &storepb.CreateStoreRequest{
 		MerchantId:         merchantID,
 		Name:               input.Name,
+		Slug:               input.Slug,
+		BusinessEmail:      email,
+		BusinessPhone:      phone,
 		Description:        desc,
 		LogoUrl:            logo,
-		BannerUrl:          banner,
 		Address:            addr,
 		BankAccountDetails: bank,
 	})
@@ -82,6 +95,17 @@ func (r *mutationResolver) UpdateStore(ctx context.Context, input model.UpdateSt
 		targetID = *input.ID
 	}
 
+	var logoURL *string
+	if input.Logo != nil {
+		processed, err := processUpload(input.Logo)
+		if err != nil {
+			return nil, appErrors.BadRequest("failed to process logo file upload")
+		}
+		logoURL = &processed
+	} else if input.LogoURL != nil {
+		logoURL = input.LogoURL
+	}
+
 	var bankDetails *string
 	if input.BankAccount != nil || input.BankAccountDetails != nil {
 		serialized := maps.SerializeBankAccount(input.BankAccount, input.BankAccountDetails)
@@ -92,11 +116,13 @@ func (r *mutationResolver) UpdateStore(ctx context.Context, input model.UpdateSt
 		Id:                 targetID,
 		MerchantId:         merchantID,
 		Name:               input.Name,
+		Slug:               input.Slug,
+		BusinessEmail:      input.BusinessEmail,
+		BusinessPhone:      input.BusinessPhone,
 		Description:        input.Description,
-		LogoUrl:            input.LogoURL,
-		BannerUrl:          input.BannerURL,
+		LogoUrl:            logoURL,
 		Address:            input.Address,
-		PublishStatus:      input.PublishStatus,
+		IsVacationMode:     input.IsVacationMode,
 		BankAccountDetails: bankDetails,
 	})
 	if err != nil {
@@ -139,6 +165,85 @@ func (r *mutationResolver) GenerateStoreUploadURL(ctx context.Context, input mod
 		Key:              res.Key,
 		ExpiresInSeconds: int(res.ExpiresInSeconds),
 	}, nil
+}
+
+// SubmitStore is the resolver for the submitStore field.
+func (r *mutationResolver) SubmitStore(ctx context.Context, id string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.SubmitStore(ctx, &storepb.SubmitStoreRequest{
+		StoreId:    id,
+		MerchantId: merchantID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// ApproveStore is the resolver for the approveStore field.
+func (r *mutationResolver) ApproveStore(ctx context.Context, id string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	adminID := ""
+	if userCtx != nil {
+		adminID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.ApproveStore(ctx, &storepb.ApproveStoreRequest{
+		StoreId: id,
+		AdminId: adminID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// RejectStore is the resolver for the rejectStore field.
+func (r *mutationResolver) RejectStore(ctx context.Context, id string, reason string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	adminID := ""
+	if userCtx != nil {
+		adminID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.RejectStore(ctx, &storepb.RejectStoreRequest{
+		StoreId:         id,
+		AdminId:         adminID,
+		RejectionReason: reason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
 }
 
 // Store is the resolver for the store field.

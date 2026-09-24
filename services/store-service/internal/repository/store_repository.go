@@ -21,6 +21,7 @@ type StoreRepository interface {
 	GetBySlug(ctx context.Context, slug string) (*model.Store, error)
 	List(ctx context.Context, merchantID string, limit, offset int) ([]*model.Store, int, error)
 	Update(ctx context.Context, store *model.Store) error
+	UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error)
 	IsSlugAvailable(ctx context.Context, slug string, excludeID string) (bool, error)
 }
 
@@ -32,45 +33,11 @@ func NewStoreRepository(pool *pgxpool.Pool) StoreRepository {
 	return &pgStoreRepository{pool: pool}
 }
 
-func formatJSONB(val string) any {
-	trimmed := strings.TrimSpace(val)
-	if trimmed == "" {
-		return nil
-	}
-	if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
-		(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
-		return trimmed
-	}
-	encoded, err := json.Marshal(trimmed)
-	if err != nil {
-		return trimmed
-	}
-	return string(encoded)
-}
-
-func parseJSONB(raw any) string {
-	if raw == nil {
-		return ""
-	}
-	switch v := raw.(type) {
-	case string:
-		var unquoted string
-		if err := json.Unmarshal([]byte(v), &unquoted); err == nil {
-			return unquoted
-		}
-		return v
-	case []byte:
-		var unquoted string
-		if err := json.Unmarshal(v, &unquoted); err == nil {
-			return unquoted
-		}
-		return string(v)
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
 func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
+	if s.ApprovalStatus == "" {
+		s.ApprovalStatus = model.StoreStatusDraft
+	}
+
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to start transaction")
@@ -79,34 +46,29 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 
 	query := `
 		INSERT INTO stores (
-			merchant_id, name, slug, description, logo_url, banner_url, address,
-			approval_status, publish_status, rejection_reason, kyc_status,
+			merchant_id, name, slug, business_email, business_phone, description,
+			logo_url, address, is_vacation_mode, approval_status, rejection_reason,
 			avg_store_rating, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7::jsonb,
-			$8, $9, $10, $11,
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10, $11,
 			$12, NOW(), NOW()
 		)
 		RETURNING id, created_at, updated_at
 	`
 
-	var addressParam any
-	if s.Address != "" {
-		addressParam = formatJSONB(s.Address)
-	}
-
 	err = tx.QueryRow(ctx, query,
 		s.MerchantID,
 		s.Name,
 		s.Slug,
+		s.BusinessEmail,
+		s.BusinessPhone,
 		s.Description,
 		s.LogoURL,
-		s.BannerURL,
-		addressParam,
+		s.Address,
+		s.IsVacationMode,
 		s.ApprovalStatus,
-		s.PublishStatus,
 		s.RejectionReason,
-		s.KYCStatus,
 		s.AvgStoreRating,
 	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
 
@@ -127,16 +89,12 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 	}
 
 	if ba != nil && (ba.AccountNumber != "" || ba.BankName != "") {
-		accType := ba.AccountType
-		if accType == "" {
-			accType = "CURRENT"
-		}
 		bankQuery := `
 			INSERT INTO store_bank_accounts (
 				store_id, account_holder_name, account_number, routing_number,
-				bank_name, account_type, branch_code, is_primary, created_at, updated_at
+				bank_name, tax_id, created_at, updated_at
 			) VALUES (
-				$1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+				$1, $2, $3, $4, $5, $6, NOW(), NOW()
 			)
 			RETURNING id, created_at, updated_at
 		`
@@ -146,16 +104,12 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 			ba.AccountNumber,
 			ba.RoutingNumber,
 			ba.BankName,
-			accType,
-			ba.BranchCode,
-			true,
+			ba.TaxID,
 		).Scan(&ba.ID, &ba.CreatedAt, &ba.UpdatedAt)
 		if err != nil {
 			return appErrors.Internal(err, "failed to insert store bank account")
 		}
 		ba.StoreID = s.ID
-		ba.AccountType = accType
-		ba.IsPrimary = true
 		s.BankAccount = ba
 	}
 
@@ -168,35 +122,18 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 
 const selectStoreWithBankSQL = `
 	SELECT
-		s.id, s.merchant_id, s.name, s.slug, s.description, s.logo_url, s.banner_url,
-		s.address, s.approval_status, s.publish_status, s.rejection_reason, s.kyc_status,
-		s.avg_store_rating, s.created_at, s.updated_at,
+		s.id, s.merchant_id, s.name, s.slug, s.business_email, s.business_phone,
+		s.description, s.logo_url, s.address, s.is_vacation_mode, s.approval_status,
+		s.rejection_reason, s.avg_store_rating, s.created_at, s.updated_at,
 		b.id, b.account_holder_name, b.account_number, b.routing_number,
-		b.bank_name, b.account_type, b.branch_code, b.is_primary, b.created_at, b.updated_at
+		b.bank_name, b.tax_id, b.created_at, b.updated_at
 	FROM stores s
-	LEFT JOIN store_bank_accounts b ON s.id = b.store_id AND b.is_primary = TRUE
+	LEFT JOIN store_bank_accounts b ON s.id = b.store_id
 `
-
-type scanStoreTarget struct {
-	store       *model.Store
-	rawAddress  any
-	bID         *string
-	bHolder     *string
-	bNumber     *string
-	bRouting    *string
-	bBank       *string
-	bType       *string
-	bBranch     *string
-	bPrimary    *bool
-	bCreatedAt  *time.Time
-	bUpdatedAt  *time.Time
-}
 
 func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 	var s model.Store
-	var rawAddress any
-	var bID, bHolder, bNumber, bRouting, bBank, bType, bBranch *string
-	var bPrimary *bool
+	var bID, bHolder, bNumber, bRouting, bBank, bTaxID *string
 	var bCreatedAt, bUpdatedAt *time.Time
 
 	err := row.Scan(
@@ -204,14 +141,14 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		&s.MerchantID,
 		&s.Name,
 		&s.Slug,
+		&s.BusinessEmail,
+		&s.BusinessPhone,
 		&s.Description,
 		&s.LogoURL,
-		&s.BannerURL,
-		&rawAddress,
+		&s.Address,
+		&s.IsVacationMode,
 		&s.ApprovalStatus,
-		&s.PublishStatus,
 		&s.RejectionReason,
-		&s.KYCStatus,
 		&s.AvgStoreRating,
 		&s.CreatedAt,
 		&s.UpdatedAt,
@@ -220,9 +157,7 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		&bNumber,
 		&bRouting,
 		&bBank,
-		&bType,
-		&bBranch,
-		&bPrimary,
+		&bTaxID,
 		&bCreatedAt,
 		&bUpdatedAt,
 	)
@@ -230,8 +165,6 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	s.Address = parseJSONB(rawAddress)
 
 	if bID != nil && *bID != "" {
 		holder := ""
@@ -246,14 +179,6 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		if bBank != nil {
 			bankName = *bBank
 		}
-		accType := "CURRENT"
-		if bType != nil && *bType != "" {
-			accType = *bType
-		}
-		isPrimary := true
-		if bPrimary != nil {
-			isPrimary = *bPrimary
-		}
 
 		ba := &model.StoreBankAccount{
 			ID:                *bID,
@@ -262,9 +187,7 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 			AccountNumber:     number,
 			RoutingNumber:     bRouting,
 			BankName:          bankName,
-			AccountType:       accType,
-			BranchCode:        bBranch,
-			IsPrimary:         isPrimary,
+			TaxID:             bTaxID,
 		}
 		if bCreatedAt != nil {
 			ba.CreatedAt = *bCreatedAt
@@ -374,9 +297,7 @@ func (r *pgStoreRepository) List(ctx context.Context, merchantID string, limit, 
 	stores := make([]*model.Store, 0)
 	for rows.Next() {
 		var s model.Store
-		var rawAddress any
-		var bID, bHolder, bNumber, bRouting, bBank, bType, bBranch *string
-		var bPrimary *bool
+		var bID, bHolder, bNumber, bRouting, bBank, bTaxID *string
 		var bCreatedAt, bUpdatedAt *time.Time
 
 		if err := rows.Scan(
@@ -384,14 +305,14 @@ func (r *pgStoreRepository) List(ctx context.Context, merchantID string, limit, 
 			&s.MerchantID,
 			&s.Name,
 			&s.Slug,
+			&s.BusinessEmail,
+			&s.BusinessPhone,
 			&s.Description,
 			&s.LogoURL,
-			&s.BannerURL,
-			&rawAddress,
+			&s.Address,
+			&s.IsVacationMode,
 			&s.ApprovalStatus,
-			&s.PublishStatus,
 			&s.RejectionReason,
-			&s.KYCStatus,
 			&s.AvgStoreRating,
 			&s.CreatedAt,
 			&s.UpdatedAt,
@@ -400,16 +321,13 @@ func (r *pgStoreRepository) List(ctx context.Context, merchantID string, limit, 
 			&bNumber,
 			&bRouting,
 			&bBank,
-			&bType,
-			&bBranch,
-			&bPrimary,
+			&bTaxID,
 			&bCreatedAt,
 			&bUpdatedAt,
 		); err != nil {
 			return nil, 0, appErrors.Internal(err, "failed to scan store row")
 		}
 
-		s.Address = parseJSONB(rawAddress)
 		if bID != nil && *bID != "" {
 			holder := ""
 			if bHolder != nil {
@@ -423,14 +341,6 @@ func (r *pgStoreRepository) List(ctx context.Context, merchantID string, limit, 
 			if bBank != nil {
 				bankName = *bBank
 			}
-			accType := "CURRENT"
-			if bType != nil && *bType != "" {
-				accType = *bType
-			}
-			isPrimary := true
-			if bPrimary != nil {
-				isPrimary = *bPrimary
-			}
 
 			ba := &model.StoreBankAccount{
 				ID:                *bID,
@@ -439,9 +349,7 @@ func (r *pgStoreRepository) List(ctx context.Context, merchantID string, limit, 
 				AccountNumber:     number,
 				RoutingNumber:     bRouting,
 				BankName:          bankName,
-				AccountType:       accType,
-				BranchCode:        bBranch,
-				IsPrimary:         isPrimary,
+				TaxID:             bTaxID,
 			}
 			if bCreatedAt != nil {
 				ba.CreatedAt = *bCreatedAt
@@ -474,36 +382,31 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 		SET
 			name = $1,
 			slug = $2,
-			description = $3,
-			logo_url = $4,
-			banner_url = $5,
-			address = $6::jsonb,
-			approval_status = $7,
-			publish_status = $8,
-			rejection_reason = $9,
-			kyc_status = $10,
+			business_email = $3,
+			business_phone = $4,
+			description = $5,
+			logo_url = $6,
+			address = $7,
+			is_vacation_mode = $8,
+			approval_status = $9,
+			rejection_reason = $10,
 			avg_store_rating = $11,
 			updated_at = NOW()
 		WHERE id = $12
 		RETURNING updated_at
 	`
 
-	var addressParam any
-	if s.Address != "" {
-		addressParam = formatJSONB(s.Address)
-	}
-
 	err = tx.QueryRow(ctx, query,
 		s.Name,
 		s.Slug,
+		s.BusinessEmail,
+		s.BusinessPhone,
 		s.Description,
 		s.LogoURL,
-		s.BannerURL,
-		addressParam,
+		s.Address,
+		s.IsVacationMode,
 		s.ApprovalStatus,
-		s.PublishStatus,
 		s.RejectionReason,
-		s.KYCStatus,
 		s.AvgStoreRating,
 		s.ID,
 	).Scan(&s.UpdatedAt)
@@ -528,32 +431,10 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 	}
 
 	if ba != nil && (ba.AccountNumber != "" || ba.BankName != "") {
-		accType := ba.AccountType
-		if accType == "" {
-			accType = "CURRENT"
-		}
-		// Upsert primary bank account for this store
-		upsertBankSQL := `
-			INSERT INTO store_bank_accounts (
-				store_id, account_holder_name, account_number, routing_number,
-				bank_name, account_type, branch_code, is_primary, created_at, updated_at
-			) VALUES (
-				$1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
-			)
-			ON CONFLICT (id) DO UPDATE SET
-				account_holder_name = EXCLUDED.account_holder_name,
-				account_number = EXCLUDED.account_number,
-				routing_number = EXCLUDED.routing_number,
-				bank_name = EXCLUDED.bank_name,
-				account_type = EXCLUDED.account_type,
-				branch_code = EXCLUDED.branch_code,
-				updated_at = NOW()
-			RETURNING id, created_at, updated_at
-		`
-		// If existing bank account doesn't have ID, check if primary exists
+		// If existing bank account doesn't have ID, check if exists
 		if ba.ID == "" {
 			var existingID string
-			_ = tx.QueryRow(ctx, "SELECT id FROM store_bank_accounts WHERE store_id = $1 AND is_primary = TRUE LIMIT 1", s.ID).Scan(&existingID)
+			_ = tx.QueryRow(ctx, "SELECT id FROM store_bank_accounts WHERE store_id = $1 LIMIT 1", s.ID).Scan(&existingID)
 			if existingID != "" {
 				ba.ID = existingID
 			}
@@ -567,10 +448,9 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 					account_number = $2,
 					routing_number = $3,
 					bank_name = $4,
-					account_type = $5,
-					branch_code = $6,
+					tax_id = $5,
 					updated_at = NOW()
-				WHERE id = $7 AND store_id = $8
+				WHERE id = $6 AND store_id = $7
 				RETURNING updated_at
 			`
 			err = tx.QueryRow(ctx, updateBankSQL,
@@ -578,21 +458,27 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 				ba.AccountNumber,
 				ba.RoutingNumber,
 				ba.BankName,
-				accType,
-				ba.BranchCode,
+				ba.TaxID,
 				ba.ID,
 				s.ID,
 			).Scan(&ba.UpdatedAt)
 		} else {
-			err = tx.QueryRow(ctx, bankQueryWithoutConflict(upsertBankSQL),
+			insertBankSQL := `
+				INSERT INTO store_bank_accounts (
+					store_id, account_holder_name, account_number, routing_number,
+					bank_name, tax_id, created_at, updated_at
+				) VALUES (
+					$1, $2, $3, $4, $5, $6, NOW(), NOW()
+				)
+				RETURNING id, created_at, updated_at
+			`
+			err = tx.QueryRow(ctx, insertBankSQL,
 				s.ID,
 				ba.AccountHolderName,
 				ba.AccountNumber,
 				ba.RoutingNumber,
 				ba.BankName,
-				accType,
-				ba.BranchCode,
-				true,
+				ba.TaxID,
 			).Scan(&ba.ID, &ba.CreatedAt, &ba.UpdatedAt)
 		}
 
@@ -636,4 +522,42 @@ func (r *pgStoreRepository) IsSlugAvailable(ctx context.Context, slug string, ex
 	}
 
 	return count == 0, nil
+}
+
+func (r *pgStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to start transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var currentStatus string
+	checkQuery := `SELECT approval_status FROM stores WHERE id = $1 FOR UPDATE`
+	err = tx.QueryRow(ctx, checkQuery, id).Scan(&currentStatus)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("store not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query store status")
+	}
+
+	if currentStatus != expectedStatus {
+		return nil, appErrors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot transition to %s (expected %s)", currentStatus, newStatus, expectedStatus))
+	}
+
+	updateQuery := `
+		UPDATE stores
+		SET approval_status = $1, rejection_reason = $2, updated_at = NOW()
+		WHERE id = $3
+	`
+	_, err = tx.Exec(ctx, updateQuery, newStatus, rejectionReason, id)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to update store status")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, appErrors.Internal(err, "failed to commit status update transaction")
+	}
+
+	return r.GetByID(ctx, id)
 }

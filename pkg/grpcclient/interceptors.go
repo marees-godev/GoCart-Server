@@ -12,6 +12,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -285,3 +286,32 @@ func GetUserRole(ctx context.Context) string {
 func GetUserContext(ctx context.Context) (*auth.UserContext, bool) {
 	return auth.UserFromContext(ctx)
 }
+
+// UnaryRoleAuthInterceptor enforces required roles per gRPC method.
+func UnaryRoleAuthInterceptor(methodRoles map[string][]string) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		requiredRoles, protected := methodRoles[info.FullMethod]
+		if !protected || len(requiredRoles) == 0 {
+			return handler(ctx, req)
+		}
+
+		userRole := strings.ToUpper(strings.TrimSpace(GetUserRole(ctx)))
+		if userRole == "" {
+			return nil, status.Error(codes.Unauthenticated, "authentication required: missing user role in request context")
+		}
+
+		for _, allowed := range requiredRoles {
+			if userRole == strings.ToUpper(strings.TrimSpace(allowed)) {
+				return handler(ctx, req)
+			}
+		}
+
+		return nil, status.Error(codes.PermissionDenied, "insufficient permissions for this gRPC operation")
+	}
+}
+

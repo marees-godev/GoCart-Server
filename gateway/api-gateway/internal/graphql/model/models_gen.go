@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/99designs/gqlgen/graphql"
 )
 
 type AddRatingInput struct {
@@ -52,20 +54,18 @@ type AuthPayload struct {
 
 type BankAccount struct {
 	AccountHolderName *string `json:"accountHolderName,omitempty"`
+	BankName          *string `json:"bankName,omitempty"`
 	AccountNumber     *string `json:"accountNumber,omitempty"`
 	RoutingNumber     *string `json:"routingNumber,omitempty"`
-	BankName          *string `json:"bankName,omitempty"`
-	AccountType       *string `json:"accountType,omitempty"`
-	BranchCode        *string `json:"branchCode,omitempty"`
+	TaxID             *string `json:"taxId,omitempty"`
 }
 
 type BankAccountInput struct {
 	AccountHolderName string  `json:"accountHolderName"`
+	BankName          string  `json:"bankName"`
 	AccountNumber     string  `json:"accountNumber"`
 	RoutingNumber     *string `json:"routingNumber,omitempty"`
-	BankName          string  `json:"bankName"`
-	AccountType       *string `json:"accountType,omitempty"`
-	BranchCode        *string `json:"branchCode,omitempty"`
+	TaxID             *string `json:"taxId,omitempty"`
 }
 
 type Cart struct {
@@ -139,9 +139,12 @@ type CreateProductInput struct {
 
 type CreateStoreInput struct {
 	Name               string            `json:"name"`
+	Slug               *string           `json:"slug,omitempty"`
+	BusinessEmail      *string           `json:"businessEmail,omitempty"`
+	BusinessPhone      *string           `json:"businessPhone,omitempty"`
 	Description        *string           `json:"description,omitempty"`
+	Logo               *graphql.Upload   `json:"logo,omitempty"`
 	LogoURL            *string           `json:"logoUrl,omitempty"`
-	BannerURL          *string           `json:"bannerUrl,omitempty"`
 	Address            *string           `json:"address,omitempty"`
 	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
@@ -343,14 +346,14 @@ type Store struct {
 	MerchantID         string       `json:"merchantId"`
 	Name               string       `json:"name"`
 	Slug               string       `json:"slug"`
+	BusinessEmail      *string      `json:"businessEmail,omitempty"`
+	BusinessPhone      *string      `json:"businessPhone,omitempty"`
 	Description        *string      `json:"description,omitempty"`
 	LogoURL            *string      `json:"logoUrl,omitempty"`
-	BannerURL          *string      `json:"bannerUrl,omitempty"`
 	Address            *string      `json:"address,omitempty"`
+	IsVacationMode     bool         `json:"isVacationMode"`
 	ApprovalStatus     string       `json:"approvalStatus"`
-	PublishStatus      bool         `json:"publishStatus"`
 	RejectionReason    *string      `json:"rejectionReason,omitempty"`
-	KycStatus          string       `json:"kycStatus"`
 	BankAccount        *BankAccount `json:"bankAccount,omitempty"`
 	BankAccountDetails *string      `json:"bankAccountDetails,omitempty"`
 	AvgStoreRating     float64      `json:"avgStoreRating"`
@@ -402,11 +405,14 @@ type UpdateProductInput struct {
 type UpdateStoreInput struct {
 	ID                 *string           `json:"id,omitempty"`
 	Name               *string           `json:"name,omitempty"`
+	Slug               *string           `json:"slug,omitempty"`
+	BusinessEmail      *string           `json:"businessEmail,omitempty"`
+	BusinessPhone      *string           `json:"businessPhone,omitempty"`
 	Description        *string           `json:"description,omitempty"`
+	Logo               *graphql.Upload   `json:"logo,omitempty"`
 	LogoURL            *string           `json:"logoUrl,omitempty"`
-	BannerURL          *string           `json:"bannerUrl,omitempty"`
 	Address            *string           `json:"address,omitempty"`
-	PublishStatus      *bool             `json:"publishStatus,omitempty"`
+	IsVacationMode     *bool             `json:"isVacationMode,omitempty"`
 	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
 }

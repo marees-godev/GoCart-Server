@@ -24,6 +24,9 @@ const (
 	StoreService_CreateStore_FullMethodName  = "/gocart.store.v1.StoreService/CreateStore"
 	StoreService_UpdateStore_FullMethodName  = "/gocart.store.v1.StoreService/UpdateStore"
 	StoreService_GetUploadUrl_FullMethodName = "/gocart.store.v1.StoreService/GetUploadUrl"
+	StoreService_SubmitStore_FullMethodName  = "/gocart.store.v1.StoreService/SubmitStore"
+	StoreService_ApproveStore_FullMethodName = "/gocart.store.v1.StoreService/ApproveStore"
+	StoreService_RejectStore_FullMethodName  = "/gocart.store.v1.StoreService/RejectStore"
 )
 
 // StoreServiceClient is the client API for StoreService service.
@@ -35,6 +38,9 @@ type StoreServiceClient interface {
 	CreateStore(ctx context.Context, in *CreateStoreRequest, opts ...grpc.CallOption) (*CreateStoreResponse, error)
 	UpdateStore(ctx context.Context, in *UpdateStoreRequest, opts ...grpc.CallOption) (*UpdateStoreResponse, error)
 	GetUploadUrl(ctx context.Context, in *GetUploadUrlRequest, opts ...grpc.CallOption) (*GetUploadUrlResponse, error)
+	SubmitStore(ctx context.Context, in *SubmitStoreRequest, opts ...grpc.CallOption) (*SubmitStoreResponse, error)
+	ApproveStore(ctx context.Context, in *ApproveStoreRequest, opts ...grpc.CallOption) (*ApproveStoreResponse, error)
+	RejectStore(ctx context.Context, in *RejectStoreRequest, opts ...grpc.CallOption) (*RejectStoreResponse, error)
 }
 
 type storeServiceClient struct {
@@ -95,6 +101,36 @@ func (c *storeServiceClient) GetUploadUrl(ctx context.Context, in *GetUploadUrlR
 	return out, nil
 }
 
+func (c *storeServiceClient) SubmitStore(ctx context.Context, in *SubmitStoreRequest, opts ...grpc.CallOption) (*SubmitStoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitStoreResponse)
+	err := c.cc.Invoke(ctx, StoreService_SubmitStore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storeServiceClient) ApproveStore(ctx context.Context, in *ApproveStoreRequest, opts ...grpc.CallOption) (*ApproveStoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveStoreResponse)
+	err := c.cc.Invoke(ctx, StoreService_ApproveStore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storeServiceClient) RejectStore(ctx context.Context, in *RejectStoreRequest, opts ...grpc.CallOption) (*RejectStoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejectStoreResponse)
+	err := c.cc.Invoke(ctx, StoreService_RejectStore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StoreServiceServer is the server API for StoreService service.
 // All implementations must embed UnimplementedStoreServiceServer
 // for forward compatibility.
@@ -104,6 +140,9 @@ type StoreServiceServer interface {
 	CreateStore(context.Context, *CreateStoreRequest) (*CreateStoreResponse, error)
 	UpdateStore(context.Context, *UpdateStoreRequest) (*UpdateStoreResponse, error)
 	GetUploadUrl(context.Context, *GetUploadUrlRequest) (*GetUploadUrlResponse, error)
+	SubmitStore(context.Context, *SubmitStoreRequest) (*SubmitStoreResponse, error)
+	ApproveStore(context.Context, *ApproveStoreRequest) (*ApproveStoreResponse, error)
+	RejectStore(context.Context, *RejectStoreRequest) (*RejectStoreResponse, error)
 	mustEmbedUnimplementedStoreServiceServer()
 }
 
@@ -128,6 +167,15 @@ func (UnimplementedStoreServiceServer) UpdateStore(context.Context, *UpdateStore
 }
 func (UnimplementedStoreServiceServer) GetUploadUrl(context.Context, *GetUploadUrlRequest) (*GetUploadUrlResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUploadUrl not implemented")
+}
+func (UnimplementedStoreServiceServer) SubmitStore(context.Context, *SubmitStoreRequest) (*SubmitStoreResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitStore not implemented")
+}
+func (UnimplementedStoreServiceServer) ApproveStore(context.Context, *ApproveStoreRequest) (*ApproveStoreResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApproveStore not implemented")
+}
+func (UnimplementedStoreServiceServer) RejectStore(context.Context, *RejectStoreRequest) (*RejectStoreResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RejectStore not implemented")
 }
 func (UnimplementedStoreServiceServer) mustEmbedUnimplementedStoreServiceServer() {}
 func (UnimplementedStoreServiceServer) testEmbeddedByValue()                      {}
@@ -240,6 +288,60 @@ func _StoreService_GetUploadUrl_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StoreService_SubmitStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).SubmitStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StoreService_SubmitStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).SubmitStore(ctx, req.(*SubmitStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StoreService_ApproveStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).ApproveStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StoreService_ApproveStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).ApproveStore(ctx, req.(*ApproveStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StoreService_RejectStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StoreServiceServer).RejectStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StoreService_RejectStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StoreServiceServer).RejectStore(ctx, req.(*RejectStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StoreService_ServiceDesc is the grpc.ServiceDesc for StoreService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +368,18 @@ var StoreService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUploadUrl",
 			Handler:    _StoreService_GetUploadUrl_Handler,
+		},
+		{
+			MethodName: "SubmitStore",
+			Handler:    _StoreService_SubmitStore_Handler,
+		},
+		{
+			MethodName: "ApproveStore",
+			Handler:    _StoreService_ApproveStore_Handler,
+		},
+		{
+			MethodName: "RejectStore",
+			Handler:    _StoreService_RejectStore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
