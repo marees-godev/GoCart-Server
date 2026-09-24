@@ -94,12 +94,12 @@ func LoadEnv() *Config {
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
 		Storage: StorageConfig{
-			Endpoint:        GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3"),
-			Region:          GetEnv("S3_REGION", "ap-south-1"),
-			AccessKeyID:     GetEnv("S3_ACCESS_KEY_ID", ""),
-			SecretAccessKey: GetEnv("S3_SECRET_ACCESS_KEY", ""),
-			Bucket:          GetEnv("S3_BUCKET", "stores"),
-			PublicURLPrefix: GetEnv("S3_PUBLIC_URL_PREFIX", ""),
+			Endpoint:        GetEnv("STORE_S3_ENDPOINT", GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3")),
+			Region:          GetEnv("STORE_S3_REGION", GetEnv("S3_REGION", "ap-south-1")),
+			AccessKeyID:     GetEnv("STORE_S3_ACCESS_KEY_ID", GetEnv("S3_ACCESS_KEY_ID", "")),
+			SecretAccessKey: GetEnv("STORE_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
+			Bucket:          GetEnv("STORE_S3_BUCKET", GetEnv("S3_BUCKET", "stores")),
+			PublicURLPrefix: GetEnv("STORE_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
 		},
 	}
 }
