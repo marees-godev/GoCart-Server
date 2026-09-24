@@ -4,6 +4,8 @@ enum Role {
   CUSTOMER
 }
 
+scalar Upload
+
 directive @auth(requires: [Role!]) on FIELD_DEFINITION | OBJECT
 
 type Query {
@@ -14,3 +16,4 @@ type Query {
 type Mutation {
   _empty: String
 }
+

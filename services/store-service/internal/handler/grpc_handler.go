@@ -75,9 +75,11 @@ func (h *StoreGRPCHandler) CreateStore(ctx context.Context, req *storepb.CreateS
 	createReq := dto.CreateStoreRequest{
 		MerchantID:         merchantID,
 		Name:               req.Name,
+		Slug:               req.Slug,
+		BusinessEmail:      req.BusinessEmail,
+		BusinessPhone:      req.BusinessPhone,
 		Description:        req.Description,
 		LogoURL:            req.LogoUrl,
-		BannerURL:          req.BannerUrl,
 		Address:            req.Address,
 		BankAccountDetails: bankDetails,
 	}
@@ -143,11 +145,13 @@ func (h *StoreGRPCHandler) UpdateStore(ctx context.Context, req *storepb.UpdateS
 
 	updateReq := dto.UpdateStoreRequest{
 		Name:               req.Name,
+		Slug:               req.Slug,
+		BusinessEmail:      req.BusinessEmail,
+		BusinessPhone:      req.BusinessPhone,
 		Description:        req.Description,
 		LogoURL:            req.LogoUrl,
-		BannerURL:          req.BannerUrl,
 		Address:            req.Address,
-		PublishStatus:      req.PublishStatus,
+		IsVacationMode:     req.IsVacationMode,
 		BankAccountDetails: req.BankAccountDetails,
 	}
 
@@ -185,5 +189,82 @@ func (h *StoreGRPCHandler) GetUploadUrl(ctx context.Context, req *storepb.GetUpl
 		PublicUrl:        res.PublicURL,
 		Key:              res.Key,
 		ExpiresInSeconds: res.ExpiresInSeconds,
+	}, nil
+}
+
+func extractAdminID(ctx context.Context, fallbackID string) string {
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil && user.UserID != "" {
+		return user.UserID
+	}
+	if uID := grpcclient.GetUserID(ctx); uID != "" {
+		return uID
+	}
+	return fallbackID
+}
+
+func (h *StoreGRPCHandler) SubmitStore(ctx context.Context, req *storepb.SubmitStoreRequest) (*storepb.SubmitStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	submitReq := dto.SubmitStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: merchantID,
+	}
+
+	store, err := h.storeService.SubmitStore(ctx, merchantID, submitReq)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+
+	return &storepb.SubmitStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) ApproveStore(ctx context.Context, req *storepb.ApproveStoreRequest) (*storepb.ApproveStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	approveReq := dto.ApproveStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+	}
+
+	store, err := h.storeService.ApproveStore(ctx, adminID, approveReq)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+
+	return &storepb.ApproveStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) RejectStore(ctx context.Context, req *storepb.RejectStoreRequest) (*storepb.RejectStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	rejectReq := dto.RejectStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+		Reason:  req.RejectionReason,
+	}
+
+	store, err := h.storeService.RejectStore(ctx, adminID, rejectReq)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+
+	return &storepb.RejectStoreResponse{
+		Store: dto.ToStorePB(store),
 	}, nil
 }

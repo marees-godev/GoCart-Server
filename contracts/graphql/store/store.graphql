@@ -8,15 +8,17 @@ extend type Mutation {
   createStore(input: CreateStoreInput!): Store! @auth(requires: [MERCHANT])
   updateStore(input: UpdateStoreInput!): Store! @auth(requires: [MERCHANT])
   generateStoreUploadUrl(input: GenerateStoreUploadUrlInput!): StoreUploadUrlPayload! @auth(requires: [MERCHANT])
+  submitStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  approveStore(id: ID!): Store! @auth(requires: [ADMIN])
+  rejectStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
 }
 
 type BankAccount {
   accountHolderName: String
+  bankName: String
   accountNumber: String
   routingNumber: String
-  bankName: String
-  accountType: String
-  branchCode: String
+  taxId: String
 }
 
 type Store {
@@ -24,14 +26,14 @@ type Store {
   merchantId: ID!
   name: String!
   slug: String!
+  businessEmail: String
+  businessPhone: String
   description: String
   logoUrl: String
-  bannerUrl: String
   address: String
+  isVacationMode: Boolean!
   approvalStatus: String!
-  publishStatus: Boolean!
   rejectionReason: String
-  kycStatus: String!
   bankAccount: BankAccount
   bankAccountDetails: String
   avgStoreRating: Float!
@@ -53,11 +55,10 @@ type StoreUploadUrlPayload {
 
 input BankAccountInput {
   accountHolderName: String!
+  bankName: String!
   accountNumber: String!
   routingNumber: String
-  bankName: String!
-  accountType: String
-  branchCode: String
+  taxId: String
 }
 
 input GenerateStoreUploadUrlInput {
@@ -68,9 +69,12 @@ input GenerateStoreUploadUrlInput {
 
 input CreateStoreInput {
   name: String!
+  slug: String
+  businessEmail: String
+  businessPhone: String
   description: String
+  logo: Upload
   logoUrl: String
-  bannerUrl: String
   address: String
   bankAccount: BankAccountInput
   bankAccountDetails: String
@@ -79,11 +83,14 @@ input CreateStoreInput {
 input UpdateStoreInput {
   id: ID
   name: String
+  slug: String
+  businessEmail: String
+  businessPhone: String
   description: String
+  logo: Upload
   logoUrl: String
-  bannerUrl: String
   address: String
-  publishStatus: Boolean
+  isVacationMode: Boolean
   bankAccount: BankAccountInput
   bankAccountDetails: String
 }
