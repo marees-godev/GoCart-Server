@@ -55,3 +55,30 @@ func TranslateGRPCError(err error) error {
 		return appErrors.Internal(err, "downstream service error")
 	}
 }
+
+// ToGRPCError translates an AppError or standard error into a gRPC status error.
+func ToGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	switch appErr.Code {
+	case appErrors.CodeBadRequest:
+		return status.Error(codes.InvalidArgument, appErr.Message)
+	case appErrors.CodeUnauthorized:
+		return status.Error(codes.Unauthenticated, appErr.Message)
+	case appErrors.CodeForbidden:
+		return status.Error(codes.PermissionDenied, appErr.Message)
+	case appErrors.CodeNotFound:
+		return status.Error(codes.NotFound, appErr.Message)
+	case appErrors.CodeConflict:
+		return status.Error(codes.AlreadyExists, appErr.Message)
+	case appErrors.CodeUnprocessableEntity:
+		return status.Error(codes.FailedPrecondition, appErr.Message)
+	default:
+		return status.Error(codes.Internal, appErr.ClientMessage())
+	}
+}

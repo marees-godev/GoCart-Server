@@ -341,6 +341,17 @@ func (s *storeService) UpdateStore(ctx context.Context, authMerchantID, storeID 
 	return existingStore, nil
 }
 
+func resolveImageFolder(imageType string) string {
+	switch strings.ToLower(strings.TrimSpace(imageType)) {
+	case "banner", "banners":
+		return "banners"
+	case "logo", "logos":
+		return "logos"
+	default:
+		return "stores"
+	}
+}
+
 func (s *storeService) UploadImage(ctx context.Context, authMerchantID, imageType, filename string, data []byte, contentType string) (string, error) {
 	if _, err := resolveMerchantContext(ctx, authMerchantID); err != nil {
 		return "", err
@@ -350,7 +361,7 @@ func (s *storeService) UploadImage(ctx context.Context, authMerchantID, imageTyp
 		return "", errors.Internal(nil, "storage uploader is not configured")
 	}
 
-	folder := "logos"
+	folder := resolveImageFolder(imageType)
 	key := s.uploader.GenerateKey(folder, filename)
 	return s.uploader.UploadBytes(ctx, key, data, contentType)
 }
@@ -364,7 +375,7 @@ func (s *storeService) GetUploadURL(ctx context.Context, authMerchantID string, 
 		return nil, errors.Internal(nil, "storage uploader is not configured")
 	}
 
-	folder := "logos"
+	folder := resolveImageFolder(req.ImageType)
 	filename := strings.TrimSpace(req.Filename)
 	if filename == "" {
 		filename = "image.png"
@@ -482,4 +493,3 @@ func (s *storeService) RejectStore(ctx context.Context, authAdminID string, req 
 
 	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusRejected, &reason)
 }
-

@@ -6,11 +6,7 @@ package resolvers
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
-	"io"
 
-	"github.com/99designs/gqlgen/graphql"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -328,26 +324,4 @@ func (r *queryResolver) Stores(ctx context.Context, merchantID *string, limit *i
 		Stores: stores,
 		Total:  int(res.Total),
 	}, nil
-}
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func processUpload(upload *graphql.Upload) (string, error) {
-	if upload == nil || upload.File == nil {
-		return "", nil
-	}
-	data, err := io.ReadAll(upload.File)
-	if err != nil {
-		return "", err
-	}
-	contentType := upload.ContentType
-	if contentType == "" {
-		contentType = "image/png"
-	}
-	encoded := base64.StdEncoding.EncodeToString(data)
-	return fmt.Sprintf("data:%s;base64,%s", contentType, encoded), nil
 }
