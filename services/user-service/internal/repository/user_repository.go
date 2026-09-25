@@ -35,7 +35,8 @@ type UserRepository interface {
 	DeactivateUser(ctx context.Context, userID, performedBy string, reason *string) error
 	ReactivateUser(ctx context.Context, userID, performedBy string) error
 	DeleteUser(ctx context.Context, userID, performedBy string, reason *string) error
-	GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error)
+	DeleteExpiredDeactivatedUser(ctx context.Context, userID string, cutoff time.Time, performedBy string, reason *string) (bool, error)
+	GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time, limit int) ([]string, error)
 	GetUserAuditLogs(ctx context.Context, userID string) ([]*model.UserAuditLog, error)
 }
 
@@ -518,7 +519,101 @@ func (r *pgUserRepository) DeleteUser(ctx context.Context, userID, performedBy s
 	return nil
 }
 
-func (r *pgUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error) {
+func (r *pgUserRepository) DeleteExpiredDeactivatedUser(ctx context.Context, userID string, cutoff time.Time, performedBy string, reason *string) (bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin tx in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	anonymizedEmail := fmt.Sprintf("deleted_%s@deleted.local", userID)
+	anonymizeQuery := `
+		UPDATE users
+		SET email = $2,
+		    username = NULL,
+		    first_name = 'Deleted',
+		    last_name = 'User',
+		    phone = NULL,
+		    alternate_phone = NULL,
+		    date_of_birth = NULL,
+		    gender = NULL,
+		    bio = NULL,
+		    avatar_url = NULL,
+		    status = 'deleted'::user_status,
+		    deactivated_at = NULL,
+		    deleted_at = NOW(),
+		    updated_at = NOW()
+		WHERE id = $1
+		  AND status = 'deactivated'::user_status
+		  AND deactivated_at IS NOT NULL
+		  AND deactivated_at <= $3
+	`
+	cmdTag, err := tx.Exec(ctx, anonymizeQuery, userID, anonymizedEmail, cutoff)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in DeleteExpiredDeactivatedUser", "user_id", userID)
+			return false, appErrors.BadRequest("user_id is invalid")
+		}
+		slog.ErrorContext(ctx, "failed to anonymize user in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to anonymize user data")
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return false, nil
+	}
+
+	deleteAddressesQuery := `DELETE FROM user_addresses WHERE user_id = $1`
+	if _, err := tx.Exec(ctx, deleteAddressesQuery, userID); err != nil {
+		slog.ErrorContext(ctx, "failed to delete user addresses in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to delete user addresses")
+	}
+
+	auditPerformedBy := toAuditUUID(performedBy, userID)
+	auditQuery := `
+		INSERT INTO user_audit_logs (user_id, action, performed_by, reason, created_at)
+		VALUES ($1, 'DELETE'::user_audit_action, $2, $3, NOW())
+	`
+	if _, err := tx.Exec(ctx, auditQuery, userID, auditPerformedBy, reason); err != nil {
+		slog.ErrorContext(ctx, "failed to insert audit log in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to record audit log")
+	}
+
+	payloadBytes, err := json.Marshal(map[string]any{
+		"user_id":      userID,
+		"status":       "deleted",
+		"performed_by": performedBy,
+		"reason":       reason,
+		"deleted_at":   time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to marshal outbox payload in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to construct event payload")
+	}
+
+	outboxQuery := `
+		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+		VALUES ('user', $1, 'user.deleted', $2, 'user.events', 'PENDING', 0, NOW())
+	`
+	if _, err := tx.Exec(ctx, outboxQuery, userID, payloadBytes); err != nil {
+		slog.ErrorContext(ctx, "failed to insert outbox event in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to record outbox event")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit tx in DeleteExpiredDeactivatedUser", "user_id", userID, "error", err)
+		return false, appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	slog.InfoContext(ctx, "expired deactivated user deleted and anonymized successfully", "user_id", userID, "performed_by", performedBy)
+	return true, nil
+}
+
+func (r *pgUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
 	query := `
 		SELECT id
 		FROM users
@@ -526,10 +621,11 @@ func (r *pgUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cut
 		  AND deactivated_at IS NOT NULL
 		  AND deactivated_at <= $1
 		ORDER BY deactivated_at ASC
+		LIMIT $2
 	`
-	rows, err := r.pool.Query(ctx, query, cutoff)
+	rows, err := r.pool.Query(ctx, query, cutoff, limit)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to query expired deactivated users", "cutoff", cutoff, "error", err)
+		slog.ErrorContext(ctx, "failed to query expired deactivated users", "cutoff", cutoff, "limit", limit, "error", err)
 		return nil, appErrors.Internal(err, "failed to query expired deactivated users")
 	}
 	defer rows.Close()

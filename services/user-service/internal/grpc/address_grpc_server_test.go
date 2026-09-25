@@ -100,7 +100,11 @@ func (m *mockUserRepository) DeleteUser(ctx context.Context, userID, performedBy
 	return nil
 }
 
-func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error) {
+func (m *mockUserRepository) DeleteExpiredDeactivatedUser(ctx context.Context, userID string, cutoff time.Time, performedBy string, reason *string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time, limit int) ([]string, error) {
 	return nil, nil
 }
 

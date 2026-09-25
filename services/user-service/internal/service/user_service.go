@@ -361,27 +361,67 @@ func (s *userService) ReactivateUser(ctx context.Context, authUserID, targetUser
 	}, nil
 }
 
+const defaultRetentionBatchSize = 100
+
 func (s *userService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
 	if retentionPeriod <= 0 {
 		retentionPeriod = 30 * 24 * time.Hour
 	}
 	cutoff := time.Now().UTC().Add(-retentionPeriod)
-	userIDs, err := s.repo.GetExpiredDeactivatedUserIDs(ctx, cutoff)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to get expired deactivated users", "cutoff", cutoff, "error", err)
-		return 0, err
-	}
-
-	processedCount := 0
 	reason := "Automatic permanent deletion after 30 days of deactivation"
-	for _, id := range userIDs {
-		if err := s.repo.DeleteUser(ctx, id, "SYSTEM", &reason); err != nil {
-			slog.ErrorContext(ctx, "failed to automatically soft-delete expired deactivated user", "user_id", id, "error", err)
-			continue
+
+	totalProcessed := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return totalProcessed, ctx.Err()
+		default:
 		}
-		processedCount++
+
+		userIDs, err := s.repo.GetExpiredDeactivatedUserIDs(ctx, cutoff, defaultRetentionBatchSize)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to get expired deactivated users batch", "cutoff", cutoff, "error", err)
+			return totalProcessed, err
+		}
+
+		if len(userIDs) == 0 {
+			break
+		}
+
+		batchProcessed := 0
+		errorCount := 0
+		for _, id := range userIDs {
+			select {
+			case <-ctx.Done():
+				return totalProcessed, ctx.Err()
+			default:
+			}
+
+			deleted, err := s.repo.DeleteExpiredDeactivatedUser(ctx, id, cutoff, "SYSTEM", &reason)
+			if err != nil {
+				slog.ErrorContext(ctx, "failed to delete expired deactivated user", "user_id", id, "error", err)
+				errorCount++
+				continue
+			}
+			if deleted {
+				batchProcessed++
+			}
+		}
+
+		totalProcessed += batchProcessed
+
+		if errorCount == len(userIDs) {
+			slog.WarnContext(ctx, "all items in retention batch failed with errors, stopping loop", "batch_size", len(userIDs))
+			break
+		}
+
+		if len(userIDs) < defaultRetentionBatchSize {
+			break
+		}
 	}
 
-	slog.InfoContext(ctx, "processed expired deactivations", "count", processedCount, "total_found", len(userIDs))
-	return processedCount, nil
+	if totalProcessed > 0 {
+		slog.InfoContext(ctx, "processed expired deactivations", "total_processed", totalProcessed)
+	}
+	return totalProcessed, nil
 }

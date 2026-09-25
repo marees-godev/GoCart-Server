@@ -170,11 +170,48 @@ func (m *mockUserRepository) DeleteUser(ctx context.Context, userID, performedBy
 	return nil
 }
 
-func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time) ([]string, error) {
+func (m *mockUserRepository) DeleteExpiredDeactivatedUser(ctx context.Context, userID string, cutoff time.Time, performedBy string, reason *string) (bool, error) {
+	u, exists := m.users[userID]
+	if !exists {
+		return false, nil
+	}
+	if u.Status != "deactivated" || u.DeactivatedAt == nil || u.DeactivatedAt.After(cutoff) {
+		return false, nil
+	}
+	now := time.Now()
+	u.Email = "deleted_" + userID + "@deleted.local"
+	u.Username = nil
+	u.FirstName = "Deleted"
+	u.LastName = "User"
+	u.PhoneNumber = nil
+	u.AlternatePhone = nil
+	u.DateOfBirth = nil
+	u.Gender = nil
+	u.Bio = nil
+	u.AvatarURL = nil
+	u.Status = "deleted"
+	u.DeactivatedAt = nil
+	u.DeletedAt = &now
+	u.UpdatedAt = now
+	m.auditLogs = append(m.auditLogs, &model.UserAuditLog{
+		ID:          "audit-" + userID,
+		UserID:      userID,
+		Action:      "DELETE",
+		PerformedBy: performedBy,
+		Reason:      reason,
+		CreatedAt:   now,
+	})
+	return true, nil
+}
+
+func (m *mockUserRepository) GetExpiredDeactivatedUserIDs(ctx context.Context, cutoff time.Time, limit int) ([]string, error) {
 	var ids []string
 	for id, u := range m.users {
 		if u.Status == "deactivated" && u.DeactivatedAt != nil && !u.DeactivatedAt.After(cutoff) {
 			ids = append(ids, id)
+			if limit > 0 && len(ids) >= limit {
+				break
+			}
 		}
 	}
 	return ids, nil
@@ -906,5 +943,91 @@ func TestErrorFormatting_HttpStatuses(t *testing.T) {
 		t.Errorf("expected 401 Unauthorized, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
 	}
 }
+
+func TestProcessExpiredDeactivations_BatchAndCleanDeletion(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+	past := time.Now().Add(-35 * 24 * time.Hour)
+	recent := time.Now().Add(-5 * 24 * time.Hour)
+
+	repo.users["user-expired-1"] = &model.User{
+		ID:            "user-expired-1",
+		Email:         "u1@example.com",
+		Status:        "deactivated",
+		DeactivatedAt: &past,
+	}
+	repo.users["user-expired-2"] = &model.User{
+		ID:            "user-expired-2",
+		Email:         "u2@example.com",
+		Status:        "deactivated",
+		DeactivatedAt: &past,
+	}
+	repo.users["user-recent"] = &model.User{
+		ID:            "user-recent",
+		Email:         "u3@example.com",
+		Status:        "deactivated",
+		DeactivatedAt: &recent,
+	}
+
+	count, err := svc.ProcessExpiredDeactivations(context.Background(), 30*24*time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 processed users, got %d", count)
+	}
+
+	if repo.users["user-expired-1"].Status != "deleted" {
+		t.Errorf("expected user-expired-1 to be deleted, got %s", repo.users["user-expired-1"].Status)
+	}
+	if repo.users["user-expired-2"].Status != "deleted" {
+		t.Errorf("expected user-expired-2 to be deleted, got %s", repo.users["user-expired-2"].Status)
+	}
+	if repo.users["user-recent"].Status != "deactivated" {
+		t.Errorf("expected user-recent to remain deactivated, got %s", repo.users["user-recent"].Status)
+	}
+}
+
+func TestProcessExpiredDeactivations_ReactivationRacePrevented(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+	past := time.Now().Add(-35 * 24 * time.Hour)
+
+	// User was deactivated and expired
+	repo.users["user-reactivated"] = &model.User{
+		ID:            "user-reactivated",
+		Email:         "reactivated@example.com",
+		Status:        "deactivated",
+		DeactivatedAt: &past,
+	}
+
+	// We simulate the race: user changes to active
+	repo.users["user-reactivated"].Status = "active"
+	repo.users["user-reactivated"].DeactivatedAt = nil
+
+	// Now DeleteExpiredDeactivatedUser on that user should return false, 0 deleted
+	deleted, err := repo.DeleteExpiredDeactivatedUser(context.Background(), "user-reactivated", time.Now().Add(-30*24*time.Hour), "SYSTEM", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if deleted {
+		t.Fatalf("expected deleted to be false for reactivated user, got true")
+	}
+
+	// Verify user was NOT deleted
+	if repo.users["user-reactivated"].Status != "active" {
+		t.Errorf("expected user status to stay active, got %s", repo.users["user-reactivated"].Status)
+	}
+
+	// Also verify ProcessExpiredDeactivations does not delete or count reactivated users
+	count, err := svc.ProcessExpiredDeactivations(context.Background(), 30*24*time.Hour)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 processed users, got %d", count)
+	}
+}
+
 
 

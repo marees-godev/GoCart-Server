@@ -140,6 +140,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	cancel()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
 	grpcServer.GracefulStop()
