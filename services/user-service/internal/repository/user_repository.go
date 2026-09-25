@@ -41,11 +41,19 @@ type UserRepository interface {
 }
 
 type pgUserRepository struct {
-	pool *pgxpool.Pool
+	pool            *pgxpool.Pool
+	retentionPeriod time.Duration
 }
 
-func NewUserRepository(pool *pgxpool.Pool) UserRepository {
-	return &pgUserRepository{pool: pool}
+func NewUserRepository(pool *pgxpool.Pool, retentionPeriod ...time.Duration) UserRepository {
+	period := 30 * 24 * time.Hour
+	if len(retentionPeriod) > 0 && retentionPeriod[0] > 0 {
+		period = retentionPeriod[0]
+	}
+	return &pgUserRepository{
+		pool:            pool,
+		retentionPeriod: period,
+	}
 }
 
 func (r *pgUserRepository) CreateUser(ctx context.Context, user *model.User) error {
@@ -363,7 +371,11 @@ func (r *pgUserRepository) ReactivateUser(ctx context.Context, userID, performed
 		return appErrors.Forbidden(fmt.Sprintf("cannot reactivate account with status %s", currentStatus))
 	}
 
-	if deactivatedAt != nil && time.Since(*deactivatedAt) > 30*24*time.Hour {
+	gracePeriod := r.retentionPeriod
+	if gracePeriod <= 0 {
+		gracePeriod = 30 * 24 * time.Hour
+	}
+	if deactivatedAt != nil && time.Since(*deactivatedAt) > gracePeriod {
 		slog.WarnContext(ctx, "deactivation grace period expired in ReactivateUser; permanently soft-deleting account", "user_id", userID, "deactivated_at", *deactivatedAt)
 		_ = tx.Rollback(ctx)
 		reason := "30-day deactivation grace period expired"

@@ -10,6 +10,7 @@ import (
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // UpdateUser is the resolver for the updateUser field.
@@ -59,7 +60,7 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
 }
@@ -87,7 +88,7 @@ func (r *mutationResolver) DeactivateAccount(ctx context.Context, input *model.D
 
 	res, err := r.Clients.UserClient.DeactivateUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return &model.AccountActionResponse{
@@ -114,7 +115,7 @@ func (r *mutationResolver) ReactivateAccount(ctx context.Context) (*model.Accoun
 
 	res, err := r.Clients.UserClient.ReactivateUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return &model.AccountActionResponse{
@@ -147,7 +148,7 @@ func (r *mutationResolver) DeleteAccount(ctx context.Context, input *model.Delet
 
 	res, err := r.Clients.UserClient.DeleteUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return &model.AccountActionResponse{
@@ -200,7 +201,7 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 
 	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -233,7 +234,7 @@ func (r *mutationResolver) UpdateUserAddress(ctx context.Context, id string, inp
 
 	res, err := r.Clients.UserClient.UpdateUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -256,7 +257,7 @@ func (r *mutationResolver) DeleteUserAddress(ctx context.Context, id string) (bo
 
 	res, err := r.Clients.UserClient.DeleteUserAddress(ctx, req)
 	if err != nil {
-		return false, err
+		return false, grpcclient.TranslateGRPCError(err)
 	}
 	return res.Success, nil
 }
@@ -279,7 +280,7 @@ func (r *mutationResolver) SetDefaultUserAddress(ctx context.Context, id string)
 
 	res, err := r.Clients.UserClient.SetDefaultUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -297,7 +298,7 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 
 	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: userId})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
 }
@@ -313,7 +314,7 @@ func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error
 
 	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: id})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
 }
@@ -329,7 +330,7 @@ func (r *queryResolver) UserAddresses(ctx context.Context, userID string) ([]*mo
 
 	res, err := r.Clients.UserClient.ListUserAddresses(ctx, &userpb.ListUserAddressesRequest{UserId: userID})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddressList(res.Addresses), nil
 }
@@ -353,7 +354,7 @@ func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Addr
 		AddressId: id,
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }

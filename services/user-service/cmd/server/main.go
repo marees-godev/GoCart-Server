@@ -88,12 +88,12 @@ func main() {
 	}
 
 	// 5. Initialize domain layers and gRPC Server
-	userRepo := repository.NewUserRepository(db.Pool)
+	userRepo := repository.NewUserRepository(db.Pool, cfg.Retention.Period)
 	userService := service.NewUserService(userRepo)
 	addressRepo := repository.NewAddressRepository(db.Pool)
 	addressService := service.NewAddressService(addressRepo, userRepo)
 
-	retentionWorker := worker.NewRetentionWorker(userService, 1*time.Hour, 30*24*time.Hour)
+	retentionWorker := worker.NewRetentionWorker(userService, cfg.Retention.Interval, cfg.Retention.Period)
 	retentionWorker.Start(ctx)
 
 	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService)

@@ -1029,5 +1029,143 @@ func TestProcessExpiredDeactivations_ReactivationRacePrevented(t *testing.T) {
 	}
 }
 
+func TestPolicy_DeactivateAccount_AllowsReactivationWithin30Days(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-grace-period",
+		Email:     "user@example.com",
+		FirstName: "John",
+		LastName:  "Doe",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	// 1. User deactivates account
+	deactRes, err := svc.DeactivateUser(context.Background(), user.ID, user.ID, dto.DeactivateUserRequest{})
+	if err != nil {
+		t.Fatalf("failed to deactivate user: %v", err)
+	}
+	if !deactRes.Success || deactRes.Status != "deactivated" {
+		t.Fatalf("expected status deactivated, got %+v", deactRes)
+	}
+	if repo.users[user.ID].Status != "deactivated" || repo.users[user.ID].DeactivatedAt == nil {
+		t.Fatalf("user was not marked deactivated in repo")
+	}
+
+	// 2. Simulate 10 days passing (within 30-day window)
+	tenDaysAgo := time.Now().Add(-10 * 24 * time.Hour)
+	repo.users[user.ID].DeactivatedAt = &tenDaysAgo
+
+	// 3. User can reactivate account successfully
+	reactRes, err := svc.ReactivateUser(context.Background(), user.ID, user.ID)
+	if err != nil {
+		t.Fatalf("failed to reactivate user within grace period: %v", err)
+	}
+	if !reactRes.Success || reactRes.Status != "active" {
+		t.Fatalf("expected active status on reactivation, got %+v", reactRes)
+	}
+	if repo.users[user.ID].Status != "active" || repo.users[user.ID].DeactivatedAt != nil {
+		t.Errorf("expected user status to be active and deactivated_at nil, got status=%s deactivated_at=%v",
+			repo.users[user.ID].Status, repo.users[user.ID].DeactivatedAt)
+	}
+}
+
+func TestPolicy_DeactivateAccount_PermanentDeletionAfter30Days_ViaWorker(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-expired-policy",
+		Email:     "expired@example.com",
+		FirstName: "Jane",
+		LastName:  "Doe",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	// 1. User deactivates account
+	_, err := svc.DeactivateUser(context.Background(), user.ID, user.ID, dto.DeactivateUserRequest{})
+	if err != nil {
+		t.Fatalf("failed to deactivate user: %v", err)
+	}
+
+	// 2. Simulate 31 days passing (past the 30-day retention window)
+	thirtyOneDaysAgo := time.Now().Add(-31 * 24 * time.Hour)
+	repo.users[user.ID].DeactivatedAt = &thirtyOneDaysAgo
+
+	// 3. Background worker executes retention deletion
+	processed, err := svc.ProcessExpiredDeactivations(context.Background(), 30*24*time.Hour)
+	if err != nil {
+		t.Fatalf("worker failed to process expired deactivations: %v", err)
+	}
+	if processed != 1 {
+		t.Errorf("expected 1 processed user, got %d", processed)
+	}
+
+	// 4. Verify account was permanently soft-deleted & anonymized
+	deletedUser := repo.users[user.ID]
+	if deletedUser.Status != "deleted" {
+		t.Errorf("expected status deleted, got %s", deletedUser.Status)
+	}
+	if deletedUser.Email != "deleted_user-expired-policy@deleted.local" {
+		t.Errorf("expected anonymized email, got %s", deletedUser.Email)
+	}
+	if deletedUser.FirstName != "Deleted" || deletedUser.LastName != "User" {
+		t.Errorf("expected anonymized name, got %s %s", deletedUser.FirstName, deletedUser.LastName)
+	}
+
+	// 5. User can no longer reactivate the account
+	_, err = svc.ReactivateUser(context.Background(), user.ID, user.ID)
+	if err == nil {
+		t.Fatalf("expected error when trying to reactivate deleted account, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden || appErr.HTTPStatus != 403 {
+		t.Errorf("expected 403 FORBIDDEN, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+}
+
+func TestPolicy_DeactivateAccount_ReactivationRejectedAndDeletedAfter30Days_BeforeWorker(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-reactivate-too-late",
+		Email:     "late@example.com",
+		FirstName: "Late",
+		LastName:  "User",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	// 1. User deactivates
+	_, err := svc.DeactivateUser(context.Background(), user.ID, user.ID, dto.DeactivateUserRequest{})
+	if err != nil {
+		t.Fatalf("failed to deactivate user: %v", err)
+	}
+
+	// 2. Simulate 35 days passing (past the 30-day window)
+	thirtyFiveDaysAgo := time.Now().Add(-35 * 24 * time.Hour)
+	repo.users[user.ID].DeactivatedAt = &thirtyFiveDaysAgo
+
+	// 3. User tries to reactivate before worker runs
+	_, err = svc.ReactivateUser(context.Background(), user.ID, user.ID)
+	if err == nil {
+		t.Fatalf("expected error when reactivating after 30 days, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden || appErr.HTTPStatus != 403 {
+		t.Errorf("expected 403 FORBIDDEN, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 4. Verify account was permanently soft-deleted as a result
+	if repo.users[user.ID].Status != "deleted" {
+		t.Errorf("expected status deleted after expired reactivation attempt, got %s", repo.users[user.ID].Status)
+	}
+}
+
+
 
 
