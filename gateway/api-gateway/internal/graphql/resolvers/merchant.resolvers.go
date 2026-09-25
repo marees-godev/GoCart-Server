@@ -6,36 +6,45 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // UpdateMerchant is the resolver for the updateMerchant field.
-func (r *mutationResolver) UpdateMerchant(ctx context.Context, id *string, merchantID *string, input model.UpdateMerchantInput) (*model.Merchant, error) {
+func (r *mutationResolver) UpdateMerchant(ctx context.Context, id string, input model.UpdateMerchantInput) (*model.Merchant, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
-	targetID := getEffectiveID(id, merchantID)
-	if targetID == "" {
+	if id == "" {
 		return nil, appErrors.BadRequest("merchant id is required")
 	}
 
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && (role != "MERCHANT" || !strings.EqualFold(userCtx.UserID, id)) {
+		return nil, appErrors.Forbidden("you can only update your own merchant profile")
+	}
+
 	req := &merchantpb.UpdateMerchantRequest{
-		Id: targetID,
+		Id: id,
 	}
 	if input.BusinessName != nil {
 		req.BusinessName = *input.BusinessName
-	}
-	if input.FirstName != nil {
-		req.FirstName = *input.FirstName
-	}
-	if input.LastName != nil {
-		req.LastName = *input.LastName
-	}
-	if input.BusinessEmail != nil {
-		req.BusinessEmail = *input.BusinessEmail
 	}
 	if input.BusinessPhone != nil {
 		req.BusinessPhone = *input.BusinessPhone
@@ -46,24 +55,23 @@ func (r *mutationResolver) UpdateMerchant(ctx context.Context, id *string, merch
 
 	res, err := r.ClientMgr.MerchantClient.UpdateMerchant(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return toModelMerchant(res.Merchant), nil
 }
 
 // UpdateMerchantStatus is the resolver for the updateMerchantStatus field.
-func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id *string, merchantID *string, status string, rejectionReason *string) (*model.Merchant, error) {
+func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, status string, rejectionReason *string) (*model.Merchant, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
-	targetID := getEffectiveID(id, merchantID)
-	if targetID == "" || status == "" {
+	if id == "" || status == "" {
 		return nil, appErrors.BadRequest("id and status are required")
 	}
 
 	req := &merchantpb.UpdateMerchantStatusRequest{
-		Id:     targetID,
+		Id:     id,
 		Status: status,
 	}
 	if rejectionReason != nil {
@@ -72,77 +80,60 @@ func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id *string,
 
 	res, err := r.ClientMgr.MerchantClient.UpdateMerchantStatus(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return toModelMerchant(res.Merchant), nil
 }
 
 // DeleteMerchant is the resolver for the deleteMerchant field.
-func (r *mutationResolver) DeleteMerchant(ctx context.Context, id *string, merchantID *string) (bool, error) {
+func (r *mutationResolver) DeleteMerchant(ctx context.Context, id string) (bool, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return false, appErrors.Internal(nil, "merchant client unavailable")
 	}
-	targetID := getEffectiveID(id, merchantID)
-	if targetID == "" {
+	if id == "" {
 		return false, appErrors.BadRequest("merchant id is required")
 	}
 
-	res, err := r.ClientMgr.MerchantClient.DeleteMerchant(ctx, &merchantpb.DeleteMerchantRequest{Id: targetID})
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+
+	if userCtx == nil {
+		return false, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role == "ADMIN" {
+		return false, appErrors.Forbidden("admins cannot delete merchant accounts; admins can only suspend merchants")
+	}
+	if role != "MERCHANT" || !strings.EqualFold(userCtx.UserID, id) {
+		return false, appErrors.Forbidden("only the merchant who created the account can delete it")
+	}
+
+	res, err := r.ClientMgr.MerchantClient.DeleteMerchant(ctx, &merchantpb.DeleteMerchantRequest{Id: id})
 	if err != nil {
-		return false, err
+		return false, grpcclient.TranslateGRPCError(err)
 	}
 
 	return res.Success, nil
 }
 
 // Merchant is the resolver for the merchant field.
-func (r *queryResolver) Merchant(ctx context.Context, id *string, merchantID *string) (*model.Merchant, error) {
+func (r *queryResolver) Merchant(ctx context.Context, id string) (*model.Merchant, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
-	targetID := getEffectiveID(id, merchantID)
-	if targetID == "" {
+	if id == "" {
 		return nil, appErrors.BadRequest("merchant id is required")
 	}
 
-	res, err := r.ClientMgr.MerchantClient.GetMerchant(ctx, &merchantpb.GetMerchantRequest{Id: targetID})
+	res, err := r.ClientMgr.MerchantClient.GetMerchant(ctx, &merchantpb.GetMerchantRequest{Id: id})
 	if err != nil {
-		return nil, err
-	}
-
-	return toModelMerchant(res.Merchant), nil
-}
-
-// MerchantByMerchantID is the resolver for the merchantByMerchantId field.
-func (r *queryResolver) MerchantByMerchantID(ctx context.Context, merchantID string) (*model.Merchant, error) {
-	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
-		return nil, appErrors.Internal(nil, "merchant client unavailable")
-	}
-	if merchantID == "" {
-		return nil, appErrors.BadRequest("merchant id is required")
-	}
-
-	res, err := r.ClientMgr.MerchantClient.GetMerchant(ctx, &merchantpb.GetMerchantRequest{Id: merchantID})
-	if err != nil {
-		return nil, err
-	}
-
-	return toModelMerchant(res.Merchant), nil
-}
-
-// MerchantByUserID is the resolver for the merchantByUserId field.
-func (r *queryResolver) MerchantByUserID(ctx context.Context, userID string) (*model.Merchant, error) {
-	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
-		return nil, appErrors.Internal(nil, "merchant client unavailable")
-	}
-	if userID == "" {
-		return nil, appErrors.BadRequest("user id is required")
-	}
-
-	res, err := r.ClientMgr.MerchantClient.GetMerchantByUserID(ctx, &merchantpb.GetMerchantByUserIDRequest{UserId: userID})
-	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	return toModelMerchant(res.Merchant), nil
@@ -167,7 +158,7 @@ func (r *queryResolver) Merchants(ctx context.Context, status *string, limit *in
 
 	res, err := r.ClientMgr.MerchantClient.ListMerchants(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	items := make([]*model.Merchant, len(res.Merchants))
@@ -179,20 +170,4 @@ func (r *queryResolver) Merchants(ctx context.Context, status *string, limit *in
 		Merchants: items,
 		Total:     int(res.Total),
 	}, nil
-}
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//     it when you're done.
-//   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func getEffectiveID(id *string, merchantID *string) string {
-	if id != nil && *id != "" {
-		return *id
-	}
-	if merchantID != nil && *merchantID != "" {
-		return *merchantID
-	}
-	return ""
 }

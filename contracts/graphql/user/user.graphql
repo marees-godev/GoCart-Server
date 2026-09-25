@@ -3,6 +3,7 @@ type User {
   email: String!
   firstName: String
   lastName: String
+  role: String
   phone: String
   createdAt: String
 }

@@ -115,10 +115,8 @@ type mockMerchantClient struct {
 func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.CreateMerchantRequest, opts ...grpc.CallOption) (*merchantpb.CreateMerchantResponse, error) {
 	m.createdMerchants = append(m.createdMerchants, in)
 	return &merchantpb.CreateMerchantResponse{
-		Merchant: &merchantpb.Merchant{
-			Id:            in.UserId,
-			UserId:        in.UserId,
-			BusinessName:  in.BusinessName,
+		Merchant: &merchantpb.MerchantResponseData{
+			Id:            in.Id,
 			BusinessEmail: in.BusinessEmail,
 			FirstName:     in.FirstName,
 			LastName:      in.LastName,
@@ -189,11 +187,11 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 	if len(mockMerchant.createdMerchants) != 1 {
 		t.Fatalf("expected 1 call to merchant service CreateMerchant, got %d", len(mockMerchant.createdMerchants))
 	}
-	if mockMerchant.createdMerchants[0].UserId != merchResp.UserId {
-		t.Errorf("expected merchant ID %s, got %s", merchResp.UserId, mockMerchant.createdMerchants[0].UserId)
+	if mockMerchant.createdMerchants[0].Id != merchResp.UserId {
+		t.Errorf("expected merchant ID %s, got %s", merchResp.UserId, mockMerchant.createdMerchants[0].Id)
 	}
-	if mockMerchant.createdMerchants[0].BusinessName != "John Merchant" {
-		t.Errorf("expected business name John Merchant, got %s", mockMerchant.createdMerchants[0].BusinessName)
+	if mockMerchant.createdMerchants[0].BusinessEmail != testEmail {
+		t.Errorf("expected business email %s, got %s", testEmail, mockMerchant.createdMerchants[0].BusinessEmail)
 	}
 
 	// 3. Registering john@example.com again as a CUSTOMER -> Fails with 409 Conflict

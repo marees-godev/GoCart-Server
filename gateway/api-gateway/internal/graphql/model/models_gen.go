@@ -42,14 +42,8 @@ type Address struct {
 }
 
 type AuthPayload struct {
-	Token         string    `json:"token"`
-	User          *User     `json:"user"`
-	MerchantID    *string   `json:"merchantId,omitempty"`
-	BusinessEmail *string   `json:"businessEmail,omitempty"`
-	FirstName     *string   `json:"firstName,omitempty"`
-	LastName      *string   `json:"lastName,omitempty"`
-	Role          *string   `json:"role,omitempty"`
-	Merchant      *Merchant `json:"merchant,omitempty"`
+	Token string `json:"token"`
+	User  *User  `json:"user"`
 }
 
 type BankAccount struct {
@@ -173,8 +167,6 @@ type LoginInput struct {
 
 type Merchant struct {
 	ID              string  `json:"id"`
-	MerchantID      string  `json:"merchantId"`
-	UserID          *string `json:"userId,omitempty"`
 	BusinessName    string  `json:"businessName"`
 	FirstName       *string `json:"firstName,omitempty"`
 	LastName        *string `json:"lastName,omitempty"`
@@ -185,6 +177,7 @@ type Merchant struct {
 	RejectionReason *string `json:"rejectionReason,omitempty"`
 	CreatedAt       *string `json:"createdAt,omitempty"`
 	UpdatedAt       *string `json:"updatedAt,omitempty"`
+	DeletedAt       *string `json:"deletedAt,omitempty"`
 }
 
 type MerchantList struct {
@@ -428,6 +421,7 @@ type User struct {
 	Email     string  `json:"email"`
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
+	Role      *string `json:"role,omitempty"`
 	Phone     *string `json:"phone,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
 }

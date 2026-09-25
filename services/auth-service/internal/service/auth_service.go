@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -237,25 +236,16 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 
 		if mClient != nil {
-			businessName := strings.TrimSpace(req.BusinessName)
-			if businessName == "" {
-				businessName = strings.TrimSpace(req.FirstName + " " + req.LastName)
-			}
-			if businessName == "" {
-				businessName = req.Email
-			}
-
 			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
 				"x-user-id", userID.String(),
 				"x-user-role", "MERCHANT",
 			))
 
 			createReq := &merchantpb.CreateMerchantRequest{
-				UserId:        userID.String(),
+				Id:            userID.String(),
 				FirstName:     req.FirstName,
 				LastName:      req.LastName,
 				BusinessEmail: req.Email,
-				BusinessName:  businessName,
 			}
 
 			mResp, err := mClient.CreateMerchant(mCtx, createReq)
