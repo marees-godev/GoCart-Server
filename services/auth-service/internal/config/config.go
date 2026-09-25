@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/marees-godev/GoCart-Server/pkg/mailer"
 	"github.com/marees-godev/GoCart-Server/pkg/redis"
 )
 
@@ -75,6 +76,20 @@ type EmailConfig struct {
 	SMTPPass        string
 	FromEmail       string
 	TokenTTLMinutes int
+}
+
+func (c EmailConfig) ToMailerConfig() mailer.Config {
+	return mailer.Config{
+		ResendAPIKey:    c.ResendAPIKey,
+		ResendFromEmail: c.ResendFromEmail,
+		BrevoAPIKey:     c.BrevoAPIKey,
+		BrevoFromEmail:  c.BrevoFromEmail,
+		SMTPHost:        c.SMTPHost,
+		SMTPPort:        c.SMTPPort,
+		SMTPUser:        c.SMTPUser,
+		SMTPPass:        c.SMTPPass,
+		FromEmail:       c.FromEmail,
+	}
 }
 
 func LoadEnv() *Config {

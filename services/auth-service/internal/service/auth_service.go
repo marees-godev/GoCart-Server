@@ -2,14 +2,9 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
-	"math/big"
 	"strings"
 	"time"
 
@@ -19,6 +14,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	pkgotp "github.com/marees-godev/GoCart-Server/pkg/otp"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
@@ -580,23 +576,14 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 }
 
 func generateOTP() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(900000))
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()+100000), nil
+	return pkgotp.GenerateNumeric(6)
 }
 
 func generateRandomToken(nBytes int) (string, error) {
-	b := make([]byte, nBytes)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
+	return pkgotp.GenerateRandomToken(nBytes)
 }
 
 func hashToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return fmt.Sprintf("%x", sum)
+	return pkgotp.HashToken(token)
 }
 
