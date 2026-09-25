@@ -6,7 +6,6 @@ package resolvers
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
@@ -63,35 +62,25 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		}
 	}
 
-	payload := &model.AuthPayload{
+	if user != nil {
+		if res.FirstName != "" {
+			fnStr := res.FirstName
+			user.FirstName = &fnStr
+		}
+		if res.LastName != "" {
+			lnStr := res.LastName
+			user.LastName = &lnStr
+		}
+		if res.Role != "" {
+			rStr := res.Role
+			user.Role = &rStr
+		}
+	}
+
+	return &model.AuthPayload{
 		Token: res.AccessToken,
 		User:  user,
-	}
-	if res.Role != "" {
-		rStr := res.Role
-		payload.Role = &rStr
-	}
-	if res.FirstName != "" {
-		fnStr := res.FirstName
-		payload.FirstName = &fnStr
-	} else if user != nil && user.FirstName != nil {
-		payload.FirstName = user.FirstName
-	}
-	if res.LastName != "" {
-		lnStr := res.LastName
-		payload.LastName = &lnStr
-	} else if user != nil && user.LastName != nil {
-		payload.LastName = user.LastName
-	}
-	if res.MerchantId != "" {
-		mID := res.MerchantId
-		payload.MerchantID = &mID
-	}
-	if res.BusinessEmail != "" {
-		bEmail := res.BusinessEmail
-		payload.BusinessEmail = &bEmail
-	}
-	return payload, nil
+	}, nil
 }
 
 // Register is the resolver for the register field.
@@ -162,71 +151,34 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		}
 	}
 
-	payload := &model.AuthPayload{
+	if user != nil {
+		roleStr := res.Role
+		if roleStr == "" {
+			if isMerchant {
+				roleStr = string(model.RoleMerchant)
+			} else {
+				roleStr = string(model.RoleCustomer)
+			}
+		}
+		user.Role = &roleStr
+		if user.FirstName == nil || *user.FirstName == "" {
+			if res.FirstName != "" {
+				user.FirstName = &res.FirstName
+			} else if fn != "" {
+				user.FirstName = &fn
+			}
+		}
+		if user.LastName == nil || *user.LastName == "" {
+			if res.LastName != "" {
+				user.LastName = &res.LastName
+			} else if ln != "" {
+				user.LastName = &ln
+			}
+		}
+	}
+
+	return &model.AuthPayload{
 		Token: res.AccessToken,
 		User:  user,
-	}
-
-	if res.Role != "" {
-		rStr := res.Role
-		payload.Role = &rStr
-	} else {
-		role := string(model.RoleCustomer)
-		if isMerchant {
-			role = string(model.RoleMerchant)
-		}
-		payload.Role = &role
-	}
-
-	if res.FirstName != "" {
-		fnStr := res.FirstName
-		payload.FirstName = &fnStr
-	} else if fn != "" {
-		payload.FirstName = &fn
-	}
-
-	if res.LastName != "" {
-		lnStr := res.LastName
-		payload.LastName = &lnStr
-	} else if ln != "" {
-		payload.LastName = &ln
-	}
-
-	if res.MerchantId != "" {
-		mID := res.MerchantId
-		payload.MerchantID = &mID
-	}
-
-	if res.BusinessEmail != "" {
-		bEmail := res.BusinessEmail
-		payload.BusinessEmail = &bEmail
-	} else if isMerchant {
-		payload.BusinessEmail = &input.Email
-	}
-
-	if isMerchant {
-		var mID string
-		if payload.MerchantID != nil {
-			mID = *payload.MerchantID
-		}
-		bEmail := input.Email
-		if payload.BusinessEmail != nil {
-			bEmail = *payload.BusinessEmail
-		}
-		bName := strings.TrimSpace(fn + " " + ln)
-		if bName == "" {
-			bName = input.Email
-		}
-		status := "PENDING"
-		payload.Merchant = &model.Merchant{
-			MerchantID:    mID,
-			BusinessName:  bName,
-			FirstName:     payload.FirstName,
-			LastName:      payload.LastName,
-			BusinessEmail: &bEmail,
-			Status:        status,
-		}
-	}
-
-	return payload, nil
+	}, nil
 }

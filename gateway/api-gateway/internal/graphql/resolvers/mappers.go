@@ -1,6 +1,8 @@
 package resolvers
 
 import (
+	"time"
+
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -22,19 +24,14 @@ func toModelUser(u *userpb.User) *model.User {
 	}
 }
 
-func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
+func toModelMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 	if m == nil {
 		return nil
 	}
 	res := &model.Merchant{
 		ID:           m.Id,
-		MerchantID:   m.Id,
 		BusinessName: m.BusinessName,
 		Status:       m.Status,
-	}
-	if m.UserId != "" {
-		uid := m.UserId
-		res.UserID = &uid
 	}
 	if m.FirstName != "" {
 		fn := m.FirstName
@@ -44,13 +41,17 @@ func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
 		ln := m.LastName
 		res.LastName = &ln
 	}
-	if m.CreatedAt != "" {
-		ca := m.CreatedAt
+	if m.CreatedAt != nil {
+		ca := m.CreatedAt.AsTime().Format(time.RFC3339)
 		res.CreatedAt = &ca
 	}
-	if m.UpdatedAt != "" {
-		ua := m.UpdatedAt
+	if m.UpdatedAt != nil {
+		ua := m.UpdatedAt.AsTime().Format(time.RFC3339)
 		res.UpdatedAt = &ua
+	}
+	if m.DeletedAt != nil {
+		da := m.DeletedAt.AsTime().Format(time.RFC3339)
+		res.DeletedAt = &da
 	}
 	if m.TaxId != "" {
 		tid := m.TaxId
