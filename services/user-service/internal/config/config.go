@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -13,7 +14,13 @@ type Config struct {
 	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
-	Tracing  TracingConfig
+	Tracing   TracingConfig
+	Retention RetentionConfig
+}
+
+type RetentionConfig struct {
+	Interval time.Duration
+	Period   time.Duration
 }
 
 type AppConfig struct {
@@ -83,6 +90,10 @@ func LoadEnv() *Config {
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
+		Retention: RetentionConfig{
+			Interval: GetEnvAsDuration("RETENTION_WORKER_INTERVAL", 1*time.Hour),
+			Period:   GetEnvAsDuration("ACCOUNT_RETENTION_PERIOD", 30*24*time.Hour),
+		},
 	}
 }
 
@@ -116,3 +127,16 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 	}
 	return val
 }
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
+}
+

@@ -17,6 +17,10 @@ type UserService interface {
 	GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error)
 	GetUserByID(ctx context.Context, id string) (*model.User, error)
 	UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error)
+	DeactivateUser(ctx context.Context, authUserID, targetUserID string, req dto.DeactivateUserRequest) (*dto.AccountActionResponse, error)
+	ReactivateUser(ctx context.Context, authUserID, targetUserID string) (*dto.AccountActionResponse, error)
+	DeleteUser(ctx context.Context, authUserID, targetUserID string, req dto.DeleteUserRequest) (*dto.AccountActionResponse, error)
+	ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error)
 }
 
 type userService struct {
@@ -57,14 +61,24 @@ func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 }
 
 func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error) {
-	idToFetch := targetUserID
+	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in GetUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	idToFetch := strings.TrimSpace(targetUserID)
 	if idToFetch == "" {
-		idToFetch = authUserID
+		idToFetch = strings.TrimSpace(authUserID)
 	}
 
 	if idToFetch == "" {
 		slog.WarnContext(ctx, "missing user ID in GetUser")
-		return nil, errors.BadRequest("user ID is required")
+		return nil, errors.BadRequest("user_id is required")
+	}
+
+	if !dto.IsValidID(idToFetch) {
+		slog.WarnContext(ctx, "invalid user ID in GetUser", "user_id", idToFetch)
+		return nil, errors.BadRequest("user_id is invalid")
 	}
 
 	user, err := s.repo.GetByID(ctx, idToFetch)
@@ -74,6 +88,12 @@ func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID stri
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		if strings.EqualFold(user.Status, "deactivated") && user.DeactivatedAt != nil && time.Since(*user.DeactivatedAt) >= 30*24*time.Hour {
+			reason := "Automatic permanent deletion after 30 days of deactivation"
+			_ = s.repo.DeleteUser(ctx, user.ID, "SYSTEM", &reason)
+			slog.WarnContext(ctx, "deactivation grace period expired; permanently deleted", "user_id", idToFetch)
+			return nil, errors.Forbidden("account deactivation period of 30 days has expired; account has been permanently deleted")
+		}
 		slog.WarnContext(ctx, "user account not active in GetUser", "user_id", idToFetch, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
@@ -83,18 +103,30 @@ func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID stri
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, error) {
-	if strings.TrimSpace(id) == "" {
+	trimmedID := strings.TrimSpace(id)
+	if trimmedID == "" {
 		slog.WarnContext(ctx, "missing user ID in GetUserByID")
-		return nil, errors.BadRequest("user ID is required")
+		return nil, errors.BadRequest("user_id is required")
 	}
 
-	user, err := s.repo.GetByID(ctx, id)
+	if !dto.IsValidID(trimmedID) {
+		slog.WarnContext(ctx, "invalid user ID in GetUserByID", "user_id", id)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
+	user, err := s.repo.GetByID(ctx, trimmedID)
 	if err != nil {
 		slog.WarnContext(ctx, "failed to get user in GetUserByID", "user_id", id, "error", err)
 		return nil, err
 	}
 
 	if !strings.EqualFold(user.Status, "active") {
+		if strings.EqualFold(user.Status, "deactivated") && user.DeactivatedAt != nil && time.Since(*user.DeactivatedAt) >= 30*24*time.Hour {
+			reason := "Automatic permanent deletion after 30 days of deactivation"
+			_ = s.repo.DeleteUser(ctx, user.ID, "SYSTEM", &reason)
+			slog.WarnContext(ctx, "deactivation grace period expired; permanently deleted", "user_id", id)
+			return nil, errors.Forbidden("account deactivation period of 30 days has expired; account has been permanently deleted")
+		}
 		slog.WarnContext(ctx, "user account not active in GetUserByID", "user_id", id, "status", user.Status)
 		return nil, errors.Forbidden("user account is not active")
 	}
@@ -104,18 +136,36 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, 
 }
 
 func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error) {
-	if authUserID == "" {
+	if strings.TrimSpace(authUserID) == "" {
 		slog.WarnContext(ctx, "missing authenticated user context in UpdateUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	if targetUserID == "" {
+	if strings.TrimSpace(targetUserID) == "" {
 		targetUserID = authUserID
 	}
 
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in UpdateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
 	if authUserID != targetUserID {
-		slog.WarnContext(ctx, "forbidden user modification in UpdateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
-		return nil, errors.Forbidden("user cannot modify another user's profile")
+		slog.WarnContext(ctx, "user id mismatch in UpdateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if req.ID != nil && strings.TrimSpace(*req.ID) != "" && strings.TrimSpace(*req.ID) != targetUserID {
+		slog.WarnContext(ctx, "id in body does not match target user in UpdateUser", "body_id", *req.ID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if req.UserID != nil && strings.TrimSpace(*req.UserID) != "" && strings.TrimSpace(*req.UserID) != targetUserID {
+		slog.WarnContext(ctx, "user_id in body does not match target user in UpdateUser", "body_user_id", *req.UserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
 	}
 
 	if err := req.Validate(); err != nil {
@@ -183,7 +233,7 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 	}
 
 	if req.Gender != nil {
-		user.Gender = req.Gender
+		user.Gender = req.GetGender()
 	}
 
 	if bio := req.GetBio(); bio != nil {
@@ -201,4 +251,177 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 
 	slog.InfoContext(ctx, "user updated successfully in UpdateUser", "user_id", user.ID)
 	return user, nil
+}
+
+func (s *userService) DeactivateUser(ctx context.Context, authUserID, targetUserID string, req dto.DeactivateUserRequest) (*dto.AccountActionResponse, error) {
+	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in DeactivateUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if strings.TrimSpace(targetUserID) == "" {
+		targetUserID = authUserID
+	}
+
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in DeactivateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "user id mismatch in DeactivateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if err := s.repo.DeactivateUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
+		slog.ErrorContext(ctx, "failed to deactivate user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account deactivated successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account deactivated successfully",
+		Status:  "deactivated",
+	}, nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, authUserID, targetUserID string, req dto.DeleteUserRequest) (*dto.AccountActionResponse, error) {
+	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in DeleteUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if strings.TrimSpace(targetUserID) == "" {
+		targetUserID = authUserID
+	}
+
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in DeleteUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "user id mismatch in DeleteUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if err := s.repo.DeleteUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
+		slog.ErrorContext(ctx, "failed to delete user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account deleted successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account deleted successfully",
+		Status:  "deleted",
+	}, nil
+}
+
+func (s *userService) ReactivateUser(ctx context.Context, authUserID, targetUserID string) (*dto.AccountActionResponse, error) {
+	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in ReactivateUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	if strings.TrimSpace(targetUserID) == "" {
+		targetUserID = authUserID
+	}
+
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in ReactivateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
+	if authUserID != targetUserID {
+		slog.WarnContext(ctx, "user id mismatch in ReactivateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if err := s.repo.ReactivateUser(ctx, targetUserID, authUserID); err != nil {
+		slog.ErrorContext(ctx, "failed to reactivate user in repository", "user_id", targetUserID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "account reactivated successfully", "user_id", targetUserID)
+	return &dto.AccountActionResponse{
+		Success: true,
+		Message: "account reactivated successfully",
+		Status:  "active",
+	}, nil
+}
+
+const defaultRetentionBatchSize = 100
+
+func (s *userService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
+	if retentionPeriod <= 0 {
+		retentionPeriod = 30 * 24 * time.Hour
+	}
+	cutoff := time.Now().UTC().Add(-retentionPeriod)
+	reason := "Automatic permanent deletion after 30 days of deactivation"
+
+	totalProcessed := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return totalProcessed, ctx.Err()
+		default:
+		}
+
+		userIDs, err := s.repo.GetExpiredDeactivatedUserIDs(ctx, cutoff, defaultRetentionBatchSize)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to get expired deactivated users batch", "cutoff", cutoff, "error", err)
+			return totalProcessed, err
+		}
+
+		if len(userIDs) == 0 {
+			break
+		}
+
+		batchProcessed := 0
+		errorCount := 0
+		for _, id := range userIDs {
+			select {
+			case <-ctx.Done():
+				return totalProcessed, ctx.Err()
+			default:
+			}
+
+			deleted, err := s.repo.DeleteExpiredDeactivatedUser(ctx, id, cutoff, "SYSTEM", &reason)
+			if err != nil {
+				slog.ErrorContext(ctx, "failed to delete expired deactivated user", "user_id", id, "error", err)
+				errorCount++
+				continue
+			}
+			if deleted {
+				batchProcessed++
+			}
+		}
+
+		totalProcessed += batchProcessed
+
+		if errorCount == len(userIDs) {
+			slog.WarnContext(ctx, "all items in retention batch failed with errors, stopping loop", "batch_size", len(userIDs))
+			break
+		}
+
+		if len(userIDs) < defaultRetentionBatchSize {
+			break
+		}
+	}
+
+	if totalProcessed > 0 {
+		slog.InfoContext(ctx, "processed expired deactivations", "total_processed", totalProcessed)
+	}
+	return totalProcessed, nil
 }

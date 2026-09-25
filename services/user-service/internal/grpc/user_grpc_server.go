@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -86,13 +88,7 @@ func (s *UserGRPCServer) CreateUser(ctx context.Context, req *userpb.CreateUserR
 
 	slog.InfoContext(ctx, "gRPC CreateUser succeeded", "user_id", u.ID)
 	return &userpb.CreateUserResponse{
-		User: &userpb.User{
-			Id:        u.ID,
-			Email:     u.Email,
-			FirstName: u.FirstName,
-			LastName:  u.LastName,
-			CreatedAt: u.CreatedAt.String(),
-		},
+		User: toProtoUser(u),
 	}, nil
 }
 
@@ -101,6 +97,10 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 		slog.WarnContext(ctx, "missing user id in gRPC GetUser")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
 	}
+	if !dto.IsValidID(req.Id) {
+		slog.WarnContext(ctx, "invalid user id in gRPC GetUser", "user_id", req.Id)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
 
 	u, err := s.userService.GetUserByID(ctx, req.Id)
 	if err != nil {
@@ -108,21 +108,9 @@ func (s *UserGRPCServer) GetUser(ctx context.Context, req *userpb.GetUserRequest
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
-	phonenumber := ""
-	if u.PhoneNumber != nil {
-		phonenumber = *u.PhoneNumber
-	}
-
 	slog.InfoContext(ctx, "gRPC GetUser succeeded", "user_id", u.ID)
 	return &userpb.GetUserResponse{
-		User: &userpb.User{
-			Id:        u.ID,
-			Email:     u.Email,
-			FirstName: u.FirstName,
-			LastName:  u.LastName,
-			Phone:     phonenumber,
-			CreatedAt: u.CreatedAt.String(),
-		},
+		User: toProtoUser(u),
 	}, nil
 }
 
@@ -130,6 +118,10 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 	if req == nil || req.Id == "" {
 		slog.WarnContext(ctx, "missing user id in gRPC UpdateUser")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+	if !dto.IsValidID(req.Id) {
+		slog.WarnContext(ctx, "invalid user id in gRPC UpdateUser", "user_id", req.Id)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
 	}
 
 	updateReq := dto.UpdateUserRequest{}
@@ -145,6 +137,24 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 		p := req.Phone
 		updateReq.PhoneNumber = &p
 	}
+	if req.Username != nil && *req.Username != "" {
+		updateReq.Username = req.Username
+	}
+	if req.AlternatePhone != nil && *req.AlternatePhone != "" {
+		updateReq.AlternatePhone = req.AlternatePhone
+	}
+	if req.DateOfBirth != nil && *req.DateOfBirth != "" {
+		updateReq.DateOfBirth = req.DateOfBirth
+	}
+	if req.Gender != nil && *req.Gender != "" {
+		updateReq.Gender = req.Gender
+	}
+	if req.Bio != nil && *req.Bio != "" {
+		updateReq.Bio = req.Bio
+	}
+	if req.AvatarUrl != nil && *req.AvatarUrl != "" {
+		updateReq.AvatarURL = req.AvatarUrl
+	}
 
 	u, err := s.userService.UpdateUser(ctx, req.Id, req.Id, updateReq)
 	if err != nil {
@@ -152,21 +162,152 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
+	slog.InfoContext(ctx, "gRPC UpdateUser succeeded", "user_id", u.ID)
+	return &userpb.UpdateUserResponse{
+		User: toProtoUser(u),
+	}, nil
+}
+
+func toProtoUser(u *model.User) *userpb.User {
+	if u == nil {
+		return nil
+	}
 	phone := ""
 	if u.PhoneNumber != nil {
 		phone = *u.PhoneNumber
 	}
+	var dobStr *string
+	if u.DateOfBirth != nil {
+		f := u.DateOfBirth.Format("2006-01-02")
+		dobStr = &f
+	}
+	var updatedAtStr *string
+	if !u.UpdatedAt.IsZero() {
+		f := u.UpdatedAt.Format(time.RFC3339)
+		updatedAtStr = &f
+	}
+	var genderStr *string
+	if u.Gender != nil {
+		g := string(*u.Gender)
+		genderStr = &g
+	}
+	return &userpb.User{
+		Id:             u.ID,
+		Email:          u.Email,
+		FirstName:      u.FirstName,
+		LastName:       u.LastName,
+		Phone:          phone,
+		CreatedAt:      u.CreatedAt.Format(time.RFC3339),
+		Status:         u.Status,
+		Username:       u.Username,
+		AlternatePhone: u.AlternatePhone,
+		DateOfBirth:    dobStr,
+		Gender:         genderStr,
+		Bio:            u.Bio,
+		AvatarUrl:      u.AvatarURL,
+		UpdatedAt:      updatedAtStr,
+	}
+}
 
-	slog.InfoContext(ctx, "gRPC UpdateUser succeeded", "user_id", u.ID)
-	return &userpb.UpdateUserResponse{
-		User: &userpb.User{
-			Id:        u.ID,
-			Email:     u.Email,
-			FirstName: u.FirstName,
-			LastName:  u.LastName,
-			Phone:     phone,
-			CreatedAt: u.CreatedAt.String(),
-		},
+func (s *UserGRPCServer) DeactivateUser(ctx context.Context, req *userpb.DeactivateUserRequest) (*userpb.DeactivateUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC DeactivateUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+	if !dto.IsValidID(req.Id) {
+		slog.WarnContext(ctx, "invalid user id in gRPC DeactivateUser", "user_id", req.Id)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+
+	var reason *string
+	if req.Reason != nil && *req.Reason != "" {
+		reason = req.Reason
+	}
+
+	res, err := s.userService.DeactivateUser(ctx, req.Id, req.Id, dto.DeactivateUserRequest{Reason: reason})
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC DeactivateUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC DeactivateUser succeeded", "user_id", req.Id)
+	return &userpb.DeactivateUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) DeleteUser(ctx context.Context, req *userpb.DeleteUserRequest) (*userpb.DeleteUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC DeleteUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+	if !dto.IsValidID(req.Id) {
+		slog.WarnContext(ctx, "invalid user id in gRPC DeleteUser", "user_id", req.Id)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+
+	var reason *string
+	if req.Reason != nil && *req.Reason != "" {
+		reason = req.Reason
+	}
+
+	res, err := s.userService.DeleteUser(ctx, req.Id, req.Id, dto.DeleteUserRequest{Reason: reason})
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC DeleteUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC DeleteUser succeeded", "user_id", req.Id)
+	return &userpb.DeleteUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) ReactivateUser(ctx context.Context, req *userpb.ReactivateUserRequest) (*userpb.ReactivateUserResponse, error) {
+	if req == nil || req.Id == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC ReactivateUser")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+	if !dto.IsValidID(req.Id) {
+		slog.WarnContext(ctx, "invalid user id in gRPC ReactivateUser", "user_id", req.Id)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+
+	res, err := s.userService.ReactivateUser(ctx, req.Id, req.Id)
+	if err != nil {
+		slog.WarnContext(ctx, "service error in gRPC ReactivateUser", "user_id", req.Id, "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC ReactivateUser succeeded", "user_id", req.Id)
+	return &userpb.ReactivateUserResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+func (s *UserGRPCServer) ProcessExpiredDeactivations(ctx context.Context, req *userpb.ProcessExpiredDeactivationsRequest) (*userpb.ProcessExpiredDeactivationsResponse, error) {
+	retentionDays := 30
+	if req != nil && req.RetentionDays != nil && *req.RetentionDays > 0 {
+		retentionDays = int(*req.RetentionDays)
+	}
+
+	retentionPeriod := time.Duration(retentionDays) * 24 * time.Hour
+	count, err := s.userService.ProcessExpiredDeactivations(ctx, retentionPeriod)
+	if err != nil {
+		slog.ErrorContext(ctx, "service error in gRPC ProcessExpiredDeactivations", "error", err)
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC ProcessExpiredDeactivations succeeded", "processed_count", count)
+	return &userpb.ProcessExpiredDeactivationsResponse{
+		ProcessedCount: int32(count),
+		Message:        fmt.Sprintf("successfully processed %d expired deactivated accounts", count),
 	}, nil
 }
 
@@ -174,6 +315,14 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 	if req == nil {
 		slog.WarnContext(ctx, "missing request payload in gRPC CreateUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "request payload is required")
+	}
+	if req.UserId == "" {
+		slog.WarnContext(ctx, "missing user id in gRPC CreateUserAddress")
+		return nil, status.Error(codes.InvalidArgument, "user id is required")
+	}
+	if !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC CreateUserAddress", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
 	}
 
 	var label *string
@@ -223,6 +372,10 @@ func (s *UserGRPCServer) ListUserAddresses(ctx context.Context, req *userpb.List
 		slog.WarnContext(ctx, "missing user id in gRPC ListUserAddresses")
 		return nil, status.Error(codes.InvalidArgument, "user id is required")
 	}
+	if !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC ListUserAddresses", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
 
 	addresses, err := s.addressService.ListAddresses(ctx, req.UserId)
 	if err != nil {
@@ -246,6 +399,14 @@ func (s *UserGRPCServer) GetUserAddress(ctx context.Context, req *userpb.GetUser
 		slog.WarnContext(ctx, "missing address id in gRPC GetUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
+	if req.UserId != "" && !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC GetUserAddress", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+	if !dto.IsValidID(req.AddressId) {
+		slog.WarnContext(ctx, "invalid address id in gRPC GetUserAddress", "address_id", req.AddressId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("address_id is invalid"))
+	}
 
 	addr, err := s.addressService.GetAddress(ctx, req.UserId, req.AddressId)
 	if err != nil {
@@ -263,6 +424,14 @@ func (s *UserGRPCServer) UpdateUserAddress(ctx context.Context, req *userpb.Upda
 	if req == nil || req.AddressId == "" {
 		slog.WarnContext(ctx, "missing address id in gRPC UpdateUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
+	}
+	if req.UserId != "" && !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC UpdateUserAddress", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+	if !dto.IsValidID(req.AddressId) {
+		slog.WarnContext(ctx, "invalid address id in gRPC UpdateUserAddress", "address_id", req.AddressId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("address_id is invalid"))
 	}
 
 	updateReq := dto.UpdateAddressRequest{
@@ -295,6 +464,14 @@ func (s *UserGRPCServer) DeleteUserAddress(ctx context.Context, req *userpb.Dele
 		slog.WarnContext(ctx, "missing address id in gRPC DeleteUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
 	}
+	if req.UserId != "" && !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC DeleteUserAddress", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+	if !dto.IsValidID(req.AddressId) {
+		slog.WarnContext(ctx, "invalid address id in gRPC DeleteUserAddress", "address_id", req.AddressId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("address_id is invalid"))
+	}
 
 	if err := s.addressService.DeleteAddress(ctx, req.UserId, req.AddressId); err != nil {
 		slog.WarnContext(ctx, "service error in gRPC DeleteUserAddress", "user_id", req.UserId, "address_id", req.AddressId, "error", err)
@@ -311,6 +488,14 @@ func (s *UserGRPCServer) SetDefaultUserAddress(ctx context.Context, req *userpb.
 	if req == nil || req.AddressId == "" {
 		slog.WarnContext(ctx, "missing address id in gRPC SetDefaultUserAddress")
 		return nil, status.Error(codes.InvalidArgument, "address id is required")
+	}
+	if req.UserId != "" && !dto.IsValidID(req.UserId) {
+		slog.WarnContext(ctx, "invalid user id in gRPC SetDefaultUserAddress", "user_id", req.UserId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("user_id is invalid"))
+	}
+	if !dto.IsValidID(req.AddressId) {
+		slog.WarnContext(ctx, "invalid address id in gRPC SetDefaultUserAddress", "address_id", req.AddressId)
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("address_id is invalid"))
 	}
 
 	addr, err := s.addressService.SetDefaultAddress(ctx, req.UserId, req.AddressId)
