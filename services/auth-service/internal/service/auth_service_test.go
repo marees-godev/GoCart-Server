@@ -912,3 +912,145 @@ func TestRegister_ReturnsError_WhenMerchantServiceFails(t *testing.T) {
 	}
 }
 
+func TestResendVerificationEmail_Cooldown(t *testing.T) {
+	svc, mockRepo, cfg, otpStore := setupTestServiceWithOTPStore()
+	cfg.Email.TokenTTLMinutes = 5
+	cfg.Email.ResendCooldownSeconds = 60
+
+	// 1. User not found -> NotFound error
+	_, err := svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "nonexistent@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected error for non-existent user")
+	}
+	if appErr := appErrors.AsAppError(err); appErr.HTTPStatus != 404 {
+		t.Errorf("expected 404 Not Found, got %d", appErr.HTTPStatus)
+	}
+
+	// 2. Already verified user -> BadRequest error
+	mockRepo.byEmail["verified@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         "verified@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+	_, err = svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "verified@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected error for already verified user")
+	}
+	if appErr := appErrors.AsAppError(err); appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request, got %d", appErr.HTTPStatus)
+	}
+
+	// 3. Unverified user - first resend request -> should succeed
+	mockRepo.byEmail["unverified@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         "unverified@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	resp, err := svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "unverified@example.com",
+	})
+	if err != nil {
+		t.Fatalf("expected first resend to succeed, got: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true, got false")
+	}
+
+	// Verify an OTP was saved in store
+	firstHash, err := otpStore.GetOTP(context.Background(), "unverified@example.com")
+	if err != nil || firstHash == "" {
+		t.Fatalf("expected OTP hash to be stored, got err: %v", err)
+	}
+
+	// 4. Immediate second resend (within 60s cooldown) -> should be rate-limited with 429
+	_, err = svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "unverified@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected cooldown rate-limit error on immediate resend, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 429 {
+		t.Errorf("expected 429 Too Many Requests, got %d", appErr.HTTPStatus)
+	}
+	if appErr.Code != appErrors.CodeTooManyRequests {
+		t.Errorf("expected CodeTooManyRequests, got %s", appErr.Code)
+	}
+
+	// 5. Simulate passage of cooldown: set TTL to remaining 3m50s (60s+ has elapsed from 5m total TTL)
+	_ = otpStore.SetOTP(context.Background(), "unverified@example.com", firstHash, 3*time.Minute+50*time.Second)
+
+	resp, err = svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "unverified@example.com",
+	})
+	if err != nil {
+		t.Fatalf("expected resend to succeed after cooldown period elapsed, got: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true, got false")
+	}
+}
+
+func TestOTP_CaseInsensitiveEmailHandling(t *testing.T) {
+	svc, mockRepo, _, otpStore := setupTestServiceWithOTPStore()
+
+	rawOTP := "882244"
+	userEmail := "case.Test@Example.COM"
+	normalizedEmail := "case.test@example.com"
+
+	mockRepo.byEmail[normalizedEmail] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         normalizedEmail,
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	// 1. Set OTP with mixed-case and padded whitespace
+	err := otpStore.SetOTP(context.Background(), "  "+userEmail+"  ", hashToken(rawOTP), 5*time.Minute)
+	if err != nil {
+		t.Fatalf("unexpected error setting OTP: %v", err)
+	}
+
+	// 2. Lookup OTP directly with normalized lowercase email
+	hash, err := otpStore.GetOTP(context.Background(), normalizedEmail)
+	if err != nil {
+		t.Fatalf("expected to find OTP using normalized email, got: %v", err)
+	}
+	if hash != hashToken(rawOTP) {
+		t.Errorf("hash mismatch: expected %s, got %s", hashToken(rawOTP), hash)
+	}
+
+	// 3. VerifyEmail with uppercase and whitespace input -> should succeed
+	verifyResp, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: "   CASE.TEST@EXAMPLE.COM   ",
+		OTP:   rawOTP,
+	})
+	if err != nil {
+		t.Fatalf("expected verification to succeed with mixed-case email, got: %v", err)
+	}
+	if !verifyResp.Success {
+		t.Errorf("expected verification success to be true")
+	}
+
+	// 4. Verify OTP was deleted from store using mixed-case query
+	_, err = otpStore.GetOTP(context.Background(), "Case.Test@Example.Com")
+	if !errors.Is(err, otp.ErrOTPNotFound) {
+		t.Errorf("expected ErrOTPNotFound after deletion, got: %v", err)
+	}
+}
+
+
+

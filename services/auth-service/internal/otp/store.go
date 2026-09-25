@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,9 +15,14 @@ var (
 	ErrOTPNotFound = errors.New("otp not found or expired")
 )
 
+func cleanEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 type Store interface {
 	SetOTP(ctx context.Context, email string, otpHash string, ttl time.Duration) error
 	GetOTP(ctx context.Context, email string) (string, error)
+	GetTTL(ctx context.Context, email string) (time.Duration, error)
 	DeleteOTP(ctx context.Context, email string) error
 }
 
@@ -29,7 +35,7 @@ func NewRedisStore(client *redis.Client) Store {
 }
 
 func (s *redisOTPStore) key(email string) string {
-	return fmt.Sprintf("auth:otp:email:%s", email)
+	return fmt.Sprintf("auth:otp:email:%s", cleanEmail(email))
 }
 
 func (s *redisOTPStore) SetOTP(ctx context.Context, email string, otpHash string, ttl time.Duration) error {
@@ -45,6 +51,17 @@ func (s *redisOTPStore) GetOTP(ctx context.Context, email string) (string, error
 		return "", err
 	}
 	return val, nil
+}
+
+func (s *redisOTPStore) GetTTL(ctx context.Context, email string) (time.Duration, error) {
+	ttl, err := s.client.TTL(ctx, s.key(email))
+	if err != nil {
+		return 0, err
+	}
+	if ttl <= 0 {
+		return 0, ErrOTPNotFound
+	}
+	return ttl, nil
 }
 
 func (s *redisOTPStore) DeleteOTP(ctx context.Context, email string) error {
@@ -70,7 +87,7 @@ func NewMemoryStore() Store {
 func (s *memoryOTPStore) SetOTP(ctx context.Context, email string, otpHash string, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.data[email] = memoryOTPEntry{
+	s.data[cleanEmail(email)] = memoryOTPEntry{
 		hash:      otpHash,
 		expiresAt: time.Now().Add(ttl),
 	}
@@ -80,16 +97,26 @@ func (s *memoryOTPStore) SetOTP(ctx context.Context, email string, otpHash strin
 func (s *memoryOTPStore) GetOTP(ctx context.Context, email string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	entry, ok := s.data[email]
+	entry, ok := s.data[cleanEmail(email)]
 	if !ok || time.Now().After(entry.expiresAt) {
 		return "", ErrOTPNotFound
 	}
 	return entry.hash, nil
 }
 
+func (s *memoryOTPStore) GetTTL(ctx context.Context, email string) (time.Duration, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entry, ok := s.data[cleanEmail(email)]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return 0, ErrOTPNotFound
+	}
+	return time.Until(entry.expiresAt), nil
+}
+
 func (s *memoryOTPStore) DeleteOTP(ctx context.Context, email string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.data, email)
+	delete(s.data, cleanEmail(email))
 	return nil
 }

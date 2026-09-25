@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/marees-godev/GoCart-Server/pkg/mailer"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
@@ -27,6 +28,7 @@ func NewMailerWithClient(client mailer.Mailer) Mailer {
 }
 
 func (m *authMailer) SendVerificationEmail(ctx context.Context, toEmail, otp string) error {
+	to := strings.ToLower(strings.TrimSpace(toEmail))
 	subject := fmt.Sprintf("Your GoCart Verification Code: %s", otp)
 	bodyText := fmt.Sprintf("Welcome to GoCart!\n\nYour email verification code is: %s\n\nThis code will expire in 5 minutes.", otp)
 	bodyHTML := fmt.Sprintf(`
@@ -48,7 +50,7 @@ func (m *authMailer) SendVerificationEmail(ctx context.Context, toEmail, otp str
 	`, otp)
 
 	return m.client.Send(ctx, mailer.Message{
-		To:       toEmail,
+		To:       to,
 		Subject:  subject,
 		HTMLBody: bodyHTML,
 		TextBody: bodyText,

@@ -116,7 +116,7 @@ func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRe
 	})
 	if err != nil {
 		h.logger.Error("Failed to verify email", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.VerifyEmailResponse{
@@ -131,7 +131,7 @@ func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.R
 	})
 	if err != nil {
 		h.logger.Error("Failed to resend verification email", slog.Any("error", err))
-		return nil, err
+		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.ResendVerificationEmailResponse{

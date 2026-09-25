@@ -74,8 +74,9 @@ type EmailConfig struct {
 	SMTPPort        string
 	SMTPUser        string
 	SMTPPass        string
-	FromEmail       string
-	TokenTTLMinutes int
+	FromEmail             string
+	TokenTTLMinutes       int
+	ResendCooldownSeconds int
 }
 
 func (c EmailConfig) ToMailerConfig() mailer.Config {
@@ -139,8 +140,9 @@ func LoadEnv() *Config {
 			SMTPPort:        GetEnv("SMTP_PORT", "587"),
 			SMTPUser:        GetEnv("SMTP_USER", ""),
 			SMTPPass:        GetEnv("SMTP_PASS", ""),
-			FromEmail:       GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
-			TokenTTLMinutes: GetEnvAsInt("EMAIL_OTP_TTL_MINUTES", GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 5)),
+			FromEmail:             GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
+			TokenTTLMinutes:       GetEnvAsInt("EMAIL_OTP_TTL_MINUTES", GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 5)),
+			ResendCooldownSeconds: GetEnvAsInt("EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60),
 		},
 		Redis:           redis.LoadConfigFromEnv("AUTH"),
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),

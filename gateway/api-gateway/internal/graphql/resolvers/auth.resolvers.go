@@ -13,6 +13,7 @@ import (
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // Login is the resolver for the login field.
@@ -37,7 +38,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		Password: input.Password,
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	var userClient userpb.UserServiceClient
@@ -134,7 +135,7 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		IsMerchant: isMerchant,
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	var userClient userpb.UserServiceClient
@@ -233,36 +234,50 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
-	if r.Clients == nil || r.Clients.AuthClient == nil {
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
 		return false, appErrors.Internal(nil, "auth client unavailable")
 	}
 	if email == "" || otp == "" {
 		return false, appErrors.BadRequest("email and otp are required")
 	}
-	res, err := r.Clients.AuthClient.VerifyEmail(ctx, &authpb.VerifyEmailRequest{
+	res, err := authClient.VerifyEmail(ctx, &authpb.VerifyEmailRequest{
 		Email: email,
 		Otp:   otp,
 		Token: otp,
 	})
 	if err != nil {
-		return false, err
+		return false, grpcclient.TranslateGRPCError(err)
 	}
 	return res.GetSuccess(), nil
 }
 
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
 func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
-	if r.Clients == nil || r.Clients.AuthClient == nil {
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
 		return false, appErrors.Internal(nil, "auth client unavailable")
 	}
 	if email == "" {
 		return false, appErrors.BadRequest("email is required")
 	}
-	res, err := r.Clients.AuthClient.ResendVerificationEmail(ctx, &authpb.ResendVerificationEmailRequest{
+	res, err := authClient.ResendVerificationEmail(ctx, &authpb.ResendVerificationEmailRequest{
 		Email: email,
 	})
 	if err != nil {
-		return false, err
+		return false, grpcclient.TranslateGRPCError(err)
 	}
 	return res.GetSuccess(), nil
 }

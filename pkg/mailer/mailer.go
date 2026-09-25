@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/smtp"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,8 @@ func New(cfg Config, log *slog.Logger) Mailer {
 }
 
 func (m *fallbackMailer) Send(ctx context.Context, msg Message) error {
+	msg.To = strings.ToLower(strings.TrimSpace(msg.To))
+
 	// 1. Try Resend API (Primary)
 	if m.cfg.ResendAPIKey != "" {
 		if err := m.sendViaResend(ctx, msg); err == nil {
