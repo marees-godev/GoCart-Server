@@ -61,3 +61,4 @@ type PasswordResetToken struct {
 	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
+

@@ -46,6 +46,11 @@ func TestTranslateGRPCError(t *testing.T) {
 			input:    status.Error(codes.FailedPrecondition, "failed precondition"),
 			expected: appErrors.CodeUnprocessableEntity,
 		},
+		{
+			name:     "ResourceExhausted",
+			input:    status.Error(codes.ResourceExhausted, "rate limited"),
+			expected: appErrors.CodeTooManyRequests,
+		},
 	}
 
 	for _, tt := range tests {

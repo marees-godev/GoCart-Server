@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -587,7 +588,8 @@ func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 OK, got %d, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var res map[string]interface{}
