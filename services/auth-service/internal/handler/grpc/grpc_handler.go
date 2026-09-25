@@ -28,8 +28,9 @@ func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *Auth
 
 func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Login(ctx, &dto.LoginRequest{
-		Email:    req.GetEmail(),
-		Password: req.GetPassword(),
+		Email:      req.GetEmail(),
+		Password:   req.GetPassword(),
+		IsMerchant: req.GetIsMerchant(),
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))
@@ -37,12 +38,16 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	}
 
 	return &pb.AuthResponse{
-		AccessToken:  resp.AccessToken,
-		RefreshToken: resp.RefreshToken,
-		TokenType:    resp.TokenType,
-		ExpiresIn:    int64(resp.ExpiresIn),
-		UserId:       resp.UserID,
-		Role:         resp.Role,
+		AccessToken:   resp.AccessToken,
+		RefreshToken:  resp.RefreshToken,
+		TokenType:     resp.TokenType,
+		ExpiresIn:     int64(resp.ExpiresIn),
+		UserId:        resp.UserID,
+		Role:          resp.Role,
+		MerchantId:    resp.MerchantID,
+		BusinessEmail: resp.BusinessEmail,
+		FirstName:     resp.FirstName,
+		LastName:      resp.LastName,
 	}, nil
 }
 

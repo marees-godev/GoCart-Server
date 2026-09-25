@@ -369,7 +369,7 @@ func TestHandleMutation_Login(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `mutation { login(input: {email: "admin@gocart.com", password: "password123"}) { token user { id email } } }`,
+		"query": `mutation { login(input: {email: "admin@gocart.com", password: "password123", isMerchant: false}) { token user { id email } } }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 
@@ -396,7 +396,7 @@ func TestHandleMutation_Register(t *testing.T) {
 	app := setupTestApp(true)
 
 	reqBody := map[string]interface{}{
-		"query": `mutation { register(input: {email: "new@gocart.com", password: "password123", firstName: "Jane", lastName: "Doe"}) { token user { id email } } }`,
+		"query": `mutation { register(input: {email: "new@gocart.com", password: "password123", firstName: "Jane", lastName: "Doe", isMerchant: false}) { token user { id email } } }`,
 	}
 	bodyBytes, _ := json.Marshal(reqBody)
 

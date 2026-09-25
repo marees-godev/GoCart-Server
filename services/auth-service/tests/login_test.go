@@ -16,6 +16,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type mockRepoForGRPC struct {
@@ -81,6 +83,7 @@ func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
 		Email:        "user@example.com",
 		PasswordHash: string(hashed),
 		Role:         model.RoleCustomer,
+		EmailVerified: true,
 		IsActive:     true,
 	}
 
@@ -149,5 +152,130 @@ func TestGRPCLogin_InvalidCredentials(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid credentials, got nil")
+	}
+}
+
+func TestGRPCLogin_MerchantSuccess(t *testing.T) {
+	userID := uuid.Must(uuid.NewV7())
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	user := &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       userID,
+		Email:        "merchant@example.com",
+		PasswordHash: string(hashed),
+		Role:         model.RoleMerchant,
+		EmailVerified: true,
+		IsActive:     true,
+	}
+
+	repo := &mockRepoForGRPC{user: user}
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "integration-jwt-secret-999",
+			ExpiryMinutes: 15,
+		},
+	}
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
+
+	loginResp, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
+		Email:      "merchant@example.com",
+		Password:   rawPassword,
+		IsMerchant: true,
+	})
+	if err != nil {
+		t.Fatalf("expected successful merchant gRPC login, got: %v", err)
+	}
+
+	if loginResp.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %s", loginResp.Role)
+	}
+
+	claims := &auth.UserClaims{}
+	token, err := jwt.ParseWithClaims(loginResp.AccessToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(cfg.JWT.Secret), nil
+	})
+	if err != nil || !token.Valid {
+		t.Fatalf("access token invalid: %v", err)
+	}
+	if claims.Role != "MERCHANT" {
+		t.Errorf("expected claim role MERCHANT, got %s", claims.Role)
+	}
+}
+
+func TestGRPCLogin_RoleMismatch(t *testing.T) {
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	user := &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       uuid.Must(uuid.NewV7()),
+		Email:        "merchant@example.com",
+		PasswordHash: string(hashed),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	repo := &mockRepoForGRPC{user: user}
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "secret"},
+	}
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
+
+	// Attempt to log into merchant account with IsMerchant: false (customer)
+	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
+		Email:      "merchant@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err == nil {
+		t.Fatal("expected error due to role mismatch, got nil")
+	}
+}
+
+func TestGRPCLogin_UnverifiedEmail_Fails(t *testing.T) {
+	userID := uuid.Must(uuid.NewV7())
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	user := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "unverified@example.com",
+		PasswordHash:  string(hashed),
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	repo := &mockRepoForGRPC{user: user}
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "secret"},
+	}
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
+
+	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
+		Email:      "unverified@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err == nil {
+		t.Fatal("expected error for unverified email, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected gRPC status error, got %v", err)
+	}
+	if st.Code() != codes.PermissionDenied {
+		t.Errorf("expected codes.PermissionDenied, got %v", st.Code())
+	}
+	expectedMsg := "email is not verified, please verify your email first and then login"
+	if st.Message() != expectedMsg {
+		t.Errorf("expected message %q, got %q", expectedMsg, st.Message())
 	}
 }

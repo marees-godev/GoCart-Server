@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -578,6 +579,7 @@ func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
 	part, _ := w.CreateFormFile("0", "logo.png")
 	_, _ = part.Write([]byte("fake-png-binary-content"))
 	_ = w.Close()
+	fmt.Printf("STORE_TEST BUFFER:\n%s\n", b.String())
 
 	req := httptest.NewRequest(http.MethodPost, "/graphql", &b)
 	req.Header.Set("Content-Type", w.FormDataContentType())

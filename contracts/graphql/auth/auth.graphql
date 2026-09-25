@@ -12,6 +12,7 @@ type AuthPayload {
 input LoginInput {
   email: String!
   password: String!
+  isMerchant: Boolean!
 }
 
 input RegisterInput {
@@ -19,7 +20,7 @@ input RegisterInput {
   password: String!
   firstName: String
   lastName: String
-  isMerchant: Boolean
+  isMerchant: Boolean!
 }
 
 extend type Mutation {

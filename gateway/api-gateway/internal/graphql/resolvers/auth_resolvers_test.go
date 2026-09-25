@@ -14,6 +14,7 @@ import (
 type mockAuthClient struct {
 	authpb.AuthServiceClient
 	lastRegisterReq *authpb.RegisterRequest
+	lastLoginReq    *authpb.LoginRequest
 }
 
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
@@ -23,6 +24,21 @@ func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterReques
 		TokenType:   "Bearer",
 		ExpiresIn:   900,
 		UserId:      "user-uuid-123",
+	}, nil
+}
+
+func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	m.lastLoginReq = in
+	role := "CUSTOMER"
+	if in.IsMerchant {
+		role = "MERCHANT"
+	}
+	return &authpb.AuthResponse{
+		AccessToken: "test-login-token",
+		TokenType:   "Bearer",
+		ExpiresIn:   900,
+		UserId:      "user-uuid-123",
+		Role:        role,
 	}, nil
 }
 
@@ -67,7 +83,7 @@ func TestRegisterResolver_Customer(t *testing.T) {
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: &isMerch,
+		IsMerchant: isMerch,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -124,7 +140,7 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: &isMerch,
+		IsMerchant: isMerch,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -161,5 +177,94 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 	}
 	if payload.User.FirstName == nil || *payload.User.FirstName != "Jane" || payload.User.LastName == nil || *payload.User.LastName != "Merchant" {
 		t.Errorf("expected name Jane Merchant, got %v %v", payload.User.FirstName, payload.User.LastName)
+	}
+}
+
+func TestLoginResolver_Customer(t *testing.T) {
+	authMock := &mockAuthClient{}
+	userMock := &mockUserClient{}
+
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	input := model.LoginInput{
+		Email:      "customer@example.com",
+		Password:   "Password123!",
+		IsMerchant: false,
+	}
+
+	payload, err := r.Login(context.Background(), input)
+	if err != nil {
+		t.Fatalf("expected successful customer login, got: %v", err)
+	}
+
+	if payload.Token != "test-login-token" {
+		t.Errorf("expected token 'test-login-token', got '%s'", payload.Token)
+	}
+	if authMock.lastLoginReq == nil {
+		t.Fatal("expected AuthClient.Login to be called")
+	}
+	if authMock.lastLoginReq.IsMerchant != false {
+		t.Errorf("expected IsMerchant to be false, got true")
+	}
+	if userMock.lastGetUserReq == nil || userMock.lastGetUserReq.Id != "user-uuid-123" {
+		t.Errorf("expected UserClient.GetUser to be called for customer")
+	}
+	if payload.Role == nil || *payload.Role != "CUSTOMER" {
+		t.Errorf("expected role CUSTOMER, got %v", payload.Role)
+	}
+}
+
+func TestLoginResolver_Merchant(t *testing.T) {
+	authMock := &mockAuthClient{}
+	userMock := &mockUserClient{}
+
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	input := model.LoginInput{
+		Email:      "merchant@example.com",
+		Password:   "Password123!",
+		IsMerchant: true,
+	}
+
+	payload, err := r.Login(context.Background(), input)
+	if err != nil {
+		t.Fatalf("expected successful merchant login, got: %v", err)
+	}
+
+	if payload.Token != "test-login-token" {
+		t.Errorf("expected token 'test-login-token', got '%s'", payload.Token)
+	}
+	if authMock.lastLoginReq == nil {
+		t.Fatal("expected AuthClient.Login to be called")
+	}
+	if authMock.lastLoginReq.IsMerchant != true {
+		t.Errorf("expected IsMerchant to be true, got false")
+	}
+	if userMock.lastGetUserReq != nil {
+		t.Errorf("expected UserClient.GetUser NOT to be called for merchant")
+	}
+	if payload.Role == nil || *payload.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %v", payload.Role)
+	}
+	if payload.Merchant == nil {
+		t.Errorf("expected Merchant payload to be populated")
 	}
 }
