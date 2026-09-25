@@ -43,3 +43,5 @@ extend type Mutation {
   updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
   deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
 }
+
+
