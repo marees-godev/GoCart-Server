@@ -264,4 +264,3 @@ func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email st
 	}
 	return res.GetSuccess(), nil
 }
-

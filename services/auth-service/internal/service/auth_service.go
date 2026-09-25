@@ -59,10 +59,10 @@ func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slo
 		log = slog.Default()
 	}
 	m := mailer.NewMailer(cfg.Email, log)
-	return NewAuthServiceWithMailer(repo, cfg, m, log)
+	return NewAuthServiceWithMailer(repo, cfg, m, log, clients...)
 }
 
-func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config, m mailer.Mailer, log *slog.Logger) AuthService {
+func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config, m mailer.Mailer, log *slog.Logger, clients ...any) AuthService {
 	if log == nil {
 		log = slog.Default()
 	}
