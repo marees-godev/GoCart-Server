@@ -8,21 +8,79 @@ import (
 
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/service"
 )
 
 type mockStoreRepository struct {
-	stores map[string]*model.Store
-	slugs  map[string]string
+	stores  map[string]*model.Store
+	slugs   map[string]string
+	appeals map[string]*model.StoreAppeal
 }
 
 func newMockRepo() *mockStoreRepository {
 	return &mockStoreRepository{
-		stores: make(map[string]*model.Store),
-		slugs:  make(map[string]string),
+		stores:  make(map[string]*model.Store),
+		slugs:   make(map[string]string),
+		appeals: make(map[string]*model.StoreAppeal),
 	}
+}
+
+func (m *mockStoreRepository) CreateAppeal(ctx context.Context, appeal *model.StoreAppeal) error {
+	if appeal.ID == "" {
+		appeal.ID = "appeal-" + appeal.StoreID
+	}
+	appeal.CreatedAt = time.Now()
+	appeal.UpdatedAt = time.Now()
+	m.appeals[appeal.ID] = appeal
+	return nil
+}
+
+func (m *mockStoreRepository) GetPendingAppealByStoreID(ctx context.Context, storeID string) (*model.StoreAppeal, error) {
+	for _, a := range m.appeals {
+		if a.StoreID == storeID && a.Status == model.AppealStatusPending {
+			cp := *a
+			return &cp, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockStoreRepository) GetAppealByID(ctx context.Context, id string) (*model.StoreAppeal, error) {
+	a, exists := m.appeals[id]
+	if !exists {
+		return nil, appErrors.NotFound("appeal not found")
+	}
+	cp := *a
+	return &cp, nil
+}
+
+func (m *mockStoreRepository) ListAppealsByStoreID(ctx context.Context, storeID string) ([]*model.StoreAppeal, error) {
+	res := make([]*model.StoreAppeal, 0)
+	for _, a := range m.appeals {
+		if a.StoreID == storeID {
+			cp := *a
+			res = append(res, &cp)
+		}
+	}
+	return res, nil
+}
+
+func (m *mockStoreRepository) UpdateAppealStatus(ctx context.Context, id string, status string, adminComment *string) (*model.StoreAppeal, error) {
+	a, exists := m.appeals[id]
+	if !exists {
+		return nil, appErrors.NotFound("appeal not found")
+	}
+	a.Status = status
+	a.AdminComment = adminComment
+	now := time.Now()
+	a.ReviewedAt = &now
+	a.UpdatedAt = now
+	m.appeals[id] = a
+	cp := *a
+	return &cp, nil
 }
 
 func (m *mockStoreRepository) Create(ctx context.Context, store *model.Store) error {
@@ -111,8 +169,67 @@ func (m *mockStoreRepository) UpdateStatus(ctx context.Context, id string, expec
 	}
 	existing.ApprovalStatus = newStatus
 	existing.RejectionReason = rejectionReason
+	m.stores[id] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+func (m *mockStoreRepository) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string) (*model.Store, error) {
+	existing, exists := m.stores[id]
+	if !exists {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.ApprovalStatus = newStatus
+	existing.RejectionReason = rejectionReason
+	if newStatus == model.StoreStatusSuspended || newStatus == model.StoreStatusClosed {
+		existing.IsPublished = false
+	}
 	existing.UpdatedAt = time.Now()
 	m.stores[id] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+func (m *mockStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycStatus string, bankAccount *model.StoreBankAccount) (*model.Store, error) {
+	existing, exists := m.stores[storeID]
+	if !exists {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.KYCStatus = kycStatus
+	existing.BankAccount = bankAccount
+	existing.UpdatedAt = time.Now()
+	m.stores[storeID] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+type mockGSTINClient struct {
+	verifyFunc func(ctx context.Context, gstinStr string) (*gstin.GSTINResponse, error)
+}
+
+func (m *mockGSTINClient) VerifyGSTIN(ctx context.Context, gstinStr string) (*gstin.GSTINResponse, error) {
+	if m.verifyFunc != nil {
+		return m.verifyFunc(ctx, gstinStr)
+	}
+	return &gstin.GSTINResponse{
+		Success: true,
+		GSTIN:   gstinStr,
+		Data: &gstin.GSTINData{
+			GSTIN:       gstinStr,
+			Status:      "Active",
+			BlockStatus: "Unblocked",
+		},
+	}, nil
+}
+
+func (m *mockStoreRepository) SetPublishStatus(ctx context.Context, storeID string, isPublished bool) (*model.Store, error) {
+	existing, exists := m.stores[storeID]
+	if !exists {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.IsPublished = isPublished
+	existing.UpdatedAt = time.Now()
+	m.stores[storeID] = existing
 	cp := *existing
 	return &cp, nil
 }
@@ -884,5 +1001,346 @@ func TestRejectStore_InvalidStateTransition(t *testing.T) {
 	appErr := appErrors.AsAppError(err)
 	if appErr.Code != appErrors.CodeUnprocessableEntity {
 		t.Errorf("expected UNPROCESSABLE_ENTITY code, got %s", appErr.Code)
+	}
+}
+
+func TestSubmitKYC_Success(t *testing.T) {
+	repo := newMockRepo()
+	mockClient := &mockGSTINClient{}
+	svc := service.NewStoreService(repo, mockClient)
+
+	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Test Store",
+		Slug:           "test-store",
+		ApprovalStatus: model.StoreStatusApproved,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	gstinVal := "33AAACC1206D1ZN"
+	req := dto.SubmitKYCRequest{
+		StoreID:           "store-1",
+		BankName:          "Chase Bank",
+		AccountNumber:     "1234567890",
+		AccountHolderName: "Merchant Owner",
+		GSTIN:             &gstinVal,
+	}
+
+	updated, err := svc.SubmitKYC(authCtx, "", req)
+	if err != nil {
+		t.Fatalf("expected SubmitKYC success, got %v", err)
+	}
+
+	if updated.KYCStatus != model.KYCStatusPending {
+		t.Errorf("expected KYC status %s, got %s", model.KYCStatusPending, updated.KYCStatus)
+	}
+}
+
+func TestSubmitKYC_OwnershipEnforcement(t *testing.T) {
+	repo := newMockRepo()
+	mockClient := &mockGSTINClient{}
+	svc := service.NewStoreService(repo, mockClient)
+
+	attackerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "attacker-merchant",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "victim-merchant",
+		Name:           "Victim Store",
+		Slug:           "victim-store",
+		ApprovalStatus: model.StoreStatusApproved,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	gstinVal := "33AAACC1206D1ZN"
+	req := dto.SubmitKYCRequest{
+		StoreID:           "store-1",
+		BankName:          "Fake Bank",
+		AccountNumber:     "999999",
+		AccountHolderName: "Attacker",
+		GSTIN:             &gstinVal,
+	}
+
+	_, err := svc.SubmitKYC(attackerCtx, "", req)
+	if err == nil {
+		t.Fatal("expected error submitting KYC for another merchant's store, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	}
+}
+
+func TestPublishStore_Rules(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	authCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	// 1. Draft/Unapproved store cannot be published
+	draftStore := &model.Store{
+		ID:             "store-draft",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusDraft,
+		IsPublished:    false,
+	}
+	_ = repo.Create(context.Background(), draftStore)
+
+	_, err := svc.PublishStore(authCtx, "", dto.PublishStoreRequest{StoreID: "store-draft"})
+	if err == nil {
+		t.Fatal("expected error publishing draft store, got nil")
+	}
+	if appErrors.AsAppError(err).Code != appErrors.CodeUnprocessableEntity {
+		t.Errorf("expected UNPROCESSABLE_ENTITY, got %s", appErrors.AsAppError(err).Code)
+	}
+
+	// 2. Rejected store cannot be published
+	rejectedStore := &model.Store{
+		ID:             "store-rejected",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusRejected,
+		IsPublished:    false,
+	}
+	_ = repo.Create(context.Background(), rejectedStore)
+
+	_, err = svc.PublishStore(authCtx, "", dto.PublishStoreRequest{StoreID: "store-rejected"})
+	if err == nil {
+		t.Fatal("expected error publishing rejected store, got nil")
+	}
+
+	// 3. Approved store can be published
+	approvedStore := &model.Store{
+		ID:             "store-approved",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusApproved,
+		IsPublished:    false,
+	}
+	_ = repo.Create(context.Background(), approvedStore)
+
+	published, err := svc.PublishStore(authCtx, "", dto.PublishStoreRequest{StoreID: "store-approved"})
+	if err != nil {
+		t.Fatalf("expected publish success for approved store, got %v", err)
+	}
+	if !published.IsPublished {
+		t.Error("expected IsPublished to be true")
+	}
+
+	// 4. Approved store can be unpublished
+	unpublished, err := svc.UnpublishStore(authCtx, "", dto.UnpublishStoreRequest{StoreID: "store-approved"})
+	if err != nil {
+		t.Fatalf("expected unpublish success, got %v", err)
+	}
+	if unpublished.IsPublished {
+		t.Error("expected IsPublished to be false")
+	}
+}
+
+func TestSuspendStore_Rules(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusApproved,
+		IsPublished:    true,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	// Merchant cannot suspend store (Admin-only protected)
+	_, err := svc.SuspendStore(merchantCtx, "", dto.SuspendStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Illegal goods",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden for merchant suspending store, got nil")
+	}
+
+	// Admin suspends store
+	suspended, err := svc.SuspendStore(adminCtx, "", dto.SuspendStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Policy violation",
+	})
+	if err != nil {
+		t.Fatalf("expected suspend success for admin, got %v", err)
+	}
+
+	if suspended.ApprovalStatus != model.StoreStatusSuspended {
+		t.Errorf("expected status %s, got %s", model.StoreStatusSuspended, suspended.ApprovalStatus)
+	}
+	if suspended.IsPublished {
+		t.Error("suspended store must be unpublished (is_published = false)")
+	}
+
+	// Suspended store cannot be published by merchant
+	_, err = svc.PublishStore(merchantCtx, "", dto.PublishStoreRequest{StoreID: "store-1"})
+	if err == nil {
+		t.Fatal("expected error publishing suspended store, got nil")
+	}
+}
+
+func TestUnsuspendStore_Rules(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	store := &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusSuspended,
+		IsPublished:    false,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	// Submit an appeal
+	_, appeal, err := svc.AppealStore(merchantCtx, "", dto.AppealStoreRequest{
+		StoreID: "store-1",
+		Reason:  "Please unblock me",
+	})
+	if err != nil {
+		t.Fatalf("expected appeal creation success, got %v", err)
+	}
+	if appeal.Status != model.AppealStatusPending {
+		t.Fatalf("expected PENDING status for new appeal, got %s", appeal.Status)
+	}
+
+	// Merchant cannot unsuspend (Admin only)
+	_, err = svc.UnsuspendStore(merchantCtx, "", dto.UnsuspendStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden error for merchant unsuspending store, got nil")
+	}
+
+	// Admin unsuspends store with a reason
+	unsuspended, err := svc.UnsuspendStore(adminCtx, "", dto.UnsuspendStoreRequest{
+		StoreID: "store-1",
+		Reason:  "it's ok bro",
+	})
+	if err != nil {
+		t.Fatalf("expected unsuspend success for admin, got %v", err)
+	}
+
+	if unsuspended.ApprovalStatus != model.StoreStatusApproved {
+		t.Errorf("expected status %s, got %s", model.StoreStatusApproved, unsuspended.ApprovalStatus)
+	}
+
+	// Verify pending appeal is marked APPROVED with admin_comment
+	updatedAppeal, err := repo.GetAppealByID(context.Background(), appeal.ID)
+	if err != nil {
+		t.Fatalf("expected appeal to exist, got %v", err)
+	}
+	if updatedAppeal.Status != model.AppealStatusApproved {
+		t.Errorf("expected appeal status APPROVED, got %s", updatedAppeal.Status)
+	}
+	if updatedAppeal.AdminComment == nil || *updatedAppeal.AdminComment != "it's ok bro" {
+		t.Errorf("expected admin comment 'it's ok bro', got %v", updatedAppeal.AdminComment)
+	}
+
+	// Unsuspending a non-suspended store should fail
+	_, err = svc.UnsuspendStore(adminCtx, "", dto.UnsuspendStoreRequest{
+		StoreID: "store-1",
+	})
+	if err == nil {
+		t.Fatal("expected error unsuspending non-suspended store, got nil")
+	}
+}
+
+func TestAppealStore_Rules(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	attackerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "attacker-merchant",
+		Role:   auth.RoleMerchant,
+	})
+
+	rejReason := "Violated terms of service"
+	store := &model.Store{
+		ID:              "store-suspended",
+		MerchantID:      "merchant-1",
+		ApprovalStatus:  model.StoreStatusSuspended,
+		RejectionReason: &rejReason,
+		IsPublished:     false,
+	}
+	_ = repo.Create(context.Background(), store)
+
+	// Attacker cannot appeal another merchant's store
+	_, _, err := svc.AppealStore(attackerCtx, "", dto.AppealStoreRequest{
+		StoreID: "store-suspended",
+		Reason:  "Please restore my store",
+	})
+	if err == nil {
+		t.Fatal("expected forbidden error for appealing another merchant's store, got nil")
+	}
+
+	// Owner appeals suspended store
+	st, appeal, err := svc.AppealStore(merchantCtx, "", dto.AppealStoreRequest{
+		StoreID: "store-suspended",
+		Reason:  "I have resolved all compliance issues",
+	})
+	if err != nil {
+		t.Fatalf("expected appeal success for owner, got %v", err)
+	}
+
+	// Store status remains SUSPENDED and rejection_reason stays intact!
+	if st.ApprovalStatus != model.StoreStatusSuspended {
+		t.Errorf("expected store approval status to remain SUSPENDED, got %s", st.ApprovalStatus)
+	}
+	if st.RejectionReason == nil || *st.RejectionReason != "Violated terms of service" {
+		t.Errorf("expected original rejection_reason to remain intact, got %v", st.RejectionReason)
+	}
+
+	if appeal.Status != model.AppealStatusPending {
+		t.Errorf("expected appeal status PENDING, got %s", appeal.Status)
+	}
+	if appeal.Reason != "I have resolved all compliance issues" {
+		t.Errorf("unexpected appeal reason: %s", appeal.Reason)
+	}
+
+	// Submitting duplicate pending appeal fails
+	_, _, err = svc.AppealStore(merchantCtx, "", dto.AppealStoreRequest{
+		StoreID: "store-suspended",
+		Reason:  "Duplicate appeal",
+	})
+	if err == nil {
+		t.Fatal("expected conflict error for submitting duplicate pending appeal, got nil")
 	}
 }

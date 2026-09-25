@@ -13,6 +13,14 @@ service StoreService {
   rpc SubmitStore (SubmitStoreRequest) returns (SubmitStoreResponse);
   rpc ApproveStore (ApproveStoreRequest) returns (ApproveStoreResponse);
   rpc RejectStore (RejectStoreRequest) returns (RejectStoreResponse);
+  rpc SubmitKYC (SubmitKYCRequest) returns (SubmitKYCResponse);
+  rpc PublishStore (PublishStoreRequest) returns (PublishStoreResponse);
+  rpc UnpublishStore (UnpublishStoreRequest) returns (UnpublishStoreResponse);
+  rpc SuspendStore (SuspendStoreRequest) returns (SuspendStoreResponse);
+  rpc UnsuspendStore (UnsuspendStoreRequest) returns (UnsuspendStoreResponse);
+  rpc AppealStore (AppealStoreRequest) returns (AppealStoreResponse);
+  rpc GetStoreAppeals (GetStoreAppealsRequest) returns (GetStoreAppealsResponse);
+  rpc CloseStore (CloseStoreRequest) returns (CloseStoreResponse);
 }
 
 message Store {
@@ -32,6 +40,9 @@ message Store {
   double avg_store_rating = 14;
   string created_at = 15;
   string updated_at = 16;
+  bool is_published = 17;
+  string kyc_status = 18;
+  string gstin = 19;
 }
 
 message GetStoreRequest {
@@ -129,5 +140,99 @@ message RejectStoreRequest {
 message RejectStoreResponse {
   Store store = 1;
 }
+
+message SubmitKYCRequest {
+  string store_id = 1;
+  string merchant_id = 2;
+  string bank_name = 3;
+  string account_number = 4;
+  string account_holder_name = 5;
+  optional string ifsc_code = 6;
+  optional string gstin = 7;
+}
+
+message SubmitKYCResponse {
+  Store store = 1;
+}
+
+message PublishStoreRequest {
+  string store_id = 1;
+  string merchant_id = 2;
+}
+
+message PublishStoreResponse {
+  Store store = 1;
+}
+
+message UnpublishStoreRequest {
+  string store_id = 1;
+  string merchant_id = 2;
+}
+
+message UnpublishStoreResponse {
+  Store store = 1;
+}
+
+message SuspendStoreRequest {
+  string store_id = 1;
+  string admin_id = 2;
+  string reason = 3;
+}
+
+message SuspendStoreResponse {
+  Store store = 1;
+}
+
+message UnsuspendStoreRequest {
+  string store_id = 1;
+  string admin_id = 2;
+  optional string reason = 3;
+}
+
+message UnsuspendStoreResponse {
+  Store store = 1;
+}
+
+message StoreAppeal {
+  string id = 1;
+  string store_id = 2;
+  string merchant_id = 3;
+  string reason = 4;
+  string status = 5;
+  string admin_comment = 6;
+  string reviewed_at = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message AppealStoreRequest {
+  string store_id = 1;
+  string merchant_id = 2;
+  string reason = 3;
+}
+
+message AppealStoreResponse {
+  Store store = 1;
+  StoreAppeal appeal = 2;
+}
+
+message GetStoreAppealsRequest {
+  string store_id = 1;
+}
+
+message GetStoreAppealsResponse {
+  repeated StoreAppeal appeals = 1;
+}
+
+message CloseStoreRequest {
+  string store_id = 1;
+  string merchant_id = 2;
+  string reason = 3;
+}
+
+message CloseStoreResponse {
+  Store store = 1;
+}
+
 
 

@@ -58,7 +58,7 @@ func (r *mutationResolver) CreateStore(ctx context.Context, input model.CreateSt
 		addr = *input.Address
 	}
 
-	bank := maps.SerializeBankAccount(input.BankAccount, input.BankAccountDetails)
+	bank := maps.SerializeBankAccount(input.BankAccount)
 
 	res, err := r.Clients.StoreClient.CreateStore(ctx, &storepb.CreateStoreRequest{
 		MerchantId:         merchantID,
@@ -107,8 +107,8 @@ func (r *mutationResolver) UpdateStore(ctx context.Context, input model.UpdateSt
 	}
 
 	var bankDetails *string
-	if input.BankAccount != nil || input.BankAccountDetails != nil {
-		serialized := maps.SerializeBankAccount(input.BankAccount, input.BankAccountDetails)
+	if input.BankAccount != nil {
+		serialized := maps.SerializeBankAccount(input.BankAccount)
 		bankDetails = &serialized
 	}
 
@@ -246,6 +246,206 @@ func (r *mutationResolver) RejectStore(ctx context.Context, id string, reason st
 	return maps.MapStore(res.Store), nil
 }
 
+// SubmitKyc is the resolver for the submitKYC field.
+func (r *mutationResolver) SubmitKyc(ctx context.Context, input model.SubmitKYCInput) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	var ifsc *string
+	if input.IfscCode != nil {
+		ifsc = input.IfscCode
+	}
+
+	gstin := &input.Gstin
+
+	res, err := r.Clients.StoreClient.SubmitKYC(ctx, &storepb.SubmitKYCRequest{
+		StoreId:           input.StoreID,
+		MerchantId:        merchantID,
+		BankName:          input.BankName,
+		AccountNumber:     input.AccountNumber,
+		AccountHolderName: input.AccountHolderName,
+		IfscCode:          ifsc,
+		Gstin:             gstin,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// PublishStore is the resolver for the publishStore field.
+func (r *mutationResolver) PublishStore(ctx context.Context, id string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.PublishStore(ctx, &storepb.PublishStoreRequest{
+		StoreId:    id,
+		MerchantId: merchantID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// UnpublishStore is the resolver for the unpublishStore field.
+func (r *mutationResolver) UnpublishStore(ctx context.Context, id string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.UnpublishStore(ctx, &storepb.UnpublishStoreRequest{
+		StoreId:    id,
+		MerchantId: merchantID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// SuspendStore is the resolver for the suspendStore field.
+func (r *mutationResolver) SuspendStore(ctx context.Context, id string, reason string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	adminID := ""
+	if userCtx != nil {
+		adminID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.SuspendStore(ctx, &storepb.SuspendStoreRequest{
+		StoreId: id,
+		AdminId: adminID,
+		Reason:  reason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// UnsuspendStore is the resolver for the unsuspendStore field.
+func (r *mutationResolver) UnsuspendStore(ctx context.Context, id string, reason *string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	adminID := ""
+	if userCtx != nil {
+		adminID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.UnsuspendStore(ctx, &storepb.UnsuspendStoreRequest{
+		StoreId: id,
+		AdminId: adminID,
+		Reason:  reason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
+// AppealStore is the resolver for the appealStore field.
+func (r *mutationResolver) AppealStore(ctx context.Context, id string, reason string) (*model.StoreAppeal, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	res, err := r.Clients.StoreClient.AppealStore(ctx, &storepb.AppealStoreRequest{
+		StoreId:    id,
+		MerchantId: merchantID,
+		Reason:     reason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStoreAppeal(res.Appeal), nil
+}
+
+// CloseStore is the resolver for the closeStore field.
+func (r *mutationResolver) CloseStore(ctx context.Context, id string, reason *string) (*model.Store, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if id == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	userID := ""
+	if userCtx != nil {
+		userID = userCtx.UserID
+	}
+
+	rStr := ""
+	if reason != nil {
+		rStr = *reason
+	}
+
+	res, err := r.Clients.StoreClient.CloseStore(ctx, &storepb.CloseStoreRequest{
+		StoreId:    id,
+		MerchantId: userID,
+		Reason:     rStr,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapStore(res.Store), nil
+}
+
 // Store is the resolver for the store field.
 func (r *queryResolver) Store(ctx context.Context, id string) (*model.Store, error) {
 	if r.Clients == nil || r.Clients.StoreClient == nil {
@@ -324,4 +524,28 @@ func (r *queryResolver) Stores(ctx context.Context, merchantID *string, limit *i
 		Stores: stores,
 		Total:  int(res.Total),
 	}, nil
+}
+
+// StoreAppeals is the resolver for the storeAppeals field.
+func (r *queryResolver) StoreAppeals(ctx context.Context, storeID string) ([]*model.StoreAppeal, error) {
+	if r.Clients == nil || r.Clients.StoreClient == nil {
+		return nil, appErrors.Internal(nil, "store service client unavailable")
+	}
+	if storeID == "" {
+		return nil, appErrors.BadRequest("store id is required")
+	}
+
+	res, err := r.Clients.StoreClient.GetStoreAppeals(ctx, &storepb.GetStoreAppealsRequest{
+		StoreId: storeID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	appeals := make([]*model.StoreAppeal, 0, len(res.Appeals))
+	for _, a := range res.Appeals {
+		appeals = append(appeals, maps.MapStoreAppeal(a))
+	}
+
+	return appeals, nil
 }

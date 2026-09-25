@@ -21,6 +21,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/repository"
@@ -101,18 +102,27 @@ func main() {
 		log.Warn("Failed to initialize S3 storage client", "error", err)
 	}
 
+	gstinClient := gstin.NewGSTINClient(cfg.GSTIN)
 	storeRepo := repository.NewStoreRepository(db.Pool)
-	storeService := service.NewStoreService(storeRepo, s3Client)
-	storeGRPCHandler := handler.NewStoreGRPCHandler(storeService)
+	storeService := service.NewStoreService(storeRepo, s3Client, gstinClient)
+	storeGRPCHandler := handler.NewStoreGRPCHandler(storeService, log)
 
 	// 6. Setup gRPC Server with role-based auth interceptor
 	storeMethodRoles := map[string][]string{
-		"/gocart.store.v1.StoreService/CreateStore":  {auth.RoleMerchant},
-		"/gocart.store.v1.StoreService/UpdateStore":  {auth.RoleMerchant},
-		"/gocart.store.v1.StoreService/SubmitStore":  {auth.RoleMerchant},
-		"/gocart.store.v1.StoreService/GetUploadUrl": {auth.RoleMerchant},
-		"/gocart.store.v1.StoreService/ApproveStore": {auth.RoleAdmin},
-		"/gocart.store.v1.StoreService/RejectStore":  {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/CreateStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/UpdateStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/SubmitStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/GetUploadUrl":    {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/ApproveStore":    {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/RejectStore":     {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/SubmitKYC":       {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/PublishStore":    {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/UnpublishStore":  {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/SuspendStore":    {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/UnsuspendStore":  {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/AppealStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/GetStoreAppeals": {auth.RoleMerchant, auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/CloseStore":      {auth.RoleMerchant, auth.RoleAdmin},
 	}
 
 	grpcServer := grpc.NewServer(

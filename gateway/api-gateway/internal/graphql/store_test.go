@@ -149,6 +149,122 @@ func (m *mockStoreClient) RejectStore(ctx context.Context, in *storepb.RejectSto
 	return &storepb.RejectStoreResponse{Store: s}, nil
 }
 
+func (m *mockStoreClient) SubmitKYC(ctx context.Context, in *storepb.SubmitKYCRequest, opts ...grpc.CallOption) (*storepb.SubmitKYCResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id:         in.StoreId,
+			MerchantId: in.MerchantId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.KycStatus = "PENDING"
+	return &storepb.SubmitKYCResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) PublishStore(ctx context.Context, in *storepb.PublishStoreRequest, opts ...grpc.CallOption) (*storepb.PublishStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id:         in.StoreId,
+			MerchantId: in.MerchantId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.IsPublished = true
+	return &storepb.PublishStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) UnpublishStore(ctx context.Context, in *storepb.UnpublishStoreRequest, opts ...grpc.CallOption) (*storepb.UnpublishStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id:         in.StoreId,
+			MerchantId: in.MerchantId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.IsPublished = false
+	return &storepb.UnpublishStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) SuspendStore(ctx context.Context, in *storepb.SuspendStoreRequest, opts ...grpc.CallOption) (*storepb.SuspendStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id: in.StoreId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.ApprovalStatus = "SUSPENDED"
+	s.IsPublished = false
+	s.RejectionReason = in.Reason
+	return &storepb.SuspendStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) UnsuspendStore(ctx context.Context, in *storepb.UnsuspendStoreRequest, opts ...grpc.CallOption) (*storepb.UnsuspendStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id: in.StoreId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.ApprovalStatus = "APPROVED"
+	s.RejectionReason = ""
+	return &storepb.UnsuspendStoreResponse{Store: s}, nil
+}
+
+func (m *mockStoreClient) AppealStore(ctx context.Context, in *storepb.AppealStoreRequest, opts ...grpc.CallOption) (*storepb.AppealStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id: in.StoreId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	appeal := &storepb.StoreAppeal{
+		Id:         "appeal-1",
+		StoreId:    in.StoreId,
+		MerchantId: in.MerchantId,
+		Reason:     in.Reason,
+		Status:     "PENDING",
+		CreatedAt:  "2026-09-25T17:00:00Z",
+		UpdatedAt:  "2026-09-25T17:00:00Z",
+	}
+	return &storepb.AppealStoreResponse{
+		Store:  s,
+		Appeal: appeal,
+	}, nil
+}
+
+func (m *mockStoreClient) GetStoreAppeals(ctx context.Context, in *storepb.GetStoreAppealsRequest, opts ...grpc.CallOption) (*storepb.GetStoreAppealsResponse, error) {
+	appeal := &storepb.StoreAppeal{
+		Id:        "appeal-1",
+		StoreId:   in.StoreId,
+		Reason:    "Issues resolved",
+		Status:    "PENDING",
+		CreatedAt: "2026-09-25T17:00:00Z",
+		UpdatedAt: "2026-09-25T17:00:00Z",
+	}
+	return &storepb.GetStoreAppealsResponse{
+		Appeals: []*storepb.StoreAppeal{appeal},
+	}, nil
+}
+
+func (m *mockStoreClient) CloseStore(ctx context.Context, in *storepb.CloseStoreRequest, opts ...grpc.CallOption) (*storepb.CloseStoreResponse, error) {
+	s, ok := m.stores[in.StoreId]
+	if !ok {
+		s = &storepb.Store{
+			Id: in.StoreId,
+		}
+		m.stores[in.StoreId] = s
+	}
+	s.ApprovalStatus = "CLOSED"
+	s.IsPublished = false
+	return &storepb.CloseStoreResponse{Store: s}, nil
+}
+
 func setupStoreTestApp(t *testing.T) (*fiber.App, string) {
 	cfg := &config.Config{
 		App: config.AppConfig{
@@ -581,7 +697,7 @@ func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
 	_ = w.Close()
 	fmt.Printf("STORE_TEST BUFFER:\n%s\n", b.String())
 
-	req := httptest.NewRequest(http.MethodPost, "/graphql", &b)
+	req := httptest.NewRequest(http.MethodPost, "/query", &b)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -608,3 +724,82 @@ func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
 	}
 }
 
+func TestStoreGraphQL_UnsuspendStore(t *testing.T) {
+	app, _ := setupStoreTestApp(t)
+
+	adminToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	}, "test-secret-key-12345", 3600*1000000000)
+
+	unsuspendQuery := `
+		mutation {
+			unsuspendStore(id: "store-1") {
+				id
+				approvalStatus
+			}
+		}
+	`
+	reqBody, _ := json.Marshal(map[string]interface{}{"query": unsuspendQuery})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["unsuspendStore"] == nil {
+		t.Fatalf("expected unsuspendStore data, got: %+v", res)
+	}
+
+	unsuspended := data["unsuspendStore"].(map[string]interface{})
+	if unsuspended["approvalStatus"] != "APPROVED" {
+		t.Errorf("expected APPROVED, got %v", unsuspended["approvalStatus"])
+	}
+}
+
+func TestStoreGraphQL_AppealStore(t *testing.T) {
+	app, merchantToken := setupStoreTestApp(t)
+
+	appealQuery := `
+		mutation {
+			appealStore(id: "store-1", reason: "Issues resolved") {
+				id
+				storeId
+				reason
+				status
+			}
+		}
+	`
+	reqBody, _ := json.Marshal(map[string]interface{}{"query": appealQuery})
+	req := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+merchantToken)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data["appealStore"] == nil {
+		t.Fatalf("expected appealStore data, got: %+v", res)
+	}
+
+	appealed := data["appealStore"].(map[string]interface{})
+	if appealed["status"] != "PENDING" {
+		t.Errorf("expected PENDING, got %v", appealed["status"])
+	}
+	if appealed["reason"] != "Issues resolved" {
+		t.Errorf("expected Issues resolved, got %v", appealed["reason"])
+	}
+}

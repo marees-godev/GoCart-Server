@@ -34,8 +34,7 @@ CREATE TABLE IF NOT EXISTS store_bank_accounts (
     account_holder_name VARCHAR(255) NOT NULL,
     bank_name VARCHAR(255) NOT NULL,
     account_number VARCHAR(100) NOT NULL,
-    routing_number VARCHAR(100),
-    tax_id VARCHAR(100),
+    ifsc_code VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
