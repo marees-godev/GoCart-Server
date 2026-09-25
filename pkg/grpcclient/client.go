@@ -18,6 +18,7 @@ import (
 	returns "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -198,4 +199,14 @@ func NewNotificationClient(target string, timeout time.Duration, opts ...grpc.Di
 		return nil, nil, err
 	}
 	return notification.NewNotificationServiceClient(conn), conn, nil
+}
+
+// MapAppErrorToGRPC converts an application error into an equivalent gRPC status error.
+func MapAppErrorToGRPC(err error) error {
+	return errors.MapAppErrorToGRPC(err)
+}
+
+// ToGRPC converts an application error into an equivalent gRPC status error.
+func ToGRPC(err error) error {
+	return errors.MapAppErrorToGRPC(err)
 }

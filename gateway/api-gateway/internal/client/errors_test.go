@@ -65,6 +65,12 @@ func TestTranslateGRPCError(t *testing.T) {
 			expectedHTTP: http.StatusUnprocessableEntity,
 		},
 		{
+			name:         "grpc ResourceExhausted",
+			inputErr:     status.Error(codes.ResourceExhausted, "rate limit exceeded"),
+			expectedCode: appErrors.CodeTooManyRequests,
+			expectedHTTP: http.StatusTooManyRequests,
+		},
+		{
 			name:         "grpc DeadlineExceeded",
 			inputErr:     status.Error(codes.DeadlineExceeded, "context deadline exceeded"),
 			expectedCode: "GATEWAY_TIMEOUT",

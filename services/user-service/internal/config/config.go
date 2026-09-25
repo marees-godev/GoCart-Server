@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -10,9 +11,16 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
-	Tracing  TracingConfig
+	Tracing   TracingConfig
+	Retention RetentionConfig
+}
+
+type RetentionConfig struct {
+	Interval time.Duration
+	Period   time.Duration
 }
 
 type AppConfig struct {
@@ -22,6 +30,10 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
+	Port string
+}
+
+type GRPCConfig struct {
 	Port string
 }
 
@@ -59,8 +71,11 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "5050"),
 		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50052"),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("DATABASE_URL", ""),
+			URL:            GetEnv("USER_SERVICE_DATABASE_URL", ""),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -74,6 +89,10 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Retention: RetentionConfig{
+			Interval: GetEnvAsDuration("RETENTION_WORKER_INTERVAL", 1*time.Hour),
+			Period:   GetEnvAsDuration("ACCOUNT_RETENTION_PERIOD", 30*24*time.Hour),
 		},
 	}
 }
@@ -108,3 +127,16 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 	}
 	return val
 }
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
+}
+

@@ -1,0 +1,30 @@
+type Notification {
+  id: ID!
+  userId: String!
+  channel: String!
+  subject: String!
+  content: String!
+  status: String!
+  createdAt: String
+}
+
+type NotificationList {
+  notifications: [Notification!]!
+  total: Int!
+}
+
+input SendNotificationInput {
+  userId: String!
+  channel: String!
+  subject: String!
+  content: String!
+  templateId: String
+}
+
+extend type Query {
+  notifications(userId: ID!, limit: Int, offset: Int): NotificationList! @auth
+}
+
+extend type Mutation {
+  sendNotification(input: SendNotificationInput!): Boolean! @auth
+}

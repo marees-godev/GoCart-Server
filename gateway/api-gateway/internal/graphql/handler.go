@@ -1,7 +1,14 @@
 package graphql
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +18,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofrs/uuid/v5"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -24,8 +32,9 @@ import (
 type contextKey string
 
 const (
-	userIDKey   contextKey = "userID"
-	userRoleKey contextKey = "userRole"
+	userIDKey       contextKey = "userID"
+	userRoleKey     contextKey = "userRole"
+	HeaderXAdminKey string     = "X-Admin-Key"
 )
 
 type GraphQLRequest struct {
@@ -86,6 +95,34 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 
 	srv.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
 		err := graphql.DefaultErrorPresenter(ctx, e)
+
+		var gqlErr *gqlerror.Error
+		if errors.As(e, &gqlErr) && gqlErr.Path == nil {
+			if err.Extensions == nil {
+				err.Extensions = make(map[string]interface{})
+			}
+			if _, exists := err.Extensions["code"]; !exists {
+				err.Extensions["code"] = appErrors.CodeUnprocessableEntity
+			}
+
+			opName := "anonymous"
+			if oc := graphql.GetOperationContext(ctx); oc != nil {
+				if oc.OperationName != "" {
+					opName = oc.OperationName
+				} else if oc.Operation != nil && oc.Operation.Name != "" {
+					opName = oc.Operation.Name
+				}
+			}
+
+			logger.FromContext(ctx).Warn("GraphQL operation validation error",
+				"operation_name", opName,
+				"error_code", appErrors.CodeUnprocessableEntity,
+				"request_id", middleware.GetRequestID(ctx),
+				"error", e.Error(),
+			)
+			return err
+		}
+
 		appErr := appErrors.AsAppError(e)
 		errorCode := "INTERNAL_SERVER_ERROR"
 		if appErr != nil {
@@ -132,19 +169,73 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	authHeader := r.Header.Get("Authorization")
-	secret := "gocart-secret-key-change-in-production"
-	if h.cfg != nil && h.cfg.JWT.Secret != "" {
-		secret = h.cfg.JWT.Secret
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
+	ctx := r.Context()
+	adminKey := r.Header.Get(HeaderXAdminKey)
 
-	if authHeader != "" {
-		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+	if adminKey != "" {
+		expectedKey := ""
+		adminID := ""
+		if h.cfg != nil {
+			expectedKey = h.cfg.AdminAPIKey
+			adminID = h.cfg.AdminUserID
+		}
+		if adminID == "" {
+			adminID = "admin"
+		}
+
+		if expectedKey != "" && adminKey == expectedKey {
+			userCtx := &auth.UserContext{
+				UserID: adminID,
+				Role:   "ADMIN",
+			}
 			ctx = auth.WithUser(ctx, userCtx)
 			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+
+			reqID := middleware.GetRequestID(ctx)
+			if reqID == "" {
+				reqID = r.Header.Get(middleware.HeaderXRequestID)
+				if reqID == "" {
+					reqID = r.Header.Get(middleware.HeaderXCorrelationID)
+				}
+				if reqID == "" {
+					reqID = uuid.Must(uuid.NewV7()).String()
+				}
+				ctx = logger.WithRequestID(ctx, reqID)
+				ctx = logger.WithCorrelationID(ctx, reqID)
+			}
 			r = r.WithContext(ctx)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			appErr := appErrors.Unauthorized("invalid admin API key")
+			gqlErr := pkgGraphQL.FormatError(ctx, appErr)
+			_ = json.NewEncoder(w).Encode(pkgGraphQL.GraphQLErrorResponse{
+				Errors: []pkgGraphQL.GraphQLError{gqlErr},
+			})
+			return
+		}
+	} else {
+		authHeader := r.Header.Get("Authorization")
+		secret := "gocart-secret-key-change-in-production"
+		if h.cfg != nil && h.cfg.JWT.Secret != "" {
+			secret = h.cfg.JWT.Secret
+		}
+
+		if authHeader != "" {
+			userCtx, err := auth.ValidateToken(authHeader, secret)
+			if err != nil {
+				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())
+			} else if userCtx != nil {
+				ctx = auth.WithUser(ctx, userCtx)
+				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+				r = r.WithContext(ctx)
+			}
 		}
 	}
 
@@ -157,32 +248,79 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		ctx = c.Context()
 	}
 
-	authHeader := c.Get("Authorization")
-	secret := "gocart-secret-key-change-in-production"
-	if h.cfg != nil && h.cfg.JWT.Secret != "" {
-		secret = h.cfg.JWT.Secret
-	}
+	adminKey := c.Get(HeaderXAdminKey)
 
-	if authHeader != "" {
-		if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+	if adminKey != "" {
+		expectedKey := ""
+		adminID := ""
+		if h.cfg != nil {
+			expectedKey = h.cfg.AdminAPIKey
+			adminID = h.cfg.AdminUserID
+		}
+		if adminID == "" {
+			adminID = "admin"
+		}
+
+		if expectedKey != "" && adminKey == expectedKey {
+			userCtx := &auth.UserContext{
+				UserID: adminID,
+				Role:   "ADMIN",
+			}
 			ctx = auth.WithUser(ctx, userCtx)
 			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
-			c.SetUserContext(ctx)
-		}
-	} else if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
-		ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
-		ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
-		c.SetUserContext(ctx)
-	} else {
-		if legacyID, ok := ctx.Value(userIDKey).(string); ok && legacyID != "" {
-			legacyRole, _ := ctx.Value(userRoleKey).(string)
-			userCtx := &auth.UserContext{
-				UserID: legacyID,
-				Role:   legacyRole,
+
+			reqID := middleware.GetRequestID(ctx)
+			if reqID == "" {
+				reqID = c.Get(middleware.HeaderXRequestID)
+				if reqID == "" {
+					reqID = c.Get(middleware.HeaderXCorrelationID)
+				}
+				if reqID == "" {
+					reqID = uuid.Must(uuid.NewV7()).String()
+				}
+				ctx = logger.WithRequestID(ctx, reqID)
+				ctx = logger.WithCorrelationID(ctx, reqID)
 			}
-			ctx = auth.WithUser(ctx, userCtx)
 			c.SetUserContext(ctx)
+		} else {
+			appErr := appErrors.Unauthorized("invalid admin API key")
+			gqlErr := pkgGraphQL.FormatError(ctx, appErr)
+			return c.Status(http.StatusUnauthorized).JSON(pkgGraphQL.GraphQLErrorResponse{
+				Errors: []pkgGraphQL.GraphQLError{gqlErr},
+			})
+		}
+	} else {
+		authHeader := c.Get("Authorization")
+		secret := "gocart-secret-key-change-in-production"
+		if h.cfg != nil && h.cfg.JWT.Secret != "" {
+			secret = h.cfg.JWT.Secret
+		}
+
+		if authHeader != "" {
+			userCtx, err := auth.ValidateToken(authHeader, secret)
+			if err != nil {
+				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())
+			} else if userCtx != nil {
+				ctx = auth.WithUser(ctx, userCtx)
+				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+				c.SetUserContext(ctx)
+			}
+		} else if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
+			ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
+			ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
+			c.SetUserContext(ctx)
+		} else {
+			if legacyID, ok := ctx.Value(userIDKey).(string); ok && legacyID != "" {
+				legacyRole, _ := ctx.Value(userRoleKey).(string)
+				userCtx := &auth.UserContext{
+					UserID: legacyID,
+					Role:   legacyRole,
+				}
+				ctx = auth.WithUser(ctx, userCtx)
+				c.SetUserContext(ctx)
+			}
 		}
 	}
 
@@ -199,6 +337,25 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 
 	return adaptor.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(ctx)
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			bodyBytes, _ := io.ReadAll(r.Body)
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+			_, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if err != nil {
+				fmt.Printf("DIAGNOSTIC: error parsing Content-Type: %v (raw: %q)\n", err, r.Header.Get("Content-Type"))
+			} else {
+				mr := multipart.NewReader(bytes.NewReader(bodyBytes), params["boundary"])
+				p, pErr := mr.NextPart()
+				if pErr != nil {
+					fmt.Printf("DIAGNOSTIC: mr.NextPart error: %v, bodyLen=%d, bodyPrefix=%q\n", pErr, len(bodyBytes), string(bodyBytes[:min(len(bodyBytes), 100)]))
+				} else {
+					if p.FormName() != "operations" {
+						fmt.Printf("DIAGNOSTIC: first formName is %q, expected 'operations'. Full body:\n%s\n", p.FormName(), string(bodyBytes))
+					}
+				}
+			}
+		}
 		h.server.ServeHTTP(w, r)
 	}))(c)
 }
@@ -213,7 +370,18 @@ func (h *Handler) HandlePlayground(c *fiber.Ctx) error {
 func (h *Handler) RegisterRoutes(app *fiber.App) {
 	app.Post("/query", h.HandleQuery)
 	app.Get("/query", h.HandlePlayground)
-	app.Get("/playground", h.HandlePlayground)
+	app.Options("/query", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+
 	app.Post("/graphql", h.HandleQuery)
 	app.Get("/graphql", h.HandlePlayground)
+	app.Options("/graphql", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+
+	app.Get("/playground", h.HandlePlayground)
+	app.Options("/playground", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
+	})
 }

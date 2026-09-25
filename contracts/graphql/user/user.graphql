@@ -1,0 +1,110 @@
+enum Gender {
+  male
+  female
+  others
+}
+
+type User {
+  id: ID!
+  email: String!
+  firstName: String
+  lastName: String
+  phone: String
+  username: String
+  alternatePhone: String
+  dateOfBirth: String
+  gender: Gender
+  bio: String
+  avatarUrl: String
+  status: String
+  createdAt: String
+  updatedAt: String
+}
+
+type Address {
+  id: ID!
+  userId: String!
+  label: String
+  fullName: String
+  phoneNumber: String
+  emailAddress: String
+  addressLine: String!
+  city: String!
+  state: String!
+  postalCode: String!
+  country: String!
+  isDefault: Boolean!
+  createdAt: String
+  updatedAt: String
+}
+
+input UpdateUserInput {
+  firstName: String
+  lastName: String
+  phone: String
+  username: String
+  alternatePhone: String
+  dateOfBirth: String
+  gender: Gender
+  bio: String
+  avatarUrl: String
+}
+
+type AccountActionResponse {
+  success: Boolean!
+  message: String!
+  status: String!
+}
+
+input DeactivateAccountInput {
+  reason: String
+}
+
+input DeleteAccountInput {
+  reason: String
+}
+
+input CreateAddressInput {
+  label: String
+  fullName: String!
+  phoneNumber: String!
+  emailAddress: String
+  addressLine: String!
+  city: String!
+  state: String!
+  postalCode: String!
+  country: String!
+  isDefault: Boolean
+}
+
+input UpdateAddressInput {
+  label: String
+  fullName: String
+  phoneNumber: String
+  emailAddress: String
+  addressLine: String
+  city: String
+  state: String
+  postalCode: String
+  country: String
+  isDefault: Boolean
+}
+
+extend type Query {
+  me: User @auth
+  user(id: ID!): User @auth(requires: [ADMIN])
+  userAddresses(userId: ID!): [Address!]! @auth
+  userAddress(id: ID!): Address @auth
+}
+
+extend type Mutation {
+  updateUser(id: ID!, input: UpdateUserInput!): User @auth
+  deactivateAccount(input: DeactivateAccountInput): AccountActionResponse! @auth
+  reactivateAccount: AccountActionResponse! @auth
+  deleteAccount(input: DeleteAccountInput): AccountActionResponse! @auth
+  createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
+  updateUserAddress(id: ID!, input: UpdateAddressInput!): Address @auth
+  deleteUserAddress(id: ID!): Boolean! @auth
+  setDefaultUserAddress(id: ID!): Address @auth
+}
+

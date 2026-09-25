@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -10,9 +11,12 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Storage  StorageConfig
+	GSTIN    GSTINConfig
 }
 
 type AppConfig struct {
@@ -22,6 +26,10 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
+	Port string
+}
+
+type GRPCConfig struct {
 	Port string
 }
 
@@ -44,11 +52,29 @@ type TracingConfig struct {
 	OTLPEndpoint string
 }
 
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Bucket          string
+	PublicURLPrefix string
+}
+
+type GSTINConfig struct {
+	APIKey  string
+	BaseURL string
+	Enabled bool
+	Timeout time.Duration
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("services/store-service/.env")
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
+
+	timeoutSec := GetEnvAsInt("GSTIN_API_TIMEOUT_SECONDS", 10)
 
 	return &Config{
 		App: AppConfig{
@@ -59,8 +85,11 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "7500"),
 		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50055"),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("DATABASE_URL", ""),
+			URL:            GetEnv("STORE_SERVICE_DATABASE_URL", ""),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -74,6 +103,20 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Storage: StorageConfig{
+			Endpoint:        GetEnv("STORE_S3_ENDPOINT", GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3")),
+			Region:          GetEnv("STORE_S3_REGION", GetEnv("S3_REGION", "ap-south-1")),
+			AccessKeyID:     GetEnv("STORE_S3_ACCESS_KEY_ID", GetEnv("S3_ACCESS_KEY_ID", "")),
+			SecretAccessKey: GetEnv("STORE_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
+			Bucket:          GetEnv("STORE_S3_BUCKET", GetEnv("S3_BUCKET", "stores")),
+			PublicURLPrefix: GetEnv("STORE_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
+		},
+		GSTIN: GSTINConfig{
+			APIKey:  GetEnv("GSTIN_API_KEY", ""),
+			BaseURL: GetEnv("GSTIN_API_BASE_URL", "https://www.gstinapi.in/v1"),
+			Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", true),
+			Timeout: time.Duration(timeoutSec) * time.Second,
 		},
 	}
 }

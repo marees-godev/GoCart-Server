@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,21 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/config"
+	userGRPC "github.com/marees-godev/GoCart-Server/services/user-service/internal/grpc"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/service"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/worker"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -78,7 +87,35 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize domain layers and gRPC Server
+	userRepo := repository.NewUserRepository(db.Pool, cfg.Retention.Period)
+	userService := service.NewUserService(userRepo)
+	addressRepo := repository.NewAddressRepository(db.Pool)
+	addressService := service.NewAddressService(addressRepo, userRepo)
+
+	retentionWorker := worker.NewRetentionWorker(userService, cfg.Retention.Interval, cfg.Retention.Period)
+	retentionWorker.Start(ctx)
+
+	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService)
+
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
+	userpb.RegisterUserServiceServer(grpcServer, userGRPCServer)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 6. Setup Fiber HTTP server for observability (health checks & Prometheus metrics)
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -95,7 +132,7 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -103,7 +140,10 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	cancel()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)

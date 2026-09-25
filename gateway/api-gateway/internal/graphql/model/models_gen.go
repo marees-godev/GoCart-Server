@@ -6,38 +6,523 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/99designs/gqlgen/graphql"
 )
 
+type AccountActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
+type AddRatingInput struct {
+	ProductID string  `json:"productId"`
+	UserID    string  `json:"userId"`
+	Rating    int     `json:"rating"`
+	Comment   *string `json:"comment,omitempty"`
+}
+
+type AddToCartInput struct {
+	UserID    string  `json:"userId"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type Address struct {
+	ID           string  `json:"id"`
+	UserID       string  `json:"userId"`
+	Label        *string `json:"label,omitempty"`
+	FullName     *string `json:"fullName,omitempty"`
+	PhoneNumber  *string `json:"phoneNumber,omitempty"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  string  `json:"addressLine"`
+	City         string  `json:"city"`
+	State        string  `json:"state"`
+	PostalCode   string  `json:"postalCode"`
+	Country      string  `json:"country"`
+	IsDefault    bool    `json:"isDefault"`
+	CreatedAt    *string `json:"createdAt,omitempty"`
+	UpdatedAt    *string `json:"updatedAt,omitempty"`
+}
+
 type AuthPayload struct {
-	Token string `json:"token"`
-	User  *User  `json:"user"`
+	Token         string    `json:"token"`
+	User          *User     `json:"user"`
+	MerchantID    *string   `json:"merchantId,omitempty"`
+	BusinessEmail *string   `json:"businessEmail,omitempty"`
+	FirstName     *string   `json:"firstName,omitempty"`
+	LastName      *string   `json:"lastName,omitempty"`
+	Role          *string   `json:"role,omitempty"`
+	Merchant      *Merchant `json:"merchant,omitempty"`
+}
+
+type BankAccount struct {
+	AccountHolderName *string `json:"accountHolderName,omitempty"`
+	BankName          *string `json:"bankName,omitempty"`
+	AccountNumber     *string `json:"accountNumber,omitempty"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             *string `json:"gstin,omitempty"`
+}
+
+type BankAccountInput struct {
+	AccountHolderName string  `json:"accountHolderName"`
+	BankName          string  `json:"bankName"`
+	AccountNumber     string  `json:"accountNumber"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             *string `json:"gstin,omitempty"`
+}
+
+type Cart struct {
+	ID          string      `json:"id"`
+	UserID      string      `json:"userId"`
+	Items       []*CartItem `json:"items"`
+	TotalAmount float64     `json:"totalAmount"`
+}
+
+type CartItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type Category struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	ParentID    *string `json:"parentId,omitempty"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   *string `json:"createdAt,omitempty"`
+}
+
+type CategoryList struct {
+	Categories []*Category `json:"categories"`
+	Total      int         `json:"total"`
+}
+
+type CreateAddressInput struct {
+	Label        *string `json:"label,omitempty"`
+	FullName     string  `json:"fullName"`
+	PhoneNumber  string  `json:"phoneNumber"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  string  `json:"addressLine"`
+	City         string  `json:"city"`
+	State        string  `json:"state"`
+	PostalCode   string  `json:"postalCode"`
+	Country      string  `json:"country"`
+	IsDefault    *bool   `json:"isDefault,omitempty"`
+}
+
+type CreateCategoryInput struct {
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	ParentID    *string `json:"parentId,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+type CreateDeliveryInput struct {
+	OrderID         string `json:"orderId"`
+	CourierName     string `json:"courierName"`
+	ShippingAddress string `json:"shippingAddress"`
+}
+
+type CreateOrderInput struct {
+	UserID          string `json:"userId"`
+	CartID          string `json:"cartId"`
+	ShippingAddress string `json:"shippingAddress"`
+}
+
+type CreateProductInput struct {
+	StoreID     string  `json:"storeId"`
+	CategoryID  string  `json:"categoryId"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	Price       float64 `json:"price"`
+	Sku         string  `json:"sku"`
+}
+
+type CreateStoreInput struct {
+	Name          string            `json:"name"`
+	Slug          *string           `json:"slug,omitempty"`
+	BusinessEmail *string           `json:"businessEmail,omitempty"`
+	BusinessPhone *string           `json:"businessPhone,omitempty"`
+	Description   *string           `json:"description,omitempty"`
+	Logo          *graphql.Upload   `json:"logo,omitempty"`
+	LogoURL       *string           `json:"logoUrl,omitempty"`
+	Address       *string           `json:"address,omitempty"`
+	BankAccount   *BankAccountInput `json:"bankAccount,omitempty"`
+}
+
+type DeactivateAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type DeleteAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type Delivery struct {
+	ID                  string  `json:"id"`
+	OrderID             string  `json:"orderId"`
+	TrackingNumber      *string `json:"trackingNumber,omitempty"`
+	CourierName         string  `json:"courierName"`
+	Status              string  `json:"status"`
+	EstimatedDeliveryAt *string `json:"estimatedDeliveryAt,omitempty"`
+	DeliveredAt         *string `json:"deliveredAt,omitempty"`
+}
+
+type GenerateStoreUploadURLInput struct {
+	ImageType   string  `json:"imageType"`
+	Filename    string  `json:"filename"`
+	ContentType *string `json:"contentType,omitempty"`
 }
 
 type LoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	IsMerchant bool   `json:"isMerchant"`
+}
+
+type Merchant struct {
+	ID              string  `json:"id"`
+	MerchantID      string  `json:"merchantId"`
+	UserID          *string `json:"userId,omitempty"`
+	BusinessName    string  `json:"businessName"`
+	FirstName       *string `json:"firstName,omitempty"`
+	LastName        *string `json:"lastName,omitempty"`
+	BusinessEmail   *string `json:"businessEmail,omitempty"`
+	BusinessPhone   *string `json:"businessPhone,omitempty"`
+	TaxID           *string `json:"taxId,omitempty"`
+	Status          string  `json:"status"`
+	RejectionReason *string `json:"rejectionReason,omitempty"`
+	CreatedAt       *string `json:"createdAt,omitempty"`
+	UpdatedAt       *string `json:"updatedAt,omitempty"`
+}
+
+type MerchantList struct {
+	Merchants []*Merchant `json:"merchants"`
+	Total     int         `json:"total"`
 }
 
 type Mutation struct {
 }
 
+type Notification struct {
+	ID        string  `json:"id"`
+	UserID    string  `json:"userId"`
+	Channel   string  `json:"channel"`
+	Subject   string  `json:"subject"`
+	Content   string  `json:"content"`
+	Status    string  `json:"status"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+}
+
+type NotificationList struct {
+	Notifications []*Notification `json:"notifications"`
+	Total         int             `json:"total"`
+}
+
+type Order struct {
+	ID              string       `json:"id"`
+	UserID          string       `json:"userId"`
+	Status          string       `json:"status"`
+	Items           []*OrderItem `json:"items"`
+	TotalAmount     float64      `json:"totalAmount"`
+	ShippingAddress string       `json:"shippingAddress"`
+	CreatedAt       *string      `json:"createdAt,omitempty"`
+}
+
+type OrderItem struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unitPrice"`
+}
+
+type OrderList struct {
+	Orders []*Order `json:"orders"`
+	Total  int      `json:"total"`
+}
+
+type Payment struct {
+	ID                   string  `json:"id"`
+	OrderID              string  `json:"orderId"`
+	Amount               float64 `json:"amount"`
+	Currency             string  `json:"currency"`
+	PaymentMethod        string  `json:"paymentMethod"`
+	Status               string  `json:"status"`
+	TransactionReference *string `json:"transactionReference,omitempty"`
+	CreatedAt            *string `json:"createdAt,omitempty"`
+}
+
+type ProcessPaymentInput struct {
+	OrderID       string  `json:"orderId"`
+	Amount        float64 `json:"amount"`
+	Currency      string  `json:"currency"`
+	PaymentMethod string  `json:"paymentMethod"`
+}
+
+type Product struct {
+	ID          string   `json:"id"`
+	StoreID     string   `json:"storeId"`
+	CategoryID  string   `json:"categoryId"`
+	Name        string   `json:"name"`
+	Description *string  `json:"description,omitempty"`
+	Price       float64  `json:"price"`
+	Sku         string   `json:"sku"`
+	IsActive    bool     `json:"isActive"`
+	Images      []string `json:"images,omitempty"`
+	CreatedAt   *string  `json:"createdAt,omitempty"`
+}
+
+type ProductList struct {
+	Products []*Product `json:"products"`
+	Total    int        `json:"total"`
+}
+
+type ProductRatings struct {
+	Ratings       []*Rating `json:"ratings"`
+	AverageRating float64   `json:"averageRating"`
+	Total         int       `json:"total"`
+}
+
 type Query struct {
 }
 
+type Rating struct {
+	ID        string  `json:"id"`
+	ProductID string  `json:"productId"`
+	UserID    string  `json:"userId"`
+	Rating    int     `json:"rating"`
+	Comment   *string `json:"comment,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+}
+
+type RefundPayload struct {
+	RefundID string  `json:"refundId"`
+	Status   string  `json:"status"`
+	Amount   float64 `json:"amount"`
+}
+
 type RegisterInput struct {
-	Email     string  `json:"email"`
-	Password  string  `json:"password"`
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
+	Email      string  `json:"email"`
+	Password   string  `json:"password"`
+	FirstName  *string `json:"firstName,omitempty"`
+	LastName   *string `json:"lastName,omitempty"`
+	IsMerchant bool    `json:"isMerchant"`
+}
+
+type RequestReturnInput struct {
+	OrderID string   `json:"orderId"`
+	UserID  string   `json:"userId"`
+	Reason  string   `json:"reason"`
+	ItemIds []string `json:"itemIds"`
+}
+
+type ReservationItemInput struct {
+	ProductID string `json:"productId"`
+	Quantity  int    `json:"quantity"`
+}
+
+type ReserveStockPayload struct {
+	ReservationID string `json:"reservationId"`
+	Success       bool   `json:"success"`
+}
+
+type ReturnOrder struct {
+	ID           string  `json:"id"`
+	OrderID      string  `json:"orderId"`
+	UserID       string  `json:"userId"`
+	Reason       string  `json:"reason"`
+	Status       string  `json:"status"`
+	RefundAmount float64 `json:"refundAmount"`
+	CreatedAt    *string `json:"createdAt,omitempty"`
+}
+
+type SendNotificationInput struct {
+	UserID     string  `json:"userId"`
+	Channel    string  `json:"channel"`
+	Subject    string  `json:"subject"`
+	Content    string  `json:"content"`
+	TemplateID *string `json:"templateId,omitempty"`
+}
+
+type StockItem struct {
+	ProductID         string `json:"productId"`
+	AvailableQuantity int    `json:"availableQuantity"`
+	ReservedQuantity  int    `json:"reservedQuantity"`
+}
+
+type Store struct {
+	ID              string       `json:"id"`
+	MerchantID      string       `json:"merchantId"`
+	Name            string       `json:"name"`
+	Slug            string       `json:"slug"`
+	BusinessEmail   *string      `json:"businessEmail,omitempty"`
+	BusinessPhone   *string      `json:"businessPhone,omitempty"`
+	Description     *string      `json:"description,omitempty"`
+	LogoURL         *string      `json:"logoUrl,omitempty"`
+	Address         *string      `json:"address,omitempty"`
+	IsVacationMode  bool         `json:"isVacationMode"`
+	ApprovalStatus  string       `json:"approvalStatus"`
+	RejectionReason *string      `json:"rejectionReason,omitempty"`
+	IsPublished     bool         `json:"isPublished"`
+	KycStatus       *string      `json:"kycStatus,omitempty"`
+	Gstin           *string      `json:"gstin,omitempty"`
+	BankAccount     *BankAccount `json:"bankAccount,omitempty"`
+	AvgStoreRating  float64      `json:"avgStoreRating"`
+	CreatedAt       string       `json:"createdAt"`
+	UpdatedAt       string       `json:"updatedAt"`
+}
+
+type StoreAppeal struct {
+	ID           string  `json:"id"`
+	StoreID      string  `json:"storeId"`
+	MerchantID   string  `json:"merchantId"`
+	Reason       string  `json:"reason"`
+	Status       string  `json:"status"`
+	AdminComment *string `json:"adminComment,omitempty"`
+	ReviewedAt   *string `json:"reviewedAt,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
+}
+
+type StoreList struct {
+	Stores []*Store `json:"stores"`
+	Total  int      `json:"total"`
+}
+
+type StoreUploadURLPayload struct {
+	UploadURL        string `json:"uploadUrl"`
+	PublicURL        string `json:"publicUrl"`
+	Key              string `json:"key"`
+	ExpiresInSeconds int    `json:"expiresInSeconds"`
+}
+
+type SubmitKYCInput struct {
+	StoreID           string  `json:"storeId"`
+	BankName          string  `json:"bankName"`
+	AccountNumber     string  `json:"accountNumber"`
+	AccountHolderName string  `json:"accountHolderName"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             string  `json:"gstin"`
+}
+
+type UpdateAddressInput struct {
+	Label        *string `json:"label,omitempty"`
+	FullName     *string `json:"fullName,omitempty"`
+	PhoneNumber  *string `json:"phoneNumber,omitempty"`
+	EmailAddress *string `json:"emailAddress,omitempty"`
+	AddressLine  *string `json:"addressLine,omitempty"`
+	City         *string `json:"city,omitempty"`
+	State        *string `json:"state,omitempty"`
+	PostalCode   *string `json:"postalCode,omitempty"`
+	Country      *string `json:"country,omitempty"`
+	IsDefault    *bool   `json:"isDefault,omitempty"`
+}
+
+type UpdateMerchantInput struct {
+	BusinessName  *string `json:"businessName,omitempty"`
+	FirstName     *string `json:"firstName,omitempty"`
+	LastName      *string `json:"lastName,omitempty"`
+	BusinessEmail *string `json:"businessEmail,omitempty"`
+	BusinessPhone *string `json:"businessPhone,omitempty"`
+	TaxID         *string `json:"taxId,omitempty"`
+}
+
+type UpdateProductInput struct {
+	Name        *string  `json:"name,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	Price       *float64 `json:"price,omitempty"`
+	IsActive    *bool    `json:"isActive,omitempty"`
+}
+
+type UpdateStoreInput struct {
+	ID             *string           `json:"id,omitempty"`
+	Name           *string           `json:"name,omitempty"`
+	Slug           *string           `json:"slug,omitempty"`
+	BusinessEmail  *string           `json:"businessEmail,omitempty"`
+	BusinessPhone  *string           `json:"businessPhone,omitempty"`
+	Description    *string           `json:"description,omitempty"`
+	Logo           *graphql.Upload   `json:"logo,omitempty"`
+	LogoURL        *string           `json:"logoUrl,omitempty"`
+	Address        *string           `json:"address,omitempty"`
+	IsVacationMode *bool             `json:"isVacationMode,omitempty"`
+	BankAccount    *BankAccountInput `json:"bankAccount,omitempty"`
+}
+
+type UpdateUserInput struct {
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	Phone          *string `json:"phone,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	AlternatePhone *string `json:"alternatePhone,omitempty"`
+	DateOfBirth    *string `json:"dateOfBirth,omitempty"`
+	Gender         *Gender `json:"gender,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	AvatarURL      *string `json:"avatarUrl,omitempty"`
 }
 
 type User struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
-	Role      *string `json:"role,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID             string  `json:"id"`
+	Email          string  `json:"email"`
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	Phone          *string `json:"phone,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	AlternatePhone *string `json:"alternatePhone,omitempty"`
+	DateOfBirth    *string `json:"dateOfBirth,omitempty"`
+	Gender         *Gender `json:"gender,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	AvatarURL      *string `json:"avatarUrl,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	CreatedAt      *string `json:"createdAt,omitempty"`
+	UpdatedAt      *string `json:"updatedAt,omitempty"`
+}
+
+type Gender string
+
+const (
+	GenderMale   Gender = "male"
+	GenderFemale Gender = "female"
+	GenderOthers Gender = "others"
+)
+
+var AllGender = []Gender{
+	GenderMale,
+	GenderFemale,
+	GenderOthers,
+}
+
+func (e Gender) IsValid() bool {
+	switch e {
+	case GenderMale, GenderFemale, GenderOthers:
+		return true
+	}
+	return false
+}
+
+func (e Gender) String() string {
+	return string(e)
+}
+
+func (e *Gender) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Gender(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Gender", str)
+	}
+	return nil
+}
+
+func (e Gender) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Role string

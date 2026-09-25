@@ -1,0 +1,125 @@
+extend type Query {
+  store(id: ID!): Store
+  myStore: Store @auth(requires: [MERCHANT])
+  stores(merchantId: ID, limit: Int, offset: Int): StoreList!
+  storeAppeals(storeId: ID!): [StoreAppeal!]! @auth(requires: [MERCHANT, ADMIN])
+}
+
+extend type Mutation {
+  createStore(input: CreateStoreInput!): Store! @auth(requires: [MERCHANT])
+  updateStore(input: UpdateStoreInput!): Store! @auth(requires: [MERCHANT])
+  generateStoreUploadUrl(input: GenerateStoreUploadUrlInput!): StoreUploadUrlPayload! @auth(requires: [MERCHANT])
+  submitStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  approveStore(id: ID!): Store! @auth(requires: [ADMIN])
+  rejectStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  submitKYC(input: SubmitKYCInput!): Store! @auth(requires: [MERCHANT])
+  publishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  unpublishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  suspendStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  unsuspendStore(id: ID!, reason: String): Store! @auth(requires: [ADMIN])
+  appealStore(id: ID!, reason: String!): StoreAppeal! @auth(requires: [MERCHANT])
+  closeStore(id: ID!, reason: String): Store! @auth(requires: [MERCHANT, ADMIN])
+}
+
+type StoreAppeal {
+  id: ID!
+  storeId: ID!
+  merchantId: ID!
+  reason: String!
+  status: String!
+  adminComment: String
+  reviewedAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type BankAccount {
+  accountHolderName: String
+  bankName: String
+  accountNumber: String
+  ifscCode: String
+  gstin: String
+}
+
+type Store {
+  id: ID!
+  merchantId: ID!
+  name: String!
+  slug: String!
+  businessEmail: String
+  businessPhone: String
+  description: String
+  logoUrl: String
+  address: String
+  isVacationMode: Boolean!
+  approvalStatus: String!
+  rejectionReason: String
+  isPublished: Boolean!
+  kycStatus: String
+  gstin: String
+  bankAccount: BankAccount
+  avgStoreRating: Float!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type StoreList {
+  stores: [Store!]!
+  total: Int!
+}
+
+type StoreUploadUrlPayload {
+  uploadUrl: String!
+  publicUrl: String!
+  key: String!
+  expiresInSeconds: Int!
+}
+
+input BankAccountInput {
+  accountHolderName: String!
+  bankName: String!
+  accountNumber: String!
+  ifscCode: String
+  gstin: String
+}
+
+input SubmitKYCInput {
+  storeId: ID!
+  bankName: String!
+  accountNumber: String!
+  accountHolderName: String!
+  ifscCode: String
+  gstin: String!
+}
+
+input GenerateStoreUploadUrlInput {
+  imageType: String!
+  filename: String!
+  contentType: String
+}
+
+input CreateStoreInput {
+  name: String!
+  slug: String
+  businessEmail: String
+  businessPhone: String
+  description: String
+  logo: Upload
+  logoUrl: String
+  address: String
+  bankAccount: BankAccountInput
+}
+
+input UpdateStoreInput {
+  id: ID
+  name: String
+  slug: String
+  businessEmail: String
+  businessPhone: String
+  description: String
+  logo: Upload
+  logoUrl: String
+  address: String
+  isVacationMode: Boolean
+  bankAccount: BankAccountInput
+}

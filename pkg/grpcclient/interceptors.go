@@ -5,13 +5,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -42,6 +43,10 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
 		md, ok := metadata.FromOutgoingContext(ctx)
 		if !ok {
 			md = metadata.New(nil)
@@ -84,7 +89,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			}
 		}
 		if reqID == "" {
-			reqID = uuid.New().String()
+			reqID = uuid.Must(uuid.NewV7()).String()
 		}
 		md.Set(HeaderRequestID, reqID)
 		md.Set(HeaderCorrelationID, reqID)
@@ -110,7 +115,11 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 
 		st, _ := status.FromError(err)
 		grpcStatus := st.Code().String()
-		downstreamService := extractServiceName(cc.Target(), method)
+		targetStr := ""
+		if cc != nil {
+			targetStr = cc.Target()
+		}
+		downstreamService := extractServiceName(targetStr, method)
 
 		var userID, role string
 		if u, ok := auth.UserFromContext(ctx); ok && u != nil {
@@ -132,7 +141,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			logger.FromContext(ctx).Warn("Service-to-service gRPC call failed",
 				"method", method,
 				"downstream_service", downstreamService,
-				"target", cc.Target(),
+				"target", targetStr,
 				"grpc_status", grpcStatus,
 				"error_code", errorCode,
 				"request_id", reqID,
@@ -146,7 +155,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			logger.FromContext(ctx).Debug("Service-to-service gRPC call succeeded",
 				"method", method,
 				"downstream_service", downstreamService,
-				"target", cc.Target(),
+				"target", targetStr,
 				"grpc_status", grpcStatus,
 				"request_id", reqID,
 				"user_id", userID,
@@ -188,6 +197,10 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+
 		md, ok := metadata.FromIncomingContext(ctx)
 		if ok {
 			var reqID string
@@ -197,7 +210,7 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 				reqID = cids[0]
 			}
 			if reqID == "" {
-				reqID = uuid.New().String()
+				reqID = uuid.Must(uuid.NewV7()).String()
 			}
 			ctx = logger.WithRequestID(ctx, reqID)
 			ctx = logger.WithCorrelationID(ctx, reqID)
@@ -234,7 +247,11 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			ctx = tracing.ExtractMessageContext(ctx, tracingHeaders)
 		}
 
-		return handler(ctx, req)
+		resp, err := handler(ctx, req)
+		if err != nil {
+			logger.FromContext(ctx).Error("gRPC server handler error", "method", info.FullMethod, "error", err)
+		}
+		return resp, err
 	}
 }
 
@@ -273,3 +290,32 @@ func GetUserRole(ctx context.Context) string {
 func GetUserContext(ctx context.Context) (*auth.UserContext, bool) {
 	return auth.UserFromContext(ctx)
 }
+
+// UnaryRoleAuthInterceptor enforces required roles per gRPC method.
+func UnaryRoleAuthInterceptor(methodRoles map[string][]string) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req any,
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (any, error) {
+		requiredRoles, protected := methodRoles[info.FullMethod]
+		if !protected || len(requiredRoles) == 0 {
+			return handler(ctx, req)
+		}
+
+		userRole := strings.ToUpper(strings.TrimSpace(GetUserRole(ctx)))
+		if userRole == "" {
+			return nil, status.Error(codes.Unauthenticated, "authentication required: missing user role in request context")
+		}
+
+		for _, allowed := range requiredRoles {
+			if userRole == strings.ToUpper(strings.TrimSpace(allowed)) {
+				return handler(ctx, req)
+			}
+		}
+
+		return nil, status.Error(codes.PermissionDenied, "insufficient permissions for this gRPC operation")
+	}
+}
+

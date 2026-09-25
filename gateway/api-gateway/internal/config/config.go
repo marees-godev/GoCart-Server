@@ -3,9 +3,11 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 )
 
 type Config struct {
@@ -18,11 +20,15 @@ type Config struct {
 	GRPC                        GRPCConfig
 	JWT                         JWTConfig
 	RateLimit                   RateLimitConfig
+	CORS                        middleware.CORSConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
 	OrderServiceAddr            string
+	MerchantServiceURL          string
 	GraphQLIntrospectionEnabled bool
+	AdminAPIKey                 string
+	AdminUserID                 string
 }
 
 type AppConfig struct {
@@ -40,6 +46,7 @@ type ServicesConfig struct {
 	ProductServiceAddr string
 	CartServiceAddr    string
 	OrderServiceAddr   string
+	MerchantServiceURL string
 }
 
 type LoggerConfig struct {
@@ -93,10 +100,11 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
-	userServiceAddr := GetEnv("USER_SERVICE_ADDR", "localhost:5050")
-	productServiceAddr := GetEnv("PRODUCT_SERVICE_ADDR", "localhost:7070")
-	cartServiceAddr := GetEnv("CART_SERVICE_ADDR", "localhost:8181")
-	orderServiceAddr := GetEnv("ORDER_SERVICE_ADDR", "localhost:8500")
+	userServiceAddr := GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052"))
+	productServiceAddr := GetEnv("PRODUCT_SERVICE_GRPC_ADDR", GetEnv("PRODUCT_SERVICE_ADDR", "localhost:50053"))
+	cartServiceAddr := GetEnv("CART_SERVICE_GRPC_ADDR", GetEnv("CART_SERVICE_ADDR", "localhost:50057"))
+	orderServiceAddr := GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059"))
+	merchantServiceURL := GetEnv("MERCHANT_SERVICE_URL", "http://localhost:7600")
 	introEnabled := GetEnvAsBool("GRAPHQL_INTROSPECTION_ENABLED", GetEnvAsBool("GRAPHQL_PLAYGROUND_ENABLED", true))
 
 	return &Config{
@@ -113,6 +121,7 @@ func LoadEnv() *Config {
 			ProductServiceAddr: productServiceAddr,
 			CartServiceAddr:    cartServiceAddr,
 			OrderServiceAddr:   orderServiceAddr,
+			MerchantServiceURL: merchantServiceURL,
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),
@@ -153,11 +162,42 @@ func LoadEnv() *Config {
 			Max:     GetEnvAsInt("RATE_LIMIT_MAX_REQUESTS", 1000),
 			Window:  GetEnvAsDuration("RATE_LIMIT_WINDOW", time.Minute),
 		},
+		CORS: func() middleware.CORSConfig {
+			origins := GetEnvAsStringSlice("CORS_ALLOWED_ORIGINS", []string{"*"})
+			hasWildcard := false
+			for _, o := range origins {
+				if o == "*" {
+					hasWildcard = true
+					break
+				}
+			}
+			defaultAllowCredentials := false
+			if !hasWildcard {
+				defaultAllowCredentials = true
+			}
+			allowCredentials := GetEnvAsBool("CORS_ALLOW_CREDENTIALS", defaultAllowCredentials)
+			if hasWildcard && allowCredentials {
+				allowCredentials = false
+			}
+
+			return middleware.CORSConfig{
+				AllowedOrigins:   origins,
+				AllowedMethods:   GetEnvAsStringSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}),
+				AllowedHeaders:   GetEnvAsStringSlice("CORS_ALLOWED_HEADERS", []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID", "X-Admin-Key"}),
+				ExposedHeaders:   GetEnvAsStringSlice("CORS_EXPOSED_HEADERS", []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers"}),
+				AllowCredentials: allowCredentials,
+				MaxAge:           GetEnvAsInt("CORS_MAX_AGE", 86400),
+			}
+		}(),
+
 		UserServiceAddr:             userServiceAddr,
 		ProductServiceAddr:          productServiceAddr,
 		CartServiceAddr:             cartServiceAddr,
 		OrderServiceAddr:            orderServiceAddr,
+		MerchantServiceURL:          merchantServiceURL,
 		GraphQLIntrospectionEnabled: introEnabled,
+		AdminAPIKey:                 GetEnv("ADMIN_API_KEY", ""),
+		AdminUserID:                 GetEnv("ADMIN_USER_ID", "admin"),
 	}
 }
 
@@ -203,3 +243,23 @@ func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	}
 	return d
 }
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
+}
+

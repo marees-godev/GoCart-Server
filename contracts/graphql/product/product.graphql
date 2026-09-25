@@ -1,0 +1,44 @@
+type Product {
+  id: ID!
+  storeId: String!
+  categoryId: String!
+  name: String!
+  description: String
+  price: Float!
+  sku: String!
+  isActive: Boolean!
+  images: [String!]
+  createdAt: String
+}
+
+type ProductList {
+  products: [Product!]!
+  total: Int!
+}
+
+input CreateProductInput {
+  storeId: String!
+  categoryId: String!
+  name: String!
+  description: String
+  price: Float!
+  sku: String!
+}
+
+input UpdateProductInput {
+  name: String
+  description: String
+  price: Float
+  isActive: Boolean
+}
+
+extend type Query {
+  product(id: ID!): Product
+  products(limit: Int, offset: Int, categoryId: String, storeId: String): ProductList!
+}
+
+extend type Mutation {
+  createProduct(input: CreateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
+  updateProduct(id: ID!, input: UpdateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
+  deleteProduct(id: ID!): Boolean! @auth(requires: [ADMIN, MERCHANT])
+}

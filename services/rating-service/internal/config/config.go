@@ -60,7 +60,7 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "5555"),
 		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("DATABASE_URL", ""),
+			URL:            GetEnv("RATINGS_SERVICE_DATABASE_URL", ""),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),

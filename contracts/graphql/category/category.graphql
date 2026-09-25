@@ -1,0 +1,29 @@
+type Category {
+  id: ID!
+  name: String!
+  slug: String!
+  parentId: String
+  description: String
+  createdAt: String
+}
+
+type CategoryList {
+  categories: [Category!]!
+  total: Int!
+}
+
+input CreateCategoryInput {
+  name: String!
+  slug: String!
+  parentId: String
+  description: String
+}
+
+extend type Query {
+  category(id: ID!): Category
+  categories(limit: Int, offset: Int): CategoryList!
+}
+
+extend type Mutation {
+  createCategory(input: CreateCategoryInput!): Category @auth(requires: [ADMIN])
+}

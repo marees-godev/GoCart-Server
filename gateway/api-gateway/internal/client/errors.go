@@ -45,6 +45,8 @@ func TranslateGRPCError(err error) error {
 		return appErrors.Forbidden(msg)
 	case codes.FailedPrecondition, codes.OutOfRange:
 		return appErrors.UnprocessableEntity(msg)
+	case codes.ResourceExhausted:
+		return appErrors.TooManyRequests(msg)
 	case codes.DeadlineExceeded:
 		return appErrors.New("GATEWAY_TIMEOUT", "downstream service request timed out", http.StatusGatewayTimeout)
 	case codes.Unavailable:

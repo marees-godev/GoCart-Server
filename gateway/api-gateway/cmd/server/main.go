@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
@@ -33,8 +35,6 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
-	log.Info("Starting API Gateway", "service", cfg.App.Name, "version", cfg.App.Version, "env", cfg.App.Environment)
-
 	// 2. Initialize distributed tracing if enabled
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
@@ -54,12 +54,22 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// 3. Setup Fiber HTTP server with observability middleware
+	// 3. Setup Fiber HTTP server with observability and CORS middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
 
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     strings.Join(cfg.CORS.AllowedOrigins, ", "),
+		AllowMethods:     strings.Join(cfg.CORS.AllowedMethods, ", "),
+		AllowHeaders:     strings.Join(cfg.CORS.AllowedHeaders, ", "),
+		ExposeHeaders:    strings.Join(cfg.CORS.ExposedHeaders, ", "),
+		AllowCredentials: cfg.CORS.AllowCredentials,
+		MaxAge:           cfg.CORS.MaxAge,
+	}))
+
 	app.Use(adaptor.HTTPMiddleware(middleware.Recovery))
+
 	app.Use(adaptor.HTTPMiddleware(middleware.RequestID))
 	app.Use(adaptor.HTTPMiddleware(middleware.Tracing(cfg.App.Name)))
 	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
@@ -94,7 +104,7 @@ func main() {
 		defer grpcClients.Close()
 	}
 
-	gqlResolver := gwResolver.NewResolver(grpcClients, cfg.App.Version)
+	gqlResolver := gwResolver.NewResolverWithManager(grpcClients, clientMgr, cfg.App.Version)
 	gqlSchema, err := gwGraphQL.NewSchema(gqlResolver)
 	if err != nil {
 		log.Error("Failed to initialize GraphQL schema", "error", err)

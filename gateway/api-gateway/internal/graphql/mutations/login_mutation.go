@@ -3,29 +3,36 @@ package mutation
 import (
 	"context"
 
-	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc/pb/userpb"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
-func (m *MutationResolver) Login(ctx context.Context, email, password string) (interface{}, error) {
-	if m.Clients == nil || m.Clients.UserClient == nil {
-		return nil, appErrors.Internal(nil, "user client unavailable")
+func (m *MutationResolver) Login(ctx context.Context, email, password string, isMerchant ...bool) (interface{}, error) {
+	if m.Clients == nil || m.Clients.AuthClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
 	}
 	if email == "" || password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	res, err := m.Clients.UserClient.Login(ctx, &userpb.LoginRequest{
-		Email:    email,
-		Password: password,
+	var isMerch bool
+	if len(isMerchant) > 0 {
+		isMerch = isMerchant[0]
+	}
+
+	res, err := m.Clients.AuthClient.Login(ctx, &auth.LoginRequest{
+		Email:      email,
+		Password:   password,
+		IsMerchant: isMerch,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]interface{}{
-		"token": res.Token,
-		"user":  maps.MapUser(res.User),
+		"token": res.AccessToken,
+		"user": map[string]interface{}{
+			"id": res.UserId,
+		},
 	}, nil
 }

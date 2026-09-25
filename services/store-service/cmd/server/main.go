@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,23 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -78,7 +89,65 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize application layers
+	s3Client, err := storage.NewS3Client(ctx, storage.Config{
+		Endpoint:        cfg.Storage.Endpoint,
+		Region:          cfg.Storage.Region,
+		AccessKeyID:     cfg.Storage.AccessKeyID,
+		SecretAccessKey: cfg.Storage.SecretAccessKey,
+		Bucket:          cfg.Storage.Bucket,
+		PublicURLPrefix: cfg.Storage.PublicURLPrefix,
+	})
+	if err != nil {
+		log.Warn("Failed to initialize S3 storage client", "error", err)
+	}
+
+	gstinClient := gstin.NewGSTINClient(cfg.GSTIN)
+	storeRepo := repository.NewStoreRepository(db.Pool)
+	storeService := service.NewStoreService(storeRepo, s3Client, gstinClient)
+	storeGRPCHandler := handler.NewStoreGRPCHandler(storeService, log)
+
+	// 6. Setup gRPC Server with role-based auth interceptor
+	storeMethodRoles := map[string][]string{
+		"/gocart.store.v1.StoreService/CreateStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/UpdateStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/SubmitStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/GetUploadUrl":    {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/ApproveStore":    {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/RejectStore":     {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/SubmitKYC":       {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/PublishStore":    {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/UnpublishStore":  {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/SuspendStore":    {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/UnsuspendStore":  {auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/AppealStore":     {auth.RoleMerchant},
+		"/gocart.store.v1.StoreService/GetStoreAppeals": {auth.RoleMerchant, auth.RoleAdmin},
+		"/gocart.store.v1.StoreService/CloseStore":      {auth.RoleMerchant, auth.RoleAdmin},
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+			grpcclient.UnaryRoleAuthInterceptor(storeMethodRoles),
+		),
+	)
+	storepb.RegisterStoreServiceServer(grpcServer, storeGRPCHandler)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 7. Setup Fiber HTTP server for observability (health checks & Prometheus metrics)
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -95,7 +164,7 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -104,6 +173,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)

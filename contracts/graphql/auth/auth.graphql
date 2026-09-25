@@ -1,0 +1,32 @@
+type AuthPayload {
+  token: String!
+  user: User!
+  merchantId: ID
+  businessEmail: String
+  firstName: String
+  lastName: String
+  role: String
+  merchant: Merchant
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+  isMerchant: Boolean!
+}
+
+input RegisterInput {
+  email: String!
+  password: String!
+  firstName: String
+  lastName: String
+  isMerchant: Boolean!
+}
+
+extend type Mutation {
+  login(input: LoginInput!): AuthPayload!
+  register(input: RegisterInput!): AuthPayload!
+  verifyEmail(email: String!, otp: String!): Boolean!
+  resendVerificationEmail(email: String!): Boolean!
+}
+

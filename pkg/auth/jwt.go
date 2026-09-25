@@ -8,12 +8,19 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
 type contextKey string
 
 const userContextKey contextKey = "auth_user_context"
+
+const (
+	RoleCustomer = "CUSTOMER"
+	RoleMerchant = "MERCHANT"
+	RoleAdmin    = "ADMIN"
+)
 
 type UserContext struct {
 	UserID string `json:"user_id"`
@@ -39,6 +46,7 @@ func GenerateToken(user UserContext, secret string, ttl time.Duration) (string, 
 		Role:   user.Role,
 		Email:  user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
 			Subject:   user.UserID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
