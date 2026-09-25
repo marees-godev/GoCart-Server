@@ -25,6 +25,7 @@ type LoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	IsMerchant    bool                   `protobuf:"varint,3,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,6 +72,13 @@ func (x *LoginRequest) GetPassword() string {
 		return x.Password
 	}
 	return ""
+}
+
+func (x *LoginRequest) GetIsMerchant() bool {
+	if x != nil {
+		return x.IsMerchant
+	}
+	return false
 }
 
 type RegisterRequest struct {
@@ -633,10 +641,12 @@ var File_contracts_protobuf_auth_auth_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"@\n" +
+	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"a\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"\xa0\x01\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1f\n" +
+	"\vis_merchant\x18\x03 \x01(\bR\n" +
+	"isMerchant\"\xa0\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +

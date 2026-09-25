@@ -69,9 +69,19 @@ func (m *mockAuthRepository) GetByEmailAndRole(ctx context.Context, email string
 	key := email + ":" + role.String()
 	cred, ok := m.byEmailRole[key]
 	if !ok {
-		return nil, repository.ErrNotFound
+		if c, found := m.byEmail[email]; found && (c.Role == role || c.Role == "") {
+			cred = c
+		} else {
+			return nil, repository.ErrNotFound
+		}
 	}
 	c := *cred
+	if fc, ok := m.failedCountMap[cred.ID]; ok {
+		c.FailedLoginCount = fc
+	}
+	if lu, ok := m.lockedUntilMap[cred.ID]; ok {
+		c.LockedUntil = lu
+	}
 	return &c, nil
 }
 
@@ -260,6 +270,128 @@ func TestLogin_Success(t *testing.T) {
 	}
 	if evt.AggregateID != userID.String() {
 		t.Errorf("expected aggregate_id %s, got %s", userID.String(), evt.AggregateID)
+	}
+}
+
+func TestLogin_Merchant_Success(t *testing.T) {
+	svc, mockRepo, cfg := setupTestService()
+	_ = cfg
+
+	userID := uuid.Must(uuid.NewV7())
+	credID := uuid.Must(uuid.NewV7())
+	rawPassword := "MerchantPass123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	mockRepo.byEmailRole["merchant@example.com:MERCHANT"] = &model.AuthCredential{
+		ID:           credID,
+		UserID:       userID,
+		Email:        "merchant@example.com",
+		PasswordHash: string(hashedPassword),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	req := &dto.LoginRequest{
+		Email:      "merchant@example.com",
+		Password:   rawPassword,
+		IsMerchant: true,
+	}
+
+	resp, err := svc.Login(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful merchant login, got error: %v", err)
+	}
+
+	if resp.Role != model.RoleMerchant.String() {
+		t.Errorf("expected role MERCHANT, got %s", resp.Role)
+	}
+	if resp.UserID != userID.String() {
+		t.Errorf("expected userID %s, got %s", userID.String(), resp.UserID)
+	}
+}
+
+func TestLogin_RoleMismatch_Fails(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	rawPassword := "SecretPass123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	// User exists ONLY as MERCHANT
+	mockRepo.byEmailRole["seller@example.com:MERCHANT"] = &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       uuid.Must(uuid.NewV7()),
+		Email:        "seller@example.com",
+		PasswordHash: string(hashedPassword),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	// Attempt to login as CUSTOMER (IsMerchant: false)
+	_, err := svc.Login(context.Background(), &dto.LoginRequest{
+		Email:      "seller@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err == nil {
+		t.Fatal("expected error when trying to login as customer with merchant-only account")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 401 {
+		t.Errorf("expected 401, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestLogin_MultiRoleSameEmail_SeparatesAccount(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	rawPassword := "SharedPass123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	customerUserID := uuid.Must(uuid.NewV7())
+	merchantUserID := uuid.Must(uuid.NewV7())
+
+	mockRepo.byEmailRole["dual@example.com:CUSTOMER"] = &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       customerUserID,
+		Email:        "dual@example.com",
+		PasswordHash: string(hashedPassword),
+		Role:         model.RoleCustomer,
+		IsActive:     true,
+	}
+
+	mockRepo.byEmailRole["dual@example.com:MERCHANT"] = &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       merchantUserID,
+		Email:        "dual@example.com",
+		PasswordHash: string(hashedPassword),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	// Login as customer
+	cResp, err := svc.Login(context.Background(), &dto.LoginRequest{
+		Email:      "dual@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err != nil {
+		t.Fatalf("customer login failed: %v", err)
+	}
+	if cResp.UserID != customerUserID.String() || cResp.Role != "CUSTOMER" {
+		t.Errorf("expected customer account %s / CUSTOMER, got %s / %s", customerUserID.String(), cResp.UserID, cResp.Role)
+	}
+
+	// Login as merchant
+	mResp, err := svc.Login(context.Background(), &dto.LoginRequest{
+		Email:      "dual@example.com",
+		Password:   rawPassword,
+		IsMerchant: true,
+	})
+	if err != nil {
+		t.Fatalf("merchant login failed: %v", err)
+	}
+	if mResp.UserID != merchantUserID.String() || mResp.Role != "MERCHANT" {
+		t.Errorf("expected merchant account %s / MERCHANT, got %s / %s", merchantUserID.String(), mResp.UserID, mResp.Role)
 	}
 }
 

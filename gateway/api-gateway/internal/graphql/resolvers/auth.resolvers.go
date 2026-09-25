@@ -10,10 +10,12 @@ import (
 	"time"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"google.golang.org/grpc/metadata"
 )
 
 // Login is the resolver for the login field.
@@ -21,6 +23,8 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
+
+	isMerchant := input.IsMerchant
 
 	var authClient authpb.AuthServiceClient
 	if r.Clients != nil && r.Clients.AuthClient != nil {
@@ -34,8 +38,9 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	}
 
 	res, err := authClient.Login(ctx, &authpb.LoginRequest{
-		Email:    input.Email,
-		Password: input.Password,
+		Email:      input.Email,
+		Password:   input.Password,
+		IsMerchant: isMerchant,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -49,7 +54,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	}
 
 	var user *model.User
-	if res.UserId != "" && userClient != nil {
+	if res.UserId != "" && !isMerchant && userClient != nil {
 		uRes, _ := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
 		if uRes != nil {
 			user = toModelUser(uRes.User)
@@ -71,6 +76,12 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	if res.Role != "" {
 		rStr := res.Role
 		payload.Role = &rStr
+	} else {
+		role := string(model.RoleCustomer)
+		if isMerchant {
+			role = string(model.RoleMerchant)
+		}
+		payload.Role = &role
 	}
 	if res.FirstName != "" {
 		fnStr := res.FirstName
@@ -91,7 +102,75 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	if res.BusinessEmail != "" {
 		bEmail := res.BusinessEmail
 		payload.BusinessEmail = &bEmail
+	} else if isMerchant {
+		payload.BusinessEmail = &input.Email
 	}
+
+	if isMerchant {
+		var mID string
+		if payload.MerchantID != nil {
+			mID = *payload.MerchantID
+		}
+		bEmail := input.Email
+		if payload.BusinessEmail != nil {
+			bEmail = *payload.BusinessEmail
+		}
+		bName := ""
+		if payload.FirstName != nil && payload.LastName != nil {
+			bName = strings.TrimSpace(*payload.FirstName + " " + *payload.LastName)
+		}
+		if bName == "" {
+			bName = input.Email
+		}
+		status := "PENDING"
+
+		var merchantClient merchantpb.MerchantServiceClient
+		if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
+			merchantClient = r.ClientMgr.MerchantClient
+		}
+
+		if merchantClient != nil && res.UserId != "" {
+			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+				"x-user-id", res.UserId,
+				"x-user-role", "MERCHANT",
+			))
+			mRes, _ := merchantClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{UserId: res.UserId})
+			if mRes != nil && mRes.Merchant != nil {
+				if mRes.Merchant.Id != "" {
+					mID = mRes.Merchant.Id
+					payload.MerchantID = &mID
+				}
+				if mRes.Merchant.BusinessEmail != "" {
+					bEmail = mRes.Merchant.BusinessEmail
+					payload.BusinessEmail = &bEmail
+				}
+				if mRes.Merchant.BusinessName != "" {
+					bName = mRes.Merchant.BusinessName
+				}
+				if mRes.Merchant.Status != "" {
+					status = mRes.Merchant.Status
+				}
+				if mRes.Merchant.FirstName != "" && payload.FirstName == nil {
+					fn := mRes.Merchant.FirstName
+					payload.FirstName = &fn
+				}
+				if mRes.Merchant.LastName != "" && payload.LastName == nil {
+					ln := mRes.Merchant.LastName
+					payload.LastName = &ln
+				}
+			}
+		}
+
+		payload.Merchant = &model.Merchant{
+			MerchantID:    mID,
+			BusinessName:  bName,
+			FirstName:     payload.FirstName,
+			LastName:      payload.LastName,
+			BusinessEmail: &bEmail,
+			Status:        status,
+		}
+	}
+
 	return payload, nil
 }
 
@@ -114,7 +193,7 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		return nil, appErrors.BadRequest("first_name and last_name are required")
 	}
 
-	isMerchant := input.IsMerchant != nil && *input.IsMerchant
+	isMerchant := input.IsMerchant
 
 	var authClient authpb.AuthServiceClient
 	if r.Clients != nil && r.Clients.AuthClient != nil {

@@ -104,14 +104,24 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	}
 
 	email := cleanEmail(req.Email)
-	cred, err := s.repo.GetByEmail(ctx, email)
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+
+	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Login attempt failed: user not found", "email", email)
+			s.logger.Warn("Login attempt failed: user not found", "email", email, "role", role.String())
 			return nil, appErrors.Unauthorized("Invalid email or password")
 		}
 		s.logger.Error("Login failed: database query error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
+	}
+
+	if cred.Role != "" && cred.Role != role {
+		s.logger.Warn("Login attempt failed: role mismatch", "user_id", cred.UserID.String(), "email", cred.Email, "role", cred.Role.String(), "expected_role", role.String())
+		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
 	if !cred.IsActive {
@@ -139,6 +149,44 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 			return nil, appErrors.Internal(err, "failed to update failed login")
 		}
 		return nil, appErrors.Unauthorized("Invalid email or password")
+	}
+
+	if cred.FailedLoginCount > 0 {
+		_ = s.repo.ResetFailedLogin(ctx, cred.ID)
+	}
+
+	var merchantID string
+	var businessEmail string
+	var firstName string
+	var lastName string
+
+	if role == model.RoleMerchant {
+		mClient := s.merchantClient
+		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
+			var err error
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			if err == nil {
+				s.merchantClient = mClient
+			}
+		}
+
+		if mClient != nil {
+			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+				"x-user-id", cred.UserID.String(),
+				"x-user-role", "MERCHANT",
+			))
+			mResp, err := mClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{
+				UserId: cred.UserID.String(),
+			})
+			if err == nil && mResp != nil && mResp.Merchant != nil {
+				merchantID = mResp.Merchant.Id
+				businessEmail = mResp.Merchant.BusinessEmail
+				firstName = mResp.Merchant.FirstName
+				lastName = mResp.Merchant.LastName
+			} else if err != nil {
+				s.logger.Warn("Failed to fetch merchant details on login", "user_id", cred.UserID.String(), "error", err)
+			}
+		}
 	}
 
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
@@ -193,12 +241,16 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	}
 
 	return &dto.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: rawRefreshToken,
-		TokenType:    "Bearer",
-		ExpiresIn:    int(accessTTL.Seconds()),
-		UserID:       cred.UserID.String(),
-		Role:         cred.Role.String(),
+		AccessToken:   accessToken,
+		RefreshToken:  rawRefreshToken,
+		TokenType:     "Bearer",
+		ExpiresIn:     int(accessTTL.Seconds()),
+		UserID:        cred.UserID.String(),
+		Role:          cred.Role.String(),
+		MerchantID:    merchantID,
+		BusinessEmail: businessEmail,
+		FirstName:     firstName,
+		LastName:      lastName,
 	}, nil
 }
 

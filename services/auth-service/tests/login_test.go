@@ -151,3 +151,83 @@ func TestGRPCLogin_InvalidCredentials(t *testing.T) {
 		t.Fatal("expected error for invalid credentials, got nil")
 	}
 }
+
+func TestGRPCLogin_MerchantSuccess(t *testing.T) {
+	userID := uuid.Must(uuid.NewV7())
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	user := &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       userID,
+		Email:        "merchant@example.com",
+		PasswordHash: string(hashed),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	repo := &mockRepoForGRPC{user: user}
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "integration-jwt-secret-999",
+			ExpiryMinutes: 15,
+		},
+	}
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
+
+	loginResp, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
+		Email:      "merchant@example.com",
+		Password:   rawPassword,
+		IsMerchant: true,
+	})
+	if err != nil {
+		t.Fatalf("expected successful merchant gRPC login, got: %v", err)
+	}
+
+	if loginResp.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %s", loginResp.Role)
+	}
+
+	claims := &auth.UserClaims{}
+	token, err := jwt.ParseWithClaims(loginResp.AccessToken, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(cfg.JWT.Secret), nil
+	})
+	if err != nil || !token.Valid {
+		t.Fatalf("access token invalid: %v", err)
+	}
+	if claims.Role != "MERCHANT" {
+		t.Errorf("expected claim role MERCHANT, got %s", claims.Role)
+	}
+}
+
+func TestGRPCLogin_RoleMismatch(t *testing.T) {
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	user := &model.AuthCredential{
+		ID:           uuid.Must(uuid.NewV7()),
+		UserID:       uuid.Must(uuid.NewV7()),
+		Email:        "merchant@example.com",
+		PasswordHash: string(hashed),
+		Role:         model.RoleMerchant,
+		IsActive:     true,
+	}
+
+	repo := &mockRepoForGRPC{user: user}
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "secret"},
+	}
+	svc := service.NewAuthService(repo, cfg, nil)
+	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
+
+	// Attempt to log into merchant account with IsMerchant: false (customer)
+	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
+		Email:      "merchant@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err == nil {
+		t.Fatal("expected error due to role mismatch, got nil")
+	}
+}
