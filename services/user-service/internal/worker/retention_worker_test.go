@@ -2,6 +2,7 @@ package worker_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type mockUserService struct {
-	processedCount int
+	processedCount atomic.Int32
 }
 
 func (m *mockUserService) CreateUser(ctx context.Context, req dto.CreateUserRequest) (*model.User, error) {
@@ -36,7 +37,7 @@ func (m *mockUserService) DeleteUser(ctx context.Context, authUserID, targetUser
 	return nil, nil
 }
 func (m *mockUserService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
-	m.processedCount++
+	m.processedCount.Add(1)
 	return 1, nil
 }
 
@@ -49,9 +50,15 @@ func TestRetentionWorker_Lifecycle(t *testing.T) {
 
 	time.Sleep(35 * time.Millisecond)
 	cancel()
-	time.Sleep(10 * time.Millisecond)
 
-	if svc.processedCount < 2 {
-		t.Errorf("expected at least 2 processed calls, got %d", svc.processedCount)
+	select {
+	case <-w.Done():
+	case <-time.After(1 * time.Second):
+		t.Fatal("worker did not shut down in time")
+	}
+
+	count := svc.processedCount.Load()
+	if count < 2 {
+		t.Errorf("expected at least 2 processed calls, got %d", count)
 	}
 }

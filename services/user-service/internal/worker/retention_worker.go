@@ -12,6 +12,7 @@ type RetentionWorker struct {
 	userService     service.UserService
 	interval        time.Duration
 	retentionPeriod time.Duration
+	done            chan struct{}
 }
 
 func NewRetentionWorker(userService service.UserService, interval, retentionPeriod time.Duration) *RetentionWorker {
@@ -25,6 +26,7 @@ func NewRetentionWorker(userService service.UserService, interval, retentionPeri
 		userService:     userService,
 		interval:        interval,
 		retentionPeriod: retentionPeriod,
+		done:            make(chan struct{}),
 	}
 }
 
@@ -32,6 +34,7 @@ func (w *RetentionWorker) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.interval)
 	go func() {
 		defer ticker.Stop()
+		defer close(w.done)
 		slog.InfoContext(ctx, "account retention worker started", "interval", w.interval, "retention_period", w.retentionPeriod)
 
 		if count, err := w.userService.ProcessExpiredDeactivations(ctx, w.retentionPeriod); err != nil {
@@ -54,4 +57,8 @@ func (w *RetentionWorker) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (w *RetentionWorker) Done() <-chan struct{} {
+	return w.done
 }
