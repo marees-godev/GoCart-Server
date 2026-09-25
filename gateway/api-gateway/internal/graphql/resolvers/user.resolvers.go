@@ -10,6 +10,7 @@ import (
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // UpdateUser is the resolver for the updateUser field.
@@ -21,6 +22,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	authID := getAuthUserIDFromCtx(ctx)
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
+	}
+	if authID != id {
+		return nil, appErrors.BadRequest("user_id does not match the expected value")
 	}
 
 	firstName := ""
@@ -36,17 +40,122 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		phone = *input.Phone
 	}
 
+	var gender *string
+	if input.Gender != nil {
+		g := input.Gender.String()
+		gender = &g
+	}
+
 	req := &userpb.UpdateUserRequest{
-		Id:        id,
-		FirstName: firstName,
-		LastName:  lastName,
-		Phone:     phone,
+		Id:             id,
+		FirstName:      firstName,
+		LastName:       lastName,
+		Phone:          phone,
+		Username:       input.Username,
+		AlternatePhone: input.AlternatePhone,
+		DateOfBirth:    input.DateOfBirth,
+		Gender:         gender,
+		Bio:            input.Bio,
+		AvatarUrl:      input.AvatarURL,
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
+}
+
+// DeactivateAccount is the resolver for the deactivateAccount field.
+func (r *mutationResolver) DeactivateAccount(ctx context.Context, input *model.DeactivateAccountInput) (*model.AccountActionResponse, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var reason *string
+	if input != nil && input.Reason != nil {
+		reason = input.Reason
+	}
+
+	req := &userpb.DeactivateUserRequest{
+		Id:     authID,
+		Reason: reason,
+	}
+
+	res, err := r.Clients.UserClient.DeactivateUser(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+// ReactivateAccount is the resolver for the reactivateAccount field.
+func (r *mutationResolver) ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.ReactivateUserRequest{
+		Id: authID,
+	}
+
+	res, err := r.Clients.UserClient.ReactivateUser(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
+}
+
+// DeleteAccount is the resolver for the deleteAccount field.
+func (r *mutationResolver) DeleteAccount(ctx context.Context, input *model.DeleteAccountInput) (*model.AccountActionResponse, error) {
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var reason *string
+	if input != nil && input.Reason != nil {
+		reason = input.Reason
+	}
+
+	req := &userpb.DeleteUserRequest{
+		Id:     authID,
+		Reason: reason,
+	}
+
+	res, err := r.Clients.UserClient.DeleteUser(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
 }
 
 // CreateUserAddress is the resolver for the createUserAddress field.
@@ -58,6 +167,9 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	authID := getAuthUserIDFromCtx(ctx)
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
+	}
+	if authID != userID {
+		return nil, appErrors.BadRequest("user_id does not match the expected value")
 	}
 
 	label := ""
@@ -89,7 +201,7 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 
 	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -122,7 +234,7 @@ func (r *mutationResolver) UpdateUserAddress(ctx context.Context, id string, inp
 
 	res, err := r.Clients.UserClient.UpdateUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -145,7 +257,7 @@ func (r *mutationResolver) DeleteUserAddress(ctx context.Context, id string) (bo
 
 	res, err := r.Clients.UserClient.DeleteUserAddress(ctx, req)
 	if err != nil {
-		return false, err
+		return false, grpcclient.TranslateGRPCError(err)
 	}
 	return res.Success, nil
 }
@@ -168,7 +280,7 @@ func (r *mutationResolver) SetDefaultUserAddress(ctx context.Context, id string)
 
 	res, err := r.Clients.UserClient.SetDefaultUserAddress(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -186,7 +298,7 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 
 	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: userId})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
 }
@@ -202,7 +314,7 @@ func (r *queryResolver) User(ctx context.Context, id string) (*model.User, error
 
 	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: id})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelUser(res.User), nil
 }
@@ -218,7 +330,7 @@ func (r *queryResolver) UserAddresses(ctx context.Context, userID string) ([]*mo
 
 	res, err := r.Clients.UserClient.ListUserAddresses(ctx, &userpb.ListUserAddressesRequest{UserId: userID})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddressList(res.Addresses), nil
 }
@@ -242,7 +354,7 @@ func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Addr
 		AddressId: id,
 	})
 	if err != nil {
-		return nil, err
+		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
 }
