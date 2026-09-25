@@ -197,9 +197,6 @@ func (m *mockStoreRepository) SubmitKYC(ctx context.Context, storeID string, kyc
 	}
 	existing.KYCStatus = kycStatus
 	existing.BankAccount = bankAccount
-	if bankAccount != nil && bankAccount.BusinessRegistration != nil {
-		existing.BusinessRegistration = bankAccount.BusinessRegistration
-	}
 	existing.UpdatedAt = time.Now()
 	m.stores[storeID] = existing
 	cp := *existing
@@ -1027,15 +1024,12 @@ func TestSubmitKYC_Success(t *testing.T) {
 	_ = repo.Create(context.Background(), store)
 
 	gstinVal := "33AAACC1206D1ZN"
-	taxVal := "TAX-7890"
 	req := dto.SubmitKYCRequest{
-		StoreID:              "store-1",
-		BusinessRegistration: "REG-123456",
-		TaxID:                &taxVal,
-		BankName:             "Chase Bank",
-		AccountNumber:        "1234567890",
-		AccountHolderName:    "Merchant Owner",
-		GSTIN:                &gstinVal,
+		StoreID:           "store-1",
+		BankName:          "Chase Bank",
+		AccountNumber:     "1234567890",
+		AccountHolderName: "Merchant Owner",
+		GSTIN:             &gstinVal,
 	}
 
 	updated, err := svc.SubmitKYC(authCtx, "", req)
@@ -1045,9 +1039,6 @@ func TestSubmitKYC_Success(t *testing.T) {
 
 	if updated.KYCStatus != model.KYCStatusPending {
 		t.Errorf("expected KYC status %s, got %s", model.KYCStatusPending, updated.KYCStatus)
-	}
-	if updated.BusinessRegistration == nil || *updated.BusinessRegistration != "REG-123456" {
-		t.Errorf("expected business registration REG-123456, got %v", updated.BusinessRegistration)
 	}
 }
 
@@ -1071,15 +1062,12 @@ func TestSubmitKYC_OwnershipEnforcement(t *testing.T) {
 	_ = repo.Create(context.Background(), store)
 
 	gstinVal := "33AAACC1206D1ZN"
-	taxVal := "TAX-999"
 	req := dto.SubmitKYCRequest{
-		StoreID:              "store-1",
-		BusinessRegistration: "REG-999",
-		TaxID:                &taxVal,
-		BankName:             "Fake Bank",
-		AccountNumber:        "999999",
-		AccountHolderName:    "Attacker",
-		GSTIN:                &gstinVal,
+		StoreID:           "store-1",
+		BankName:          "Fake Bank",
+		AccountNumber:     "999999",
+		AccountHolderName: "Attacker",
+		GSTIN:             &gstinVal,
 	}
 
 	_, err := svc.SubmitKYC(attackerCtx, "", req)

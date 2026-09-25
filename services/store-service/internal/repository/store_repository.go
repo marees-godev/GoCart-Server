@@ -106,10 +106,10 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 	if ba != nil && (ba.AccountNumber != "" || ba.BankName != "") {
 		bankQuery := `
 			INSERT INTO store_bank_accounts (
-				store_id, account_holder_name, account_number, routing_number,
-				bank_name, tax_id, business_registration, created_at, updated_at
+				store_id, account_holder_name, account_number, ifsc_code,
+				bank_name, created_at, updated_at
 			) VALUES (
-				$1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+				$1, $2, $3, $4, $5, NOW(), NOW()
 			)
 			RETURNING id, created_at, updated_at
 		`
@@ -117,10 +117,8 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 			s.ID,
 			ba.AccountHolderName,
 			ba.AccountNumber,
-			ba.RoutingNumber,
+			ba.IfscCode,
 			ba.BankName,
-			ba.TaxID,
-			ba.BusinessRegistration,
 		).Scan(&ba.ID, &ba.CreatedAt, &ba.UpdatedAt)
 		if err != nil {
 			return appErrors.Internal(err, "failed to insert store bank account")
@@ -140,16 +138,16 @@ const selectStoreWithBankSQL = `
 	SELECT
 		s.id, s.merchant_id, s.name, s.slug, s.business_email, s.business_phone,
 		s.description, s.logo_url, s.address, s.is_vacation_mode, s.approval_status,
-		s.rejection_reason, s.is_published, s.kyc_status, s.avg_store_rating, s.created_at, s.updated_at,
-		b.id, b.account_holder_name, b.account_number, b.routing_number,
-		b.bank_name, b.tax_id, b.business_registration, b.gstin, b.created_at, b.updated_at
+		s.rejection_reason, s.is_published, s.kyc_status, s.gstin, s.avg_store_rating, s.created_at, s.updated_at,
+		b.id, b.account_holder_name, b.account_number, b.ifsc_code,
+		b.bank_name, b.gstin, b.created_at, b.updated_at
 	FROM stores s
 	LEFT JOIN store_bank_accounts b ON s.id = b.store_id
 `
 
 func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 	var s model.Store
-	var bID, bHolder, bNumber, bRouting, bBank, bTaxID, bBusReg, bGSTIN *string
+	var bID, bHolder, bNumber, bIFSC, bBank, bGSTIN *string
 	var bCreatedAt, bUpdatedAt *time.Time
 
 	err := row.Scan(
@@ -167,16 +165,15 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		&s.RejectionReason,
 		&s.IsPublished,
 		&s.KYCStatus,
+		&s.GSTIN,
 		&s.AvgStoreRating,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 		&bID,
 		&bHolder,
 		&bNumber,
-		&bRouting,
+		&bIFSC,
 		&bBank,
-		&bTaxID,
-		&bBusReg,
 		&bGSTIN,
 		&bCreatedAt,
 		&bUpdatedAt,
@@ -201,15 +198,13 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		}
 
 		ba := &model.StoreBankAccount{
-			ID:                   *bID,
-			StoreID:              s.ID,
-			AccountHolderName:    holder,
-			AccountNumber:        number,
-			RoutingNumber:        bRouting,
-			BankName:             bankName,
-			TaxID:                bTaxID,
-			BusinessRegistration: bBusReg,
-			GSTIN:                bGSTIN,
+			ID:                *bID,
+			StoreID:           s.ID,
+			AccountHolderName: holder,
+			AccountNumber:     number,
+			IfscCode:          bIFSC,
+			BankName:          bankName,
+			GSTIN:             bGSTIN,
 		}
 		if bCreatedAt != nil {
 			ba.CreatedAt = *bCreatedAt
@@ -218,7 +213,6 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 			ba.UpdatedAt = *bUpdatedAt
 		}
 		s.BankAccount = ba
-		s.BusinessRegistration = bBusReg
 		s.GSTIN = bGSTIN
 
 		if bytes, jsonErr := json.Marshal(ba); jsonErr == nil {
@@ -408,31 +402,27 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 				SET
 					account_holder_name = $1,
 					account_number = $2,
-					routing_number = $3,
+					ifsc_code = $3,
 					bank_name = $4,
-					tax_id = $5,
-					business_registration = $6,
 					updated_at = NOW()
-				WHERE id = $7 AND store_id = $8
+				WHERE id = $5 AND store_id = $6
 				RETURNING updated_at
 			`
 			err = tx.QueryRow(ctx, updateBankSQL,
 				ba.AccountHolderName,
 				ba.AccountNumber,
-				ba.RoutingNumber,
+				ba.IfscCode,
 				ba.BankName,
-				ba.TaxID,
-				ba.BusinessRegistration,
 				ba.ID,
 				s.ID,
 			).Scan(&ba.UpdatedAt)
 		} else {
 			insertBankSQL := `
 				INSERT INTO store_bank_accounts (
-					store_id, account_holder_name, account_number, routing_number,
-					bank_name, tax_id, business_registration, created_at, updated_at
+					store_id, account_holder_name, account_number, ifsc_code,
+					bank_name, created_at, updated_at
 				) VALUES (
-					$1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
+					$1, $2, $3, $4, $5, NOW(), NOW()
 				)
 				RETURNING id, created_at, updated_at
 			`
@@ -440,10 +430,8 @@ func (r *pgStoreRepository) Update(ctx context.Context, s *model.Store) error {
 				s.ID,
 				ba.AccountHolderName,
 				ba.AccountNumber,
-				ba.RoutingNumber,
+				ba.IfscCode,
 				ba.BankName,
-				ba.TaxID,
-				ba.BusinessRegistration,
 			).Scan(&ba.ID, &ba.CreatedAt, &ba.UpdatedAt)
 		}
 
@@ -566,21 +554,17 @@ func (r *pgStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycSt
 				SET
 					account_holder_name = $1,
 					account_number = $2,
-					routing_number = $3,
+					ifsc_code = $3,
 					bank_name = $4,
-					tax_id = $5,
-					business_registration = $6,
-					gstin = $7,
+					gstin = $5,
 					updated_at = NOW()
-				WHERE id = $8 AND store_id = $9
+				WHERE id = $6 AND store_id = $7
 			`
 			_, err = tx.Exec(ctx, updateBankSQL,
 				bank.AccountHolderName,
 				bank.AccountNumber,
-				bank.RoutingNumber,
+				bank.IfscCode,
 				bank.BankName,
-				bank.TaxID,
-				bank.BusinessRegistration,
 				bank.GSTIN,
 				existingID,
 				storeID,
@@ -588,20 +572,18 @@ func (r *pgStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycSt
 		} else {
 			insertBankSQL := `
 				INSERT INTO store_bank_accounts (
-					store_id, account_holder_name, account_number, routing_number,
-					bank_name, tax_id, business_registration, gstin, created_at, updated_at
+					store_id, account_holder_name, account_number, ifsc_code,
+					bank_name, gstin, created_at, updated_at
 				) VALUES (
-					$1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()
+					$1, $2, $3, $4, $5, $6, NOW(), NOW()
 				)
 			`
 			_, err = tx.Exec(ctx, insertBankSQL,
 				storeID,
 				bank.AccountHolderName,
 				bank.AccountNumber,
-				bank.RoutingNumber,
+				bank.IfscCode,
 				bank.BankName,
-				bank.TaxID,
-				bank.BusinessRegistration,
 				bank.GSTIN,
 			)
 		}

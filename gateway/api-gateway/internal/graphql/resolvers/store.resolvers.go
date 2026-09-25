@@ -258,22 +258,21 @@ func (r *mutationResolver) SubmitKyc(ctx context.Context, input model.SubmitKYCI
 		merchantID = userCtx.UserID
 	}
 
-	var routing *string
-	if input.RoutingNumber != nil {
-		routing = input.RoutingNumber
+	var ifsc *string
+	if input.IfscCode != nil {
+		ifsc = input.IfscCode
 	}
 
 	gstin := &input.Gstin
 
 	res, err := r.Clients.StoreClient.SubmitKYC(ctx, &storepb.SubmitKYCRequest{
-		StoreId:              input.StoreID,
-		MerchantId:           merchantID,
-		BusinessRegistration: input.BusinessRegistration,
-		BankName:             input.BankName,
-		AccountNumber:        input.AccountNumber,
-		AccountHolderName:    input.AccountHolderName,
-		RoutingNumber:        routing,
-		Gstin:                gstin,
+		StoreId:           input.StoreID,
+		MerchantId:        merchantID,
+		BankName:          input.BankName,
+		AccountNumber:     input.AccountNumber,
+		AccountHolderName: input.AccountHolderName,
+		IfscCode:          ifsc,
+		Gstin:             gstin,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

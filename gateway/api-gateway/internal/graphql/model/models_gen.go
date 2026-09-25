@@ -59,21 +59,19 @@ type AuthPayload struct {
 }
 
 type BankAccount struct {
-	AccountHolderName    *string `json:"accountHolderName,omitempty"`
-	BankName             *string `json:"bankName,omitempty"`
-	AccountNumber        *string `json:"accountNumber,omitempty"`
-	RoutingNumber        *string `json:"routingNumber,omitempty"`
-	BusinessRegistration *string `json:"businessRegistration,omitempty"`
-	Gstin                *string `json:"gstin,omitempty"`
+	AccountHolderName *string `json:"accountHolderName,omitempty"`
+	BankName          *string `json:"bankName,omitempty"`
+	AccountNumber     *string `json:"accountNumber,omitempty"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             *string `json:"gstin,omitempty"`
 }
 
 type BankAccountInput struct {
-	AccountHolderName    string  `json:"accountHolderName"`
-	BankName             string  `json:"bankName"`
-	AccountNumber        string  `json:"accountNumber"`
-	RoutingNumber        *string `json:"routingNumber,omitempty"`
-	BusinessRegistration *string `json:"businessRegistration,omitempty"`
-	Gstin                *string `json:"gstin,omitempty"`
+	AccountHolderName string  `json:"accountHolderName"`
+	BankName          string  `json:"bankName"`
+	AccountNumber     string  `json:"accountNumber"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             *string `json:"gstin,omitempty"`
 }
 
 type Cart struct {
@@ -358,26 +356,25 @@ type StockItem struct {
 }
 
 type Store struct {
-	ID                   string       `json:"id"`
-	MerchantID           string       `json:"merchantId"`
-	Name                 string       `json:"name"`
-	Slug                 string       `json:"slug"`
-	BusinessEmail        *string      `json:"businessEmail,omitempty"`
-	BusinessPhone        *string      `json:"businessPhone,omitempty"`
-	Description          *string      `json:"description,omitempty"`
-	LogoURL              *string      `json:"logoUrl,omitempty"`
-	Address              *string      `json:"address,omitempty"`
-	IsVacationMode       bool         `json:"isVacationMode"`
-	ApprovalStatus       string       `json:"approvalStatus"`
-	RejectionReason      *string      `json:"rejectionReason,omitempty"`
-	IsPublished          bool         `json:"isPublished"`
-	KycStatus            *string      `json:"kycStatus,omitempty"`
-	BusinessRegistration *string      `json:"businessRegistration,omitempty"`
-	Gstin                *string      `json:"gstin,omitempty"`
-	BankAccount          *BankAccount `json:"bankAccount,omitempty"`
-	AvgStoreRating       float64      `json:"avgStoreRating"`
-	CreatedAt            string       `json:"createdAt"`
-	UpdatedAt            string       `json:"updatedAt"`
+	ID              string       `json:"id"`
+	MerchantID      string       `json:"merchantId"`
+	Name            string       `json:"name"`
+	Slug            string       `json:"slug"`
+	BusinessEmail   *string      `json:"businessEmail,omitempty"`
+	BusinessPhone   *string      `json:"businessPhone,omitempty"`
+	Description     *string      `json:"description,omitempty"`
+	LogoURL         *string      `json:"logoUrl,omitempty"`
+	Address         *string      `json:"address,omitempty"`
+	IsVacationMode  bool         `json:"isVacationMode"`
+	ApprovalStatus  string       `json:"approvalStatus"`
+	RejectionReason *string      `json:"rejectionReason,omitempty"`
+	IsPublished     bool         `json:"isPublished"`
+	KycStatus       *string      `json:"kycStatus,omitempty"`
+	Gstin           *string      `json:"gstin,omitempty"`
+	BankAccount     *BankAccount `json:"bankAccount,omitempty"`
+	AvgStoreRating  float64      `json:"avgStoreRating"`
+	CreatedAt       string       `json:"createdAt"`
+	UpdatedAt       string       `json:"updatedAt"`
 }
 
 type StoreAppeal struct {
@@ -405,13 +402,12 @@ type StoreUploadURLPayload struct {
 }
 
 type SubmitKYCInput struct {
-	StoreID              string  `json:"storeId"`
-	BusinessRegistration string  `json:"businessRegistration"`
-	BankName             string  `json:"bankName"`
-	AccountNumber        string  `json:"accountNumber"`
-	AccountHolderName    string  `json:"accountHolderName"`
-	RoutingNumber        *string `json:"routingNumber,omitempty"`
-	Gstin                string  `json:"gstin"`
+	StoreID           string  `json:"storeId"`
+	BankName          string  `json:"bankName"`
+	AccountNumber     string  `json:"accountNumber"`
+	AccountHolderName string  `json:"accountHolderName"`
+	IfscCode          *string `json:"ifscCode,omitempty"`
+	Gstin             string  `json:"gstin"`
 }
 
 type UpdateAddressInput struct {

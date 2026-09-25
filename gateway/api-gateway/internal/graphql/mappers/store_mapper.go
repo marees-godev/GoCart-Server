@@ -55,33 +55,27 @@ func MapStore(s *storepb.Store) *model.Store {
 		kycStat = &s.KycStatus
 	}
 
-	var busReg *string
-	if s.BusinessRegistration != "" {
-		busReg = &s.BusinessRegistration
-	}
-
 	var gstin *string
 	if s.Gstin != "" {
 		gstin = &s.Gstin
 	}
 
 	return &model.Store{
-		ID:                   s.Id,
-		MerchantID:           s.MerchantId,
-		Name:                 s.Name,
-		Slug:                 s.Slug,
-		BusinessEmail:        email,
-		BusinessPhone:        phone,
-		Description:          desc,
-		LogoURL:              logo,
-		Address:              addr,
-		IsVacationMode:       s.IsVacationMode,
-		ApprovalStatus:       s.ApprovalStatus,
-		RejectionReason:      rej,
-		IsPublished:          s.IsPublished,
-		KycStatus:            kycStat,
-		BusinessRegistration: busReg,
-		Gstin:                gstin,
+		ID:              s.Id,
+		MerchantID:      s.MerchantId,
+		Name:            s.Name,
+		Slug:            s.Slug,
+		BusinessEmail:   email,
+		BusinessPhone:   phone,
+		Description:     desc,
+		LogoURL:         logo,
+		Address:         addr,
+		IsVacationMode:  s.IsVacationMode,
+		ApprovalStatus:  s.ApprovalStatus,
+		RejectionReason: rej,
+		IsPublished:     s.IsPublished,
+		KycStatus:       kycStat,
+		Gstin:           gstin,
 		BankAccount:          bankAccount,
 		AvgStoreRating:       s.AvgStoreRating,
 		CreatedAt:            s.CreatedAt,

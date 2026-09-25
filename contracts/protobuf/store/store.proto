@@ -42,8 +42,7 @@ message Store {
   string updated_at = 16;
   bool is_published = 17;
   string kyc_status = 18;
-  string business_registration = 19;
-  string gstin = 20;
+  string gstin = 19;
 }
 
 message GetStoreRequest {
@@ -145,13 +144,11 @@ message RejectStoreResponse {
 message SubmitKYCRequest {
   string store_id = 1;
   string merchant_id = 2;
-  string business_registration = 3;
-  string bank_name = 4;
-  string account_number = 5;
-  string account_holder_name = 6;
-  optional string routing_number = 7;
-  optional string gstin = 8;
-  optional string tax_id = 9;
+  string bank_name = 3;
+  string account_number = 4;
+  string account_holder_name = 5;
+  optional string ifsc_code = 6;
+  optional string gstin = 7;
 }
 
 message SubmitKYCResponse {

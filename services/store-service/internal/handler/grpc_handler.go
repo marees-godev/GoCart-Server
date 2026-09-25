@@ -257,9 +257,9 @@ func (h *StoreGRPCHandler) SubmitKYC(ctx context.Context, req *storepb.SubmitKYC
 
 	merchantID := extractMerchantID(ctx, req.MerchantId)
 
-	var routing *string
-	if req.RoutingNumber != nil {
-		routing = req.RoutingNumber
+	var ifsc *string
+	if req.IfscCode != nil {
+		ifsc = req.IfscCode
 	}
 
 	var gstin *string
@@ -268,15 +268,13 @@ func (h *StoreGRPCHandler) SubmitKYC(ctx context.Context, req *storepb.SubmitKYC
 	}
 
 	kycReq := dto.SubmitKYCRequest{
-		StoreID:              req.StoreId,
-		MerchantID:           merchantID,
-		BusinessRegistration: req.BusinessRegistration,
-		TaxID:                req.TaxId,
-		BankName:             req.BankName,
-		AccountNumber:        req.AccountNumber,
-		AccountHolderName:    req.AccountHolderName,
-		RoutingNumber:        routing,
-		GSTIN:                gstin,
+		StoreID:           req.StoreId,
+		MerchantID:        merchantID,
+		BankName:          req.BankName,
+		AccountNumber:     req.AccountNumber,
+		AccountHolderName: req.AccountHolderName,
+		IfscCode:          ifsc,
+		GSTIN:             gstin,
 	}
 
 	store, err := h.storeService.SubmitKYC(ctx, merchantID, kycReq)

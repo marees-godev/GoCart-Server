@@ -188,9 +188,6 @@ func (m *mockStoreRepo) SubmitKYC(ctx context.Context, storeID string, kycStatus
 	}
 	existing.KYCStatus = kycStatus
 	existing.BankAccount = bankAccount
-	if bankAccount != nil && bankAccount.BusinessRegistration != nil {
-		existing.BusinessRegistration = bankAccount.BusinessRegistration
-	}
 	m.stores[storeID] = existing
 	cp := *existing
 	return &cp, nil
@@ -497,16 +494,13 @@ func TestGRPCHandler_SubmitKYC_And_Publishing(t *testing.T) {
 	})
 
 	gstinVal := "33AAACC1206D1ZN"
-	taxVal := "TAX-001"
 	// 1. Submit KYC
 	kycRes, err := h.SubmitKYC(merchantCtx, &storepb.SubmitKYCRequest{
-		StoreId:              "store-1",
-		BusinessRegistration: "REG-001",
-		TaxId:                &taxVal,
-		BankName:             "Main Bank",
-		AccountNumber:        "9876543210",
-		AccountHolderName:    "Owner Name",
-		Gstin:                &gstinVal,
+		StoreId:           "store-1",
+		BankName:          "Main Bank",
+		AccountNumber:     "9876543210",
+		AccountHolderName: "Owner Name",
+		Gstin:             &gstinVal,
 	})
 	if err != nil {
 		t.Fatalf("expected SubmitKYC success, got %v", err)

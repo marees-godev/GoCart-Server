@@ -39,17 +39,15 @@ type StoreAppeal struct {
 }
 
 type StoreBankAccount struct {
-	ID                   string    `json:"id" db:"id"`
-	StoreID              string    `json:"store_id" db:"store_id"`
-	AccountHolderName    string    `json:"account_holder_name" db:"account_holder_name"`
-	BankName             string    `json:"bank_name" db:"bank_name"`
-	AccountNumber        string    `json:"account_number" db:"account_number"`
-	RoutingNumber        *string   `json:"routing_number,omitempty" db:"routing_number"`
-	TaxID                *string   `json:"tax_id,omitempty" db:"tax_id"`
-	BusinessRegistration *string   `json:"business_registration,omitempty" db:"business_registration"`
-	GSTIN                *string   `json:"gstin,omitempty" db:"gstin"`
-	CreatedAt            time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at" db:"updated_at"`
+	ID                string    `json:"id" db:"id"`
+	StoreID           string    `json:"store_id" db:"store_id"`
+	AccountHolderName string    `json:"account_holder_name" db:"account_holder_name"`
+	BankName          string    `json:"bank_name" db:"bank_name"`
+	AccountNumber     string    `json:"account_number" db:"account_number"`
+	IfscCode          *string   `json:"ifsc_code,omitempty" db:"ifsc_code"`
+	GSTIN             *string   `json:"gstin,omitempty" db:"gstin"`
+	CreatedAt         time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Store struct {
@@ -67,7 +65,6 @@ type Store struct {
 	RejectionReason      *string           `json:"rejection_reason,omitempty" db:"rejection_reason"`
 	IsPublished          bool              `json:"is_published" db:"is_published"`
 	KYCStatus            string            `json:"kyc_status" db:"kyc_status"`
-	BusinessRegistration *string           `json:"business_registration,omitempty" db:"business_registration"`
 	GSTIN                *string           `json:"gstin,omitempty" db:"gstin"`
 	BankAccount          *StoreBankAccount `json:"bank_account,omitempty"`
 	BankAccountDetails   *string           `json:"bank_account_details,omitempty"`

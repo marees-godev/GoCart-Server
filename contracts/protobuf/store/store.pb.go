@@ -22,29 +22,28 @@ const (
 )
 
 type Store struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Id                   string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	MerchantId           string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
-	Name                 string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Slug                 string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
-	BusinessEmail        string                 `protobuf:"bytes,5,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
-	BusinessPhone        string                 `protobuf:"bytes,6,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
-	Description          string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
-	LogoUrl              string                 `protobuf:"bytes,8,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
-	Address              string                 `protobuf:"bytes,9,opt,name=address,proto3" json:"address,omitempty"`
-	IsVacationMode       bool                   `protobuf:"varint,10,opt,name=is_vacation_mode,json=isVacationMode,proto3" json:"is_vacation_mode,omitempty"`
-	ApprovalStatus       string                 `protobuf:"bytes,11,opt,name=approval_status,json=approvalStatus,proto3" json:"approval_status,omitempty"`
-	RejectionReason      string                 `protobuf:"bytes,12,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
-	BankAccountDetails   string                 `protobuf:"bytes,13,opt,name=bank_account_details,json=bankAccountDetails,proto3" json:"bank_account_details,omitempty"`
-	AvgStoreRating       float64                `protobuf:"fixed64,14,opt,name=avg_store_rating,json=avgStoreRating,proto3" json:"avg_store_rating,omitempty"`
-	CreatedAt            string                 `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt            string                 `protobuf:"bytes,16,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	IsPublished          bool                   `protobuf:"varint,17,opt,name=is_published,json=isPublished,proto3" json:"is_published,omitempty"`
-	KycStatus            string                 `protobuf:"bytes,18,opt,name=kyc_status,json=kycStatus,proto3" json:"kyc_status,omitempty"`
-	BusinessRegistration string                 `protobuf:"bytes,19,opt,name=business_registration,json=businessRegistration,proto3" json:"business_registration,omitempty"`
-	Gstin                string                 `protobuf:"bytes,20,opt,name=gstin,proto3" json:"gstin,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	MerchantId         string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	Name               string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Slug               string                 `protobuf:"bytes,4,opt,name=slug,proto3" json:"slug,omitempty"`
+	BusinessEmail      string                 `protobuf:"bytes,5,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
+	BusinessPhone      string                 `protobuf:"bytes,6,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
+	Description        string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	LogoUrl            string                 `protobuf:"bytes,8,opt,name=logo_url,json=logoUrl,proto3" json:"logo_url,omitempty"`
+	Address            string                 `protobuf:"bytes,9,opt,name=address,proto3" json:"address,omitempty"`
+	IsVacationMode     bool                   `protobuf:"varint,10,opt,name=is_vacation_mode,json=isVacationMode,proto3" json:"is_vacation_mode,omitempty"`
+	ApprovalStatus     string                 `protobuf:"bytes,11,opt,name=approval_status,json=approvalStatus,proto3" json:"approval_status,omitempty"`
+	RejectionReason    string                 `protobuf:"bytes,12,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	BankAccountDetails string                 `protobuf:"bytes,13,opt,name=bank_account_details,json=bankAccountDetails,proto3" json:"bank_account_details,omitempty"`
+	AvgStoreRating     float64                `protobuf:"fixed64,14,opt,name=avg_store_rating,json=avgStoreRating,proto3" json:"avg_store_rating,omitempty"`
+	CreatedAt          string                 `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt          string                 `protobuf:"bytes,16,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	IsPublished        bool                   `protobuf:"varint,17,opt,name=is_published,json=isPublished,proto3" json:"is_published,omitempty"`
+	KycStatus          string                 `protobuf:"bytes,18,opt,name=kyc_status,json=kycStatus,proto3" json:"kyc_status,omitempty"`
+	Gstin              string                 `protobuf:"bytes,19,opt,name=gstin,proto3" json:"gstin,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Store) Reset() {
@@ -199,13 +198,6 @@ func (x *Store) GetIsPublished() bool {
 func (x *Store) GetKycStatus() string {
 	if x != nil {
 		return x.KycStatus
-	}
-	return ""
-}
-
-func (x *Store) GetBusinessRegistration() string {
-	if x != nil {
-		return x.BusinessRegistration
 	}
 	return ""
 }
@@ -1178,18 +1170,16 @@ func (x *RejectStoreResponse) GetStore() *Store {
 }
 
 type SubmitKYCRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	StoreId              string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	MerchantId           string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
-	BusinessRegistration string                 `protobuf:"bytes,3,opt,name=business_registration,json=businessRegistration,proto3" json:"business_registration,omitempty"`
-	BankName             string                 `protobuf:"bytes,4,opt,name=bank_name,json=bankName,proto3" json:"bank_name,omitempty"`
-	AccountNumber        string                 `protobuf:"bytes,5,opt,name=account_number,json=accountNumber,proto3" json:"account_number,omitempty"`
-	AccountHolderName    string                 `protobuf:"bytes,6,opt,name=account_holder_name,json=accountHolderName,proto3" json:"account_holder_name,omitempty"`
-	RoutingNumber        *string                `protobuf:"bytes,7,opt,name=routing_number,json=routingNumber,proto3,oneof" json:"routing_number,omitempty"`
-	Gstin                *string                `protobuf:"bytes,8,opt,name=gstin,proto3,oneof" json:"gstin,omitempty"`
-	TaxId                *string                `protobuf:"bytes,9,opt,name=tax_id,json=taxId,proto3,oneof" json:"tax_id,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	StoreId           string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	MerchantId        string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
+	BankName          string                 `protobuf:"bytes,3,opt,name=bank_name,json=bankName,proto3" json:"bank_name,omitempty"`
+	AccountNumber     string                 `protobuf:"bytes,4,opt,name=account_number,json=accountNumber,proto3" json:"account_number,omitempty"`
+	AccountHolderName string                 `protobuf:"bytes,5,opt,name=account_holder_name,json=accountHolderName,proto3" json:"account_holder_name,omitempty"`
+	IfscCode          *string                `protobuf:"bytes,6,opt,name=ifsc_code,json=ifscCode,proto3,oneof" json:"ifsc_code,omitempty"`
+	Gstin             *string                `protobuf:"bytes,7,opt,name=gstin,proto3,oneof" json:"gstin,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SubmitKYCRequest) Reset() {
@@ -1236,13 +1226,6 @@ func (x *SubmitKYCRequest) GetMerchantId() string {
 	return ""
 }
 
-func (x *SubmitKYCRequest) GetBusinessRegistration() string {
-	if x != nil {
-		return x.BusinessRegistration
-	}
-	return ""
-}
-
 func (x *SubmitKYCRequest) GetBankName() string {
 	if x != nil {
 		return x.BankName
@@ -1264,9 +1247,9 @@ func (x *SubmitKYCRequest) GetAccountHolderName() string {
 	return ""
 }
 
-func (x *SubmitKYCRequest) GetRoutingNumber() string {
-	if x != nil && x.RoutingNumber != nil {
-		return *x.RoutingNumber
+func (x *SubmitKYCRequest) GetIfscCode() string {
+	if x != nil && x.IfscCode != nil {
+		return *x.IfscCode
 	}
 	return ""
 }
@@ -1274,13 +1257,6 @@ func (x *SubmitKYCRequest) GetRoutingNumber() string {
 func (x *SubmitKYCRequest) GetGstin() string {
 	if x != nil && x.Gstin != nil {
 		return *x.Gstin
-	}
-	return ""
-}
-
-func (x *SubmitKYCRequest) GetTaxId() string {
-	if x != nil && x.TaxId != nil {
-		return *x.TaxId
 	}
 	return ""
 }
@@ -2145,7 +2121,7 @@ var File_contracts_protobuf_store_store_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"\n" +
-	"$contracts/protobuf/store/store.proto\x12\x0fgocart.store.v1\"\xaa\x05\n" +
+	"$contracts/protobuf/store/store.proto\x12\x0fgocart.store.v1\"\xf5\x04\n" +
 	"\x05Store\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
@@ -2169,9 +2145,8 @@ const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"updated_at\x18\x10 \x01(\tR\tupdatedAt\x12!\n" +
 	"\fis_published\x18\x11 \x01(\bR\visPublished\x12\x1d\n" +
 	"\n" +
-	"kyc_status\x18\x12 \x01(\tR\tkycStatus\x123\n" +
-	"\x15business_registration\x18\x13 \x01(\tR\x14businessRegistration\x12\x14\n" +
-	"\x05gstin\x18\x14 \x01(\tR\x05gstin\"B\n" +
+	"kyc_status\x18\x12 \x01(\tR\tkycStatus\x12\x14\n" +
+	"\x05gstin\x18\x13 \x01(\tR\x05gstin\"B\n" +
 	"\x0fGetStoreRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
@@ -2256,21 +2231,19 @@ const file_contracts_protobuf_store_store_proto_rawDesc = "" +
 	"\badmin_id\x18\x02 \x01(\tR\aadminId\x12)\n" +
 	"\x10rejection_reason\x18\x03 \x01(\tR\x0frejectionReason\"C\n" +
 	"\x13RejectStoreResponse\x12,\n" +
-	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"\x82\x03\n" +
+	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"\x97\x02\n" +
 	"\x10SubmitKYCRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
-	"merchantId\x123\n" +
-	"\x15business_registration\x18\x03 \x01(\tR\x14businessRegistration\x12\x1b\n" +
-	"\tbank_name\x18\x04 \x01(\tR\bbankName\x12%\n" +
-	"\x0eaccount_number\x18\x05 \x01(\tR\raccountNumber\x12.\n" +
-	"\x13account_holder_name\x18\x06 \x01(\tR\x11accountHolderName\x12*\n" +
-	"\x0erouting_number\x18\a \x01(\tH\x00R\rroutingNumber\x88\x01\x01\x12\x19\n" +
-	"\x05gstin\x18\b \x01(\tH\x01R\x05gstin\x88\x01\x01\x12\x1a\n" +
-	"\x06tax_id\x18\t \x01(\tH\x02R\x05taxId\x88\x01\x01B\x11\n" +
-	"\x0f_routing_numberB\b\n" +
-	"\x06_gstinB\t\n" +
-	"\a_tax_id\"A\n" +
+	"merchantId\x12\x1b\n" +
+	"\tbank_name\x18\x03 \x01(\tR\bbankName\x12%\n" +
+	"\x0eaccount_number\x18\x04 \x01(\tR\raccountNumber\x12.\n" +
+	"\x13account_holder_name\x18\x05 \x01(\tR\x11accountHolderName\x12 \n" +
+	"\tifsc_code\x18\x06 \x01(\tH\x00R\bifscCode\x88\x01\x01\x12\x19\n" +
+	"\x05gstin\x18\a \x01(\tH\x01R\x05gstin\x88\x01\x01B\f\n" +
+	"\n" +
+	"_ifsc_codeB\b\n" +
+	"\x06_gstin\"A\n" +
 	"\x11SubmitKYCResponse\x12,\n" +
 	"\x05store\x18\x01 \x01(\v2\x16.gocart.store.v1.StoreR\x05store\"Q\n" +
 	"\x13PublishStoreRequest\x12\x19\n" +

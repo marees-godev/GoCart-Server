@@ -82,12 +82,11 @@ type ComplexityRoot struct {
 	}
 
 	BankAccount struct {
-		AccountHolderName    func(childComplexity int) int
-		AccountNumber        func(childComplexity int) int
-		BankName             func(childComplexity int) int
-		BusinessRegistration func(childComplexity int) int
-		Gstin                func(childComplexity int) int
-		RoutingNumber        func(childComplexity int) int
+		AccountHolderName func(childComplexity int) int
+		AccountNumber     func(childComplexity int) int
+		BankName          func(childComplexity int) int
+		Gstin             func(childComplexity int) int
+		IfscCode          func(childComplexity int) int
 	}
 
 	Cart struct {
@@ -340,26 +339,25 @@ type ComplexityRoot struct {
 	}
 
 	Store struct {
-		Address              func(childComplexity int) int
-		ApprovalStatus       func(childComplexity int) int
-		AvgStoreRating       func(childComplexity int) int
-		BankAccount          func(childComplexity int) int
-		BusinessEmail        func(childComplexity int) int
-		BusinessPhone        func(childComplexity int) int
-		BusinessRegistration func(childComplexity int) int
-		CreatedAt            func(childComplexity int) int
-		Description          func(childComplexity int) int
-		Gstin                func(childComplexity int) int
-		ID                   func(childComplexity int) int
-		IsPublished          func(childComplexity int) int
-		IsVacationMode       func(childComplexity int) int
-		KycStatus            func(childComplexity int) int
-		LogoURL              func(childComplexity int) int
-		MerchantID           func(childComplexity int) int
-		Name                 func(childComplexity int) int
-		RejectionReason      func(childComplexity int) int
-		Slug                 func(childComplexity int) int
-		UpdatedAt            func(childComplexity int) int
+		Address         func(childComplexity int) int
+		ApprovalStatus  func(childComplexity int) int
+		AvgStoreRating  func(childComplexity int) int
+		BankAccount     func(childComplexity int) int
+		BusinessEmail   func(childComplexity int) int
+		BusinessPhone   func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		Description     func(childComplexity int) int
+		Gstin           func(childComplexity int) int
+		ID              func(childComplexity int) int
+		IsPublished     func(childComplexity int) int
+		IsVacationMode  func(childComplexity int) int
+		KycStatus       func(childComplexity int) int
+		LogoURL         func(childComplexity int) int
+		MerchantID      func(childComplexity int) int
+		Name            func(childComplexity int) int
+		RejectionReason func(childComplexity int) int
+		Slug            func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
 	}
 
 	StoreAppeal struct {
@@ -700,13 +698,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.BankAccount.BankName(childComplexity), true
 
-	case "BankAccount.businessRegistration":
-		if e.complexity.BankAccount.BusinessRegistration == nil {
-			break
-		}
-
-		return e.complexity.BankAccount.BusinessRegistration(childComplexity), true
-
 	case "BankAccount.gstin":
 		if e.complexity.BankAccount.Gstin == nil {
 			break
@@ -714,12 +705,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.BankAccount.Gstin(childComplexity), true
 
-	case "BankAccount.routingNumber":
-		if e.complexity.BankAccount.RoutingNumber == nil {
+	case "BankAccount.ifscCode":
+		if e.complexity.BankAccount.IfscCode == nil {
 			break
 		}
 
-		return e.complexity.BankAccount.RoutingNumber(childComplexity), true
+		return e.complexity.BankAccount.IfscCode(childComplexity), true
 
 	case "Cart.id":
 		if e.complexity.Cart.ID == nil {
@@ -2373,13 +2364,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Store.BusinessPhone(childComplexity), true
 
-	case "Store.businessRegistration":
-		if e.complexity.Store.BusinessRegistration == nil {
-			break
-		}
-
-		return e.complexity.Store.BusinessRegistration(childComplexity), true
-
 	case "Store.createdAt":
 		if e.complexity.Store.CreatedAt == nil {
 			break
@@ -3255,8 +3239,7 @@ type BankAccount {
   accountHolderName: String
   bankName: String
   accountNumber: String
-  routingNumber: String
-  businessRegistration: String
+  ifscCode: String
   gstin: String
 }
 
@@ -3275,7 +3258,6 @@ type Store {
   rejectionReason: String
   isPublished: Boolean!
   kycStatus: String
-  businessRegistration: String
   gstin: String
   bankAccount: BankAccount
   avgStoreRating: Float!
@@ -3299,18 +3281,16 @@ input BankAccountInput {
   accountHolderName: String!
   bankName: String!
   accountNumber: String!
-  routingNumber: String
-  businessRegistration: String
+  ifscCode: String
   gstin: String
 }
 
 input SubmitKYCInput {
   storeId: ID!
-  businessRegistration: String!
   bankName: String!
   accountNumber: String!
   accountHolderName: String!
-  routingNumber: String
+  ifscCode: String
   gstin: String!
 }
 
@@ -6187,8 +6167,8 @@ func (ec *executionContext) fieldContext_BankAccount_accountNumber(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _BankAccount_routingNumber(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_BankAccount_routingNumber(ctx, field)
+func (ec *executionContext) _BankAccount_ifscCode(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BankAccount_ifscCode(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6201,7 +6181,7 @@ func (ec *executionContext) _BankAccount_routingNumber(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.RoutingNumber, nil
+		return obj.IfscCode, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6215,48 +6195,7 @@ func (ec *executionContext) _BankAccount_routingNumber(ctx context.Context, fiel
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_BankAccount_routingNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "BankAccount",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _BankAccount_businessRegistration(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_BankAccount_businessRegistration(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.BusinessRegistration, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_BankAccount_businessRegistration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_BankAccount_ifscCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "BankAccount",
 		Field:      field,
@@ -10384,8 +10323,6 @@ func (ec *executionContext) fieldContext_Mutation_createStore(ctx context.Contex
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -10505,8 +10442,6 @@ func (ec *executionContext) fieldContext_Mutation_updateStore(ctx context.Contex
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -10715,8 +10650,6 @@ func (ec *executionContext) fieldContext_Mutation_submitStore(ctx context.Contex
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -10836,8 +10769,6 @@ func (ec *executionContext) fieldContext_Mutation_approveStore(ctx context.Conte
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -10957,8 +10888,6 @@ func (ec *executionContext) fieldContext_Mutation_rejectStore(ctx context.Contex
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11078,8 +11007,6 @@ func (ec *executionContext) fieldContext_Mutation_submitKYC(ctx context.Context,
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11199,8 +11126,6 @@ func (ec *executionContext) fieldContext_Mutation_publishStore(ctx context.Conte
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11320,8 +11245,6 @@ func (ec *executionContext) fieldContext_Mutation_unpublishStore(ctx context.Con
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11441,8 +11364,6 @@ func (ec *executionContext) fieldContext_Mutation_suspendStore(ctx context.Conte
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11562,8 +11483,6 @@ func (ec *executionContext) fieldContext_Mutation_unsuspendStore(ctx context.Con
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -11782,8 +11701,6 @@ func (ec *executionContext) fieldContext_Mutation_closeStore(ctx context.Context
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -16102,8 +16019,6 @@ func (ec *executionContext) fieldContext_Query_store(ctx context.Context, field 
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -16220,8 +16135,6 @@ func (ec *executionContext) fieldContext_Query_myStore(_ context.Context, field 
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -18442,47 +18355,6 @@ func (ec *executionContext) fieldContext_Store_kycStatus(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Store_businessRegistration(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Store_businessRegistration(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.BusinessRegistration, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Store_businessRegistration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Store",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Store_gstin(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Store_gstin(ctx, field)
 	if err != nil {
@@ -18566,10 +18438,8 @@ func (ec *executionContext) fieldContext_Store_bankAccount(_ context.Context, fi
 				return ec.fieldContext_BankAccount_bankName(ctx, field)
 			case "accountNumber":
 				return ec.fieldContext_BankAccount_accountNumber(ctx, field)
-			case "routingNumber":
-				return ec.fieldContext_BankAccount_routingNumber(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_BankAccount_businessRegistration(ctx, field)
+			case "ifscCode":
+				return ec.fieldContext_BankAccount_ifscCode(ctx, field)
 			case "gstin":
 				return ec.fieldContext_BankAccount_gstin(ctx, field)
 			}
@@ -19168,8 +19038,6 @@ func (ec *executionContext) fieldContext_StoreList_stores(_ context.Context, fie
 				return ec.fieldContext_Store_isPublished(ctx, field)
 			case "kycStatus":
 				return ec.fieldContext_Store_kycStatus(ctx, field)
-			case "businessRegistration":
-				return ec.fieldContext_Store_businessRegistration(ctx, field)
 			case "gstin":
 				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
@@ -21863,7 +21731,7 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"accountHolderName", "bankName", "accountNumber", "routingNumber", "businessRegistration", "gstin"}
+	fieldsInOrder := [...]string{"accountHolderName", "bankName", "accountNumber", "ifscCode", "gstin"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -21891,20 +21759,13 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 				return it, err
 			}
 			it.AccountNumber = data
-		case "routingNumber":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("routingNumber"))
+		case "ifscCode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ifscCode"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.RoutingNumber = data
-		case "businessRegistration":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessRegistration"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BusinessRegistration = data
+			it.IfscCode = data
 		case "gstin":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gstin"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -22666,7 +22527,7 @@ func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"storeId", "businessRegistration", "bankName", "accountNumber", "accountHolderName", "routingNumber", "gstin"}
+	fieldsInOrder := [...]string{"storeId", "bankName", "accountNumber", "accountHolderName", "ifscCode", "gstin"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -22680,13 +22541,6 @@ func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, ob
 				return it, err
 			}
 			it.StoreID = data
-		case "businessRegistration":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessRegistration"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BusinessRegistration = data
 		case "bankName":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bankName"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -22708,13 +22562,13 @@ func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, ob
 				return it, err
 			}
 			it.AccountHolderName = data
-		case "routingNumber":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("routingNumber"))
+		case "ifscCode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ifscCode"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.RoutingNumber = data
+			it.IfscCode = data
 		case "gstin":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gstin"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -23324,10 +23178,8 @@ func (ec *executionContext) _BankAccount(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._BankAccount_bankName(ctx, field, obj)
 		case "accountNumber":
 			out.Values[i] = ec._BankAccount_accountNumber(ctx, field, obj)
-		case "routingNumber":
-			out.Values[i] = ec._BankAccount_routingNumber(ctx, field, obj)
-		case "businessRegistration":
-			out.Values[i] = ec._BankAccount_businessRegistration(ctx, field, obj)
+		case "ifscCode":
+			out.Values[i] = ec._BankAccount_ifscCode(ctx, field, obj)
 		case "gstin":
 			out.Values[i] = ec._BankAccount_gstin(ctx, field, obj)
 		default:
@@ -25484,8 +25336,6 @@ func (ec *executionContext) _Store(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "kycStatus":
 			out.Values[i] = ec._Store_kycStatus(ctx, field, obj)
-		case "businessRegistration":
-			out.Values[i] = ec._Store_businessRegistration(ctx, field, obj)
 		case "gstin":
 			out.Values[i] = ec._Store_gstin(ctx, field, obj)
 		case "bankAccount":

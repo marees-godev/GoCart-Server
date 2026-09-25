@@ -536,14 +536,7 @@ func (s *storeService) SubmitKYC(ctx context.Context, authMerchantID string, req
 		return nil, errors.Forbidden("merchant can only operate on their own store")
 	}
 
-	routing := req.RoutingNumber
-	busReg := strings.TrimSpace(req.BusinessRegistration)
-
-	var taxID *string
-	if req.TaxID != nil && strings.TrimSpace(*req.TaxID) != "" {
-		t := strings.TrimSpace(*req.TaxID)
-		taxID = &t
-	}
+	ifsc := req.IfscCode
 
 	if req.GSTIN == nil || strings.TrimSpace(*req.GSTIN) == "" {
 		return nil, errors.BadRequest("GSTIN is mandatory for KYC submission")
@@ -578,14 +571,12 @@ func (s *storeService) SubmitKYC(ctx context.Context, authMerchantID string, req
 	}
 
 	bank := &model.StoreBankAccount{
-		StoreID:              existingStore.ID,
-		AccountHolderName:    strings.TrimSpace(req.AccountHolderName),
-		AccountNumber:        strings.TrimSpace(req.AccountNumber),
-		RoutingNumber:        routing,
-		BankName:             strings.TrimSpace(req.BankName),
-		TaxID:                taxID,
-		BusinessRegistration: &busReg,
-		GSTIN:                gstinPtr,
+		StoreID:           existingStore.ID,
+		AccountHolderName: strings.TrimSpace(req.AccountHolderName),
+		AccountNumber:     strings.TrimSpace(req.AccountNumber),
+		IfscCode:          ifsc,
+		BankName:          strings.TrimSpace(req.BankName),
+		GSTIN:             gstinPtr,
 	}
 
 	return s.repo.SubmitKYC(ctx, existingStore.ID, model.KYCStatusPending, bank)

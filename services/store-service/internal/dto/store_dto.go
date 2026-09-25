@@ -111,7 +111,6 @@ type StoreResponse struct {
 	RejectionReason      *string `json:"rejection_reason,omitempty"`
 	IsPublished          bool    `json:"is_published"`
 	KYCStatus            string  `json:"kyc_status"`
-	BusinessRegistration *string `json:"business_registration,omitempty"`
 	GSTIN                *string `json:"gstin,omitempty"`
 	BankAccountDetails   *string `json:"bank_account_details,omitempty"`
 	AvgStoreRating       float64 `json:"avg_store_rating"`
@@ -144,7 +143,6 @@ func ToStoreResponse(s *model.Store) *StoreResponse {
 		RejectionReason:      s.RejectionReason,
 		IsPublished:          s.IsPublished,
 		KYCStatus:            kycStat,
-		BusinessRegistration: s.BusinessRegistration,
 		GSTIN:                s.GSTIN,
 		BankAccountDetails:   s.BankAccountDetails,
 		AvgStoreRating:       s.AvgStoreRating,
@@ -166,13 +164,6 @@ func ToStorePB(s *model.Store) *storepb.Store {
 	var bankDetails string
 	if s.BankAccountDetails != nil {
 		bankDetails = *s.BankAccountDetails
-	}
-
-	var busReg string
-	if s.BusinessRegistration != nil {
-		busReg = *s.BusinessRegistration
-	} else if s.BankAccount != nil && s.BankAccount.BusinessRegistration != nil {
-		busReg = *s.BankAccount.BusinessRegistration
 	}
 
 	var gstin string
@@ -206,7 +197,6 @@ func ToStorePB(s *model.Store) *storepb.Store {
 		UpdatedAt:            s.UpdatedAt.Format(time.RFC3339),
 		IsPublished:          s.IsPublished,
 		KycStatus:            kycStat,
-		BusinessRegistration: busReg,
 		Gstin:                gstin,
 	}
 }
@@ -248,13 +238,11 @@ func GenerateSlug(name string) string {
 }
 
 type BankAccount struct {
-	AccountHolderName    string  `json:"account_holder_name"`
-	BankName             string  `json:"bank_name"`
-	AccountNumber        string  `json:"account_number"`
-	RoutingNumber        *string `json:"routing_number,omitempty"`
-	TaxID                *string `json:"tax_id,omitempty"`
-	BusinessRegistration *string `json:"business_registration,omitempty"`
-	GSTIN                *string `json:"gstin,omitempty"`
+	AccountHolderName string  `json:"account_holder_name"`
+	BankName          string  `json:"bank_name"`
+	AccountNumber     string  `json:"account_number"`
+	IfscCode          *string `json:"ifsc_code,omitempty"`
+	GSTIN             *string `json:"gstin,omitempty"`
 }
 
 type GetUploadURLRequest struct {
@@ -312,23 +300,18 @@ func (r *RejectStoreRequest) Validate() error {
 }
 
 type SubmitKYCRequest struct {
-	StoreID              string  `json:"store_id"`
-	MerchantID           string  `json:"merchant_id"`
-	BusinessRegistration string  `json:"business_registration"`
-	TaxID                *string `json:"tax_id,omitempty"`
-	BankName             string  `json:"bank_name"`
-	AccountNumber        string  `json:"account_number"`
-	AccountHolderName    string  `json:"account_holder_name"`
-	RoutingNumber        *string `json:"routing_number,omitempty"`
-	GSTIN                *string `json:"gstin,omitempty"`
+	StoreID           string  `json:"store_id"`
+	MerchantID        string  `json:"merchant_id"`
+	BankName          string  `json:"bank_name"`
+	AccountNumber     string  `json:"account_number"`
+	AccountHolderName string  `json:"account_holder_name"`
+	IfscCode          *string `json:"ifsc_code,omitempty"`
+	GSTIN             *string `json:"gstin,omitempty"`
 }
 
 func (r *SubmitKYCRequest) Validate() error {
 	if strings.TrimSpace(r.StoreID) == "" {
 		return errors.BadRequest("store_id is required")
-	}
-	if strings.TrimSpace(r.BusinessRegistration) == "" {
-		return errors.BadRequest("business registration is required")
 	}
 	if strings.TrimSpace(r.BankName) == "" {
 		return errors.BadRequest("bank name is required")

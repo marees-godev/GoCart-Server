@@ -37,8 +37,7 @@ type BankAccount {
   accountHolderName: String
   bankName: String
   accountNumber: String
-  routingNumber: String
-  businessRegistration: String
+  ifscCode: String
   gstin: String
 }
 
@@ -57,7 +56,6 @@ type Store {
   rejectionReason: String
   isPublished: Boolean!
   kycStatus: String
-  businessRegistration: String
   gstin: String
   bankAccount: BankAccount
   avgStoreRating: Float!
@@ -81,18 +79,16 @@ input BankAccountInput {
   accountHolderName: String!
   bankName: String!
   accountNumber: String!
-  routingNumber: String
-  businessRegistration: String
+  ifscCode: String
   gstin: String
 }
 
 input SubmitKYCInput {
   storeId: ID!
-  businessRegistration: String!
   bankName: String!
   accountNumber: String!
   accountHolderName: String!
-  routingNumber: String
+  ifscCode: String
   gstin: String!
 }
 

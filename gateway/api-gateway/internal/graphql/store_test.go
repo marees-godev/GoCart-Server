@@ -159,7 +159,6 @@ func (m *mockStoreClient) SubmitKYC(ctx context.Context, in *storepb.SubmitKYCRe
 		m.stores[in.StoreId] = s
 	}
 	s.KycStatus = "PENDING"
-	s.BusinessRegistration = in.BusinessRegistration
 	return &storepb.SubmitKYCResponse{Store: s}, nil
 }
 
