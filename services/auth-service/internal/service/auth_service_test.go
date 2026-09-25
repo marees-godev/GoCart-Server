@@ -447,8 +447,9 @@ func TestLogin_InvalidEmailOrPassword_GenericResponse(t *testing.T) {
 		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "user@example.com",
 		PasswordHash: string(hashedPassword),
-		Role:         model.RoleCustomer,
-		IsActive:     true,
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
 	}
 
 	tests := []struct {
@@ -493,6 +494,7 @@ func TestLogin_InactiveOrLockedAccount(t *testing.T) {
 		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "inactive@example.com",
 		PasswordHash: string(hashedPassword),
+		EmailVerified: true,
 		IsActive:     false,
 	}
 
@@ -504,6 +506,7 @@ func TestLogin_InactiveOrLockedAccount(t *testing.T) {
 		UserID:       uuid.Must(uuid.NewV7()),
 		Email:        "locked@example.com",
 		PasswordHash: string(hashedPassword),
+		EmailVerified: true,
 		IsActive:     true,
 		LockedUntil:  &futureLock,
 	}
@@ -548,6 +551,7 @@ func TestLogin_LockoutAfterFailedAttempts(t *testing.T) {
 		UserID:           userID,
 		Email:            "user@example.com",
 		PasswordHash:     string(hashedPassword),
+		EmailVerified:    true,
 		IsActive:         true,
 		FailedLoginCount: 4, // 4 failed logins already
 	}
