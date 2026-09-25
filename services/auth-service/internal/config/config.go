@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/marees-godev/GoCart-Server/pkg/redis"
 )
 
 type Config struct {
@@ -15,7 +16,8 @@ type Config struct {
 	Logger          LoggerConfig
 	Tracing         TracingConfig
 	JWT             JWTConfig
-	Email    EmailConfig
+	Email           EmailConfig
+	Redis           redis.Config
 	UserServiceAddr string
 	Services        ServicesConfig
 }
@@ -72,7 +74,6 @@ type EmailConfig struct {
 	SMTPUser        string
 	SMTPPass        string
 	FromEmail       string
-	VerifyBaseURL   string
 	TokenTTLMinutes int
 }
 
@@ -124,9 +125,9 @@ func LoadEnv() *Config {
 			SMTPUser:        GetEnv("SMTP_USER", ""),
 			SMTPPass:        GetEnv("SMTP_PASS", ""),
 			FromEmail:       GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
-			VerifyBaseURL:   GetEnv("EMAIL_VERIFY_BASE_URL", "http://localhost:8080"),
-			TokenTTLMinutes: GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 30),
+			TokenTTLMinutes: GetEnvAsInt("EMAIL_OTP_TTL_MINUTES", GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 5)),
 		},
+		Redis:           redis.LoadConfigFromEnv("AUTH"),
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{
 			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),

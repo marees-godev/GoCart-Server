@@ -110,6 +110,8 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 
 func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
 	resp, err := h.authService.VerifyEmail(ctx, &dto.VerifyEmailRequest{
+		Email: req.GetEmail(),
+		OTP:   req.GetOtp(),
 		Token: req.GetToken(),
 	})
 	if err != nil {

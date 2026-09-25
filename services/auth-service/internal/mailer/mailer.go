@@ -15,7 +15,7 @@ import (
 )
 
 type Mailer interface {
-	SendVerificationEmail(ctx context.Context, toEmail, token string) error
+	SendVerificationEmail(ctx context.Context, toEmail, otp string) error
 }
 
 type fallbackMailer struct {
@@ -37,19 +37,26 @@ func NewMailer(cfg config.EmailConfig, log *slog.Logger) Mailer {
 	}
 }
 
-func (m *fallbackMailer) SendVerificationEmail(ctx context.Context, toEmail, token string) error {
-	verifyURL := fmt.Sprintf("%s/api/v1/auth/verify-email?token=%s", m.cfg.VerifyBaseURL, token)
-	subject := "Verify your GoCart account email"
-	bodyText := fmt.Sprintf("Welcome to GoCart! Please verify your email address by visiting the following link: %s\nThis link will expire in 30 minutes.", verifyURL)
+func (m *fallbackMailer) SendVerificationEmail(ctx context.Context, toEmail, otp string) error {
+	subject := fmt.Sprintf("Your GoCart Verification Code: %s", otp)
+	bodyText := fmt.Sprintf("Welcome to GoCart!\n\nYour email verification code is: %s\n\nThis code will expire in 5 minutes.", otp)
 	bodyHTML := fmt.Sprintf(`
-		<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-			<h2>Welcome to GoCart!</h2>
-			<p>Thank you for registering. Please click the button below to verify your email address:</p>
-			<p><a href="%s" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Verify Email</a></p>
-			<p style="font-size: 12px; color: #666;">Or copy and paste this link in your browser:<br><a href="%s">%s</a></p>
-			<p style="font-size: 12px; color: #999;">This link expires in 30 minutes.</p>
+		<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+			<div style="margin-bottom: 24px;">
+				<h1 style="color: #4F46E5; font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">GoCart</h1>
+				<h2 style="color: #1e293b; font-size: 20px; font-weight: 600; margin: 0;">Verify your email address</h2>
+			</div>
+			<p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+				Thank you for signing up with GoCart. Please use the following 6-digit verification code to complete your email verification:
+			</p>
+			<div style="background-color: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
+				<span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #4F46E5; display: inline-block;">%s</span>
+			</div>
+			<p style="color: #64748b; font-size: 14px; line-height: 1.5; margin: 0;">
+				This code is valid for 5 minutes. If you did not request this, please safely ignore this email.
+			</p>
 		</div>
-	`, verifyURL, verifyURL, verifyURL)
+	`, otp)
 
 	// 1. Try Resend API (Primary)
 	if m.cfg.ResendAPIKey != "" {
@@ -81,7 +88,7 @@ func (m *fallbackMailer) SendVerificationEmail(ctx context.Context, toEmail, tok
 		}
 	}
 
-	m.logger.Warn("All email providers failed or unconfigured; verification link logged", "to", toEmail, "verify_url", verifyURL)
+	m.logger.Warn("All email providers failed or unconfigured; verification OTP logged", "to", toEmail, "otp", otp)
 	return nil
 }
 

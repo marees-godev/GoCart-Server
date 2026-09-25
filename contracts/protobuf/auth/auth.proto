@@ -55,7 +55,9 @@ message AuthResponse {
 }
 
 message VerifyEmailRequest {
-  string token = 1;
+  string email = 1;
+  string otp = 2;
+  string token = 3;
 }
 
 message VerifyEmailResponse {

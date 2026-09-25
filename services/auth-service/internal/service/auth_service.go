@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"strings"
 	"time"
 
@@ -19,10 +20,12 @@ import (
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
+	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/mailer"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/otp"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
@@ -48,7 +51,8 @@ type AuthService interface {
 type authService struct {
 	repo           repository.AuthRepository
 	cfg            *config.Config
-	mailer mailer.Mailer
+	mailer         mailer.Mailer
+	otpStore       otp.Store
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
@@ -81,7 +85,16 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 			s.userClient = client
 		case merchantpb.MerchantServiceClient:
 			s.merchantClient = client
+		case otp.Store:
+			s.otpStore = client
+		case *redis.Client:
+			if client != nil {
+				s.otpStore = otp.NewRedisStore(client)
+			}
 		}
+	}
+	if s.otpStore == nil {
+		s.otpStore = otp.NewMemoryStore()
 	}
 	return s
 }
@@ -234,27 +247,21 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, err
 	}
 
-	// Generate verification token (valid for 30 minutes)
-	rawVerifyToken, err := generateRandomToken(32)
+	// Generate 6-digit verification OTP (valid for 5 minutes by default)
+	rawOTP, err := generateOTP()
 	if err == nil {
 		ttlMinutes := s.cfg.Email.TokenTTLMinutes
 		if ttlMinutes <= 0 {
-			ttlMinutes = 30
+			ttlMinutes = 5
 		}
-		verifyTokenHash := hashToken(rawVerifyToken)
-		vToken := &model.EmailVerificationToken{
-			ID:        uuid.Must(uuid.NewV7()),
-			UserID:    userID,
-			TokenHash: verifyTokenHash,
-			ExpiresAt: time.Now().Add(time.Duration(ttlMinutes) * time.Minute),
-			Used:      false,
-		}
-		if err := s.repo.CreateVerificationToken(ctx, vToken); err == nil {
-			go func(toEmail, token string) {
-				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, token)
-			}(req.Email, rawVerifyToken)
+		otpHash := hashToken(rawOTP)
+		ttl := time.Duration(ttlMinutes) * time.Minute
+		if err := s.otpStore.SetOTP(ctx, cred.Email, otpHash, ttl); err == nil {
+			go func(toEmail, otp string) {
+				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
+			}(req.Email, rawOTP)
 		} else {
-			s.logger.Error("Failed to store verification token", "error", err)
+			s.logger.Error("Failed to store verification OTP in store", "error", err)
 		}
 	}
 
@@ -467,37 +474,59 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 }
 
 func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error) {
-	if req == nil || req.Token == "" {
-		s.logger.Warn("Verify email failed: missing token")
-		return nil, appErrors.BadRequest("verification token is required")
+	if req == nil || (req.OTP == "" && req.Token == "") {
+		s.logger.Warn("Verify email failed: missing verification code")
+		return nil, appErrors.BadRequest("verification code is required")
 	}
 
-	tokenHash := hashToken(req.Token)
-	vToken, err := s.repo.GetVerificationTokenByHash(ctx, tokenHash)
+	otpVal := strings.TrimSpace(req.OTP)
+	if otpVal == "" {
+		otpVal = strings.TrimSpace(req.Token)
+	}
+
+	email := strings.TrimSpace(req.Email)
+	if email == "" {
+		s.logger.Warn("Verify email failed: missing email")
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	cred, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Verify email failed: token not found")
-			return nil, appErrors.BadRequest("invalid verification token")
+			s.logger.Warn("Verify email failed: user not found", "email", email)
+			return nil, appErrors.NotFound("user not found")
 		}
 		s.logger.Error("Verify email failed: database query error", "error", err)
-		return nil, appErrors.Internal(err, "failed to query verification token")
+		return nil, appErrors.Internal(err, "failed to query user credentials")
 	}
 
-	if vToken.Used {
-		s.logger.Warn("Verify email failed: token already used", "token_id", vToken.ID.String())
-		return nil, appErrors.BadRequest("verification token has already been used")
+	if cred.EmailVerified {
+		return &dto.VerifyEmailResponse{
+			Success: true,
+			Message: "Email address is already verified",
+		}, nil
 	}
 
-	if time.Now().After(vToken.ExpiresAt) {
-		s.logger.Warn("Verify email failed: token expired", "expires_at", vToken.ExpiresAt)
-		return nil, appErrors.BadRequest("verification token has expired")
+	storedHash, err := s.otpStore.GetOTP(ctx, cred.Email)
+	if err != nil {
+		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email)
+		return nil, appErrors.BadRequest("verification code has expired or is invalid")
 	}
 
-	if err := s.repo.VerifyEmailAtomic(ctx, vToken.ID, vToken.UserID); err != nil {
+	if storedHash != hashToken(otpVal) {
+		s.logger.Warn("Verify email failed: code mismatch", "user_id", cred.UserID.String())
+		return nil, appErrors.BadRequest("invalid verification code")
+	}
+
+	// Delete from Redis so OTP cannot be reused
+	_ = s.otpStore.DeleteOTP(ctx, cred.Email)
+
+	// Update user in PostgreSQL
+	if err := s.repo.MarkEmailVerified(ctx, cred.UserID); err != nil {
 		return nil, appErrors.Internal(err, "failed to update email verification status")
 	}
 
-	s.logger.Info("Email verified successfully", "user_id", vToken.UserID.String())
+	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email)
 	return &dto.VerifyEmailResponse{
 		Success: true,
 		Message: "Email address verified successfully",
@@ -524,37 +553,38 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 		return nil, appErrors.BadRequest("email is already verified")
 	}
 
-	rawVerifyToken, err := generateRandomToken(32)
+	rawOTP, err := generateOTP()
 	if err != nil {
-		return nil, appErrors.Internal(err, "failed to generate verification token")
+		return nil, appErrors.Internal(err, "failed to generate verification OTP")
 	}
 
 	ttlMinutes := s.cfg.Email.TokenTTLMinutes
 	if ttlMinutes <= 0 {
-		ttlMinutes = 30
+		ttlMinutes = 5
 	}
 
-	tokenHash := hashToken(rawVerifyToken)
-	vToken := &model.EmailVerificationToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    cred.UserID,
-		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(time.Duration(ttlMinutes) * time.Minute),
-		Used:      false,
+	otpHash := hashToken(rawOTP)
+	ttl := time.Duration(ttlMinutes) * time.Minute
+	if err := s.otpStore.SetOTP(ctx, cred.Email, otpHash, ttl); err != nil {
+		return nil, appErrors.Internal(err, "failed to store verification OTP in store")
 	}
 
-	if err := s.repo.CreateVerificationToken(ctx, vToken); err != nil {
-		return nil, appErrors.Internal(err, "failed to store verification token")
-	}
-
-	go func(toEmail, token string) {
-		_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, token)
-	}(cred.Email, rawVerifyToken)
+	go func(toEmail, otp string) {
+		_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
+	}(cred.Email, rawOTP)
 
 	return &dto.ResendVerificationEmailResponse{
 		Success: true,
-		Message: "Verification email sent successfully",
+		Message: "Verification OTP sent successfully",
 	}, nil
+}
+
+func generateOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(900000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()+100000), nil
 }
 
 func generateRandomToken(nBytes int) (string, error) {

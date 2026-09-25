@@ -26,9 +26,7 @@ type AuthRepository interface {
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
-	CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error
-	GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error)
-	VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
 }
 
 type postgresAuthRepository struct {
@@ -259,82 +257,16 @@ func (r *postgresAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid
 	return nil
 }
 
-func (r *postgresAuthRepository) CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error {
-	if token.ID == uuid.Nil {
-		token.ID = uuid.Must(uuid.NewV7())
-	}
+func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
 	query := `
-		INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at, used, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`
-	_, err := r.pool.Exec(ctx, query, token.ID, token.UserID, token.TokenHash, token.ExpiresAt, token.Used)
-	if err != nil {
-		r.logger.Error("Failed to create verification token", "error", err)
-		return fmt.Errorf("repository: create verification token failed: %w", err)
-	}
-	return nil
-}
-
-func (r *postgresAuthRepository) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error) {
-	query := `
-		SELECT id, user_id, token_hash, expires_at, used, used_at, created_at
-		FROM email_verification_tokens
-		WHERE token_hash = $1
-		LIMIT 1
-	`
-	var tok model.EmailVerificationToken
-	err := r.pool.QueryRow(ctx, query, tokenHash).Scan(
-		&tok.ID,
-		&tok.UserID,
-		&tok.TokenHash,
-		&tok.ExpiresAt,
-		&tok.Used,
-		&tok.UsedAt,
-		&tok.CreatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			r.logger.Warn("Verification token not found", "token_hash", tokenHash)
-			return nil, ErrNotFound
-		}
-		r.logger.Error("Failed to get verification token", "error", err)
-		return nil, fmt.Errorf("repository: get verification token failed: %w", err)
-	}
-	return &tok, nil
-}
-
-func (r *postgresAuthRepository) VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("repository: begin tx failed: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	// 1. Mark token as used
-	_, err = tx.Exec(ctx, `
-		UPDATE email_verification_tokens
-		SET used = true, used_at = NOW()
-		WHERE id = $1
-	`, tokenID)
-	if err != nil {
-		r.logger.Error("Failed to mark token as used", "token_id", tokenID, "error", err)
-		return fmt.Errorf("repository: mark token used failed: %w", err)
-	}
-
-	// 2. Mark user email_verified = true
-	_, err = tx.Exec(ctx, `
 		UPDATE auth_credentials
 		SET email_verified = true, updated_at = NOW()
 		WHERE user_id = $1
-	`, userID)
+	`
+	_, err := r.pool.Exec(ctx, query, userID)
 	if err != nil {
-		r.logger.Error("Failed to mark email_verified = true", "user_id", userID, "error", err)
-		return fmt.Errorf("repository: update email_verified failed: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		r.logger.Error("Failed to commit verify email tx", "error", err)
-		return fmt.Errorf("repository: commit verify email tx failed: %w", err)
+		r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: mark email verified failed: %w", err)
 	}
 	return nil
 }

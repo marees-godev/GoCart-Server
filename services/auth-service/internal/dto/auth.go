@@ -43,7 +43,9 @@ type RefreshTokenRequest struct {
 }
 
 type VerifyEmailRequest struct {
-	Token string `json:"token"`
+	Email string `json:"email,omitempty"`
+	OTP   string `json:"otp,omitempty"`
+	Token string `json:"token,omitempty"`
 }
 
 type VerifyEmailResponse struct {

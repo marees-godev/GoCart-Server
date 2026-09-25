@@ -166,6 +166,7 @@ type ComplexityRoot struct {
 		ReleaseStock            func(childComplexity int, reservationID string) int
 		RemoveFromCart          func(childComplexity int, userID string, productID string) int
 		RequestReturn           func(childComplexity int, input model.RequestReturnInput) int
+		ResendOtp               func(childComplexity int, email string) int
 		ResendVerificationEmail func(childComplexity int, email string) int
 		ReserveStock            func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
 		SendNotification        func(childComplexity int, input model.SendNotificationInput) int
@@ -181,7 +182,8 @@ type ComplexityRoot struct {
 		UpdateStore             func(childComplexity int, input model.UpdateStoreInput) int
 		UpdateUser              func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress       func(childComplexity int, id string, input model.UpdateAddressInput) int
-		VerifyEmail             func(childComplexity int, token string) int
+		VerifyEmail             func(childComplexity int, email string, otp string) int
+		VerifyEmailOtp          func(childComplexity int, email string, otp string) int
 	}
 
 	Notification struct {
@@ -367,8 +369,10 @@ type MutationResolver interface {
 	Empty(ctx context.Context) (*string, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
 	Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error)
-	VerifyEmail(ctx context.Context, token string) (bool, error)
+	VerifyEmail(ctx context.Context, email string, otp string) (bool, error)
+	VerifyEmailOtp(ctx context.Context, email string, otp string) (bool, error)
 	ResendVerificationEmail(ctx context.Context, email string) (bool, error)
+	ResendOtp(ctx context.Context, email string) (bool, error)
 	AddToCart(ctx context.Context, input model.AddToCartInput) (*model.Cart, error)
 	RemoveFromCart(ctx context.Context, userID string, productID string) (*model.Cart, error)
 	ClearCart(ctx context.Context, userID string) (bool, error)
@@ -1178,6 +1182,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RequestReturn(childComplexity, args["input"].(model.RequestReturnInput)), true
 
+	case "Mutation.resendOtp":
+		if e.complexity.Mutation.ResendOtp == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resendOtp_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ResendOtp(childComplexity, args["email"].(string)), true
+
 	case "Mutation.resendVerificationEmail":
 		if e.complexity.Mutation.ResendVerificationEmail == nil {
 			break
@@ -1368,7 +1384,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.VerifyEmail(childComplexity, args["token"].(string)), true
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string)), true
+
+	case "Mutation.verifyEmailOtp":
+		if e.complexity.Mutation.VerifyEmailOtp == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyEmailOtp_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyEmailOtp(childComplexity, args["email"].(string), args["otp"].(string)), true
 
 	case "Notification.channel":
 		if e.complexity.Notification.Channel == nil {
@@ -2480,8 +2508,10 @@ input RegisterInput {
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
-  verifyEmail(token: String!): Boolean!
+  verifyEmail(email: String!, otp: String!): Boolean!
+  verifyEmailOtp(email: String!, otp: String!): Boolean!
   resendVerificationEmail(email: String!): Boolean!
+  resendOtp(email: String!): Boolean!
 }
 
 `, BuiltIn: false},
@@ -3442,6 +3472,21 @@ func (ec *executionContext) field_Mutation_requestReturn_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_resendOtp_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["email"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_resendVerificationEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -3793,18 +3838,51 @@ func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, 
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_verifyEmailOtp_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 string
-	if tmp, ok := rawArgs["token"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
 		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["token"] = arg0
+	args["email"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["otp"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("otp"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["otp"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["email"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["otp"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("otp"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["otp"] = arg1
 	return args, nil
 }
 
@@ -7385,7 +7463,7 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().VerifyEmail(rctx, fc.Args["token"].(string))
+		return ec.resolvers.Mutation().VerifyEmail(rctx, fc.Args["email"].(string), fc.Args["otp"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7420,6 +7498,61 @@ func (ec *executionContext) fieldContext_Mutation_verifyEmail(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_verifyEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyEmailOtp(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyEmailOtp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyEmailOtp(rctx, fc.Args["email"].(string), fc.Args["otp"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyEmailOtp(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyEmailOtp_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7475,6 +7608,61 @@ func (ec *executionContext) fieldContext_Mutation_resendVerificationEmail(ctx co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_resendVerificationEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_resendOtp(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_resendOtp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ResendOtp(rctx, fc.Args["email"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_resendOtp(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_resendOtp_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -20655,9 +20843,23 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "verifyEmailOtp":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyEmailOtp(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "resendVerificationEmail":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_resendVerificationEmail(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "resendOtp":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resendOtp(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

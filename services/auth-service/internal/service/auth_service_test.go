@@ -17,6 +17,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/otp"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
@@ -29,7 +30,6 @@ type mockAuthRepository struct {
 	failedCountMap     map[uuid.UUID]int
 	lockedUntilMap     map[uuid.UUID]*time.Time
 	refreshTokens      []*model.RefreshToken
-	verificationTokens []*model.EmailVerificationToken
 	outboxEvents       []*outbox.Event
 	getByEmailErr      error
 	createSessionErr   error
@@ -141,28 +141,7 @@ func (m *mockAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUI
 	return nil
 }
 
-func (m *mockAuthRepository) CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error {
-	m.verificationTokens = append(m.verificationTokens, token)
-	return nil
-}
-
-func (m *mockAuthRepository) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error) {
-	for _, vt := range m.verificationTokens {
-		if vt.TokenHash == tokenHash {
-			return vt, nil
-		}
-	}
-	return nil, repository.ErrNotFound
-}
-
-func (m *mockAuthRepository) VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error {
-	for _, vt := range m.verificationTokens {
-		if vt.ID == tokenID {
-			vt.Used = true
-			now := time.Now()
-			vt.UsedAt = &now
-		}
-	}
+func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
 	for _, cred := range m.byEmail {
 		if cred.UserID == userID {
 			cred.EmailVerified = true
@@ -170,7 +149,6 @@ func (m *mockAuthRepository) VerifyEmailAtomic(ctx context.Context, tokenID uuid
 	}
 	return nil
 }
-
 
 func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 	mockRepo := newMockAuthRepository()
@@ -182,6 +160,19 @@ func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 	}
 	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{})
 	return svc, mockRepo, cfg
+}
+
+func setupTestServiceWithOTPStore() (AuthService, *mockAuthRepository, *config.Config, otp.Store) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	store := otp.NewMemoryStore()
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, store)
+	return svc, mockRepo, cfg, store
 }
 
 func TestLogin_Success(t *testing.T) {
@@ -541,7 +532,7 @@ func TestRegister_CompoundUniqueness_SameEmailBothRoles(t *testing.T) {
 }
 
 func TestVerifyEmail_Flow(t *testing.T) {
-	svc, mockRepo, _ := setupTestService()
+	svc, mockRepo, _, otpStore := setupTestServiceWithOTPStore()
 
 	userID := uuid.Must(uuid.NewV7())
 	mockRepo.byEmail["unverified@example.com"] = &model.AuthCredential{
@@ -553,20 +544,14 @@ func TestVerifyEmail_Flow(t *testing.T) {
 		IsActive:      true,
 	}
 
-	rawToken := "test-verification-raw-token-12345"
-	tokHash := hashToken(rawToken)
+	rawOTP := "847291"
+	_ = otpStore.SetOTP(context.Background(), "unverified@example.com", hashToken(rawOTP), 5*time.Minute)
 
-	vToken := &model.EmailVerificationToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    userID,
-		TokenHash: tokHash,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
-		Used:      false,
-	}
-	_ = mockRepo.CreateVerificationToken(context.Background(), vToken)
-
-	// 1. Verify with valid token
-	res, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: rawToken})
+	// 1. Verify with valid Email and OTP
+	res, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: "unverified@example.com",
+		OTP:   rawOTP,
+	})
 	if err != nil {
 		t.Fatalf("expected successful email verification, got: %v", err)
 	}
@@ -580,40 +565,72 @@ func TestVerifyEmail_Flow(t *testing.T) {
 		t.Error("expected credential EmailVerified to be true after verification")
 	}
 
-	// 2. Verify with already used token -> should fail
-	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: rawToken})
+	// OTP should be deleted from store after successful verification (one-time use)
+	_, err = otpStore.GetOTP(context.Background(), "unverified@example.com")
 	if err == nil {
-		t.Fatal("expected error when verifying with already used token")
+		t.Error("expected OTP to be deleted from store after successful verification")
+	}
+
+	// 2. Verify already verified email -> should return success
+	resAlready, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: "unverified@example.com",
+		OTP:   rawOTP,
+	})
+	if err != nil || !resAlready.Success {
+		t.Errorf("expected success for already verified email, got err: %v", err)
+	}
+
+	// 3. New unverified user with invalid OTP -> should fail
+	user2ID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["user2@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        user2ID,
+		Email:         "user2@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+	_ = otpStore.SetOTP(context.Background(), "user2@example.com", hashToken("123456"), 5*time.Minute)
+
+	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: "user2@example.com",
+		OTP:   "999999", // incorrect code
+	})
+	if err == nil {
+		t.Fatal("expected error when verifying with wrong OTP")
 	}
 	appErr := appErrors.AsAppError(err)
 	if appErr.HTTPStatus != 400 {
 		t.Errorf("expected 400 Bad Request, got %d", appErr.HTTPStatus)
 	}
 
-	// 3. Verify with expired token -> should fail
-	expiredRawToken := "expired-token-999"
-	expiredHash := hashToken(expiredRawToken)
-	expiredVToken := &model.EmailVerificationToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    userID,
-		TokenHash: expiredHash,
-		ExpiresAt: time.Now().Add(-5 * time.Minute), // expired 5 mins ago
-		Used:      false,
+	// 4. Verify with expired/non-existent OTP -> should fail
+	user3ID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["user3@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        user3ID,
+		Email:         "user3@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
 	}
-	_ = mockRepo.CreateVerificationToken(context.Background(), expiredVToken)
+	_ = otpStore.SetOTP(context.Background(), "user3@example.com", hashToken("654321"), -1*time.Minute)
 
-	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: expiredRawToken})
+	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: "user3@example.com",
+		OTP:   "654321",
+	})
 	if err == nil {
-		t.Fatal("expected error when verifying with expired token")
+		t.Fatal("expected error when verifying with expired OTP")
 	}
 	appErr = appErrors.AsAppError(err)
 	if appErr.HTTPStatus != 400 {
-		t.Errorf("expected 400 Bad Request for expired token, got %d", appErr.HTTPStatus)
+		t.Errorf("expected 400 Bad Request for expired OTP, got %d", appErr.HTTPStatus)
 	}
 }
 
 func TestResendVerificationEmail(t *testing.T) {
-	svc, mockRepo, _ := setupTestService()
+	svc, mockRepo, _, otpStore := setupTestServiceWithOTPStore()
 
 	userID := uuid.Must(uuid.NewV7())
 	mockRepo.byEmail["resend@example.com"] = &model.AuthCredential{
@@ -635,8 +652,9 @@ func TestResendVerificationEmail(t *testing.T) {
 		t.Error("expected res.Success to be true")
 	}
 
-	if len(mockRepo.verificationTokens) != 1 {
-		t.Errorf("expected 1 verification token stored, got %d", len(mockRepo.verificationTokens))
+	storedHash, err := otpStore.GetOTP(context.Background(), "resend@example.com")
+	if err != nil || storedHash == "" {
+		t.Errorf("expected OTP to be stored for resend@example.com, got err: %v", err)
 	}
 }
 

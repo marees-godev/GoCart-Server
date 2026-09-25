@@ -423,7 +423,9 @@ func (x *AuthResponse) GetLastName() string {
 
 type VerifyEmailRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Otp           string                 `protobuf:"bytes,2,opt,name=otp,proto3" json:"otp,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -456,6 +458,20 @@ func (x *VerifyEmailRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use VerifyEmailRequest.ProtoReflect.Descriptor instead.
 func (*VerifyEmailRequest) Descriptor() ([]byte, []int) {
 	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *VerifyEmailRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *VerifyEmailRequest) GetOtp() string {
+	if x != nil {
+		return x.Otp
+	}
+	return ""
 }
 
 func (x *VerifyEmailRequest) GetToken() string {
@@ -653,9 +669,11 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
 	"first_name\x18\t \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\n" +
-	" \x01(\tR\blastName\"*\n" +
+	" \x01(\tR\blastName\"R\n" +
 	"\x12VerifyEmailRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"I\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
+	"\x03otp\x18\x02 \x01(\tR\x03otp\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\"I\n" +
 	"\x13VerifyEmailResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"6\n" +
