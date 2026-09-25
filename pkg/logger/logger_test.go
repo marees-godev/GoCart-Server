@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -93,3 +94,85 @@ func TestRedactSensitiveKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestLoggerLocationMark(t *testing.T) {
+	t.Run("default configuration includes location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Output:      &buf,
+		})
+
+		l.Info("testing default location mark")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v, raw: %s", err, buf.String())
+		}
+
+		loc, ok := logEntry["location"].(string)
+		if !ok || loc == "" || !strings.Contains(loc, ":") {
+			t.Fatalf("Expected 'location' to be present with file:line, got: %v", logEntry["location"])
+		}
+		if _, exists := logEntry["source"]; exists {
+			t.Errorf("Expected 'source' group to be absent in favor of single 'location', got: %v", logEntry["source"])
+		}
+	})
+
+	t.Run("DisableSource disables location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName:   "test-service",
+			DisableSource: true,
+			Output:        &buf,
+		})
+
+		l.Info("testing disabled location mark")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v", err)
+		}
+
+		if _, exists := logEntry["location"]; exists {
+			t.Errorf("Expected 'location' to be absent when DisableSource is true, got: %v", logEntry["location"])
+		}
+	})
+
+	t.Run("LOG_ADD_SOURCE=false disables location mark", func(t *testing.T) {
+		t.Setenv("LOG_ADD_SOURCE", "false")
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Output:      &buf,
+		})
+
+		l.Info("testing LOG_ADD_SOURCE=false")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v", err)
+		}
+
+		if _, exists := logEntry["location"]; exists {
+			t.Errorf("Expected 'location' to be absent when LOG_ADD_SOURCE=false, got: %v", logEntry["location"])
+		}
+	})
+
+	t.Run("text format includes location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Format:      "text",
+			Output:      &buf,
+		})
+
+		l.Info("testing text format location mark")
+
+		raw := buf.String()
+		if !bytes.Contains(buf.Bytes(), []byte("location=")) {
+			t.Errorf("Expected 'location=' in text log output, got: %s", raw)
+		}
+	})
+}
+

@@ -3,6 +3,7 @@ package graphql
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -89,6 +90,34 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 
 	srv.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
 		err := graphql.DefaultErrorPresenter(ctx, e)
+
+		var gqlErr *gqlerror.Error
+		if errors.As(e, &gqlErr) && gqlErr.Path == nil {
+			if err.Extensions == nil {
+				err.Extensions = make(map[string]interface{})
+			}
+			if _, exists := err.Extensions["code"]; !exists {
+				err.Extensions["code"] = appErrors.CodeUnprocessableEntity
+			}
+
+			opName := "anonymous"
+			if oc := graphql.GetOperationContext(ctx); oc != nil {
+				if oc.OperationName != "" {
+					opName = oc.OperationName
+				} else if oc.Operation != nil && oc.Operation.Name != "" {
+					opName = oc.Operation.Name
+				}
+			}
+
+			logger.FromContext(ctx).Warn("GraphQL operation validation error",
+				"operation_name", opName,
+				"error_code", appErrors.CodeUnprocessableEntity,
+				"request_id", middleware.GetRequestID(ctx),
+				"error", e.Error(),
+			)
+			return err
+		}
+
 		appErr := appErrors.AsAppError(e)
 		errorCode := "INTERNAL_SERVER_ERROR"
 		if appErr != nil {
