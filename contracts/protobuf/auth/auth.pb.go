@@ -386,37 +386,190 @@ func (x *AuthResponse) GetUserId() string {
 	return ""
 }
 
-func (x *AuthResponse) GetRole() string {
+type VerifyEmailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyEmailRequest) Reset() {
+	*x = VerifyEmailRequest{}
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyEmailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyEmailRequest) ProtoMessage() {}
+
+func (x *VerifyEmailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
 	if x != nil {
-		return x.Role
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*VerifyEmailRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *VerifyEmailRequest) GetToken() string {
+	if x != nil {
+		return x.Token
 	}
 	return ""
 }
 
-func (x *AuthResponse) GetMerchantId() string {
+type VerifyEmailResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyEmailResponse) Reset() {
+	*x = VerifyEmailResponse{}
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyEmailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyEmailResponse) ProtoMessage() {}
+
+func (x *VerifyEmailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
 	if x != nil {
-		return x.MerchantId
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*VerifyEmailResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *VerifyEmailResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *VerifyEmailResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
 	}
 	return ""
 }
 
-func (x *AuthResponse) GetBusinessEmail() string {
+type ResendVerificationEmailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResendVerificationEmailRequest) Reset() {
+	*x = ResendVerificationEmailRequest{}
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResendVerificationEmailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResendVerificationEmailRequest) ProtoMessage() {}
+
+func (x *ResendVerificationEmailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
 	if x != nil {
-		return x.BusinessEmail
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*ResendVerificationEmailRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ResendVerificationEmailRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
 	}
 	return ""
 }
 
-func (x *AuthResponse) GetFirstName() string {
-	if x != nil {
-		return x.FirstName
-	}
-	return ""
+type ResendVerificationEmailResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AuthResponse) GetLastName() string {
+func (x *ResendVerificationEmailResponse) Reset() {
+	*x = ResendVerificationEmailResponse{}
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResendVerificationEmailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResendVerificationEmailResponse) ProtoMessage() {}
+
+func (x *ResendVerificationEmailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
 	if x != nil {
-		return x.LastName
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (*ResendVerificationEmailResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ResendVerificationEmailResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ResendVerificationEmailResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
 	}
 	return ""
 }

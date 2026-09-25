@@ -15,6 +15,7 @@ type Config struct {
 	Logger          LoggerConfig
 	Tracing         TracingConfig
 	JWT             JWTConfig
+	Email    EmailConfig
 	UserServiceAddr string
 	Services        ServicesConfig
 }
@@ -61,6 +62,20 @@ type JWTConfig struct {
 	ExpiryMinutes int
 }
 
+type EmailConfig struct {
+	ResendAPIKey    string
+	ResendFromEmail string
+	BrevoAPIKey     string
+	BrevoFromEmail  string
+	SMTPHost        string
+	SMTPPort        string
+	SMTPUser        string
+	SMTPPass        string
+	FromEmail       string
+	VerifyBaseURL   string
+	TokenTTLMinutes int
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("services/auth-service/.env")
@@ -98,6 +113,19 @@ func LoadEnv() *Config {
 		JWT: JWTConfig{
 			Secret:        GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
 			ExpiryMinutes: GetEnvAsInt("JWT_EXPIRY_MINUTES", 60),
+		},
+		Email: EmailConfig{
+			ResendAPIKey:    GetEnv("RESEND_API_KEY", ""),
+			ResendFromEmail: GetEnv("RESEND_FROM_EMAIL", GetEnv("EMAIL_FROM", "onboarding@resend.dev")),
+			BrevoAPIKey:     GetEnv("BREVO_API_KEY", ""),
+			BrevoFromEmail:  GetEnv("BREVO_FROM_EMAIL", GetEnv("EMAIL_FROM", "nikotest122@gmail.com")),
+			SMTPHost:        GetEnv("SMTP_HOST", "smtp.gmail.com"),
+			SMTPPort:        GetEnv("SMTP_PORT", "587"),
+			SMTPUser:        GetEnv("SMTP_USER", ""),
+			SMTPPass:        GetEnv("SMTP_PASS", ""),
+			FromEmail:       GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
+			VerifyBaseURL:   GetEnv("EMAIL_VERIFY_BASE_URL", "http://localhost:8080"),
+			TokenTTLMinutes: GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 30),
 		},
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{

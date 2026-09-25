@@ -15,6 +15,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
+	gwHandler "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/handler"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -113,6 +114,9 @@ func main() {
 
 	gqlHandler := gwGraphQL.NewHandler(gqlSchema, cfg)
 	gqlHandler.RegisterRoutes(app)
+
+	// Register dedicated auth HTTP routes
+	gwHandler.RegisterAuthRoutes(app, grpcClients)
 
 	// Additional endpoint aliases for backward compatibility
 	legacyServer := gwGraphQL.NewServer(gqlResolver)

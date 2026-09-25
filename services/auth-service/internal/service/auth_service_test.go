@@ -24,14 +24,15 @@ import (
 )
 
 type mockAuthRepository struct {
-	byEmail           map[string]*model.AuthCredential
-	byEmailRole       map[string]*model.AuthCredential
-	failedCountMap    map[uuid.UUID]int
-	lockedUntilMap    map[uuid.UUID]*time.Time
-	refreshTokens     []*model.RefreshToken
-	outboxEvents      []*outbox.Event
-	getByEmailErr     error
-	createSessionErr  error
+	byEmail            map[string]*model.AuthCredential
+	byEmailRole        map[string]*model.AuthCredential
+	failedCountMap     map[uuid.UUID]int
+	lockedUntilMap     map[uuid.UUID]*time.Time
+	refreshTokens      []*model.RefreshToken
+	verificationTokens []*model.EmailVerificationToken
+	outboxEvents       []*outbox.Event
+	getByEmailErr      error
+	createSessionErr   error
 }
 
 func newMockAuthRepository() *mockAuthRepository {
@@ -139,6 +140,37 @@ func (m *mockAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUI
 	}
 	return nil
 }
+
+func (m *mockAuthRepository) CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error {
+	m.verificationTokens = append(m.verificationTokens, token)
+	return nil
+}
+
+func (m *mockAuthRepository) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error) {
+	for _, vt := range m.verificationTokens {
+		if vt.TokenHash == tokenHash {
+			return vt, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (m *mockAuthRepository) VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error {
+	for _, vt := range m.verificationTokens {
+		if vt.ID == tokenID {
+			vt.Used = true
+			now := time.Now()
+			vt.UsedAt = &now
+		}
+	}
+	for _, cred := range m.byEmail {
+		if cred.UserID == userID {
+			cred.EmailVerified = true
+		}
+	}
+	return nil
+}
+
 
 func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
 	mockRepo := newMockAuthRepository()
@@ -507,6 +539,107 @@ func TestRegister_CompoundUniqueness_SameEmailBothRoles(t *testing.T) {
 		t.Errorf("expected HTTP 409 Conflict, got %d", appErr.HTTPStatus)
 	}
 }
+
+func TestVerifyEmail_Flow(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["unverified@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "unverified@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	rawToken := "test-verification-raw-token-12345"
+	tokHash := hashToken(rawToken)
+
+	vToken := &model.EmailVerificationToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: tokHash,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+		Used:      false,
+	}
+	_ = mockRepo.CreateVerificationToken(context.Background(), vToken)
+
+	// 1. Verify with valid token
+	res, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: rawToken})
+	if err != nil {
+		t.Fatalf("expected successful email verification, got: %v", err)
+	}
+	if !res.Success {
+		t.Error("expected res.Success to be true")
+	}
+
+	// Verify user email_verified updated to true
+	cred := mockRepo.byEmail["unverified@example.com"]
+	if !cred.EmailVerified {
+		t.Error("expected credential EmailVerified to be true after verification")
+	}
+
+	// 2. Verify with already used token -> should fail
+	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: rawToken})
+	if err == nil {
+		t.Fatal("expected error when verifying with already used token")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request, got %d", appErr.HTTPStatus)
+	}
+
+	// 3. Verify with expired token -> should fail
+	expiredRawToken := "expired-token-999"
+	expiredHash := hashToken(expiredRawToken)
+	expiredVToken := &model.EmailVerificationToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: expiredHash,
+		ExpiresAt: time.Now().Add(-5 * time.Minute), // expired 5 mins ago
+		Used:      false,
+	}
+	_ = mockRepo.CreateVerificationToken(context.Background(), expiredVToken)
+
+	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{Token: expiredRawToken})
+	if err == nil {
+		t.Fatal("expected error when verifying with expired token")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request for expired token, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestResendVerificationEmail(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["resend@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "resend@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	res, err := svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: "resend@example.com",
+	})
+	if err != nil {
+		t.Fatalf("expected successful resend, got: %v", err)
+	}
+	if !res.Success {
+		t.Error("expected res.Success to be true")
+	}
+
+	if len(mockRepo.verificationTokens) != 1 {
+		t.Errorf("expected 1 verification token stored, got %d", len(mockRepo.verificationTokens))
+	}
+}
+
 
 
 type mockUserServiceClient struct {

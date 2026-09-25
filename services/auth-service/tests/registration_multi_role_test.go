@@ -107,6 +107,19 @@ func (r *inMemoryAuthRepo) RevokeRefreshToken(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
+func (r *inMemoryAuthRepo) CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error {
+	return nil
+}
+
+func (r *inMemoryAuthRepo) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error) {
+	return nil, repository.ErrNotFound
+}
+
+func (r *inMemoryAuthRepo) VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error {
+	return nil
+}
+
+
 type mockMerchantClient struct {
 	merchantpb.MerchantServiceClient
 	createdMerchants []*merchantpb.CreateMerchantRequest

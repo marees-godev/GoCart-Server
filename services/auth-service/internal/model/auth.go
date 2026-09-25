@@ -61,3 +61,14 @@ type PasswordResetToken struct {
 	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
+
+type EmailVerificationToken struct {
+	ID        uuid.UUID  `json:"id" db:"id"`
+	UserID    uuid.UUID  `json:"user_id" db:"user_id"`
+	TokenHash string     `json:"-" db:"token_hash"`
+	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
+	Used      bool       `json:"used" db:"used"`
+	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+}
+

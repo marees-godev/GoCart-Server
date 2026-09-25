@@ -21,6 +21,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/mailer"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -40,11 +41,14 @@ type AuthService interface {
 	Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error)
 	ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error)
 	RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
+	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error)
+	ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error)
 }
 
 type authService struct {
 	repo           repository.AuthRepository
 	cfg            *config.Config
+	mailer mailer.Mailer
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
@@ -54,9 +58,18 @@ func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slo
 	if log == nil {
 		log = slog.Default()
 	}
+	m := mailer.NewMailer(cfg.Email, log)
+	return NewAuthServiceWithMailer(repo, cfg, m, log)
+}
+
+func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config, m mailer.Mailer, log *slog.Logger) AuthService {
+	if log == nil {
+		log = slog.Default()
+	}
 	s := &authService{
 		repo:   repo,
 		cfg:    cfg,
+		mailer: m,
 		logger: log,
 	}
 	for _, c := range clients {
@@ -219,6 +232,30 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	if err := s.repo.CreateCredential(ctx, cred); err != nil {
 		return nil, err
+	}
+
+	// Generate verification token (valid for 30 minutes)
+	rawVerifyToken, err := generateRandomToken(32)
+	if err == nil {
+		ttlMinutes := s.cfg.Email.TokenTTLMinutes
+		if ttlMinutes <= 0 {
+			ttlMinutes = 30
+		}
+		verifyTokenHash := hashToken(rawVerifyToken)
+		vToken := &model.EmailVerificationToken{
+			ID:        uuid.Must(uuid.NewV7()),
+			UserID:    userID,
+			TokenHash: verifyTokenHash,
+			ExpiresAt: time.Now().Add(time.Duration(ttlMinutes) * time.Minute),
+			Used:      false,
+		}
+		if err := s.repo.CreateVerificationToken(ctx, vToken); err == nil {
+			go func(toEmail, token string) {
+				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, token)
+			}(req.Email, rawVerifyToken)
+		} else {
+			s.logger.Error("Failed to store verification token", "error", err)
+		}
 	}
 
 	var merchantID string
@@ -429,6 +466,97 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	}, nil
 }
 
+func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error) {
+	if req == nil || req.Token == "" {
+		s.logger.Warn("Verify email failed: missing token")
+		return nil, appErrors.BadRequest("verification token is required")
+	}
+
+	tokenHash := hashToken(req.Token)
+	vToken, err := s.repo.GetVerificationTokenByHash(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Verify email failed: token not found")
+			return nil, appErrors.BadRequest("invalid verification token")
+		}
+		s.logger.Error("Verify email failed: database query error", "error", err)
+		return nil, appErrors.Internal(err, "failed to query verification token")
+	}
+
+	if vToken.Used {
+		s.logger.Warn("Verify email failed: token already used", "token_id", vToken.ID.String())
+		return nil, appErrors.BadRequest("verification token has already been used")
+	}
+
+	if time.Now().After(vToken.ExpiresAt) {
+		s.logger.Warn("Verify email failed: token expired", "expires_at", vToken.ExpiresAt)
+		return nil, appErrors.BadRequest("verification token has expired")
+	}
+
+	if err := s.repo.VerifyEmailAtomic(ctx, vToken.ID, vToken.UserID); err != nil {
+		return nil, appErrors.Internal(err, "failed to update email verification status")
+	}
+
+	s.logger.Info("Email verified successfully", "user_id", vToken.UserID.String())
+	return &dto.VerifyEmailResponse{
+		Success: true,
+		Message: "Email address verified successfully",
+	}, nil
+}
+
+func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error) {
+	if req == nil || req.Email == "" {
+		s.logger.Warn("Resend verification email failed: missing email")
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	cred, err := s.repo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Resend verification email failed: user not found", "email", req.Email)
+			return nil, appErrors.NotFound("user not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if cred.EmailVerified {
+		s.logger.Warn("Resend verification email failed: email already verified", "email", req.Email)
+		return nil, appErrors.BadRequest("email is already verified")
+	}
+
+	rawVerifyToken, err := generateRandomToken(32)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to generate verification token")
+	}
+
+	ttlMinutes := s.cfg.Email.TokenTTLMinutes
+	if ttlMinutes <= 0 {
+		ttlMinutes = 30
+	}
+
+	tokenHash := hashToken(rawVerifyToken)
+	vToken := &model.EmailVerificationToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    cred.UserID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(time.Duration(ttlMinutes) * time.Minute),
+		Used:      false,
+	}
+
+	if err := s.repo.CreateVerificationToken(ctx, vToken); err != nil {
+		return nil, appErrors.Internal(err, "failed to store verification token")
+	}
+
+	go func(toEmail, token string) {
+		_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, token)
+	}(cred.Email, rawVerifyToken)
+
+	return &dto.ResendVerificationEmailResponse{
+		Success: true,
+		Message: "Verification email sent successfully",
+	}, nil
+}
+
 func generateRandomToken(nBytes int) (string, error) {
 	b := make([]byte, nBytes)
 	if _, err := rand.Read(b); err != nil {
@@ -441,3 +569,4 @@ func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return fmt.Sprintf("%x", sum)
 }
+

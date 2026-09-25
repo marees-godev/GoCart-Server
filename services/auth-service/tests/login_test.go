@@ -64,6 +64,19 @@ func (m *mockRepoForGRPC) RevokeRefreshToken(ctx context.Context, id uuid.UUID) 
 	return nil
 }
 
+func (m *mockRepoForGRPC) CreateVerificationToken(ctx context.Context, token *model.EmailVerificationToken) error {
+	return nil
+}
+
+func (m *mockRepoForGRPC) GetVerificationTokenByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error) {
+	return nil, repository.ErrNotFound
+}
+
+func (m *mockRepoForGRPC) VerifyEmailAtomic(ctx context.Context, tokenID uuid.UUID, userID uuid.UUID) error {
+	return nil
+}
+
+
 func TestGRPCLogin_SuccessAndClaims(t *testing.T) {
 	userID := uuid.Must(uuid.NewV7())
 	rawPassword := "Password123!"

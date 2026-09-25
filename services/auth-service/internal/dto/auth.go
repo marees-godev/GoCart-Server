@@ -41,3 +41,22 @@ type ValidateTokenResponse struct {
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+type VerifyEmailResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ResendVerificationEmailRequest struct {
+	Email string `json:"email"`
+}
+
+type ResendVerificationEmailResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+

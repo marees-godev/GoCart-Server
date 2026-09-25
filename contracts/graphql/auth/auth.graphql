@@ -25,4 +25,7 @@ input RegisterInput {
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  verifyEmail(token: String!): Boolean!
+  resendVerificationEmail(email: String!): Boolean!
 }
+

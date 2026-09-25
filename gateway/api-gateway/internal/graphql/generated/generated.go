@@ -143,43 +143,41 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRating              func(childComplexity int, input model.AddRatingInput) int
-		AddToCart              func(childComplexity int, input model.AddToCartInput) int
-		ApproveStore           func(childComplexity int, id string) int
-		ClearCart              func(childComplexity int, userID string) int
-		CreateCategory         func(childComplexity int, input model.CreateCategoryInput) int
-		CreateDelivery         func(childComplexity int, input model.CreateDeliveryInput) int
-		CreateOrder            func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct          func(childComplexity int, input model.CreateProductInput) int
-		CreateRefund           func(childComplexity int, paymentID string, amount float64, reason *string) int
-		CreateStore            func(childComplexity int, input model.CreateStoreInput) int
-		CreateUserAddress      func(childComplexity int, userID string, input model.CreateAddressInput) int
-		DeleteMerchant         func(childComplexity int, id *string, merchantID *string) int
-		DeleteProduct          func(childComplexity int, id string) int
-		DeleteUserAddress      func(childComplexity int, id string) int
-		Empty                  func(childComplexity int) int
-		GenerateStoreUploadURL func(childComplexity int, input model.GenerateStoreUploadURLInput) int
-		Login                  func(childComplexity int, input model.LoginInput) int
-		ProcessPayment         func(childComplexity int, input model.ProcessPaymentInput) int
-		Register               func(childComplexity int, input model.RegisterInput) int
-		RejectStore            func(childComplexity int, id string, reason string) int
-		ReleaseStock           func(childComplexity int, reservationID string) int
-		RemoveFromCart         func(childComplexity int, userID string, productID string) int
-		RequestReturn          func(childComplexity int, input model.RequestReturnInput) int
-		ReserveStock           func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
-		SendNotification       func(childComplexity int, input model.SendNotificationInput) int
-		SetDefaultUserAddress  func(childComplexity int, id string) int
-		SubmitStore            func(childComplexity int, id string) int
-		UpdateDeliveryStatus   func(childComplexity int, id string, status string, location *string) int
-		UpdateMerchant         func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
-		UpdateMerchantStatus   func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
-		UpdateOrderStatus      func(childComplexity int, id string, status string) int
-		UpdateProduct          func(childComplexity int, id string, input model.UpdateProductInput) int
-		UpdateReturnStatus     func(childComplexity int, id string, status string) int
-		UpdateStock            func(childComplexity int, productID string, quantity int) int
-		UpdateStore            func(childComplexity int, input model.UpdateStoreInput) int
-		UpdateUser             func(childComplexity int, id string, input model.UpdateUserInput) int
-		UpdateUserAddress      func(childComplexity int, id string, input model.UpdateAddressInput) int
+		AddRating               func(childComplexity int, input model.AddRatingInput) int
+		AddToCart               func(childComplexity int, input model.AddToCartInput) int
+		ClearCart               func(childComplexity int, userID string) int
+		CreateCategory          func(childComplexity int, input model.CreateCategoryInput) int
+		CreateDelivery          func(childComplexity int, input model.CreateDeliveryInput) int
+		CreateMerchant          func(childComplexity int, input model.CreateMerchantInput) int
+		CreateOrder             func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct           func(childComplexity int, input model.CreateProductInput) int
+		CreateRefund            func(childComplexity int, paymentID string, amount float64, reason *string) int
+		CreateStore             func(childComplexity int, input model.CreateStoreInput) int
+		CreateUserAddress       func(childComplexity int, userID string, input model.CreateAddressInput) int
+		DeleteProduct           func(childComplexity int, id string) int
+		DeleteUserAddress       func(childComplexity int, id string) int
+		Empty                   func(childComplexity int) int
+		GenerateStoreUploadURL  func(childComplexity int, input model.GenerateStoreUploadURLInput) int
+		Login                   func(childComplexity int, input model.LoginInput) int
+		ProcessPayment          func(childComplexity int, input model.ProcessPaymentInput) int
+		Register                func(childComplexity int, input model.RegisterInput) int
+		ReleaseStock            func(childComplexity int, reservationID string) int
+		RemoveFromCart          func(childComplexity int, userID string, productID string) int
+		RequestReturn           func(childComplexity int, input model.RequestReturnInput) int
+		ResendVerificationEmail func(childComplexity int, email string) int
+		ReserveStock            func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
+		SendNotification        func(childComplexity int, input model.SendNotificationInput) int
+		SetDefaultUserAddress   func(childComplexity int, id string) int
+		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
+		UpdateMerchantStatus    func(childComplexity int, id string, status string) int
+		UpdateOrderStatus       func(childComplexity int, id string, status string) int
+		UpdateProduct           func(childComplexity int, id string, input model.UpdateProductInput) int
+		UpdateReturnStatus      func(childComplexity int, id string, status string) int
+		UpdateStock             func(childComplexity int, productID string, quantity int) int
+		UpdateStore             func(childComplexity int, input model.UpdateStoreInput) int
+		UpdateUser              func(childComplexity int, id string, input model.UpdateUserInput) int
+		UpdateUserAddress       func(childComplexity int, id string, input model.UpdateAddressInput) int
+		VerifyEmail             func(childComplexity int, token string) int
 	}
 
 	Notification struct {
@@ -365,6 +363,8 @@ type MutationResolver interface {
 	Empty(ctx context.Context) (*string, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
 	Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error)
+	VerifyEmail(ctx context.Context, token string) (bool, error)
+	ResendVerificationEmail(ctx context.Context, email string) (bool, error)
 	AddToCart(ctx context.Context, input model.AddToCartInput) (*model.Cart, error)
 	RemoveFromCart(ctx context.Context, userID string, productID string) (*model.Cart, error)
 	ClearCart(ctx context.Context, userID string) (bool, error)
@@ -1174,6 +1174,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RequestReturn(childComplexity, args["input"].(model.RequestReturnInput)), true
 
+	case "Mutation.resendVerificationEmail":
+		if e.complexity.Mutation.ResendVerificationEmail == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resendVerificationEmail_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ResendVerificationEmail(childComplexity, args["email"].(string)), true
+
 	case "Mutation.reserveStock":
 		if e.complexity.Mutation.ReserveStock == nil {
 			break
@@ -1341,6 +1353,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateUserAddress(childComplexity, args["id"].(string), args["input"].(model.UpdateAddressInput)), true
+
+	case "Mutation.verifyEmail":
+		if e.complexity.Mutation.VerifyEmail == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyEmail_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["token"].(string)), true
 
 	case "Notification.channel":
 		if e.complexity.Notification.Channel == nil {
@@ -2452,7 +2476,10 @@ input RegisterInput {
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  verifyEmail(token: String!): Boolean!
+  resendVerificationEmail(email: String!): Boolean!
 }
+
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/cart/cart.graphql", Input: `type CartItem {
   id: ID!
@@ -3411,6 +3438,21 @@ func (ec *executionContext) field_Mutation_requestReturn_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_resendVerificationEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["email"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_reserveStock_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -3744,6 +3786,21 @@ func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, 
 		}
 	}
 	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["token"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["token"] = arg0
 	return args, nil
 }
 
@@ -7304,6 +7361,116 @@ func (ec *executionContext) fieldContext_Mutation_register(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_register_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyEmail(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyEmail(rctx, fc.Args["token"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyEmail(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_resendVerificationEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_resendVerificationEmail(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ResendVerificationEmail(rctx, fc.Args["email"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_resendVerificationEmail(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_resendVerificationEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -20473,6 +20640,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "register":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_register(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verifyEmail":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyEmail(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "resendVerificationEmail":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resendVerificationEmail(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

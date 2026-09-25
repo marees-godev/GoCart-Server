@@ -230,3 +230,38 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 
 	return payload, nil
 }
+
+// VerifyEmail is the resolver for the verifyEmail field.
+func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (bool, error) {
+	if r.Clients == nil || r.Clients.AuthClient == nil {
+		return false, appErrors.Internal(nil, "auth client unavailable")
+	}
+	if token == "" {
+		return false, appErrors.BadRequest("token is required")
+	}
+	res, err := r.Clients.AuthClient.VerifyEmail(ctx, &authpb.VerifyEmailRequest{
+		Token: token,
+	})
+	if err != nil {
+		return false, err
+	}
+	return res.GetSuccess(), nil
+}
+
+// ResendVerificationEmail is the resolver for the resendVerificationEmail field.
+func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
+	if r.Clients == nil || r.Clients.AuthClient == nil {
+		return false, appErrors.Internal(nil, "auth client unavailable")
+	}
+	if email == "" {
+		return false, appErrors.BadRequest("email is required")
+	}
+	res, err := r.Clients.AuthClient.ResendVerificationEmail(ctx, &authpb.ResendVerificationEmailRequest{
+		Email: email,
+	})
+	if err != nil {
+		return false, err
+	}
+	return res.GetSuccess(), nil
+}
+
