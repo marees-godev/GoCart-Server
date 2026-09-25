@@ -149,46 +149,48 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRating              func(childComplexity int, input model.AddRatingInput) int
-		AddToCart              func(childComplexity int, input model.AddToCartInput) int
-		ApproveStore           func(childComplexity int, id string) int
-		ClearCart              func(childComplexity int, userID string) int
-		CreateCategory         func(childComplexity int, input model.CreateCategoryInput) int
-		CreateDelivery         func(childComplexity int, input model.CreateDeliveryInput) int
-		CreateOrder            func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct          func(childComplexity int, input model.CreateProductInput) int
-		CreateRefund           func(childComplexity int, paymentID string, amount float64, reason *string) int
-		CreateStore            func(childComplexity int, input model.CreateStoreInput) int
-		CreateUserAddress      func(childComplexity int, userID string, input model.CreateAddressInput) int
-		DeactivateAccount      func(childComplexity int, input *model.DeactivateAccountInput) int
-		DeleteAccount          func(childComplexity int, input *model.DeleteAccountInput) int
-		DeleteMerchant         func(childComplexity int, id *string, merchantID *string) int
-		DeleteProduct          func(childComplexity int, id string) int
-		DeleteUserAddress      func(childComplexity int, id string) int
-		Empty                  func(childComplexity int) int
-		GenerateStoreUploadURL func(childComplexity int, input model.GenerateStoreUploadURLInput) int
-		Login                  func(childComplexity int, input model.LoginInput) int
-		ProcessPayment         func(childComplexity int, input model.ProcessPaymentInput) int
-		ReactivateAccount      func(childComplexity int) int
-		Register               func(childComplexity int, input model.RegisterInput) int
-		RejectStore            func(childComplexity int, id string, reason string) int
-		ReleaseStock           func(childComplexity int, reservationID string) int
-		RemoveFromCart         func(childComplexity int, userID string, productID string) int
-		RequestReturn          func(childComplexity int, input model.RequestReturnInput) int
-		ReserveStock           func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
-		SendNotification       func(childComplexity int, input model.SendNotificationInput) int
-		SetDefaultUserAddress  func(childComplexity int, id string) int
-		SubmitStore            func(childComplexity int, id string) int
-		UpdateDeliveryStatus   func(childComplexity int, id string, status string, location *string) int
-		UpdateMerchant         func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
-		UpdateMerchantStatus   func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
-		UpdateOrderStatus      func(childComplexity int, id string, status string) int
-		UpdateProduct          func(childComplexity int, id string, input model.UpdateProductInput) int
-		UpdateReturnStatus     func(childComplexity int, id string, status string) int
-		UpdateStock            func(childComplexity int, productID string, quantity int) int
-		UpdateStore            func(childComplexity int, input model.UpdateStoreInput) int
-		UpdateUser             func(childComplexity int, id string, input model.UpdateUserInput) int
-		UpdateUserAddress      func(childComplexity int, id string, input model.UpdateAddressInput) int
+		AddRating               func(childComplexity int, input model.AddRatingInput) int
+		AddToCart               func(childComplexity int, input model.AddToCartInput) int
+		ApproveStore            func(childComplexity int, id string) int
+		ClearCart               func(childComplexity int, userID string) int
+		CreateCategory          func(childComplexity int, input model.CreateCategoryInput) int
+		CreateDelivery          func(childComplexity int, input model.CreateDeliveryInput) int
+		CreateOrder             func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct           func(childComplexity int, input model.CreateProductInput) int
+		CreateRefund            func(childComplexity int, paymentID string, amount float64, reason *string) int
+		CreateStore             func(childComplexity int, input model.CreateStoreInput) int
+		CreateUserAddress       func(childComplexity int, userID string, input model.CreateAddressInput) int
+		DeactivateAccount       func(childComplexity int, input *model.DeactivateAccountInput) int
+		DeleteAccount           func(childComplexity int, input *model.DeleteAccountInput) int
+		DeleteMerchant          func(childComplexity int, id *string, merchantID *string) int
+		DeleteProduct           func(childComplexity int, id string) int
+		DeleteUserAddress       func(childComplexity int, id string) int
+		Empty                   func(childComplexity int) int
+		GenerateStoreUploadURL  func(childComplexity int, input model.GenerateStoreUploadURLInput) int
+		Login                   func(childComplexity int, input model.LoginInput) int
+		ProcessPayment          func(childComplexity int, input model.ProcessPaymentInput) int
+		ReactivateAccount       func(childComplexity int) int
+		Register                func(childComplexity int, input model.RegisterInput) int
+		RejectStore             func(childComplexity int, id string, reason string) int
+		ReleaseStock            func(childComplexity int, reservationID string) int
+		RemoveFromCart          func(childComplexity int, userID string, productID string) int
+		RequestReturn           func(childComplexity int, input model.RequestReturnInput) int
+		ResendVerificationEmail func(childComplexity int, email string) int
+		ReserveStock            func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
+		SendNotification        func(childComplexity int, input model.SendNotificationInput) int
+		SetDefaultUserAddress   func(childComplexity int, id string) int
+		SubmitStore             func(childComplexity int, id string) int
+		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
+		UpdateMerchant          func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
+		UpdateMerchantStatus    func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
+		UpdateOrderStatus       func(childComplexity int, id string, status string) int
+		UpdateProduct           func(childComplexity int, id string, input model.UpdateProductInput) int
+		UpdateReturnStatus      func(childComplexity int, id string, status string) int
+		UpdateStock             func(childComplexity int, productID string, quantity int) int
+		UpdateStore             func(childComplexity int, input model.UpdateStoreInput) int
+		UpdateUser              func(childComplexity int, id string, input model.UpdateUserInput) int
+		UpdateUserAddress       func(childComplexity int, id string, input model.UpdateAddressInput) int
+		VerifyEmail             func(childComplexity int, email string, otp string) int
 	}
 
 	Notification struct {
