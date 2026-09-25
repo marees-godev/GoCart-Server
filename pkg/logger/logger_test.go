@@ -110,23 +110,12 @@ func TestLoggerLocationMark(t *testing.T) {
 			t.Fatalf("Failed to parse log JSON: %v, raw: %s", err, buf.String())
 		}
 
-		source, ok := logEntry["source"].(map[string]any)
-		if !ok || source == nil {
-			t.Fatalf("Expected 'source' location mark to be present, got: %v", logEntry)
-		}
-		file, ok := source["file"].(string)
-		if !ok || file == "" || !strings.Contains(file, ":") {
-			t.Errorf("Expected 'file' to contain file:line location, got: %v", source["file"])
-		}
-		loc, ok := source["location"].(string)
+		loc, ok := logEntry["location"].(string)
 		if !ok || loc == "" || !strings.Contains(loc, ":") {
-			t.Errorf("Expected 'location' to contain file:line location, got: %v", source["location"])
+			t.Fatalf("Expected 'location' to be present with file:line, got: %v", logEntry["location"])
 		}
-		if line, ok := source["line"].(float64); !ok || line == 0 {
-			t.Errorf("Expected non-zero 'line' in location mark, got: %v", source["line"])
-		}
-		if function, ok := source["function"].(string); !ok || function == "" {
-			t.Errorf("Expected 'function' in location mark, got: %v", source["function"])
+		if _, exists := logEntry["source"]; exists {
+			t.Errorf("Expected 'source' group to be absent in favor of single 'location', got: %v", logEntry["source"])
 		}
 	})
 
@@ -145,8 +134,8 @@ func TestLoggerLocationMark(t *testing.T) {
 			t.Fatalf("Failed to parse log JSON: %v", err)
 		}
 
-		if _, exists := logEntry["source"]; exists {
-			t.Errorf("Expected 'source' to be absent when DisableSource is true, got: %v", logEntry["source"])
+		if _, exists := logEntry["location"]; exists {
+			t.Errorf("Expected 'location' to be absent when DisableSource is true, got: %v", logEntry["location"])
 		}
 	})
 
@@ -165,8 +154,8 @@ func TestLoggerLocationMark(t *testing.T) {
 			t.Fatalf("Failed to parse log JSON: %v", err)
 		}
 
-		if _, exists := logEntry["source"]; exists {
-			t.Errorf("Expected 'source' to be absent when LOG_ADD_SOURCE=false, got: %v", logEntry["source"])
+		if _, exists := logEntry["location"]; exists {
+			t.Errorf("Expected 'location' to be absent when LOG_ADD_SOURCE=false, got: %v", logEntry["location"])
 		}
 	})
 
@@ -181,8 +170,8 @@ func TestLoggerLocationMark(t *testing.T) {
 		l.Info("testing text format location mark")
 
 		raw := buf.String()
-		if !bytes.Contains(buf.Bytes(), []byte("source=")) {
-			t.Errorf("Expected 'source=' in text log output, got: %s", raw)
+		if !bytes.Contains(buf.Bytes(), []byte("location=")) {
+			t.Errorf("Expected 'location=' in text log output, got: %s", raw)
 		}
 	})
 }

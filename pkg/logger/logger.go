@@ -135,22 +135,13 @@ func New(cfg Config) *slog.Logger {
 		addSource = true
 	}
 
-	format := strings.ToLower(cfg.Format)
 	replaceAttr := func(groups []string, a slog.Attr) slog.Attr {
 		a = RedactAttr(groups, a)
 		if a.Key == slog.SourceKey {
 			if source, ok := a.Value.Any().(*slog.Source); ok && source != nil {
 				cleanPath := filepath.ToSlash(source.File)
 				loc := fmt.Sprintf("%s:%d", cleanPath, source.Line)
-				if format == "text" {
-					return slog.String(slog.SourceKey, loc)
-				}
-				return slog.Group(slog.SourceKey,
-					slog.String("location", loc),
-					slog.String("file", loc),
-					slog.Int("line", source.Line),
-					slog.String("function", source.Function),
-				)
+				return slog.String("location", loc)
 			}
 		}
 		return a
