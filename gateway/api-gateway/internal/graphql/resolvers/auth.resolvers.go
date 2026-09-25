@@ -96,6 +96,9 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		}
 		payload.Role = &role
 	}
+	if user != nil && (user.Role == nil || *user.Role == "") {
+		user.Role = payload.Role
+	}
 	if res.FirstName != "" {
 		fnStr := res.FirstName
 		payload.FirstName = &fnStr
@@ -152,7 +155,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 				"x-user-id", res.UserId,
 				"x-user-role", string(model.RoleMerchant),
 			))
-			mRes, _ := merchantClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{UserId: res.UserId})
+			mRes, _ := merchantClient.GetMerchant(mCtx, &merchantpb.GetMerchantRequest{Id: res.UserId})
 			if mRes != nil && mRes.Merchant != nil {
 				if mRes.Merchant.Id != "" {
 					mID = mRes.Merchant.Id
@@ -180,7 +183,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		}
 
 		payload.Merchant = &model.Merchant{
-			MerchantID:    mID,
+			ID:            mID,
 			BusinessName:  bName,
 			FirstName:     payload.FirstName,
 			LastName:      payload.LastName,
@@ -287,6 +290,9 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		}
 		payload.Role = &role
 	}
+	if user != nil && (user.Role == nil || *user.Role == "") {
+		user.Role = payload.Role
+	}
 
 	if res.FirstName != "" {
 		fnStr := res.FirstName
@@ -329,7 +335,7 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		}
 		status := "PENDING"
 		payload.Merchant = &model.Merchant{
-			MerchantID:    mID,
+			ID:            mID,
 			BusinessName:  bName,
 			FirstName:     payload.FirstName,
 			LastName:      payload.LastName,

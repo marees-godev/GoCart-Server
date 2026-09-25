@@ -1,7 +1,5 @@
 type Merchant {
   id: ID!
-  merchantId: ID!
-  userId: String
   businessName: String!
   firstName: String
   lastName: String
@@ -12,6 +10,7 @@ type Merchant {
   rejectionReason: String
   createdAt: String
   updatedAt: String
+  deletedAt: String
 }
 
 type MerchantList {
@@ -29,16 +28,15 @@ input UpdateMerchantInput {
 }
 
 extend type Query {
-  merchant(id: ID, merchantId: ID): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchantByMerchantId(merchantId: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchantByUserId(userId: String!): Merchant @auth(requires: [ADMIN, MERCHANT])
+  merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
   merchants(status: String, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
-  updateMerchant(id: ID, merchantId: ID, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
-  updateMerchantStatus(id: ID, merchantId: ID, status: String!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
-  deleteMerchant(id: ID, merchantId: ID): Boolean! @auth(requires: [ADMIN])
+  updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
+  updateMerchantStatus(id: ID!, status: String!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
+  deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
 }
+
 
 

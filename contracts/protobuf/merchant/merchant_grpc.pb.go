@@ -19,13 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MerchantService_GetMerchant_FullMethodName          = "/gocart.merchant.v1.MerchantService/GetMerchant"
-	MerchantService_GetMerchantByUserID_FullMethodName  = "/gocart.merchant.v1.MerchantService/GetMerchantByUserID"
-	MerchantService_ListMerchants_FullMethodName        = "/gocart.merchant.v1.MerchantService/ListMerchants"
-	MerchantService_CreateMerchant_FullMethodName       = "/gocart.merchant.v1.MerchantService/CreateMerchant"
-	MerchantService_UpdateMerchant_FullMethodName       = "/gocart.merchant.v1.MerchantService/UpdateMerchant"
-	MerchantService_UpdateMerchantStatus_FullMethodName = "/gocart.merchant.v1.MerchantService/UpdateMerchantStatus"
-	MerchantService_DeleteMerchant_FullMethodName       = "/gocart.merchant.v1.MerchantService/DeleteMerchant"
+	MerchantService_GetMerchant_FullMethodName          = "/merchant.v1.MerchantService/GetMerchant"
+	MerchantService_UpdateMerchant_FullMethodName       = "/merchant.v1.MerchantService/UpdateMerchant"
+	MerchantService_CreateMerchant_FullMethodName       = "/merchant.v1.MerchantService/CreateMerchant"
+	MerchantService_ListMerchants_FullMethodName        = "/merchant.v1.MerchantService/ListMerchants"
+	MerchantService_UpdateMerchantStatus_FullMethodName = "/merchant.v1.MerchantService/UpdateMerchantStatus"
+	MerchantService_DeleteMerchant_FullMethodName       = "/merchant.v1.MerchantService/DeleteMerchant"
 )
 
 // MerchantServiceClient is the client API for MerchantService service.
@@ -33,10 +32,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MerchantServiceClient interface {
 	GetMerchant(ctx context.Context, in *GetMerchantRequest, opts ...grpc.CallOption) (*GetMerchantResponse, error)
-	GetMerchantByUserID(ctx context.Context, in *GetMerchantByUserIDRequest, opts ...grpc.CallOption) (*GetMerchantResponse, error)
-	ListMerchants(ctx context.Context, in *ListMerchantsRequest, opts ...grpc.CallOption) (*ListMerchantsResponse, error)
-	CreateMerchant(ctx context.Context, in *CreateMerchantRequest, opts ...grpc.CallOption) (*CreateMerchantResponse, error)
 	UpdateMerchant(ctx context.Context, in *UpdateMerchantRequest, opts ...grpc.CallOption) (*UpdateMerchantResponse, error)
+	CreateMerchant(ctx context.Context, in *CreateMerchantRequest, opts ...grpc.CallOption) (*CreateMerchantResponse, error)
+	ListMerchants(ctx context.Context, in *ListMerchantsRequest, opts ...grpc.CallOption) (*ListMerchantsResponse, error)
 	UpdateMerchantStatus(ctx context.Context, in *UpdateMerchantStatusRequest, opts ...grpc.CallOption) (*UpdateMerchantStatusResponse, error)
 	DeleteMerchant(ctx context.Context, in *DeleteMerchantRequest, opts ...grpc.CallOption) (*DeleteMerchantResponse, error)
 }
@@ -59,20 +57,10 @@ func (c *merchantServiceClient) GetMerchant(ctx context.Context, in *GetMerchant
 	return out, nil
 }
 
-func (c *merchantServiceClient) GetMerchantByUserID(ctx context.Context, in *GetMerchantByUserIDRequest, opts ...grpc.CallOption) (*GetMerchantResponse, error) {
+func (c *merchantServiceClient) UpdateMerchant(ctx context.Context, in *UpdateMerchantRequest, opts ...grpc.CallOption) (*UpdateMerchantResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetMerchantResponse)
-	err := c.cc.Invoke(ctx, MerchantService_GetMerchantByUserID_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *merchantServiceClient) ListMerchants(ctx context.Context, in *ListMerchantsRequest, opts ...grpc.CallOption) (*ListMerchantsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListMerchantsResponse)
-	err := c.cc.Invoke(ctx, MerchantService_ListMerchants_FullMethodName, in, out, cOpts...)
+	out := new(UpdateMerchantResponse)
+	err := c.cc.Invoke(ctx, MerchantService_UpdateMerchant_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +77,10 @@ func (c *merchantServiceClient) CreateMerchant(ctx context.Context, in *CreateMe
 	return out, nil
 }
 
-func (c *merchantServiceClient) UpdateMerchant(ctx context.Context, in *UpdateMerchantRequest, opts ...grpc.CallOption) (*UpdateMerchantResponse, error) {
+func (c *merchantServiceClient) ListMerchants(ctx context.Context, in *ListMerchantsRequest, opts ...grpc.CallOption) (*ListMerchantsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(UpdateMerchantResponse)
-	err := c.cc.Invoke(ctx, MerchantService_UpdateMerchant_FullMethodName, in, out, cOpts...)
+	out := new(ListMerchantsResponse)
+	err := c.cc.Invoke(ctx, MerchantService_ListMerchants_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +112,9 @@ func (c *merchantServiceClient) DeleteMerchant(ctx context.Context, in *DeleteMe
 // for forward compatibility.
 type MerchantServiceServer interface {
 	GetMerchant(context.Context, *GetMerchantRequest) (*GetMerchantResponse, error)
-	GetMerchantByUserID(context.Context, *GetMerchantByUserIDRequest) (*GetMerchantResponse, error)
-	ListMerchants(context.Context, *ListMerchantsRequest) (*ListMerchantsResponse, error)
-	CreateMerchant(context.Context, *CreateMerchantRequest) (*CreateMerchantResponse, error)
 	UpdateMerchant(context.Context, *UpdateMerchantRequest) (*UpdateMerchantResponse, error)
+	CreateMerchant(context.Context, *CreateMerchantRequest) (*CreateMerchantResponse, error)
+	ListMerchants(context.Context, *ListMerchantsRequest) (*ListMerchantsResponse, error)
 	UpdateMerchantStatus(context.Context, *UpdateMerchantStatusRequest) (*UpdateMerchantStatusResponse, error)
 	DeleteMerchant(context.Context, *DeleteMerchantRequest) (*DeleteMerchantResponse, error)
 	mustEmbedUnimplementedMerchantServiceServer()
@@ -143,17 +130,14 @@ type UnimplementedMerchantServiceServer struct{}
 func (UnimplementedMerchantServiceServer) GetMerchant(context.Context, *GetMerchantRequest) (*GetMerchantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMerchant not implemented")
 }
-func (UnimplementedMerchantServiceServer) GetMerchantByUserID(context.Context, *GetMerchantByUserIDRequest) (*GetMerchantResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetMerchantByUserID not implemented")
-}
-func (UnimplementedMerchantServiceServer) ListMerchants(context.Context, *ListMerchantsRequest) (*ListMerchantsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListMerchants not implemented")
+func (UnimplementedMerchantServiceServer) UpdateMerchant(context.Context, *UpdateMerchantRequest) (*UpdateMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateMerchant not implemented")
 }
 func (UnimplementedMerchantServiceServer) CreateMerchant(context.Context, *CreateMerchantRequest) (*CreateMerchantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateMerchant not implemented")
 }
-func (UnimplementedMerchantServiceServer) UpdateMerchant(context.Context, *UpdateMerchantRequest) (*UpdateMerchantResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method UpdateMerchant not implemented")
+func (UnimplementedMerchantServiceServer) ListMerchants(context.Context, *ListMerchantsRequest) (*ListMerchantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMerchants not implemented")
 }
 func (UnimplementedMerchantServiceServer) UpdateMerchantStatus(context.Context, *UpdateMerchantStatusRequest) (*UpdateMerchantStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMerchantStatus not implemented")
@@ -200,38 +184,20 @@ func _MerchantService_GetMerchant_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerchantService_GetMerchantByUserID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetMerchantByUserIDRequest)
+func _MerchantService_UpdateMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMerchantRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerchantServiceServer).GetMerchantByUserID(ctx, in)
+		return srv.(MerchantServiceServer).UpdateMerchant(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerchantService_GetMerchantByUserID_FullMethodName,
+		FullMethod: MerchantService_UpdateMerchant_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerchantServiceServer).GetMerchantByUserID(ctx, req.(*GetMerchantByUserIDRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _MerchantService_ListMerchants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListMerchantsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MerchantServiceServer).ListMerchants(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MerchantService_ListMerchants_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerchantServiceServer).ListMerchants(ctx, req.(*ListMerchantsRequest))
+		return srv.(MerchantServiceServer).UpdateMerchant(ctx, req.(*UpdateMerchantRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -254,20 +220,20 @@ func _MerchantService_CreateMerchant_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerchantService_UpdateMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UpdateMerchantRequest)
+func _MerchantService_ListMerchants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMerchantsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerchantServiceServer).UpdateMerchant(ctx, in)
+		return srv.(MerchantServiceServer).ListMerchants(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerchantService_UpdateMerchant_FullMethodName,
+		FullMethod: MerchantService_ListMerchants_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerchantServiceServer).UpdateMerchant(ctx, req.(*UpdateMerchantRequest))
+		return srv.(MerchantServiceServer).ListMerchants(ctx, req.(*ListMerchantsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -312,7 +278,7 @@ func _MerchantService_DeleteMerchant_Handler(srv interface{}, ctx context.Contex
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var MerchantService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "gocart.merchant.v1.MerchantService",
+	ServiceName: "merchant.v1.MerchantService",
 	HandlerType: (*MerchantServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -320,20 +286,16 @@ var MerchantService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MerchantService_GetMerchant_Handler,
 		},
 		{
-			MethodName: "GetMerchantByUserID",
-			Handler:    _MerchantService_GetMerchantByUserID_Handler,
-		},
-		{
-			MethodName: "ListMerchants",
-			Handler:    _MerchantService_ListMerchants_Handler,
+			MethodName: "UpdateMerchant",
+			Handler:    _MerchantService_UpdateMerchant_Handler,
 		},
 		{
 			MethodName: "CreateMerchant",
 			Handler:    _MerchantService_CreateMerchant_Handler,
 		},
 		{
-			MethodName: "UpdateMerchant",
-			Handler:    _MerchantService_UpdateMerchant_Handler,
+			MethodName: "ListMerchants",
+			Handler:    _MerchantService_ListMerchants_Handler,
 		},
 		{
 			MethodName: "UpdateMerchantStatus",

@@ -1,3 +1,2 @@
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL DEFAULT '';
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) NOT NULL DEFAULT '';
-CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
