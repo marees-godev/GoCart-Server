@@ -142,7 +142,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	adminKey := r.Header.Get(HeaderXAdminKey)
 
-
 	if adminKey != "" {
 		expectedKey := ""
 		adminID := ""
@@ -194,7 +193,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if authHeader != "" {
-			if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+			userCtx, err := auth.ValidateToken(authHeader, secret)
+			if err != nil {
+				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())
+			} else if userCtx != nil {
 				ctx = auth.WithUser(ctx, userCtx)
 				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
@@ -262,7 +264,10 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		}
 
 		if authHeader != "" {
-			if userCtx, err := auth.ValidateToken(authHeader, secret); err == nil && userCtx != nil {
+			userCtx, err := auth.ValidateToken(authHeader, secret)
+			if err != nil {
+				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())
+			} else if userCtx != nil {
 				ctx = auth.WithUser(ctx, userCtx)
 				ctx = context.WithValue(ctx, userIDKey, userCtx.UserID)
 				ctx = context.WithValue(ctx, userRoleKey, userCtx.Role)
@@ -327,4 +332,3 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 		return c.SendStatus(fiber.StatusNoContent)
 	})
 }
-
