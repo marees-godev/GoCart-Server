@@ -14,6 +14,22 @@ var (
 	phoneRegex = regexp.MustCompile(`^\+?[0-9]{7,15}$`)
 )
 
+func IsValidID(id string) bool {
+	trimmed := strings.TrimSpace(id)
+	if trimmed == "" || len(trimmed) > 64 {
+		return false
+	}
+	if strings.EqualFold(trimmed, "null") || strings.EqualFold(trimmed, "undefined") || trimmed == "0" || trimmed == "-1" {
+		return false
+	}
+	for _, ch := range trimmed {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 type CreateUserRequest struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
@@ -23,7 +39,10 @@ type CreateUserRequest struct {
 
 func (r *CreateUserRequest) Validate() error {
 	if strings.TrimSpace(r.ID) == "" {
-		return errors.BadRequest("user ID is required")
+		return errors.BadRequest("user_id is required")
+	}
+	if !IsValidID(r.ID) {
+		return errors.BadRequest("user_id is invalid")
 	}
 	trimmedEmail := strings.TrimSpace(r.Email)
 	if trimmedEmail == "" || !emailRegex.MatchString(trimmedEmail) {
@@ -39,6 +58,8 @@ func (r *CreateUserRequest) Validate() error {
 }
 
 type UpdateUserRequest struct {
+	ID             *string `json:"id,omitempty"`
+	UserID         *string `json:"user_id,omitempty"`
 	Username       *string `json:"username,omitempty"`
 	Email          *string `json:"email,omitempty"`
 	EmailAddress   *string `json:"email_address,omitempty"`
@@ -74,7 +95,29 @@ func (r *UpdateUserRequest) GetBio() *string {
 	return r.About
 }
 
+func (r *UpdateUserRequest) GetGender() *model.Gender {
+	if r.Gender == nil {
+		return nil
+	}
+	g := model.Gender(strings.ToLower(strings.TrimSpace(*r.Gender)))
+	if g.IsValid() {
+		return &g
+	}
+	return nil
+}
+
 func (r *UpdateUserRequest) Validate() error {
+	if r.ID != nil && strings.TrimSpace(*r.ID) != "" {
+		if !IsValidID(strings.TrimSpace(*r.ID)) {
+			return errors.BadRequest("user_id is invalid")
+		}
+	}
+	if r.UserID != nil && strings.TrimSpace(*r.UserID) != "" {
+		if !IsValidID(strings.TrimSpace(*r.UserID)) {
+			return errors.BadRequest("user_id is invalid")
+		}
+	}
+
 	email := r.GetEmail()
 	if email != nil {
 		trimmed := strings.TrimSpace(*email)
@@ -123,8 +166,17 @@ func (r *UpdateUserRequest) Validate() error {
 		return errors.BadRequest("bio must not exceed 1000 characters")
 	}
 
-	if r.Gender != nil && len(*r.Gender) > 50 {
-		return errors.BadRequest("gender field must not exceed 50 characters")
+	if r.Gender != nil {
+		g := strings.ToLower(strings.TrimSpace(*r.Gender))
+		if g == "" {
+			r.Gender = nil
+		} else {
+			gender := model.Gender(g)
+			if !gender.IsValid() {
+				return errors.BadRequest("gender must be one of: male, female, others")
+			}
+			*r.Gender = g
+		}
 	}
 
 	return nil
@@ -145,6 +197,24 @@ type UserResponse struct {
 	Status         string  `json:"status"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
+	DeactivatedAt  *string `json:"deactivated_at,omitempty"`
+	DeletedAt      *string `json:"deleted_at,omitempty"`
+}
+
+type DeactivateUserRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type ReactivateUserRequest struct{}
+
+type DeleteUserRequest struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type AccountActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
 }
 
 func ToUserResponse(u *model.User) *UserResponse {
@@ -158,6 +228,24 @@ func ToUserResponse(u *model.User) *UserResponse {
 		dobStr = &formatted
 	}
 
+	var deactivatedAtStr *string
+	if u.DeactivatedAt != nil {
+		formatted := u.DeactivatedAt.Format(time.RFC3339)
+		deactivatedAtStr = &formatted
+	}
+
+	var deletedAtStr *string
+	if u.DeletedAt != nil {
+		formatted := u.DeletedAt.Format(time.RFC3339)
+		deletedAtStr = &formatted
+	}
+
+	var genderStr *string
+	if u.Gender != nil {
+		g := string(*u.Gender)
+		genderStr = &g
+	}
+
 	return &UserResponse{
 		UserID:         u.ID,
 		Username:       u.Username,
@@ -167,11 +255,13 @@ func ToUserResponse(u *model.User) *UserResponse {
 		PhoneNumber:    u.PhoneNumber,
 		AlternatePhone: u.AlternatePhone,
 		DateOfBirth:    dobStr,
-		Gender:         u.Gender,
+		Gender:         genderStr,
 		Bio:            u.Bio,
 		AvatarURL:      u.AvatarURL,
 		Status:         u.Status,
 		CreatedAt:      u.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:      u.UpdatedAt.Format(time.RFC3339),
+		DeactivatedAt:  deactivatedAtStr,
+		DeletedAt:      deletedAtStr,
 	}
 }

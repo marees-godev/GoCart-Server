@@ -10,6 +10,12 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+type AccountActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type AddRatingInput struct {
 	ProductID string  `json:"productId"`
 	UserID    string  `json:"userId"`
@@ -148,6 +154,14 @@ type CreateStoreInput struct {
 	Address            *string           `json:"address,omitempty"`
 	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
 	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+}
+
+type DeactivateAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
+}
+
+type DeleteAccountInput struct {
+	Reason *string `json:"reason,omitempty"`
 }
 
 type Delivery struct {
@@ -419,18 +433,75 @@ type UpdateStoreInput struct {
 }
 
 type UpdateUserInput struct {
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
-	Phone     *string `json:"phone,omitempty"`
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	Phone          *string `json:"phone,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	AlternatePhone *string `json:"alternatePhone,omitempty"`
+	DateOfBirth    *string `json:"dateOfBirth,omitempty"`
+	Gender         *Gender `json:"gender,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	AvatarURL      *string `json:"avatarUrl,omitempty"`
 }
 
 type User struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	FirstName *string `json:"firstName,omitempty"`
-	LastName  *string `json:"lastName,omitempty"`
-	Phone     *string `json:"phone,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID             string  `json:"id"`
+	Email          string  `json:"email"`
+	FirstName      *string `json:"firstName,omitempty"`
+	LastName       *string `json:"lastName,omitempty"`
+	Phone          *string `json:"phone,omitempty"`
+	Username       *string `json:"username,omitempty"`
+	AlternatePhone *string `json:"alternatePhone,omitempty"`
+	DateOfBirth    *string `json:"dateOfBirth,omitempty"`
+	Gender         *Gender `json:"gender,omitempty"`
+	Bio            *string `json:"bio,omitempty"`
+	AvatarURL      *string `json:"avatarUrl,omitempty"`
+	Status         *string `json:"status,omitempty"`
+	CreatedAt      *string `json:"createdAt,omitempty"`
+	UpdatedAt      *string `json:"updatedAt,omitempty"`
+}
+
+type Gender string
+
+const (
+	GenderMale   Gender = "male"
+	GenderFemale Gender = "female"
+	GenderOthers Gender = "others"
+)
+
+var AllGender = []Gender{
+	GenderMale,
+	GenderFemale,
+	GenderOthers,
+}
+
+func (e Gender) IsValid() bool {
+	switch e {
+	case GenderMale, GenderFemale, GenderOthers:
+		return true
+	}
+	return false
+}
+
+func (e Gender) String() string {
+	return string(e)
+}
+
+func (e *Gender) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Gender(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Gender", str)
+	}
+	return nil
+}
+
+func (e Gender) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Role string
