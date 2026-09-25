@@ -1,9 +1,14 @@
 package graphql
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -332,6 +337,25 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 
 	return adaptor.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(ctx)
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			bodyBytes, _ := io.ReadAll(r.Body)
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+			_, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if err != nil {
+				fmt.Printf("DIAGNOSTIC: error parsing Content-Type: %v (raw: %q)\n", err, r.Header.Get("Content-Type"))
+			} else {
+				mr := multipart.NewReader(bytes.NewReader(bodyBytes), params["boundary"])
+				p, pErr := mr.NextPart()
+				if pErr != nil {
+					fmt.Printf("DIAGNOSTIC: mr.NextPart error: %v, bodyLen=%d, bodyPrefix=%q\n", pErr, len(bodyBytes), string(bodyBytes[:min(len(bodyBytes), 100)]))
+				} else {
+					if p.FormName() != "operations" {
+						fmt.Printf("DIAGNOSTIC: first formName is %q, expected 'operations'. Full body:\n%s\n", p.FormName(), string(bodyBytes))
+					}
+				}
+			}
+		}
 		h.server.ServeHTTP(w, r)
 	}))(c)
 }

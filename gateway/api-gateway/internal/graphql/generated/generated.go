@@ -2597,6 +2597,7 @@ var sources = []*ast.Source{
 input LoginInput {
   email: String!
   password: String!
+  isMerchant: Boolean!
 }
 
 input RegisterInput {
@@ -2604,7 +2605,7 @@ input RegisterInput {
   password: String!
   firstName: String
   lastName: String
-  isMerchant: Boolean
+  isMerchant: Boolean!
 }
 
 extend type Mutation {
@@ -20444,7 +20445,7 @@ func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj in
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email", "password"}
+	fieldsInOrder := [...]string{"email", "password", "isMerchant"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -20465,6 +20466,13 @@ func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj in
 				return it, err
 			}
 			it.Password = data
+		case "isMerchant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isMerchant"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsMerchant = data
 		}
 	}
 
@@ -20563,7 +20571,7 @@ func (ec *executionContext) unmarshalInputRegisterInput(ctx context.Context, obj
 			it.LastName = data
 		case "isMerchant":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isMerchant"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}

@@ -181,8 +181,9 @@ type GenerateStoreUploadURLInput struct {
 }
 
 type LoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	IsMerchant bool   `json:"isMerchant"`
 }
 
 type Merchant struct {
@@ -311,7 +312,7 @@ type RegisterInput struct {
 	Password   string  `json:"password"`
 	FirstName  *string `json:"firstName,omitempty"`
 	LastName   *string `json:"lastName,omitempty"`
-	IsMerchant *bool   `json:"isMerchant,omitempty"`
+	IsMerchant bool    `json:"isMerchant"`
 }
 
 type RequestReturnInput struct {

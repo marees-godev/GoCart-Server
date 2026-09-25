@@ -7,7 +7,7 @@ import (
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
-func (m *MutationResolver) Login(ctx context.Context, email, password string) (interface{}, error) {
+func (m *MutationResolver) Login(ctx context.Context, email, password string, isMerchant ...bool) (interface{}, error) {
 	if m.Clients == nil || m.Clients.AuthClient == nil {
 		return nil, appErrors.Internal(nil, "auth client unavailable")
 	}
@@ -15,9 +15,15 @@ func (m *MutationResolver) Login(ctx context.Context, email, password string) (i
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
+	var isMerch bool
+	if len(isMerchant) > 0 {
+		isMerch = isMerchant[0]
+	}
+
 	res, err := m.Clients.AuthClient.Login(ctx, &auth.LoginRequest{
-		Email:    email,
-		Password: password,
+		Email:      email,
+		Password:   password,
+		IsMerchant: isMerch,
 	})
 	if err != nil {
 		return nil, err
