@@ -8,12 +8,23 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/model"
 )
+
+func toAuditUUID(performedBy, userID string) string {
+	if _, err := uuid.Parse(performedBy); err == nil {
+		return performedBy
+	}
+	if _, err := uuid.Parse(userID); err == nil {
+		return userID
+	}
+	return "00000000-0000-0000-0000-000000000000"
+}
 
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *model.User) error
@@ -104,6 +115,11 @@ func (r *pgUserRepository) GetByID(ctx context.Context, id string) (*model.User,
 			slog.WarnContext(ctx, "user not found by id in repository", "user_id", id)
 			return nil, appErrors.NotFound("user not found")
 		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in GetByID in repository", "user_id", id)
+			return nil, appErrors.BadRequest("user_id is invalid")
+		}
 		slog.ErrorContext(ctx, "failed to query user by id in repository", "user_id", id, "error", err)
 		return nil, appErrors.Internal(err, "failed to query user by id")
 	}
@@ -188,7 +204,7 @@ func (r *pgUserRepository) GetByUsername(ctx context.Context, username string) (
 func (r *pgUserRepository) UpdateUser(ctx context.Context, user *model.User) error {
 	query := `
 		UPDATE users
-		SET username = $1, email = $2, first_name = $3, last_name = $4, phone = $5, alternate_phone = $6, date_of_birth = $7, gender = $8, bio = $9, avatar_url = $10, updated_at = NOW()
+		SET username = $1, email = $2, first_name = $3, last_name = $4, phone = $5, alternate_phone = $6, date_of_birth = $7, gender = NULLIF($8, '')::user_gender, bio = $9, avatar_url = $10, updated_at = NOW()
 		WHERE id = $11
 		RETURNING updated_at
 	`
@@ -209,6 +225,11 @@ func (r *pgUserRepository) UpdateUser(ctx context.Context, user *model.User) err
 		if errors.Is(err, pgx.ErrNoRows) {
 			slog.WarnContext(ctx, "user not found for update in repository", "user_id", user.ID)
 			return appErrors.NotFound("user not found")
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in UpdateUser in repository", "user_id", user.ID)
+			return appErrors.BadRequest("user_id is invalid")
 		}
 		slog.ErrorContext(ctx, "failed to update user profile in repository", "user_id", user.ID, "error", err)
 		return appErrors.Internal(err, "failed to update user profile")
@@ -231,6 +252,11 @@ func (r *pgUserRepository) DeactivateUser(ctx context.Context, userID, performed
 		if errors.Is(err, pgx.ErrNoRows) {
 			slog.WarnContext(ctx, "user not found in DeactivateUser", "user_id", userID)
 			return appErrors.NotFound("user not found")
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in DeactivateUser in repository", "user_id", userID)
+			return appErrors.BadRequest("user_id is invalid")
 		}
 		slog.ErrorContext(ctx, "failed to fetch user status in DeactivateUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to fetch user status")
@@ -256,11 +282,12 @@ func (r *pgUserRepository) DeactivateUser(ctx context.Context, userID, performed
 		return appErrors.Internal(err, "failed to deactivate user")
 	}
 
+	auditPerformedBy := toAuditUUID(performedBy, userID)
 	auditQuery := `
 		INSERT INTO user_audit_logs (user_id, action, performed_by, reason, created_at)
 		VALUES ($1, 'DEACTIVATE'::user_audit_action, $2, $3, NOW())
 	`
-	if _, err := tx.Exec(ctx, auditQuery, userID, performedBy, reason); err != nil {
+	if _, err := tx.Exec(ctx, auditQuery, userID, auditPerformedBy, reason); err != nil {
 		slog.ErrorContext(ctx, "failed to insert audit log in DeactivateUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to record audit log")
 	}
@@ -311,6 +338,11 @@ func (r *pgUserRepository) ReactivateUser(ctx context.Context, userID, performed
 			slog.WarnContext(ctx, "user not found in ReactivateUser", "user_id", userID)
 			return appErrors.NotFound("user not found")
 		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in ReactivateUser in repository", "user_id", userID)
+			return appErrors.BadRequest("user_id is invalid")
+		}
 		slog.ErrorContext(ctx, "failed to fetch user status in ReactivateUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to fetch user status")
 	}
@@ -323,6 +355,11 @@ func (r *pgUserRepository) ReactivateUser(ctx context.Context, userID, performed
 	if currentStatus == "active" {
 		slog.InfoContext(ctx, "user already active in ReactivateUser", "user_id", userID)
 		return nil
+	}
+
+	if currentStatus != "deactivated" {
+		slog.WarnContext(ctx, "cannot reactivate user with non-deactivated status", "user_id", userID, "status", currentStatus)
+		return appErrors.Forbidden(fmt.Sprintf("cannot reactivate account with status %s", currentStatus))
 	}
 
 	if deactivatedAt != nil && time.Since(*deactivatedAt) > 30*24*time.Hour {
@@ -343,11 +380,12 @@ func (r *pgUserRepository) ReactivateUser(ctx context.Context, userID, performed
 		return appErrors.Internal(err, "failed to reactivate user")
 	}
 
+	auditPerformedBy := toAuditUUID(performedBy, userID)
 	auditQuery := `
 		INSERT INTO user_audit_logs (user_id, action, performed_by, reason, created_at)
 		VALUES ($1, 'REACTIVATE'::user_audit_action, $2, 'Account reactivated within 30-day grace period', NOW())
 	`
-	if _, err := tx.Exec(ctx, auditQuery, userID, performedBy); err != nil {
+	if _, err := tx.Exec(ctx, auditQuery, userID, auditPerformedBy); err != nil {
 		slog.ErrorContext(ctx, "failed to insert audit log in ReactivateUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to record audit log")
 	}
@@ -396,6 +434,11 @@ func (r *pgUserRepository) DeleteUser(ctx context.Context, userID, performedBy s
 			slog.WarnContext(ctx, "user not found in DeleteUser", "user_id", userID)
 			return appErrors.NotFound("user not found")
 		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			slog.WarnContext(ctx, "invalid uuid in DeleteUser in repository", "user_id", userID)
+			return appErrors.BadRequest("user_id is invalid")
+		}
 		slog.ErrorContext(ctx, "failed to fetch user status in DeleteUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to fetch user status")
 	}
@@ -435,11 +478,12 @@ func (r *pgUserRepository) DeleteUser(ctx context.Context, userID, performedBy s
 		return appErrors.Internal(err, "failed to delete user addresses")
 	}
 
+	auditPerformedBy := toAuditUUID(performedBy, userID)
 	auditQuery := `
 		INSERT INTO user_audit_logs (user_id, action, performed_by, reason, created_at)
 		VALUES ($1, 'DELETE'::user_audit_action, $2, $3, NOW())
 	`
-	if _, err := tx.Exec(ctx, auditQuery, userID, performedBy, reason); err != nil {
+	if _, err := tx.Exec(ctx, auditQuery, userID, auditPerformedBy, reason); err != nil {
 		slog.ErrorContext(ctx, "failed to insert audit log in DeleteUser", "user_id", userID, "error", err)
 		return appErrors.Internal(err, "failed to record audit log")
 	}

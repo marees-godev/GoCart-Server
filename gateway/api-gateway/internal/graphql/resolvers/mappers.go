@@ -14,13 +14,33 @@ func toModelUser(u *userpb.User) *model.User {
 	ln := u.LastName
 	ca := u.CreatedAt
 	st := u.Status
+	var ph *string
+	if u.Phone != "" {
+		p := u.Phone
+		ph = &p
+	}
+	var gender *model.Gender
+	if u.Gender != nil && *u.Gender != "" {
+		g := model.Gender(*u.Gender)
+		if g.IsValid() {
+			gender = &g
+		}
+	}
 	return &model.User{
-		ID:        u.Id,
-		Email:     u.Email,
-		FirstName: &fn,
-		LastName:  &ln,
-		Status:    &st,
-		CreatedAt: &ca,
+		ID:             u.Id,
+		Email:          u.Email,
+		FirstName:      &fn,
+		LastName:       &ln,
+		Phone:          ph,
+		Username:       u.Username,
+		AlternatePhone: u.AlternatePhone,
+		DateOfBirth:    u.DateOfBirth,
+		Gender:         gender,
+		Bio:            u.Bio,
+		AvatarURL:      u.AvatarUrl,
+		Status:         &st,
+		CreatedAt:      &ca,
+		UpdatedAt:      u.UpdatedAt,
 	}
 }
 

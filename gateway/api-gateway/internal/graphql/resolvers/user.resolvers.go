@@ -6,7 +6,6 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -23,6 +22,9 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
 	}
+	if authID != id {
+		return nil, appErrors.BadRequest("user_id does not match the expected value")
+	}
 
 	firstName := ""
 	if input.FirstName != nil {
@@ -37,11 +39,23 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		phone = *input.Phone
 	}
 
+	var gender *string
+	if input.Gender != nil {
+		g := input.Gender.String()
+		gender = &g
+	}
+
 	req := &userpb.UpdateUserRequest{
-		Id:        id,
-		FirstName: firstName,
-		LastName:  lastName,
-		Phone:     phone,
+		Id:             id,
+		FirstName:      firstName,
+		LastName:       lastName,
+		Phone:          phone,
+		Username:       input.Username,
+		AlternatePhone: input.AlternatePhone,
+		DateOfBirth:    input.DateOfBirth,
+		Gender:         gender,
+		Bio:            input.Bio,
+		AvatarUrl:      input.AvatarURL,
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
@@ -85,7 +99,29 @@ func (r *mutationResolver) DeactivateAccount(ctx context.Context, input *model.D
 
 // ReactivateAccount is the resolver for the reactivateAccount field.
 func (r *mutationResolver) ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error) {
-	panic(fmt.Errorf("not implemented: ReactivateAccount - reactivateAccount"))
+	if r.Clients == nil || r.Clients.UserClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	req := &userpb.ReactivateUserRequest{
+		Id: authID,
+	}
+
+	res, err := r.Clients.UserClient.ReactivateUser(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AccountActionResponse{
+		Success: res.Success,
+		Message: res.Message,
+		Status:  res.Status,
+	}, nil
 }
 
 // DeleteAccount is the resolver for the deleteAccount field.
@@ -130,6 +166,9 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	authID := getAuthUserIDFromCtx(ctx)
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
+	}
+	if authID != userID {
+		return nil, appErrors.BadRequest("user_id does not match the expected value")
 	}
 
 	label := ""

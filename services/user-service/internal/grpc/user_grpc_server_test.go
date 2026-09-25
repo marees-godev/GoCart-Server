@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -83,3 +85,55 @@ func TestUserGRPCServer_DeleteUser(t *testing.T) {
 		t.Errorf("expected success with deleted status, got %+v", resp)
 	}
 }
+
+func TestUserGRPCServer_InvalidUserID_ReturnsInvalidArgument(t *testing.T) {
+	server, _, _ := setupGRPCTestServer()
+	ctx := context.Background()
+
+	invalidIDs := []string{"", "invalid id with spaces", "null", "undefined", "bad@id!"}
+
+	for _, id := range invalidIDs {
+		_, err := server.GetUser(ctx, &userpb.GetUserRequest{Id: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in GetUser, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in GetUser, got %v", id, status.Code(err))
+		}
+
+		_, err = server.UpdateUser(ctx, &userpb.UpdateUserRequest{Id: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in UpdateUser, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in UpdateUser, got %v", id, status.Code(err))
+		}
+
+		_, err = server.DeactivateUser(ctx, &userpb.DeactivateUserRequest{Id: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in DeactivateUser, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in DeactivateUser, got %v", id, status.Code(err))
+		}
+
+		_, err = server.DeleteUser(ctx, &userpb.DeleteUserRequest{Id: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in DeleteUser, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in DeleteUser, got %v", id, status.Code(err))
+		}
+
+		_, err = server.ReactivateUser(ctx, &userpb.ReactivateUserRequest{Id: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in ReactivateUser, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in ReactivateUser, got %v", id, status.Code(err))
+		}
+
+		_, err = server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{UserId: id})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in CreateUserAddress, got nil", id)
+		} else if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument code for id %q in CreateUserAddress, got %v", id, status.Code(err))
+		}
+	}
+}
+

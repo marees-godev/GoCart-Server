@@ -324,8 +324,8 @@ func TestUpdateUser_Success(t *testing.T) {
 	if updated.DateOfBirth == nil || updated.DateOfBirth.Format("2006-01-02") != "1990-05-15" {
 		t.Errorf("expected updated dob 1990-05-15, got %v", updated.DateOfBirth)
 	}
-	if updated.Gender == nil || *updated.Gender != "Male" {
-		t.Errorf("expected updated gender Male, got %v", updated.Gender)
+	if updated.Gender == nil || *updated.Gender != model.GenderMale {
+		t.Errorf("expected updated gender male, got %v", updated.Gender)
 	}
 	if updated.Bio == nil || *updated.Bio != "Tech enthusiast, music lover, and frequent GoCart shopper." {
 		t.Errorf("expected updated bio, got %v", updated.Bio)
@@ -359,8 +359,8 @@ func TestUpdateUser_CannotModifyAnotherUser(t *testing.T) {
 		t.Fatal("expected error when modifying another user's profile, got nil")
 	}
 	appErr := appErrors.AsAppError(err)
-	if appErr.Code != appErrors.CodeForbidden {
-		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	if appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BAD_REQUEST code, got %s", appErr.Code)
 	}
 }
 
@@ -545,11 +545,11 @@ func TestDeactivateUser_ForbiddenOtherUser(t *testing.T) {
 
 	_, err := svc.DeactivateUser(context.Background(), "attacker-id", "user-103", dto.DeactivateUserRequest{})
 	if err == nil {
-		t.Fatal("expected forbidden error modifying other user, got nil")
+		t.Fatal("expected bad request error modifying other user, got nil")
 	}
 	appErr := appErrors.AsAppError(err)
-	if appErr.Code != appErrors.CodeForbidden {
-		t.Errorf("expected FORBIDDEN code, got %s", appErr.Code)
+	if appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BAD_REQUEST code, got %s", appErr.Code)
 	}
 }
 
@@ -690,3 +690,221 @@ func TestDeactivatedUser_CannotPerformOperations(t *testing.T) {
 		t.Errorf("expected FORBIDDEN code, got %s", appErrors.AsAppError(err).Code)
 	}
 }
+
+func TestUpdateUser_GenderEnumValidation(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-gender-test",
+		Email:     "gender@example.com",
+		FirstName: "Gender",
+		LastName:  "Tester",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	validCases := []struct {
+		input    string
+		expected model.Gender
+	}{
+		{"male", model.GenderMale},
+		{"Male", model.GenderMale},
+		{"MALE", model.GenderMale},
+		{" female ", model.GenderFemale},
+		{"others", model.GenderOthers},
+		{"Others", model.GenderOthers},
+	}
+
+	for _, tc := range validCases {
+		val := tc.input
+		req := dto.UpdateUserRequest{Gender: &val}
+		updated, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+		if err != nil {
+			t.Fatalf("expected success for gender %q, got error: %v", tc.input, err)
+		}
+		if updated.Gender == nil || *updated.Gender != tc.expected {
+			t.Errorf("for input %q, expected gender %q, got %v", tc.input, tc.expected, updated.Gender)
+		}
+	}
+
+	invalidCases := []string{
+		"unknown",
+		"invalid",
+		"man",
+		"woman",
+		"other",
+	}
+
+	for _, tc := range invalidCases {
+		val := tc
+		req := dto.UpdateUserRequest{Gender: &val}
+		_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+		if err == nil {
+			t.Errorf("expected validation error for invalid gender %q, got nil", tc)
+		}
+	}
+}
+
+func TestErrorFormatting_InvalidUserID(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	invalidIDs := []string{
+		"",
+		"   ",
+		"user@id!",
+		"null",
+		"undefined",
+		"user id with spaces",
+		"very-long-id-that-exceeds-sixty-four-characters-limit-12345678901234567890",
+	}
+
+	for _, id := range invalidIDs {
+		// GetUserByID
+		_, err := svc.GetUserByID(context.Background(), id)
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in GetUserByID, got nil", id)
+		} else {
+			appErr := appErrors.AsAppError(err)
+			if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+				t.Errorf("expected 400 Bad Request for id %q, got code=%s status=%d", id, appErr.Code, appErr.HTTPStatus)
+			}
+		}
+
+		// UpdateUser
+		newFirst := "Test"
+		_, err = svc.UpdateUser(context.Background(), id, id, dto.UpdateUserRequest{FirstName: &newFirst})
+		if err == nil {
+			t.Errorf("expected error for invalid id %q in UpdateUser, got nil", id)
+		} else {
+			appErr := appErrors.AsAppError(err)
+			if appErr.Code != appErrors.CodeBadRequest && appErr.Code != appErrors.CodeUnauthorized {
+				t.Errorf("expected 400 Bad Request or 401 Unauthorized for id %q in UpdateUser, got code=%s", id, appErr.Code)
+			}
+		}
+	}
+}
+
+func TestErrorFormatting_UserIDMismatch(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	user := &model.User{
+		ID:        "user-target",
+		Email:     "target@example.com",
+		FirstName: "Target",
+		LastName:  "User",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	// 1. authUserID != targetUserID in UpdateUser
+	newFirst := "Hacker"
+	_, err := svc.UpdateUser(context.Background(), "user-caller", "user-target", dto.UpdateUserRequest{FirstName: &newFirst})
+	if err == nil {
+		t.Fatal("expected error on user mismatch, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request on user mismatch, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+	if appErr.Message != "user_id does not match the expected value" {
+		t.Errorf("expected message 'user_id does not match the expected value', got %q", appErr.Message)
+	}
+
+	// 2. Body ID mismatch in UpdateUser
+	mismatchedBodyID := "user-other"
+	_, err = svc.UpdateUser(context.Background(), "user-target", "user-target", dto.UpdateUserRequest{
+		ID:        &mismatchedBodyID,
+		FirstName: &newFirst,
+	})
+	if err == nil {
+		t.Fatal("expected error on body ID mismatch, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request on body ID mismatch, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 3. User ID mismatch in DeactivateUser
+	_, err = svc.DeactivateUser(context.Background(), "user-caller", "user-target", dto.DeactivateUserRequest{})
+	if err == nil {
+		t.Fatal("expected error on deactivation mismatch, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request on deactivation mismatch, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 4. User ID mismatch in DeleteUser
+	_, err = svc.DeleteUser(context.Background(), "user-caller", "user-target", dto.DeleteUserRequest{})
+	if err == nil {
+		t.Fatal("expected error on delete mismatch, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request on delete mismatch, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 5. User ID mismatch in ReactivateUser
+	_, err = svc.ReactivateUser(context.Background(), "user-caller", "user-target")
+	if err == nil {
+		t.Fatal("expected error on reactivate mismatch, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest || appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 Bad Request on reactivate mismatch, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+}
+
+func TestErrorFormatting_HttpStatuses(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo)
+
+	// 404 Not Found
+	_, err := svc.GetUserByID(context.Background(), "non-existent-user")
+	if err == nil {
+		t.Fatal("expected not found error, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeNotFound || appErr.HTTPStatus != 404 {
+		t.Errorf("expected 404 Not Found, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 409 Conflict
+	existingUser := &model.User{
+		ID:        "user-exist",
+		Email:     "exist@example.com",
+		FirstName: "John",
+		LastName:  "Doe",
+		Status:    "active",
+	}
+	repo.users[existingUser.ID] = existingUser
+
+	_, err = svc.CreateUser(context.Background(), dto.CreateUserRequest{
+		ID:        "user-new",
+		Email:     "exist@example.com",
+		FirstName: "Jane",
+		LastName:  "Doe",
+	})
+	if err == nil {
+		t.Fatal("expected conflict error, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeConflict || appErr.HTTPStatus != 409 {
+		t.Errorf("expected 409 Conflict, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+
+	// 401 Unauthorized
+	_, err = svc.GetUser(context.Background(), "", "user-exist")
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeUnauthorized || appErr.HTTPStatus != 401 {
+		t.Errorf("expected 401 Unauthorized, got code=%s status=%d", appErr.Code, appErr.HTTPStatus)
+	}
+}
+
+

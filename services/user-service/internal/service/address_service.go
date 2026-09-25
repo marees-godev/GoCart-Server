@@ -71,6 +71,10 @@ func (s *addressService) CreateAddress(ctx context.Context, authUserID string, r
 		slog.WarnContext(ctx, "missing authenticated user context in CreateAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in CreateAddress", "user_id", authUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
 
 	if err := req.Validate(); err != nil {
 		slog.WarnContext(ctx, "validation failed in CreateAddress", "user_id", authUserID, "error", err)
@@ -137,6 +141,10 @@ func (s *addressService) ListAddresses(ctx context.Context, authUserID string) (
 		slog.WarnContext(ctx, "missing authenticated user context in ListAddresses")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in ListAddresses", "user_id", authUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
 
 	if _, err := s.getActiveUser(ctx, authUserID); err != nil {
 		return nil, err
@@ -157,10 +165,18 @@ func (s *addressService) GetAddress(ctx context.Context, authUserID string, addr
 		slog.WarnContext(ctx, "missing authenticated user context in GetAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in GetAddress", "user_id", authUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
 
 	if strings.TrimSpace(addressID) == "" {
 		slog.WarnContext(ctx, "missing address ID in GetAddress", "user_id", authUserID)
-		return nil, errors.BadRequest("address ID is required")
+		return nil, errors.BadRequest("address_id is required")
+	}
+	if !dto.IsValidID(addressID) {
+		slog.WarnContext(ctx, "invalid address ID in GetAddress", "user_id", authUserID, "address_id", addressID)
+		return nil, errors.BadRequest("address_id is invalid")
 	}
 
 	if _, err := s.getActiveUser(ctx, authUserID); err != nil {
@@ -187,10 +203,18 @@ func (s *addressService) UpdateAddress(ctx context.Context, authUserID string, a
 		slog.WarnContext(ctx, "missing authenticated user context in UpdateAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in UpdateAddress", "user_id", authUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
 
 	if strings.TrimSpace(addressID) == "" {
 		slog.WarnContext(ctx, "missing address ID in UpdateAddress", "user_id", authUserID)
-		return nil, errors.BadRequest("address ID is required")
+		return nil, errors.BadRequest("address_id is required")
+	}
+	if !dto.IsValidID(addressID) {
+		slog.WarnContext(ctx, "invalid address ID in UpdateAddress", "user_id", authUserID, "address_id", addressID)
+		return nil, errors.BadRequest("address_id is invalid")
 	}
 
 	if err := req.Validate(); err != nil {
@@ -274,10 +298,18 @@ func (s *addressService) DeleteAddress(ctx context.Context, authUserID string, a
 		slog.WarnContext(ctx, "missing authenticated user context in DeleteAddress")
 		return errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in DeleteAddress", "user_id", authUserID)
+		return errors.BadRequest("user_id is invalid")
+	}
 
 	if strings.TrimSpace(addressID) == "" {
 		slog.WarnContext(ctx, "missing address ID in DeleteAddress", "user_id", authUserID)
-		return errors.BadRequest("address ID is required")
+		return errors.BadRequest("address_id is required")
+	}
+	if !dto.IsValidID(addressID) {
+		slog.WarnContext(ctx, "invalid address ID in DeleteAddress", "user_id", authUserID, "address_id", addressID)
+		return errors.BadRequest("address_id is invalid")
 	}
 
 	if _, err := s.getActiveUser(ctx, authUserID); err != nil {
@@ -309,10 +341,18 @@ func (s *addressService) SetDefaultAddress(ctx context.Context, authUserID strin
 		slog.WarnContext(ctx, "missing authenticated user context in SetDefaultAddress")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
+	if !dto.IsValidID(authUserID) {
+		slog.WarnContext(ctx, "invalid user id in SetDefaultAddress", "user_id", authUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
 
 	if strings.TrimSpace(addressID) == "" {
 		slog.WarnContext(ctx, "missing address ID in SetDefaultAddress", "user_id", authUserID)
-		return nil, errors.BadRequest("address ID is required")
+		return nil, errors.BadRequest("address_id is required")
+	}
+	if !dto.IsValidID(addressID) {
+		slog.WarnContext(ctx, "invalid address ID in SetDefaultAddress", "user_id", authUserID, "address_id", addressID)
+		return nil, errors.BadRequest("address_id is invalid")
 	}
 
 	if _, err := s.getActiveUser(ctx, authUserID); err != nil {

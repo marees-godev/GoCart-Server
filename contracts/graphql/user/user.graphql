@@ -1,11 +1,24 @@
+enum Gender {
+  male
+  female
+  others
+}
+
 type User {
   id: ID!
   email: String!
   firstName: String
   lastName: String
   phone: String
+  username: String
+  alternatePhone: String
+  dateOfBirth: String
+  gender: Gender
+  bio: String
+  avatarUrl: String
   status: String
   createdAt: String
+  updatedAt: String
 }
 
 type Address {
@@ -29,6 +42,12 @@ input UpdateUserInput {
   firstName: String
   lastName: String
   phone: String
+  username: String
+  alternatePhone: String
+  dateOfBirth: String
+  gender: Gender
+  bio: String
+  avatarUrl: String
 }
 
 type AccountActionResponse {

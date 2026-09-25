@@ -22,16 +22,23 @@ const (
 )
 
 type User struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
-	FirstName     string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
-	LastName      string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
-	Phone         string                 `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email          string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	FirstName      string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName       string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Phone          string                 `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`
+	CreatedAt      string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Status         string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	Username       *string                `protobuf:"bytes,8,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	AlternatePhone *string                `protobuf:"bytes,9,opt,name=alternate_phone,json=alternatePhone,proto3,oneof" json:"alternate_phone,omitempty"`
+	DateOfBirth    *string                `protobuf:"bytes,10,opt,name=date_of_birth,json=dateOfBirth,proto3,oneof" json:"date_of_birth,omitempty"`
+	Gender         *string                `protobuf:"bytes,11,opt,name=gender,proto3,oneof" json:"gender,omitempty"`
+	Bio            *string                `protobuf:"bytes,12,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	AvatarUrl      *string                `protobuf:"bytes,13,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
+	UpdatedAt      *string                `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3,oneof" json:"updated_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -109,6 +116,55 @@ func (x *User) GetCreatedAt() string {
 func (x *User) GetStatus() string {
 	if x != nil {
 		return x.Status
+	}
+	return ""
+}
+
+func (x *User) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *User) GetAlternatePhone() string {
+	if x != nil && x.AlternatePhone != nil {
+		return *x.AlternatePhone
+	}
+	return ""
+}
+
+func (x *User) GetDateOfBirth() string {
+	if x != nil && x.DateOfBirth != nil {
+		return *x.DateOfBirth
+	}
+	return ""
+}
+
+func (x *User) GetGender() string {
+	if x != nil && x.Gender != nil {
+		return *x.Gender
+	}
+	return ""
+}
+
+func (x *User) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *User) GetAvatarUrl() string {
+	if x != nil && x.AvatarUrl != nil {
+		return *x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *User) GetUpdatedAt() string {
+	if x != nil && x.UpdatedAt != nil {
+		return *x.UpdatedAt
 	}
 	return ""
 }
@@ -462,13 +518,19 @@ func (x *GetUserResponse) GetUser() *User {
 }
 
 type UpdateUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName     string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
-	LastName      string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
-	Phone         string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName      string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName       string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Phone          string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
+	Username       *string                `protobuf:"bytes,5,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	AlternatePhone *string                `protobuf:"bytes,6,opt,name=alternate_phone,json=alternatePhone,proto3,oneof" json:"alternate_phone,omitempty"`
+	DateOfBirth    *string                `protobuf:"bytes,7,opt,name=date_of_birth,json=dateOfBirth,proto3,oneof" json:"date_of_birth,omitempty"`
+	Gender         *string                `protobuf:"bytes,8,opt,name=gender,proto3,oneof" json:"gender,omitempty"`
+	Bio            *string                `protobuf:"bytes,9,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	AvatarUrl      *string                `protobuf:"bytes,10,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -525,6 +587,48 @@ func (x *UpdateUserRequest) GetLastName() string {
 func (x *UpdateUserRequest) GetPhone() string {
 	if x != nil {
 		return x.Phone
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetAlternatePhone() string {
+	if x != nil && x.AlternatePhone != nil {
+		return *x.AlternatePhone
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetDateOfBirth() string {
+	if x != nil && x.DateOfBirth != nil {
+		return *x.DateOfBirth
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetGender() string {
+	if x != nil && x.Gender != nil {
+		return *x.Gender
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetAvatarUrl() string {
+	if x != nil && x.AvatarUrl != nil {
+		return *x.AvatarUrl
 	}
 	return ""
 }
@@ -1721,7 +1825,7 @@ var File_contracts_protobuf_user_user_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/user/user.proto\x12\x0egocart.user.v1\"\xb5\x01\n" +
+	"\"contracts/protobuf/user/user.proto\x12\x0egocart.user.v1\"\x8d\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1d\n" +
@@ -1731,7 +1835,24 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\x05phone\x18\x05 \x01(\tR\x05phone\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x16\n" +
-	"\x06status\x18\a \x01(\tR\x06status\"\x92\x03\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12\x1f\n" +
+	"\busername\x18\b \x01(\tH\x00R\busername\x88\x01\x01\x12,\n" +
+	"\x0falternate_phone\x18\t \x01(\tH\x01R\x0ealternatePhone\x88\x01\x01\x12'\n" +
+	"\rdate_of_birth\x18\n" +
+	" \x01(\tH\x02R\vdateOfBirth\x88\x01\x01\x12\x1b\n" +
+	"\x06gender\x18\v \x01(\tH\x03R\x06gender\x88\x01\x01\x12\x15\n" +
+	"\x03bio\x18\f \x01(\tH\x04R\x03bio\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"avatar_url\x18\r \x01(\tH\x05R\tavatarUrl\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"updated_at\x18\x0e \x01(\tH\x06R\tupdatedAt\x88\x01\x01B\v\n" +
+	"\t_usernameB\x12\n" +
+	"\x10_alternate_phoneB\x10\n" +
+	"\x0e_date_of_birthB\t\n" +
+	"\a_genderB\x06\n" +
+	"\x04_bioB\r\n" +
+	"\v_avatar_urlB\r\n" +
+	"\v_updated_at\"\x92\x03\n" +
 	"\aAddress\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
@@ -1763,13 +1884,27 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\x0eGetUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\";\n" +
 	"\x0fGetUserResponse\x12(\n" +
-	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"u\n" +
+	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"\x9a\x03\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x02 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x03 \x01(\tR\blastName\x12\x14\n" +
-	"\x05phone\x18\x04 \x01(\tR\x05phone\">\n" +
+	"\x05phone\x18\x04 \x01(\tR\x05phone\x12\x1f\n" +
+	"\busername\x18\x05 \x01(\tH\x00R\busername\x88\x01\x01\x12,\n" +
+	"\x0falternate_phone\x18\x06 \x01(\tH\x01R\x0ealternatePhone\x88\x01\x01\x12'\n" +
+	"\rdate_of_birth\x18\a \x01(\tH\x02R\vdateOfBirth\x88\x01\x01\x12\x1b\n" +
+	"\x06gender\x18\b \x01(\tH\x03R\x06gender\x88\x01\x01\x12\x15\n" +
+	"\x03bio\x18\t \x01(\tH\x04R\x03bio\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"avatar_url\x18\n" +
+	" \x01(\tH\x05R\tavatarUrl\x88\x01\x01B\v\n" +
+	"\t_usernameB\x12\n" +
+	"\x10_alternate_phoneB\x10\n" +
+	"\x0e_date_of_birthB\t\n" +
+	"\a_genderB\x06\n" +
+	"\x04_bioB\r\n" +
+	"\v_avatar_url\">\n" +
 	"\x12UpdateUserResponse\x12(\n" +
 	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"\xd5\x02\n" +
 	"\x18CreateUserAddressRequest\x12\x17\n" +
@@ -1979,6 +2114,8 @@ func file_contracts_protobuf_user_user_proto_init() {
 	if File_contracts_protobuf_user_user_proto != nil {
 		return
 	}
+	file_contracts_protobuf_user_user_proto_msgTypes[0].OneofWrappers = []any{}
+	file_contracts_protobuf_user_user_proto_msgTypes[6].OneofWrappers = []any{}
 	file_contracts_protobuf_user_user_proto_msgTypes[14].OneofWrappers = []any{}
 	file_contracts_protobuf_user_user_proto_msgTypes[20].OneofWrappers = []any{}
 	file_contracts_protobuf_user_user_proto_msgTypes[22].OneofWrappers = []any{}

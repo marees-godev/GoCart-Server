@@ -28,6 +28,13 @@ message User {
   string phone = 5;
   string created_at = 6;
   string status = 7;
+  optional string username = 8;
+  optional string alternate_phone = 9;
+  optional string date_of_birth = 10;
+  optional string gender = 11;
+  optional string bio = 12;
+  optional string avatar_url = 13;
+  optional string updated_at = 14;
 }
 
 message Address {
@@ -71,6 +78,12 @@ message UpdateUserRequest {
   string first_name = 2;
   string last_name = 3;
   string phone = 4;
+  optional string username = 5;
+  optional string alternate_phone = 6;
+  optional string date_of_birth = 7;
+  optional string gender = 8;
+  optional string bio = 9;
+  optional string avatar_url = 10;
 }
 
 message UpdateUserResponse {

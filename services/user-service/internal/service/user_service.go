@@ -61,14 +61,24 @@ func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest)
 }
 
 func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID string) (*model.User, error) {
-	idToFetch := targetUserID
+	if strings.TrimSpace(authUserID) == "" {
+		slog.WarnContext(ctx, "missing authenticated user context in GetUser")
+		return nil, errors.Unauthorized("authenticated user context is required")
+	}
+
+	idToFetch := strings.TrimSpace(targetUserID)
 	if idToFetch == "" {
-		idToFetch = authUserID
+		idToFetch = strings.TrimSpace(authUserID)
 	}
 
 	if idToFetch == "" {
 		slog.WarnContext(ctx, "missing user ID in GetUser")
-		return nil, errors.BadRequest("user ID is required")
+		return nil, errors.BadRequest("user_id is required")
+	}
+
+	if !dto.IsValidID(idToFetch) {
+		slog.WarnContext(ctx, "invalid user ID in GetUser", "user_id", idToFetch)
+		return nil, errors.BadRequest("user_id is invalid")
 	}
 
 	user, err := s.repo.GetByID(ctx, idToFetch)
@@ -93,12 +103,18 @@ func (s *userService) GetUser(ctx context.Context, authUserID, targetUserID stri
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, error) {
-	if strings.TrimSpace(id) == "" {
+	trimmedID := strings.TrimSpace(id)
+	if trimmedID == "" {
 		slog.WarnContext(ctx, "missing user ID in GetUserByID")
-		return nil, errors.BadRequest("user ID is required")
+		return nil, errors.BadRequest("user_id is required")
 	}
 
-	user, err := s.repo.GetByID(ctx, id)
+	if !dto.IsValidID(trimmedID) {
+		slog.WarnContext(ctx, "invalid user ID in GetUserByID", "user_id", id)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
+	user, err := s.repo.GetByID(ctx, trimmedID)
 	if err != nil {
 		slog.WarnContext(ctx, "failed to get user in GetUserByID", "user_id", id, "error", err)
 		return nil, err
@@ -120,18 +136,36 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*model.User, 
 }
 
 func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID string, req dto.UpdateUserRequest) (*model.User, error) {
-	if authUserID == "" {
+	if strings.TrimSpace(authUserID) == "" {
 		slog.WarnContext(ctx, "missing authenticated user context in UpdateUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	if targetUserID == "" {
+	if strings.TrimSpace(targetUserID) == "" {
 		targetUserID = authUserID
 	}
 
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in UpdateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
 	if authUserID != targetUserID {
-		slog.WarnContext(ctx, "forbidden user modification in UpdateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
-		return nil, errors.Forbidden("user cannot modify another user's profile")
+		slog.WarnContext(ctx, "user id mismatch in UpdateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if req.ID != nil && strings.TrimSpace(*req.ID) != "" && strings.TrimSpace(*req.ID) != targetUserID {
+		slog.WarnContext(ctx, "id in body does not match target user in UpdateUser", "body_id", *req.ID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
+	}
+
+	if req.UserID != nil && strings.TrimSpace(*req.UserID) != "" && strings.TrimSpace(*req.UserID) != targetUserID {
+		slog.WarnContext(ctx, "user_id in body does not match target user in UpdateUser", "body_user_id", *req.UserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
 	}
 
 	if err := req.Validate(); err != nil {
@@ -199,7 +233,7 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 	}
 
 	if req.Gender != nil {
-		user.Gender = req.Gender
+		user.Gender = req.GetGender()
 	}
 
 	if bio := req.GetBio(); bio != nil {
@@ -220,18 +254,26 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 }
 
 func (s *userService) DeactivateUser(ctx context.Context, authUserID, targetUserID string, req dto.DeactivateUserRequest) (*dto.AccountActionResponse, error) {
-	if authUserID == "" {
+	if strings.TrimSpace(authUserID) == "" {
 		slog.WarnContext(ctx, "missing authenticated user context in DeactivateUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	if targetUserID == "" {
+	if strings.TrimSpace(targetUserID) == "" {
 		targetUserID = authUserID
 	}
 
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in DeactivateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
 	if authUserID != targetUserID {
-		slog.WarnContext(ctx, "forbidden user deactivation attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
-		return nil, errors.Forbidden("user cannot deactivate another user's account")
+		slog.WarnContext(ctx, "user id mismatch in DeactivateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
 	}
 
 	if err := s.repo.DeactivateUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
@@ -248,18 +290,26 @@ func (s *userService) DeactivateUser(ctx context.Context, authUserID, targetUser
 }
 
 func (s *userService) DeleteUser(ctx context.Context, authUserID, targetUserID string, req dto.DeleteUserRequest) (*dto.AccountActionResponse, error) {
-	if authUserID == "" {
+	if strings.TrimSpace(authUserID) == "" {
 		slog.WarnContext(ctx, "missing authenticated user context in DeleteUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	if targetUserID == "" {
+	if strings.TrimSpace(targetUserID) == "" {
 		targetUserID = authUserID
 	}
 
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in DeleteUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
 	if authUserID != targetUserID {
-		slog.WarnContext(ctx, "forbidden user deletion attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
-		return nil, errors.Forbidden("user cannot delete another user's account")
+		slog.WarnContext(ctx, "user id mismatch in DeleteUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
 	}
 
 	if err := s.repo.DeleteUser(ctx, targetUserID, authUserID, req.Reason); err != nil {
@@ -276,18 +326,26 @@ func (s *userService) DeleteUser(ctx context.Context, authUserID, targetUserID s
 }
 
 func (s *userService) ReactivateUser(ctx context.Context, authUserID, targetUserID string) (*dto.AccountActionResponse, error) {
-	if authUserID == "" {
+	if strings.TrimSpace(authUserID) == "" {
 		slog.WarnContext(ctx, "missing authenticated user context in ReactivateUser")
 		return nil, errors.Unauthorized("authenticated user context is required")
 	}
 
-	if targetUserID == "" {
+	if strings.TrimSpace(targetUserID) == "" {
 		targetUserID = authUserID
 	}
 
+	targetUserID = strings.TrimSpace(targetUserID)
+	authUserID = strings.TrimSpace(authUserID)
+
+	if !dto.IsValidID(targetUserID) {
+		slog.WarnContext(ctx, "invalid user id in ReactivateUser", "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id is invalid")
+	}
+
 	if authUserID != targetUserID {
-		slog.WarnContext(ctx, "forbidden user reactivation attempt", "auth_user_id", authUserID, "target_user_id", targetUserID)
-		return nil, errors.Forbidden("user cannot reactivate another user's account")
+		slog.WarnContext(ctx, "user id mismatch in ReactivateUser", "auth_user_id", authUserID, "target_user_id", targetUserID)
+		return nil, errors.BadRequest("user_id does not match the expected value")
 	}
 
 	if err := s.repo.ReactivateUser(ctx, targetUserID, authUserID); err != nil {
