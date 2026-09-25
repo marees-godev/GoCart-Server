@@ -199,6 +199,7 @@ func TestLogin_Success(t *testing.T) {
 		Email:            "user@example.com",
 		PasswordHash:     string(hashedPassword),
 		Role:             model.RoleCustomer,
+		EmailVerified:    true,
 		IsActive:         true,
 		FailedLoginCount: 0,
 	}
@@ -288,6 +289,7 @@ func TestLogin_Merchant_Success(t *testing.T) {
 		Email:        "merchant@example.com",
 		PasswordHash: string(hashedPassword),
 		Role:         model.RoleMerchant,
+		EmailVerified: true,
 		IsActive:     true,
 	}
 
@@ -341,6 +343,44 @@ func TestLogin_RoleMismatch_Fails(t *testing.T) {
 	}
 }
 
+func TestLogin_UnverifiedEmail_Fails(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	rawPassword := "ValidPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	mockRepo.byEmailRole["unverified@example.com:CUSTOMER"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         "unverified@example.com",
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	_, err := svc.Login(context.Background(), &dto.LoginRequest{
+		Email:      "unverified@example.com",
+		Password:   rawPassword,
+		IsMerchant: false,
+	})
+	if err == nil {
+		t.Fatal("expected error when trying to login with unverified email, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected error code FORBIDDEN, got %s", appErr.Code)
+	}
+	if appErr.HTTPStatus != 403 {
+		t.Errorf("expected status 403, got %d", appErr.HTTPStatus)
+	}
+	expectedMsg := "email is not verified, please verify your email first and then login"
+	if appErr.ClientMessage() != expectedMsg {
+		t.Errorf("expected error message %q, got %q", expectedMsg, appErr.ClientMessage())
+	}
+}
+
 func TestLogin_MultiRoleSameEmail_SeparatesAccount(t *testing.T) {
 	svc, mockRepo, _ := setupTestService()
 
@@ -356,6 +396,7 @@ func TestLogin_MultiRoleSameEmail_SeparatesAccount(t *testing.T) {
 		Email:        "dual@example.com",
 		PasswordHash: string(hashedPassword),
 		Role:         model.RoleCustomer,
+		EmailVerified: true,
 		IsActive:     true,
 	}
 
@@ -365,6 +406,7 @@ func TestLogin_MultiRoleSameEmail_SeparatesAccount(t *testing.T) {
 		Email:        "dual@example.com",
 		PasswordHash: string(hashedPassword),
 		Role:         model.RoleMerchant,
+		EmailVerified: true,
 		IsActive:     true,
 	}
 
