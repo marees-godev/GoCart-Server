@@ -250,11 +250,6 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp st
 	return res.GetSuccess(), nil
 }
 
-// VerifyEmailOtp is the resolver for the verifyEmailOtp field.
-func (r *mutationResolver) VerifyEmailOtp(ctx context.Context, email string, otp string) (bool, error) {
-	return r.VerifyEmail(ctx, email, otp)
-}
-
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
 func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
 	if r.Clients == nil || r.Clients.AuthClient == nil {
@@ -270,9 +265,4 @@ func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email st
 		return false, err
 	}
 	return res.GetSuccess(), nil
-}
-
-// ResendOtp is the resolver for the resendOtp field.
-func (r *mutationResolver) ResendOtp(ctx context.Context, email string) (bool, error) {
-	return r.ResendVerificationEmail(ctx, email)
 }
