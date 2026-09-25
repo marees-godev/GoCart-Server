@@ -839,6 +839,7 @@ func TestResendVerificationEmail(t *testing.T) {
 
 
 type mockUserServiceClient struct {
+	userpb.UserServiceClient
 	createdUsers []*userpb.CreateUserRequest
 	createErr    error
 }
