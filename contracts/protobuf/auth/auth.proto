@@ -9,6 +9,8 @@ service AuthService {
   rpc Register (RegisterRequest) returns (AuthResponse);
   rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
   rpc RefreshToken (RefreshTokenRequest) returns (AuthResponse);
+  rpc VerifyEmail (VerifyEmailRequest) returns (VerifyEmailResponse);
+  rpc ResendVerificationEmail (ResendVerificationEmailRequest) returns (ResendVerificationEmailResponse);
 }
 
 message LoginRequest {
@@ -50,5 +52,25 @@ message AuthResponse {
   string business_email = 8;
   string first_name = 9;
   string last_name = 10;
+}
+
+message VerifyEmailRequest {
+  string email = 1;
+  string otp = 2;
+  string token = 3;
+}
+
+message VerifyEmailResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ResendVerificationEmailRequest {
+  string email = 1;
+}
+
+message ResendVerificationEmailResponse {
+  bool success = 1;
+  string message = 2;
 }
 

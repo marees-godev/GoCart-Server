@@ -107,3 +107,36 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 		UserId:       resp.UserID,
 	}, nil
 }
+
+func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
+	resp, err := h.authService.VerifyEmail(ctx, &dto.VerifyEmailRequest{
+		Email: req.GetEmail(),
+		OTP:   req.GetOtp(),
+		Token: req.GetToken(),
+	})
+	if err != nil {
+		h.logger.Error("Failed to verify email", slog.Any("error", err))
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.VerifyEmailResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.ResendVerificationEmailRequest) (*pb.ResendVerificationEmailResponse, error) {
+	resp, err := h.authService.ResendVerificationEmail(ctx, &dto.ResendVerificationEmailRequest{
+		Email: req.GetEmail(),
+	})
+	if err != nil {
+		h.logger.Error("Failed to resend verification email", slog.Any("error", err))
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ResendVerificationEmailResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+

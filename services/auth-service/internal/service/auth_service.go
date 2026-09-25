@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,10 +15,14 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	pkgotp "github.com/marees-godev/GoCart-Server/pkg/otp"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
+	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/mailer"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/otp"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
@@ -40,11 +41,15 @@ type AuthService interface {
 	Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error)
 	ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error)
 	RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
+	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error)
+	ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error)
 }
 
 type authService struct {
 	repo           repository.AuthRepository
 	cfg            *config.Config
+	mailer         mailer.Mailer
+	otpStore       otp.Store
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
@@ -54,9 +59,18 @@ func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slo
 	if log == nil {
 		log = slog.Default()
 	}
+	m := mailer.NewMailer(cfg.Email, log)
+	return NewAuthServiceWithMailer(repo, cfg, m, log, clients...)
+}
+
+func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config, m mailer.Mailer, log *slog.Logger, clients ...any) AuthService {
+	if log == nil {
+		log = slog.Default()
+	}
 	s := &authService{
 		repo:   repo,
 		cfg:    cfg,
+		mailer: m,
 		logger: log,
 	}
 	for _, c := range clients {
@@ -68,25 +82,35 @@ func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slo
 			s.userClient = client
 		case merchantpb.MerchantServiceClient:
 			s.merchantClient = client
+		case otp.Store:
+			s.otpStore = client
+		case *redis.Client:
+			if client != nil {
+				s.otpStore = otp.NewRedisStore(client)
+			}
 		}
+	}
+	if s.otpStore == nil {
+		s.otpStore = otp.NewMemoryStore()
 	}
 	return s
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
 
-	if req == nil || req.Email == "" || req.Password == "" {
+	if req == nil || strings.TrimSpace(req.Email) == "" || req.Password == "" {
 		s.logger.Warn("Login attempt failed: missing email or password")
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	cred, err := s.repo.GetByEmail(ctx, req.Email)
+	email := cleanEmail(req.Email)
+	cred, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Login attempt failed: user not found", "email", req.Email)
+			s.logger.Warn("Login attempt failed: user not found", "email", email)
 			return nil, appErrors.Unauthorized("Invalid email or password")
 		}
-		s.logger.Error("Login failed: database query error", "email", req.Email, "error", err)
+		s.logger.Error("Login failed: database query error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
 	}
 
@@ -179,24 +203,25 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 }
 
 func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error) {
-	if req == nil || req.Email == "" || req.Password == "" {
+	if req == nil || strings.TrimSpace(req.Email) == "" || req.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
+	email := cleanEmail(req.Email)
 	role := model.RoleCustomer
 	if req.IsMerchant {
 		role = model.RoleMerchant
 	}
 
-	existing, err := s.repo.GetByEmailAndRole(ctx, req.Email, role)
+	existing, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err == nil && existing != nil {
-		s.logger.Warn("Registration failed: user with email and role already exists", "email", req.Email, "role", role.String())
+		s.logger.Warn("Registration failed: user with email and role already exists", "email", email, "role", role.String())
 		return nil, appErrors.Conflict("user with this email and role already exists")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		s.logger.Error("Registration failed: password hash error", "email", req.Email, "error", err)
+		s.logger.Error("Registration failed: password hash error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to hash password")
 	}
 
@@ -205,7 +230,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	cred := &model.AuthCredential{
 		ID:            credID,
 		UserID:        userID,
-		Email:         req.Email,
+		Email:         email,
 		PasswordHash:  string(hashedPassword),
 		Role:          role,
 		EmailVerified: false,
@@ -219,6 +244,24 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	if err := s.repo.CreateCredential(ctx, cred); err != nil {
 		return nil, err
+	}
+
+	// Generate 6-digit verification OTP (valid for 5 minutes by default)
+	rawOTP, err := generateOTP()
+	if err == nil {
+		ttlMinutes := s.cfg.Email.TokenTTLMinutes
+		if ttlMinutes <= 0 {
+			ttlMinutes = 5
+		}
+		otpHash := hashToken(rawOTP)
+		ttl := time.Duration(ttlMinutes) * time.Minute
+		if err := s.otpStore.SetOTP(ctx, email, otpHash, ttl); err == nil {
+			go func(toEmail, otp string) {
+				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
+			}(email, rawOTP)
+		} else {
+			s.logger.Error("Failed to store verification OTP in store", "error", err)
+		}
 	}
 
 	var merchantID string
@@ -429,15 +472,150 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	}, nil
 }
 
-func generateRandomToken(nBytes int) (string, error) {
-	b := make([]byte, nBytes)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error) {
+	if req == nil || (req.OTP == "" && req.Token == "") {
+		s.logger.Warn("Verify email failed: missing verification code")
+		return nil, appErrors.BadRequest("verification code is required")
 	}
-	return hex.EncodeToString(b), nil
+
+	otpVal := strings.TrimSpace(req.OTP)
+	if otpVal == "" {
+		otpVal = strings.TrimSpace(req.Token)
+	}
+
+	email := cleanEmail(req.Email)
+	if email == "" {
+		s.logger.Warn("Verify email failed: missing email")
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	cred, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Verify email failed: user not found", "email", email)
+			return nil, appErrors.NotFound("user not found")
+		}
+		s.logger.Error("Verify email failed: database query error", "error", err)
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if cred.EmailVerified {
+		return &dto.VerifyEmailResponse{
+			Success: true,
+			Message: "Email address is already verified",
+		}, nil
+	}
+
+	storedHash, err := s.otpStore.GetOTP(ctx, email)
+	if err != nil {
+		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email)
+		return nil, appErrors.BadRequest("verification code has expired or is invalid")
+	}
+
+	if storedHash != hashToken(otpVal) {
+		s.logger.Warn("Verify email failed: code mismatch", "user_id", cred.UserID.String())
+		return nil, appErrors.BadRequest("invalid verification code")
+	}
+
+	// Delete from Redis so OTP cannot be reused
+	_ = s.otpStore.DeleteOTP(ctx, email)
+
+	// Update user in PostgreSQL
+	if err := s.repo.MarkEmailVerified(ctx, cred.UserID); err != nil {
+		return nil, appErrors.Internal(err, "failed to update email verification status")
+	}
+
+	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email)
+	return &dto.VerifyEmailResponse{
+		Success: true,
+		Message: "Email address verified successfully",
+	}, nil
+}
+
+func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error) {
+	if req == nil || strings.TrimSpace(req.Email) == "" {
+		s.logger.Warn("Resend verification email failed: missing email")
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	email := cleanEmail(req.Email)
+	cred, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Resend verification email failed: user not found", "email", email)
+			return nil, appErrors.NotFound("user not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if cred.EmailVerified {
+		s.logger.Warn("Resend verification email failed: email already verified", "email", email)
+		return nil, appErrors.BadRequest("email is already verified")
+	}
+
+	ttlMinutes := s.cfg.Email.TokenTTLMinutes
+	if ttlMinutes <= 0 {
+		ttlMinutes = 5
+	}
+	totalTTL := time.Duration(ttlMinutes) * time.Minute
+
+	cooldownSec := s.cfg.Email.ResendCooldownSeconds
+	if cooldownSec <= 0 {
+		cooldownSec = 60
+	}
+	cooldown := time.Duration(cooldownSec) * time.Second
+
+	// Enforce minimum cooldown period by checking remaining TTL in store before issuing a new OTP
+	if remainingTTL, err := s.otpStore.GetTTL(ctx, email); err == nil && remainingTTL > 0 {
+		timeElapsed := totalTTL - remainingTTL
+		if timeElapsed < cooldown {
+			waitSec := int((cooldown - timeElapsed + time.Second - 1) / time.Second)
+			if waitSec < 1 {
+				waitSec = 1
+			}
+			s.logger.Warn("Resend verification email rate limited: cooldown active",
+				"email", email,
+				"wait_seconds", waitSec,
+			)
+			return nil, appErrors.TooManyRequests(fmt.Sprintf("please wait %d seconds before requesting a new verification code", waitSec))
+		}
+	} else if err != nil && !errors.Is(err, otp.ErrOTPNotFound) {
+		s.logger.Warn("Failed to check OTP remaining TTL, proceeding with resend", "error", err)
+	}
+
+	rawOTP, err := generateOTP()
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to generate verification OTP")
+	}
+
+	otpHash := hashToken(rawOTP)
+	if err := s.otpStore.SetOTP(ctx, email, otpHash, totalTTL); err != nil {
+		return nil, appErrors.Internal(err, "failed to store verification OTP in store")
+	}
+
+	go func(toEmail, otp string) {
+		_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
+	}(email, rawOTP)
+
+	return &dto.ResendVerificationEmailResponse{
+		Success: true,
+		Message: "Verification OTP sent successfully",
+	}, nil
+}
+
+func cleanEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func generateOTP() (string, error) {
+	return pkgotp.GenerateNumeric(6)
+}
+
+func generateRandomToken(nBytes int) (string, error) {
+	return pkgotp.GenerateRandomToken(nBytes)
 }
 
 func hashToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return fmt.Sprintf("%x", sum)
+	return pkgotp.HashToken(token)
 }
+

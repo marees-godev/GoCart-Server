@@ -19,9 +19,11 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	authGRPC "github.com/marees-godev/GoCart-Server/services/auth-service/internal/handler/grpc"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/otp"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/service"
 	"google.golang.org/grpc"
@@ -121,8 +123,18 @@ func main() {
 		}
 	}
 
+	var otpStore otp.Store
+	redisClient, err := redis.New(ctx, cfg.Redis)
+	if err != nil {
+		log.Warn("Failed to connect to Redis for OTP storage, falling back to in-memory store", "error", err)
+		otpStore = otp.NewMemoryStore()
+	} else {
+		defer redisClient.Close()
+		otpStore = otp.NewRedisStore(redisClient)
+	}
+
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, otpStore)
 
 	// 7. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))

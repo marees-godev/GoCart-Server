@@ -107,6 +107,12 @@ func (r *inMemoryAuthRepo) RevokeRefreshToken(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
+func (r *inMemoryAuthRepo) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+	return nil
+}
+
+
+
 type mockMerchantClient struct {
 	merchantpb.MerchantServiceClient
 	createdMerchants []*merchantpb.CreateMerchantRequest

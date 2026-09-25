@@ -26,6 +26,7 @@ type AuthRepository interface {
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
 }
 
 type postgresAuthRepository struct {
@@ -255,3 +256,18 @@ func (r *postgresAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid
 	}
 	return nil
 }
+
+func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE auth_credentials
+		SET email_verified = true, updated_at = NOW()
+		WHERE user_id = $1
+	`
+	_, err := r.pool.Exec(ctx, query, userID)
+	if err != nil {
+		r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: mark email verified failed: %w", err)
+	}
+	return nil
+}
+
