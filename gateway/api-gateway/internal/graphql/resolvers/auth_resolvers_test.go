@@ -77,13 +77,13 @@ func TestRegisterResolver_Customer(t *testing.T) {
 
 	fn := "John"
 	ln := "Doe"
-	isMerch := false
+	isMerchCust := false
 	input := model.RegisterInput{
 		Email:      "customer@example.com",
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: isMerch,
+		IsMerchant: isMerchCust,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -115,6 +115,9 @@ func TestRegisterResolver_Customer(t *testing.T) {
 	if payload.User.CreatedAt == nil || *payload.User.CreatedAt != "2026-09-23T10:00:00Z" {
 		t.Errorf("expected payload user with CreatedAt '2026-09-23T10:00:00Z', got %+v", payload.User)
 	}
+	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
+		t.Errorf("expected payload user role 'CUSTOMER', got %v", payload.User.Role)
+	}
 }
 
 func TestRegisterResolver_Merchant(t *testing.T) {
@@ -134,13 +137,13 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 
 	fn := "Jane"
 	ln := "Merchant"
-	isMerch := true
+	isMerchTrue := true
 	input := model.RegisterInput{
 		Email:      "merchant@example.com",
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: isMerch,
+		IsMerchant: isMerchTrue,
 	}
 
 	payload, err := r.Register(context.Background(), input)

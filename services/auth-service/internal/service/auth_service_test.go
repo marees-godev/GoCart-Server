@@ -969,10 +969,8 @@ func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.
 	}
 	m.createdReqs = append(m.createdReqs, in)
 	return &merchantpb.CreateMerchantResponse{
-		Merchant: &merchantpb.Merchant{
-			Id:            in.UserId,
-			UserId:        in.UserId,
-			BusinessName:  in.BusinessName,
+		Merchant: &merchantpb.MerchantResponseData{
+			Id:            in.Id,
 			BusinessEmail: in.BusinessEmail,
 			FirstName:     in.FirstName,
 			LastName:      in.LastName,
@@ -992,12 +990,11 @@ func TestRegister_CallsMerchantService_WhenIsMerchantTrue(t *testing.T) {
 	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, mockMerchant)
 
 	req := &dto.RegisterRequest{
-		Email:        "merchant@example.com",
-		Password:     "Password123!",
-		FirstName:    "Jane",
-		LastName:     "Doe",
-		BusinessName: "Jane's Superstore",
-		IsMerchant:   true,
+		Email:      "merchant@example.com",
+		Password:   "Password123!",
+		FirstName:  "Jane",
+		LastName:   "Doe",
+		IsMerchant: true,
 	}
 
 	resp, err := svc.Register(context.Background(), req)
@@ -1010,11 +1007,8 @@ func TestRegister_CallsMerchantService_WhenIsMerchantTrue(t *testing.T) {
 	}
 
 	created := mockMerchant.createdReqs[0]
-	if created.UserId != resp.UserID {
-		t.Errorf("expected merchant ID %s, got %s", resp.UserID, created.UserId)
-	}
-	if created.BusinessName != "Jane's Superstore" {
-		t.Errorf("expected business name Jane's Superstore, got %s", created.BusinessName)
+	if created.Id != resp.UserID {
+		t.Errorf("expected merchant ID %s, got %s", resp.UserID, created.Id)
 	}
 	if created.BusinessEmail != "merchant@example.com" {
 		t.Errorf("expected email merchant@example.com, got %s", created.BusinessEmail)

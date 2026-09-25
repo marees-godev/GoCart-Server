@@ -8,22 +8,15 @@ import (
 
 type CreateMerchantRequest struct {
 	ID            string `json:"id,omitempty"`
-	UserID        string `json:"user_id,omitempty"`
-	BusinessName  string `json:"business_name"`
 	FirstName     string `json:"first_name,omitempty"`
 	LastName      string `json:"last_name,omitempty"`
 	BusinessEmail string `json:"business_email,omitempty"`
-	BusinessPhone string `json:"business_phone,omitempty"`
-	TaxID         string `json:"tax_id,omitempty"`
 }
 
 type UpdateMerchantRequest struct {
-	BusinessName  string `json:"business_name,omitempty"`
-	FirstName     string `json:"first_name,omitempty"`
-	LastName      string `json:"last_name,omitempty"`
-	BusinessEmail string `json:"business_email,omitempty"`
-	BusinessPhone string `json:"business_phone,omitempty"`
-	TaxID         string `json:"tax_id,omitempty"`
+	BusinessName  string `json:"business_name"`
+	BusinessPhone string `json:"business_phone"`
+	TaxID         string `json:"tax_id"`
 }
 
 type UpdateMerchantStatusRequest struct {
@@ -33,7 +26,6 @@ type UpdateMerchantStatusRequest struct {
 
 type MerchantResponse struct {
 	ID              string `json:"id"`
-	UserID          string `json:"user_id,omitempty"`
 	BusinessName    string `json:"business_name"`
 	FirstName       string `json:"first_name,omitempty"`
 	LastName        string `json:"last_name,omitempty"`
@@ -59,7 +51,6 @@ func ToMerchantResponse(m *model.Merchant) MerchantResponse {
 	}
 	return MerchantResponse{
 		ID:              m.ID.String(),
-		UserID:          m.UserID.String(),
 		BusinessName:    m.BusinessName,
 		FirstName:       m.FirstName,
 		LastName:        m.LastName,

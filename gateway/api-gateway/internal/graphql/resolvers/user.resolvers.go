@@ -9,6 +9,7 @@ import (
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -300,7 +301,12 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
-	return toModelUser(res.User), nil
+	user := toModelUser(res.User)
+	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil && user != nil && userCtx.Role != "" {
+		rStr := userCtx.Role
+		user.Role = &rStr
+	}
+	return user, nil
 }
 
 // User is the resolver for the user field.

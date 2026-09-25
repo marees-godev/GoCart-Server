@@ -1,23 +1,20 @@
 package maps
 
 import (
+	"time"
+
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 )
 
-func ToGraphQLMerchant(m *merchantpb.Merchant) *model.Merchant {
+func ToGraphQLMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 	if m == nil {
 		return nil
 	}
 	res := &model.Merchant{
 		ID:           m.Id,
-		MerchantID:   m.Id,
 		BusinessName: m.BusinessName,
 		Status:       m.Status,
-	}
-	if m.UserId != "" {
-		uid := m.UserId
-		res.UserID = &uid
 	}
 	if m.FirstName != "" {
 		fn := m.FirstName
@@ -27,13 +24,17 @@ func ToGraphQLMerchant(m *merchantpb.Merchant) *model.Merchant {
 		ln := m.LastName
 		res.LastName = &ln
 	}
-	if m.CreatedAt != "" {
-		createdAt := m.CreatedAt
+	if m.CreatedAt != nil {
+		createdAt := m.CreatedAt.AsTime().Format(time.RFC3339)
 		res.CreatedAt = &createdAt
 	}
-	if m.UpdatedAt != "" {
-		updatedAt := m.UpdatedAt
+	if m.UpdatedAt != nil {
+		updatedAt := m.UpdatedAt.AsTime().Format(time.RFC3339)
 		res.UpdatedAt = &updatedAt
+	}
+	if m.DeletedAt != nil {
+		deletedAt := m.DeletedAt.AsTime().Format(time.RFC3339)
+		res.DeletedAt = &deletedAt
 	}
 	if m.TaxId != "" {
 		taxId := m.TaxId

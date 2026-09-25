@@ -24,33 +24,36 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type mockMerchantBackend struct {
 	merchantpb.UnimplementedMerchantServiceServer
-	merchants map[string]*merchantpb.Merchant
+	merchants map[string]*merchantpb.MerchantResponseData
 }
 
 func newMockMerchantBackend() *mockMerchantBackend {
 	return &mockMerchantBackend{
-		merchants: make(map[string]*merchantpb.Merchant),
+		merchants: make(map[string]*merchantpb.MerchantResponseData),
 	}
 }
 
 func (m *mockMerchantBackend) CreateMerchant(ctx context.Context, req *merchantpb.CreateMerchantRequest) (*merchantpb.CreateMerchantResponse, error) {
-	id := uuid.New().String()
-	merch := &merchantpb.Merchant{
+	id := req.Id
+	if id == "" {
+		id = uuid.New().String()
+	}
+	merch := &merchantpb.MerchantResponseData{
 		Id:            id,
-		UserId:        req.UserId,
-		BusinessName:  req.BusinessName,
+		BusinessName:  "",
 		BusinessEmail: req.BusinessEmail,
-		BusinessPhone: req.BusinessPhone,
-		TaxId:         req.TaxId,
+		BusinessPhone: "",
+		TaxId:         "",
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
 		Status:        "PENDING",
-		CreatedAt:     time.Now().Format(time.RFC3339),
-		UpdatedAt:     time.Now().Format(time.RFC3339),
+		CreatedAt:     timestamppb.Now(),
+		UpdatedAt:     timestamppb.Now(),
 	}
 	m.merchants[id] = merch
 	return &merchantpb.CreateMerchantResponse{Merchant: merch}, nil
@@ -64,17 +67,8 @@ func (m *mockMerchantBackend) GetMerchant(ctx context.Context, req *merchantpb.G
 	return &merchantpb.GetMerchantResponse{Merchant: merch}, nil
 }
 
-func (m *mockMerchantBackend) GetMerchantByUserID(ctx context.Context, req *merchantpb.GetMerchantByUserIDRequest) (*merchantpb.GetMerchantResponse, error) {
-	for _, merch := range m.merchants {
-		if merch.UserId == req.UserId {
-			return &merchantpb.GetMerchantResponse{Merchant: merch}, nil
-		}
-	}
-	return nil, status.Error(codes.NotFound, "merchant not found")
-}
-
 func (m *mockMerchantBackend) ListMerchants(ctx context.Context, req *merchantpb.ListMerchantsRequest) (*merchantpb.ListMerchantsResponse, error) {
-	var list []*merchantpb.Merchant
+	var list []*merchantpb.MerchantResponseData
 	for _, merch := range m.merchants {
 		if req.Status == "" || merch.Status == req.Status {
 			list = append(list, merch)
@@ -94,16 +88,13 @@ func (m *mockMerchantBackend) UpdateMerchant(ctx context.Context, req *merchantp
 	if req.BusinessName != "" {
 		merch.BusinessName = req.BusinessName
 	}
-	if req.BusinessEmail != "" {
-		merch.BusinessEmail = req.BusinessEmail
+	if req.BusinessPhone != "" {
+		merch.BusinessPhone = req.BusinessPhone
 	}
-	if req.FirstName != "" {
-		merch.FirstName = req.FirstName
+	if req.TaxId != "" {
+		merch.TaxId = req.TaxId
 	}
-	if req.LastName != "" {
-		merch.LastName = req.LastName
-	}
-	merch.UpdatedAt = time.Now().Format(time.RFC3339)
+	merch.UpdatedAt = timestamppb.Now()
 	return &merchantpb.UpdateMerchantResponse{Merchant: merch}, nil
 }
 
@@ -114,7 +105,7 @@ func (m *mockMerchantBackend) UpdateMerchantStatus(ctx context.Context, req *mer
 	}
 	merch.Status = req.Status
 	merch.RejectionReason = req.RejectionReason
-	merch.UpdatedAt = time.Now().Format(time.RFC3339)
+	merch.UpdatedAt = timestamppb.Now()
 	return &merchantpb.UpdateMerchantStatusResponse{Merchant: merch}, nil
 }
 
@@ -218,15 +209,14 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 
 	// Seed merchant in mock backend (merchant accounts are provisioned via auth-service)
 	merchantID := "m-100"
-	backend.merchants[merchantID] = &merchantpb.Merchant{
+	backend.merchants[merchantID] = &merchantpb.MerchantResponseData{
 		Id:           merchantID,
-		UserId:       "user-100",
 		BusinessName: "Acme Retail",
 		FirstName:    "Alice",
 		LastName:     "Smith",
 		Status:       "PENDING",
-		CreatedAt:    "2026-09-21T00:00:00Z",
-		UpdatedAt:    "2026-09-21T00:00:00Z",
+		CreatedAt:    timestamppb.Now(),
+		UpdatedAt:    timestamppb.Now(),
 	}
 
 	// 2. Query Merchant by ID
@@ -299,13 +289,13 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 		mutation {
 			updateMerchant(id: "%s", input: {
 				businessName: "Acme Super Store"
-				firstName: "AliceUpdated"
-				lastName: "SmithUpdated"
+				businessPhone: "+1234567890"
+				taxId: "TAX-123"
 			}) {
 				id
 				businessName
-				firstName
-				lastName
+				businessPhone
+				taxId
 			}
 		}
 	`, merchantID)
@@ -322,10 +312,10 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	var updateRes struct {
 		Data struct {
 			UpdateMerchant struct {
-				ID           string  `json:"id"`
-				BusinessName string  `json:"businessName"`
-				FirstName    *string `json:"firstName"`
-				LastName     *string `json:"lastName"`
+				ID            string  `json:"id"`
+				BusinessName  string  `json:"businessName"`
+				BusinessPhone *string `json:"businessPhone"`
+				TaxID         *string `json:"taxId"`
 			} `json:"updateMerchant"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
@@ -337,15 +327,15 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	if updateRes.Data.UpdateMerchant.BusinessName != "Acme Super Store" {
 		t.Errorf("expected Acme Super Store, got %s", updateRes.Data.UpdateMerchant.BusinessName)
 	}
-	if updateRes.Data.UpdateMerchant.FirstName == nil || *updateRes.Data.UpdateMerchant.FirstName != "AliceUpdated" {
-		t.Errorf("expected AliceUpdated, got %v", updateRes.Data.UpdateMerchant.FirstName)
+	if updateRes.Data.UpdateMerchant.BusinessPhone == nil || *updateRes.Data.UpdateMerchant.BusinessPhone != "+1234567890" {
+		t.Errorf("expected +1234567890, got %v", updateRes.Data.UpdateMerchant.BusinessPhone)
 	}
-	if updateRes.Data.UpdateMerchant.LastName == nil || *updateRes.Data.UpdateMerchant.LastName != "SmithUpdated" {
-		t.Errorf("expected SmithUpdated, got %v", updateRes.Data.UpdateMerchant.LastName)
+	if updateRes.Data.UpdateMerchant.TaxID == nil || *updateRes.Data.UpdateMerchant.TaxID != "TAX-123" {
+		t.Errorf("expected TAX-123, got %v", updateRes.Data.UpdateMerchant.TaxID)
 	}
 
-	// 5. Query MerchantByUserID
-	queryByUser := `query { merchantByUserId(userId: "user-100") { id businessName } }`
+	// 5. Query MerchantByUserID -> Rejected by schema (removed)
+	queryByUser := fmt.Sprintf(`query { merchantByUserId(userId: "%s") { id businessName } }`, merchantID)
 	reqBody, _ = json.Marshal(map[string]string{"query": queryByUser})
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -353,23 +343,11 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 
 	resp, err = app.Test(req, -1)
 	if err != nil {
-		t.Fatalf("merchantByUserId query failed: %v", err)
+		t.Fatalf("merchantByUserId request failed: %v", err)
 	}
 	bodyBytes, _ = io.ReadAll(resp.Body)
-	var userRes struct {
-		Data struct {
-			MerchantByUserID struct {
-				ID string `json:"id"`
-			} `json:"merchantByUserId"`
-		} `json:"data"`
-		Errors []any `json:"errors"`
-	}
-	_ = json.Unmarshal(bodyBytes, &userRes)
-	if len(userRes.Errors) > 0 {
-		t.Fatalf("GraphQL errors in getByUser: %v", userRes.Errors)
-	}
-	if userRes.Data.MerchantByUserID.ID != merchantID {
-		t.Errorf("expected %s, got %s", merchantID, userRes.Data.MerchantByUserID.ID)
+	if !bytes.Contains(bodyBytes, []byte("Cannot query field")) && !bytes.Contains(bodyBytes, []byte("errors")) {
+		t.Fatalf("expected merchantByUserId to be rejected by GraphQL schema, got: %s", string(bodyBytes))
 	}
 
 	// 6. Query Merchants List
@@ -403,7 +381,8 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 		t.Errorf("expected total 1, got %d", listRes.Data.Merchants.Total)
 	}
 
-	// 7. DeleteMerchant Mutation
+	// 7. DeleteMerchant & Suspend Rules
+	// 7a. Admin cannot delete merchant -> FORBIDDEN (admin can only suspend)
 	delMutation := fmt.Sprintf(`mutation { deleteMerchant(id: "%s") }`, merchantID)
 	reqBody, _ = json.Marshal(map[string]string{"query": delMutation})
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
@@ -415,6 +394,62 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 		t.Fatalf("deleteMerchant request failed: %v", err)
 	}
 	bodyBytes, _ = io.ReadAll(resp.Body)
+	var adminDelResult struct {
+		Errors []struct {
+			Extensions struct {
+				Code string `json:"code"`
+			} `json:"extensions"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(bodyBytes, &adminDelResult)
+	if len(adminDelResult.Errors) == 0 || adminDelResult.Errors[0].Extensions.Code != "FORBIDDEN" {
+		t.Fatalf("expected admin deletion to be FORBIDDEN, got: %s", string(bodyBytes))
+	}
+
+	// 7b. Admin can suspend the merchant
+	suspendMutation := fmt.Sprintf(`mutation { updateMerchantStatus(id: "%s", status: "SUSPENDED", rejectionReason: "Suspicious activity") { id status } }`, merchantID)
+	reqBody, _ = json.Marshal(map[string]string{"query": suspendMutation})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("suspendMerchant request failed: %v", err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	var suspendResult struct {
+		Data struct {
+			UpdateMerchantStatus struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			} `json:"updateMerchantStatus"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	_ = json.Unmarshal(bodyBytes, &suspendResult)
+	if len(suspendResult.Errors) > 0 {
+		t.Fatalf("errors in suspend: %v", suspendResult.Errors)
+	}
+	if suspendResult.Data.UpdateMerchantStatus.Status != "SUSPENDED" {
+		t.Errorf("expected SUSPENDED, got %s", suspendResult.Data.UpdateMerchantStatus.Status)
+	}
+
+	// 7c. Merchant owner can delete their own account
+	ownerMerchantToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: merchantID,
+		Role:   "MERCHANT",
+	}, "test-secret-key-12345", time.Hour)
+
+	reqBody, _ = json.Marshal(map[string]string{"query": delMutation})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+ownerMerchantToken)
+
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("owner deleteMerchant request failed: %v", err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
 	var delResult struct {
 		Data struct {
 			DeleteMerchant bool `json:"deleteMerchant"`
@@ -423,7 +458,7 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	}
 	_ = json.Unmarshal(bodyBytes, &delResult)
 	if len(delResult.Errors) > 0 {
-		t.Fatalf("GraphQL errors in delete: %v", delResult.Errors)
+		t.Fatalf("GraphQL errors in owner delete: %v", delResult.Errors)
 	}
 	if !delResult.Data.DeleteMerchant {
 		t.Errorf("expected deleteMerchant true, got false")
@@ -432,11 +467,12 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 
 func TestE2E_GraphQLMerchant_RoleAuthorization(t *testing.T) {
 	backend := newMockMerchantBackend()
-	backend.merchants["m-1"] = &merchantpb.Merchant{
+	backend.merchants["m-1"] = &merchantpb.MerchantResponseData{
 		Id:           "m-1",
-		UserId:       "merchant-1",
 		BusinessName: "Original Shop",
 		Status:       "PENDING",
+		CreatedAt:    timestamppb.Now(),
+		UpdatedAt:    timestamppb.Now(),
 	}
 	app, cleanup, _ := setupMerchantGatewayTest(t, backend)
 	defer cleanup()
@@ -503,7 +539,7 @@ func TestE2E_GraphQLMerchant_RoleAuthorization(t *testing.T) {
 
 	// 3. Role MERCHANT -> SUCCESS
 	merchantToken, _ := auth.GenerateToken(auth.UserContext{
-		UserID: "merchant-1",
+		UserID: "m-1",
 		Role:   "MERCHANT",
 	}, "test-secret-key-12345", time.Hour)
 
@@ -553,5 +589,84 @@ func TestE2E_GraphQLMerchant_RoleAuthorization(t *testing.T) {
 	_ = json.Unmarshal(bodyBytes, &statusForbiddenRes)
 	if len(statusForbiddenRes.Errors) == 0 || statusForbiddenRes.Errors[0].Extensions.Code != "FORBIDDEN" {
 		t.Errorf("expected FORBIDDEN for MERCHANT updating status, got: %s", string(bodyBytes))
+	}
+
+	// 5. Role ADMIN deleting merchant -> FORBIDDEN (admins cannot delete, only suspend)
+	adminToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	}, "test-secret-key-12345", time.Hour)
+
+	delMutation := `mutation { deleteMerchant(id: "m-1") }`
+	reqBody, _ = json.Marshal(map[string]string{"query": delMutation})
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("admin delete merchant failed: %v", err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	var adminDelForbidden struct {
+		Errors []struct {
+			Extensions struct {
+				Code string `json:"code"`
+			} `json:"extensions"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(bodyBytes, &adminDelForbidden)
+	if len(adminDelForbidden.Errors) == 0 || adminDelForbidden.Errors[0].Extensions.Code != "FORBIDDEN" {
+		t.Errorf("expected FORBIDDEN for ADMIN deleting merchant, got: %s", string(bodyBytes))
+	}
+
+	// 6. Role MERCHANT (non-owner) deleting merchant -> FORBIDDEN
+	nonOwnerToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "merchant-other",
+		Role:   "MERCHANT",
+	}, "test-secret-key-12345", time.Hour)
+
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+nonOwnerToken)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("non-owner delete merchant failed: %v", err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	var nonOwnerForbidden struct {
+		Errors []struct {
+			Extensions struct {
+				Code string `json:"code"`
+			} `json:"extensions"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(bodyBytes, &nonOwnerForbidden)
+	if len(nonOwnerForbidden.Errors) == 0 || nonOwnerForbidden.Errors[0].Extensions.Code != "FORBIDDEN" {
+		t.Errorf("expected FORBIDDEN for non-owner deleting merchant, got: %s", string(bodyBytes))
+	}
+
+	// 7. Role MERCHANT (owner) deleting merchant -> SUCCESS
+	ownerToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: "m-1",
+		Role:   "MERCHANT",
+	}, "test-secret-key-12345", time.Hour)
+
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+ownerToken)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("owner delete merchant failed: %v", err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	var ownerDelSuccess struct {
+		Data struct {
+			DeleteMerchant bool `json:"deleteMerchant"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	_ = json.Unmarshal(bodyBytes, &ownerDelSuccess)
+	if len(ownerDelSuccess.Errors) > 0 || !ownerDelSuccess.Data.DeleteMerchant {
+		t.Errorf("expected SUCCESS for owner deleting merchant, got: %s", string(bodyBytes))
 	}
 }
