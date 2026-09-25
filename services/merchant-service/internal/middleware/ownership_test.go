@@ -33,14 +33,6 @@ func (m *mockMerchantRepo) GetByID(ctx context.Context, id uuid.UUID) (*model.Me
 	}
 	return merch, nil
 }
-func (m *mockMerchantRepo) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.Merchant, error) {
-	for _, merch := range m.merchants {
-		if merch.UserID == userID {
-			return merch, nil
-		}
-	}
-	return nil, status.Error(codes.NotFound, "not found")
-}
 func (m *mockMerchantRepo) List(ctx context.Context, limit, offset int, status string) ([]*model.Merchant, int, error) {
 	var list []*model.Merchant
 	for _, merch := range m.merchants {
@@ -92,7 +84,7 @@ func TestUnaryOwnershipInterceptor(t *testing.T) {
 	}
 
 	// 1. GetMerchant: Owner accessing own merchant -> ALLOWED
-	info := &grpc.UnaryServerInfo{FullMethod: "/gocart.merchant.v1.MerchantService/GetMerchant"}
+	info := &grpc.UnaryServerInfo{FullMethod: "/merchant.v1.MerchantService/GetMerchant"}
 	_, err := interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.GetMerchantRequest{Id: merchant1ID.String()}, info, dummyHandler)
 	if err != nil {
 		t.Errorf("expected owner access to succeed, got error: %v", err)
@@ -110,37 +102,36 @@ func TestUnaryOwnershipInterceptor(t *testing.T) {
 		t.Errorf("expected admin access to succeed, got error: %v", err)
 	}
 
-	// 4. GetMerchantByUserID: Owner accessing own userID -> ALLOWED
-	infoByUser := &grpc.UnaryServerInfo{FullMethod: "/gocart.merchant.v1.MerchantService/GetMerchantByUserID"}
-	_, err = interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.GetMerchantByUserIDRequest{UserId: user1ID.String()}, infoByUser, dummyHandler)
+	// 4. GetMerchant: Internal consumer with no user context -> ALLOWED
+	_, err = interceptor(context.Background(), &merchantpb.GetMerchantRequest{Id: merchant1ID.String()}, info, dummyHandler)
 	if err != nil {
-		t.Errorf("expected owner access by user id to succeed, got error: %v", err)
+		t.Errorf("expected internal consumer access to succeed, got error: %v", err)
 	}
 
-	// 5. GetMerchantByUserID: Different merchant accessing user1's merchant -> FORBIDDEN
-	_, err = interceptor(ctxForUser(user2ID.String(), "MERCHANT"), &merchantpb.GetMerchantByUserIDRequest{UserId: user1ID.String()}, infoByUser, dummyHandler)
-	if err == nil || status.Code(err) != codes.PermissionDenied {
-		t.Errorf("expected PermissionDenied for different merchant by user id, got: %v", err)
-	}
-
-	// 6. UpdateMerchant: Non-owner -> FORBIDDEN
-	infoUpdate := &grpc.UnaryServerInfo{FullMethod: "/gocart.merchant.v1.MerchantService/UpdateMerchant"}
+	// 5. UpdateMerchant: Non-owner -> FORBIDDEN
+	infoUpdate := &grpc.UnaryServerInfo{FullMethod: "/merchant.v1.MerchantService/UpdateMerchant"}
 	_, err = interceptor(ctxForUser(user2ID.String(), "MERCHANT"), &merchantpb.UpdateMerchantRequest{Id: merchant1ID.String(), BusinessName: "Hack"}, infoUpdate, dummyHandler)
 	if err == nil || status.Code(err) != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied on UpdateMerchant for non-owner, got: %v", err)
 	}
 
-	// 7. UpdateMerchant: Owner -> ALLOWED
+	// 6. UpdateMerchant: Owner -> ALLOWED
 	_, err = interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.UpdateMerchantRequest{Id: merchant1ID.String(), BusinessName: "New Name"}, infoUpdate, dummyHandler)
 	if err != nil {
 		t.Errorf("expected owner UpdateMerchant to succeed, got: %v", err)
 	}
 
-	// 8. DeleteMerchant: Non-owner -> FORBIDDEN
-	infoDelete := &grpc.UnaryServerInfo{FullMethod: "/gocart.merchant.v1.MerchantService/DeleteMerchant"}
+	// 7. DeleteMerchant: Non-owner -> FORBIDDEN
+	infoDelete := &grpc.UnaryServerInfo{FullMethod: "/merchant.v1.MerchantService/DeleteMerchant"}
 	_, err = interceptor(ctxForUser(user2ID.String(), "MERCHANT"), &merchantpb.DeleteMerchantRequest{Id: merchant1ID.String()}, infoDelete, dummyHandler)
 	if err == nil || status.Code(err) != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied on DeleteMerchant for non-owner, got: %v", err)
+	}
+
+	// 8. DeleteMerchant: Admin -> FORBIDDEN (admin cannot delete, only suspend)
+	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.DeleteMerchantRequest{Id: merchant1ID.String()}, infoDelete, dummyHandler)
+	if err == nil || status.Code(err) != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied on DeleteMerchant for admin, got: %v", err)
 	}
 
 	// 9. DeleteMerchant: Owner -> ALLOWED
@@ -150,7 +141,7 @@ func TestUnaryOwnershipInterceptor(t *testing.T) {
 	}
 
 	// 10. UpdateMerchantStatus: Merchant -> FORBIDDEN (ADMIN only)
-	infoStatus := &grpc.UnaryServerInfo{FullMethod: "/gocart.merchant.v1.MerchantService/UpdateMerchantStatus"}
+	infoStatus := &grpc.UnaryServerInfo{FullMethod: "/merchant.v1.MerchantService/UpdateMerchantStatus"}
 	_, err = interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "APPROVED"}, infoStatus, dummyHandler)
 	if err == nil || status.Code(err) != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied for merchant trying to update status, got: %v", err)
@@ -160,5 +151,11 @@ func TestUnaryOwnershipInterceptor(t *testing.T) {
 	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "APPROVED"}, infoStatus, dummyHandler)
 	if err != nil {
 		t.Errorf("expected admin UpdateMerchantStatus to succeed, got: %v", err)
+	}
+
+	// 12. UpdateMerchantStatus: Admin suspending merchant -> ALLOWED
+	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "SUSPENDED", RejectionReason: "policy violation"}, infoStatus, dummyHandler)
+	if err != nil {
+		t.Errorf("expected admin suspend merchant to succeed, got: %v", err)
 	}
 }

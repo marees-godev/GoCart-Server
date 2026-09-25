@@ -89,14 +89,13 @@ func main() {
 	}
 
 	// 5. Initialize repository & service
-	merchantRepo := repository.NewMerchantRepository(db)
+	merchantRepo := repository.NewMerchantRepository(db, log)
 	merchantService := service.NewMerchantService(merchantRepo, log)
 
 	// 6. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
-
 
 	app.Use(adaptor.HTTPMiddleware(middleware.Recovery))
 	app.Use(adaptor.HTTPMiddleware(middleware.RequestID))
@@ -113,10 +112,10 @@ func main() {
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpcclient.UnaryServerInterceptor(),
-			merchantMiddleware.UnaryOwnershipInterceptor(merchantRepo),
+			merchantMiddleware.UnaryOwnershipInterceptor(merchantRepo, log),
 		),
 	)
-	merchantGRPCServer := merchantGRPC.NewMerchantGRPCServer(merchantService)
+	merchantGRPCServer := merchantGRPC.NewMerchantGRPCServer(merchantService, log)
 	merchantpb.RegisterMerchantServiceServer(grpcServer, merchantGRPCServer)
 
 	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
