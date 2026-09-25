@@ -23,20 +23,20 @@ type serviceDef struct {
 }
 
 var services = []serviceDef{
-	{Name: "auth", Aliases: []string{"auth", "auth-service"}, ServiceDir: "auth-service", EnvKey: "AUTH_DATABASE_URL", MigrationsPath: "services/auth-service/migrations"},
-	{Name: "user", Aliases: []string{"user", "users", "user-service"}, ServiceDir: "user-service", EnvKey: "USERS_DATABASE_URL", MigrationsPath: "services/user-service/migrations"},
-	{Name: "merchant", Aliases: []string{"merchant", "merchants", "merchant-service"}, ServiceDir: "merchant-service", EnvKey: "MERCHANT_DATABASE_URL", MigrationsPath: "services/merchant-service/migrations"},
-	{Name: "store", Aliases: []string{"store", "stores", "store-service"}, ServiceDir: "store-service", EnvKey: "STORE_DATABASE_URL", MigrationsPath: "services/store-service/migrations"},
-	{Name: "category", Aliases: []string{"category", "categories", "category-service"}, ServiceDir: "category-service", EnvKey: "CATEGORY_DATABASE_URL", MigrationsPath: "services/category-service/migrations"},
-	{Name: "product", Aliases: []string{"product", "products", "product-service"}, ServiceDir: "product-service", EnvKey: "PRODUCTS_DATABASE_URL", MigrationsPath: "services/product-service/migrations"},
-	{Name: "inventory", Aliases: []string{"inventory", "inventories", "inventory-service"}, ServiceDir: "inventory-service", EnvKey: "INVENTORY_DATABASE_URL", MigrationsPath: "services/inventory-service/migrations"},
-	{Name: "cart", Aliases: []string{"cart", "carts", "cart-service"}, ServiceDir: "cart-service", EnvKey: "CART_DATABASE_URL", MigrationsPath: "services/cart-service/migrations"},
-	{Name: "order", Aliases: []string{"order", "orders", "order-service"}, ServiceDir: "order-service", EnvKey: "ORDERS_DATABASE_URL", MigrationsPath: "services/order-service/migrations"},
-	{Name: "payment", Aliases: []string{"payment", "payments", "payment-service"}, ServiceDir: "payment-service", EnvKey: "PAYMENTS_DATABASE_URL", MigrationsPath: "services/payment-service/migrations"},
-	{Name: "delivery", Aliases: []string{"delivery", "deliveries", "delivery-service"}, ServiceDir: "delivery-service", EnvKey: "DELIVERY_DATABASE_URL", MigrationsPath: "services/delivery-service/migrations"},
-	{Name: "return", Aliases: []string{"return", "returns", "return-service"}, ServiceDir: "return-service", EnvKey: "RETURNS_DATABASE_URL", MigrationsPath: "services/return-service/migrations"},
-	{Name: "rating", Aliases: []string{"rating", "ratings", "rating-service"}, ServiceDir: "rating-service", EnvKey: "RATINGS_DATABASE_URL", MigrationsPath: "services/rating-service/migrations"},
-	{Name: "notification", Aliases: []string{"notification", "notifications", "notification-service"}, ServiceDir: "notification-service", EnvKey: "NOTIFICATIONS_DATABASE_URL", MigrationsPath: "services/notification-service/migrations"},
+	{Name: "auth", Aliases: []string{"auth", "auth-service"}, ServiceDir: "auth-service", EnvKey: "AUTH_SERVICE_DATABASE_URL", MigrationsPath: "services/auth-service/migrations"},
+	{Name: "user", Aliases: []string{"user", "users", "user-service"}, ServiceDir: "user-service", EnvKey: "USER_SERVICE_DATABASE_URL", MigrationsPath: "services/user-service/migrations"},
+	{Name: "merchant", Aliases: []string{"merchant", "merchants", "merchant-service"}, ServiceDir: "merchant-service", EnvKey: "MERCHANT_SERVICE_DATABASE_URL", MigrationsPath: "services/merchant-service/migrations"},
+	{Name: "store", Aliases: []string{"store", "stores", "store-service"}, ServiceDir: "store-service", EnvKey: "STORE_SERVICE_DATABASE_URL", MigrationsPath: "services/store-service/migrations"},
+	{Name: "category", Aliases: []string{"category", "categories", "category-service"}, ServiceDir: "category-service", EnvKey: "CATEGORY_SERVICE_DATABASE_URL", MigrationsPath: "services/category-service/migrations"},
+	{Name: "product", Aliases: []string{"product", "products", "product-service"}, ServiceDir: "product-service", EnvKey: "PRODUCT_SERVICE_DATABASE_URL", MigrationsPath: "services/product-service/migrations"},
+	{Name: "inventory", Aliases: []string{"inventory", "inventories", "inventory-service"}, ServiceDir: "inventory-service", EnvKey: "INVENTORY_SERVICE_DATABASE_URL", MigrationsPath: "services/inventory-service/migrations"},
+	{Name: "cart", Aliases: []string{"cart", "carts", "cart-service"}, ServiceDir: "cart-service", EnvKey: "CART_SERVICE_DATABASE_URL", MigrationsPath: "services/cart-service/migrations"},
+	{Name: "order", Aliases: []string{"order", "orders", "order-service"}, ServiceDir: "order-service", EnvKey: "ORDER_SERVICE_DATABASE_URL", MigrationsPath: "services/order-service/migrations"},
+	{Name: "payment", Aliases: []string{"payment", "payments", "payment-service"}, ServiceDir: "payment-service", EnvKey: "PAYMENT_SERVICE_DATABASE_URL", MigrationsPath: "services/payment-service/migrations"},
+	{Name: "delivery", Aliases: []string{"delivery", "deliveries", "delivery-service"}, ServiceDir: "delivery-service", EnvKey: "DELIVERY_SERVICE_DATABASE_URL", MigrationsPath: "services/delivery-service/migrations"},
+	{Name: "return", Aliases: []string{"return", "returns", "return-service"}, ServiceDir: "return-service", EnvKey: "RETURN_SERVICE_DATABASE_URL", MigrationsPath: "services/return-service/migrations"},
+	{Name: "rating", Aliases: []string{"rating", "ratings", "rating-service"}, ServiceDir: "rating-service", EnvKey: "RATINGS_SERVICE_DATABASE_URL", MigrationsPath: "services/rating-service/migrations"},
+	{Name: "notification", Aliases: []string{"notification", "notifications", "notification-service"}, ServiceDir: "notification-service", EnvKey: "NOTIFICATIONS_SERVICE_DATABASE_URL", MigrationsPath: "services/notification-service/migrations"},
 }
 
 func main() {
@@ -87,13 +87,7 @@ func main() {
 	for _, target := range targets {
 		fmt.Printf("\n=== %s Service: %s ===\n", strings.ToUpper(action), strings.ToUpper(target.Name))
 
-		dbURL := os.Getenv(target.EnvKey)
-		if dbURL == "" {
-			envPath := filepath.Join("services", target.ServiceDir, ".env")
-			if envMap, err := godotenv.Read(envPath); err == nil {
-				dbURL = envMap["DATABASE_URL"]
-			}
-		}
+		dbURL := getServiceDatabaseURL(target)
 
 		if dbURL == "" {
 			slog.Error("Missing database URL", "service", target.Name)
@@ -159,4 +153,32 @@ func matchesService(s serviceDef, input string) bool {
 		}
 	}
 	return false
+}
+
+func getServiceDatabaseURL(target serviceDef) string {
+	keysToTry := []string{target.EnvKey}
+	legacyKey := strings.Replace(target.EnvKey, "_SERVICE_DATABASE_URL", "_DATABASE_URL", 1)
+	if legacyKey != target.EnvKey {
+		keysToTry = append(keysToTry, legacyKey)
+	}
+
+	for _, k := range keysToTry {
+		if val := os.Getenv(k); val != "" {
+			return val
+		}
+	}
+
+	envPath := filepath.Join("services", target.ServiceDir, ".env")
+	if envMap, err := godotenv.Read(envPath); err == nil {
+		for _, k := range keysToTry {
+			if val := envMap[k]; val != "" {
+				return val
+			}
+		}
+		if val := envMap["DATABASE_URL"]; val != "" {
+			return val
+		}
+	}
+
+	return ""
 }

@@ -82,11 +82,12 @@ type ComplexityRoot struct {
 	}
 
 	BankAccount struct {
-		AccountHolderName func(childComplexity int) int
-		AccountNumber     func(childComplexity int) int
-		BankName          func(childComplexity int) int
-		RoutingNumber     func(childComplexity int) int
-		TaxID             func(childComplexity int) int
+		AccountHolderName    func(childComplexity int) int
+		AccountNumber        func(childComplexity int) int
+		BankName             func(childComplexity int) int
+		BusinessRegistration func(childComplexity int) int
+		Gstin                func(childComplexity int) int
+		RoutingNumber        func(childComplexity int) int
 	}
 
 	Cart struct {
@@ -151,8 +152,10 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddRating               func(childComplexity int, input model.AddRatingInput) int
 		AddToCart               func(childComplexity int, input model.AddToCartInput) int
+		AppealStore             func(childComplexity int, id string, reason string) int
 		ApproveStore            func(childComplexity int, id string) int
 		ClearCart               func(childComplexity int, userID string) int
+		CloseStore              func(childComplexity int, id string, reason *string) int
 		CreateCategory          func(childComplexity int, input model.CreateCategoryInput) int
 		CreateDelivery          func(childComplexity int, input model.CreateDeliveryInput) int
 		CreateOrder             func(childComplexity int, input model.CreateOrderInput) int
@@ -169,6 +172,7 @@ type ComplexityRoot struct {
 		GenerateStoreUploadURL  func(childComplexity int, input model.GenerateStoreUploadURLInput) int
 		Login                   func(childComplexity int, input model.LoginInput) int
 		ProcessPayment          func(childComplexity int, input model.ProcessPaymentInput) int
+		PublishStore            func(childComplexity int, id string) int
 		ReactivateAccount       func(childComplexity int) int
 		Register                func(childComplexity int, input model.RegisterInput) int
 		RejectStore             func(childComplexity int, id string, reason string) int
@@ -179,7 +183,11 @@ type ComplexityRoot struct {
 		ReserveStock            func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
 		SendNotification        func(childComplexity int, input model.SendNotificationInput) int
 		SetDefaultUserAddress   func(childComplexity int, id string) int
+		SubmitKyc               func(childComplexity int, input model.SubmitKYCInput) int
 		SubmitStore             func(childComplexity int, id string) int
+		SuspendStore            func(childComplexity int, id string, reason string) int
+		UnpublishStore          func(childComplexity int, id string) int
+		UnsuspendStore          func(childComplexity int, id string, reason *string) int
 		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
 		UpdateMerchant          func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
 		UpdateMerchantStatus    func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
@@ -287,6 +295,7 @@ type ComplexityRoot struct {
 		ReturnOrder          func(childComplexity int, id string) int
 		Stock                func(childComplexity int, productID string) int
 		Store                func(childComplexity int, id string) int
+		StoreAppeals         func(childComplexity int, storeID string) int
 		Stores               func(childComplexity int, merchantID *string, limit *int, offset *int) int
 		User                 func(childComplexity int, id string) int
 		UserAddress          func(childComplexity int, id string) int
@@ -331,23 +340,38 @@ type ComplexityRoot struct {
 	}
 
 	Store struct {
-		Address            func(childComplexity int) int
-		ApprovalStatus     func(childComplexity int) int
-		AvgStoreRating     func(childComplexity int) int
-		BankAccount        func(childComplexity int) int
-		BankAccountDetails func(childComplexity int) int
-		BusinessEmail      func(childComplexity int) int
-		BusinessPhone      func(childComplexity int) int
-		CreatedAt          func(childComplexity int) int
-		Description        func(childComplexity int) int
-		ID                 func(childComplexity int) int
-		IsVacationMode     func(childComplexity int) int
-		LogoURL            func(childComplexity int) int
-		MerchantID         func(childComplexity int) int
-		Name               func(childComplexity int) int
-		RejectionReason    func(childComplexity int) int
-		Slug               func(childComplexity int) int
-		UpdatedAt          func(childComplexity int) int
+		Address              func(childComplexity int) int
+		ApprovalStatus       func(childComplexity int) int
+		AvgStoreRating       func(childComplexity int) int
+		BankAccount          func(childComplexity int) int
+		BusinessEmail        func(childComplexity int) int
+		BusinessPhone        func(childComplexity int) int
+		BusinessRegistration func(childComplexity int) int
+		CreatedAt            func(childComplexity int) int
+		Description          func(childComplexity int) int
+		Gstin                func(childComplexity int) int
+		ID                   func(childComplexity int) int
+		IsPublished          func(childComplexity int) int
+		IsVacationMode       func(childComplexity int) int
+		KycStatus            func(childComplexity int) int
+		LogoURL              func(childComplexity int) int
+		MerchantID           func(childComplexity int) int
+		Name                 func(childComplexity int) int
+		RejectionReason      func(childComplexity int) int
+		Slug                 func(childComplexity int) int
+		UpdatedAt            func(childComplexity int) int
+	}
+
+	StoreAppeal struct {
+		AdminComment func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		ID           func(childComplexity int) int
+		MerchantID   func(childComplexity int) int
+		Reason       func(childComplexity int) int
+		ReviewedAt   func(childComplexity int) int
+		Status       func(childComplexity int) int
+		StoreID      func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
 	}
 
 	StoreList struct {
@@ -415,6 +439,13 @@ type MutationResolver interface {
 	SubmitStore(ctx context.Context, id string) (*model.Store, error)
 	ApproveStore(ctx context.Context, id string) (*model.Store, error)
 	RejectStore(ctx context.Context, id string, reason string) (*model.Store, error)
+	SubmitKyc(ctx context.Context, input model.SubmitKYCInput) (*model.Store, error)
+	PublishStore(ctx context.Context, id string) (*model.Store, error)
+	UnpublishStore(ctx context.Context, id string) (*model.Store, error)
+	SuspendStore(ctx context.Context, id string, reason string) (*model.Store, error)
+	UnsuspendStore(ctx context.Context, id string, reason *string) (*model.Store, error)
+	AppealStore(ctx context.Context, id string, reason string) (*model.StoreAppeal, error)
+	CloseStore(ctx context.Context, id string, reason *string) (*model.Store, error)
 	UpdateUser(ctx context.Context, id string, input model.UpdateUserInput) (*model.User, error)
 	DeactivateAccount(ctx context.Context, input *model.DeactivateAccountInput) (*model.AccountActionResponse, error)
 	ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error)
@@ -447,6 +478,7 @@ type QueryResolver interface {
 	Store(ctx context.Context, id string) (*model.Store, error)
 	MyStore(ctx context.Context) (*model.Store, error)
 	Stores(ctx context.Context, merchantID *string, limit *int, offset *int) (*model.StoreList, error)
+	StoreAppeals(ctx context.Context, storeID string) ([]*model.StoreAppeal, error)
 	Me(ctx context.Context) (*model.User, error)
 	User(ctx context.Context, id string) (*model.User, error)
 	UserAddresses(ctx context.Context, userID string) ([]*model.Address, error)
@@ -668,19 +700,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.BankAccount.BankName(childComplexity), true
 
+	case "BankAccount.businessRegistration":
+		if e.complexity.BankAccount.BusinessRegistration == nil {
+			break
+		}
+
+		return e.complexity.BankAccount.BusinessRegistration(childComplexity), true
+
+	case "BankAccount.gstin":
+		if e.complexity.BankAccount.Gstin == nil {
+			break
+		}
+
+		return e.complexity.BankAccount.Gstin(childComplexity), true
+
 	case "BankAccount.routingNumber":
 		if e.complexity.BankAccount.RoutingNumber == nil {
 			break
 		}
 
 		return e.complexity.BankAccount.RoutingNumber(childComplexity), true
-
-	case "BankAccount.taxId":
-		if e.complexity.BankAccount.TaxID == nil {
-			break
-		}
-
-		return e.complexity.BankAccount.TaxID(childComplexity), true
 
 	case "Cart.id":
 		if e.complexity.Cart.ID == nil {
@@ -972,6 +1011,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AddToCart(childComplexity, args["input"].(model.AddToCartInput)), true
 
+	case "Mutation.appealStore":
+		if e.complexity.Mutation.AppealStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_appealStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AppealStore(childComplexity, args["id"].(string), args["reason"].(string)), true
+
 	case "Mutation.approveStore":
 		if e.complexity.Mutation.ApproveStore == nil {
 			break
@@ -995,6 +1046,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.ClearCart(childComplexity, args["userId"].(string)), true
+
+	case "Mutation.closeStore":
+		if e.complexity.Mutation.CloseStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_closeStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CloseStore(childComplexity, args["id"].(string), args["reason"].(*string)), true
 
 	case "Mutation.createCategory":
 		if e.complexity.Mutation.CreateCategory == nil {
@@ -1183,6 +1246,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ProcessPayment(childComplexity, args["input"].(model.ProcessPaymentInput)), true
 
+	case "Mutation.publishStore":
+		if e.complexity.Mutation.PublishStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_publishStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.PublishStore(childComplexity, args["id"].(string)), true
+
 	case "Mutation.reactivateAccount":
 		if e.complexity.Mutation.ReactivateAccount == nil {
 			break
@@ -1298,6 +1373,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.SetDefaultUserAddress(childComplexity, args["id"].(string)), true
 
+	case "Mutation.submitKYC":
+		if e.complexity.Mutation.SubmitKyc == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_submitKYC_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SubmitKyc(childComplexity, args["input"].(model.SubmitKYCInput)), true
+
 	case "Mutation.submitStore":
 		if e.complexity.Mutation.SubmitStore == nil {
 			break
@@ -1309,6 +1396,42 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.SubmitStore(childComplexity, args["id"].(string)), true
+
+	case "Mutation.suspendStore":
+		if e.complexity.Mutation.SuspendStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_suspendStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SuspendStore(childComplexity, args["id"].(string), args["reason"].(string)), true
+
+	case "Mutation.unpublishStore":
+		if e.complexity.Mutation.UnpublishStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unpublishStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnpublishStore(childComplexity, args["id"].(string)), true
+
+	case "Mutation.unsuspendStore":
+		if e.complexity.Mutation.UnsuspendStore == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unsuspendStore_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnsuspendStore(childComplexity, args["id"].(string), args["reason"].(*string)), true
 
 	case "Mutation.updateDeliveryStatus":
 		if e.complexity.Mutation.UpdateDeliveryStatus == nil {
@@ -1994,6 +2117,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Store(childComplexity, args["id"].(string)), true
 
+	case "Query.storeAppeals":
+		if e.complexity.Query.StoreAppeals == nil {
+			break
+		}
+
+		args, err := ec.field_Query_storeAppeals_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.StoreAppeals(childComplexity, args["storeId"].(string)), true
+
 	case "Query.stores":
 		if e.complexity.Query.Stores == nil {
 			break
@@ -2224,13 +2359,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Store.BankAccount(childComplexity), true
 
-	case "Store.bankAccountDetails":
-		if e.complexity.Store.BankAccountDetails == nil {
-			break
-		}
-
-		return e.complexity.Store.BankAccountDetails(childComplexity), true
-
 	case "Store.businessEmail":
 		if e.complexity.Store.BusinessEmail == nil {
 			break
@@ -2244,6 +2372,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Store.BusinessPhone(childComplexity), true
+
+	case "Store.businessRegistration":
+		if e.complexity.Store.BusinessRegistration == nil {
+			break
+		}
+
+		return e.complexity.Store.BusinessRegistration(childComplexity), true
 
 	case "Store.createdAt":
 		if e.complexity.Store.CreatedAt == nil {
@@ -2259,6 +2394,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Store.Description(childComplexity), true
 
+	case "Store.gstin":
+		if e.complexity.Store.Gstin == nil {
+			break
+		}
+
+		return e.complexity.Store.Gstin(childComplexity), true
+
 	case "Store.id":
 		if e.complexity.Store.ID == nil {
 			break
@@ -2266,12 +2408,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Store.ID(childComplexity), true
 
+	case "Store.isPublished":
+		if e.complexity.Store.IsPublished == nil {
+			break
+		}
+
+		return e.complexity.Store.IsPublished(childComplexity), true
+
 	case "Store.isVacationMode":
 		if e.complexity.Store.IsVacationMode == nil {
 			break
 		}
 
 		return e.complexity.Store.IsVacationMode(childComplexity), true
+
+	case "Store.kycStatus":
+		if e.complexity.Store.KycStatus == nil {
+			break
+		}
+
+		return e.complexity.Store.KycStatus(childComplexity), true
 
 	case "Store.logoUrl":
 		if e.complexity.Store.LogoURL == nil {
@@ -2314,6 +2470,69 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Store.UpdatedAt(childComplexity), true
+
+	case "StoreAppeal.adminComment":
+		if e.complexity.StoreAppeal.AdminComment == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.AdminComment(childComplexity), true
+
+	case "StoreAppeal.createdAt":
+		if e.complexity.StoreAppeal.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.CreatedAt(childComplexity), true
+
+	case "StoreAppeal.id":
+		if e.complexity.StoreAppeal.ID == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.ID(childComplexity), true
+
+	case "StoreAppeal.merchantId":
+		if e.complexity.StoreAppeal.MerchantID == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.MerchantID(childComplexity), true
+
+	case "StoreAppeal.reason":
+		if e.complexity.StoreAppeal.Reason == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.Reason(childComplexity), true
+
+	case "StoreAppeal.reviewedAt":
+		if e.complexity.StoreAppeal.ReviewedAt == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.ReviewedAt(childComplexity), true
+
+	case "StoreAppeal.status":
+		if e.complexity.StoreAppeal.Status == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.Status(childComplexity), true
+
+	case "StoreAppeal.storeId":
+		if e.complexity.StoreAppeal.StoreID == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.StoreID(childComplexity), true
+
+	case "StoreAppeal.updatedAt":
+		if e.complexity.StoreAppeal.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.StoreAppeal.UpdatedAt(childComplexity), true
 
 	case "StoreList.stores":
 		if e.complexity.StoreList.Stores == nil {
@@ -2481,6 +2700,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputRequestReturnInput,
 		ec.unmarshalInputReservationItemInput,
 		ec.unmarshalInputSendNotificationInput,
+		ec.unmarshalInputSubmitKYCInput,
 		ec.unmarshalInputUpdateAddressInput,
 		ec.unmarshalInputUpdateMerchantInput,
 		ec.unmarshalInputUpdateProductInput,
@@ -3000,6 +3220,7 @@ extend type Mutation {
   store(id: ID!): Store
   myStore: Store @auth(requires: [MERCHANT])
   stores(merchantId: ID, limit: Int, offset: Int): StoreList!
+  storeAppeals(storeId: ID!): [StoreAppeal!]! @auth(requires: [MERCHANT, ADMIN])
 }
 
 extend type Mutation {
@@ -3009,6 +3230,25 @@ extend type Mutation {
   submitStore(id: ID!): Store! @auth(requires: [MERCHANT])
   approveStore(id: ID!): Store! @auth(requires: [ADMIN])
   rejectStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  submitKYC(input: SubmitKYCInput!): Store! @auth(requires: [MERCHANT])
+  publishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  unpublishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  suspendStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  unsuspendStore(id: ID!, reason: String): Store! @auth(requires: [ADMIN])
+  appealStore(id: ID!, reason: String!): StoreAppeal! @auth(requires: [MERCHANT])
+  closeStore(id: ID!, reason: String): Store! @auth(requires: [MERCHANT, ADMIN])
+}
+
+type StoreAppeal {
+  id: ID!
+  storeId: ID!
+  merchantId: ID!
+  reason: String!
+  status: String!
+  adminComment: String
+  reviewedAt: String
+  createdAt: String!
+  updatedAt: String!
 }
 
 type BankAccount {
@@ -3016,7 +3256,8 @@ type BankAccount {
   bankName: String
   accountNumber: String
   routingNumber: String
-  taxId: String
+  businessRegistration: String
+  gstin: String
 }
 
 type Store {
@@ -3032,8 +3273,11 @@ type Store {
   isVacationMode: Boolean!
   approvalStatus: String!
   rejectionReason: String
+  isPublished: Boolean!
+  kycStatus: String
+  businessRegistration: String
+  gstin: String
   bankAccount: BankAccount
-  bankAccountDetails: String
   avgStoreRating: Float!
   createdAt: String!
   updatedAt: String!
@@ -3056,7 +3300,18 @@ input BankAccountInput {
   bankName: String!
   accountNumber: String!
   routingNumber: String
-  taxId: String
+  businessRegistration: String
+  gstin: String
+}
+
+input SubmitKYCInput {
+  storeId: ID!
+  businessRegistration: String!
+  bankName: String!
+  accountNumber: String!
+  accountHolderName: String!
+  routingNumber: String
+  gstin: String!
 }
 
 input GenerateStoreUploadUrlInput {
@@ -3075,7 +3330,6 @@ input CreateStoreInput {
   logoUrl: String
   address: String
   bankAccount: BankAccountInput
-  bankAccountDetails: String
 }
 
 input UpdateStoreInput {
@@ -3090,7 +3344,6 @@ input UpdateStoreInput {
   address: String
   isVacationMode: Boolean
   bankAccount: BankAccountInput
-  bankAccountDetails: String
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/user/user.graphql", Input: `enum Gender {
@@ -3256,6 +3509,30 @@ func (ec *executionContext) field_Mutation_addToCart_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_appealStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_approveStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -3283,6 +3560,30 @@ func (ec *executionContext) field_Mutation_clearCart_args(ctx context.Context, r
 		}
 	}
 	args["userId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_closeStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -3547,6 +3848,21 @@ func (ec *executionContext) field_Mutation_processPayment_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_publishStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_register_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -3709,6 +4025,21 @@ func (ec *executionContext) field_Mutation_setDefaultUserAddress_args(ctx contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_submitKYC_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.SubmitKYCInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNSubmitKYCInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐSubmitKYCInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_submitStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -3721,6 +4052,69 @@ func (ec *executionContext) field_Mutation_submitStore_args(ctx context.Context,
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_suspendStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unpublishStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unsuspendStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -4399,6 +4793,21 @@ func (ec *executionContext) field_Query_stock_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["productId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_storeAppeals_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["storeId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("storeId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["storeId"] = arg0
 	return args, nil
 }
 
@@ -5819,8 +6228,8 @@ func (ec *executionContext) fieldContext_BankAccount_routingNumber(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _BankAccount_taxId(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_BankAccount_taxId(ctx, field)
+func (ec *executionContext) _BankAccount_businessRegistration(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BankAccount_businessRegistration(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5833,7 +6242,7 @@ func (ec *executionContext) _BankAccount_taxId(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TaxID, nil
+		return obj.BusinessRegistration, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5847,7 +6256,48 @@ func (ec *executionContext) _BankAccount_taxId(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_BankAccount_taxId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_BankAccount_businessRegistration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BankAccount",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BankAccount_gstin(ctx context.Context, field graphql.CollectedField, obj *model.BankAccount) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BankAccount_gstin(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gstin, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BankAccount_gstin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "BankAccount",
 		Field:      field,
@@ -9930,10 +10380,16 @@ func (ec *executionContext) fieldContext_Mutation_createStore(ctx context.Contex
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -10045,10 +10501,16 @@ func (ec *executionContext) fieldContext_Mutation_updateStore(ctx context.Contex
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -10249,10 +10711,16 @@ func (ec *executionContext) fieldContext_Mutation_submitStore(ctx context.Contex
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -10364,10 +10832,16 @@ func (ec *executionContext) fieldContext_Mutation_approveStore(ctx context.Conte
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -10479,10 +10953,16 @@ func (ec *executionContext) fieldContext_Mutation_rejectStore(ctx context.Contex
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -10501,6 +10981,831 @@ func (ec *executionContext) fieldContext_Mutation_rejectStore(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_rejectStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_submitKYC(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_submitKYC(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SubmitKyc(rctx, fc.Args["input"].(model.SubmitKYCInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_submitKYC(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_submitKYC_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_publishStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_publishStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().PublishStore(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_publishStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_publishStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unpublishStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_unpublishStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UnpublishStore(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unpublishStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unpublishStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_suspendStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_suspendStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().SuspendStore(rctx, fc.Args["id"].(string), fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_suspendStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_suspendStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unsuspendStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_unsuspendStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UnsuspendStore(rctx, fc.Args["id"].(string), fc.Args["reason"].(*string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unsuspendStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unsuspendStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_appealStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_appealStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AppealStore(rctx, fc.Args["id"].(string), fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.StoreAppeal); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.StoreAppeal`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.StoreAppeal)
+	fc.Result = res
+	return ec.marshalNStoreAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppeal(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_appealStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StoreAppeal_id(ctx, field)
+			case "storeId":
+				return ec.fieldContext_StoreAppeal_storeId(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_StoreAppeal_merchantId(ctx, field)
+			case "reason":
+				return ec.fieldContext_StoreAppeal_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_StoreAppeal_status(ctx, field)
+			case "adminComment":
+				return ec.fieldContext_StoreAppeal_adminComment(ctx, field)
+			case "reviewedAt":
+				return ec.fieldContext_StoreAppeal_reviewedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_StoreAppeal_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_StoreAppeal_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StoreAppeal", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_appealStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_closeStore(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_closeStore(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CloseStore(rctx, fc.Args["id"].(string), fc.Args["reason"].(*string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT", "ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Store); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Store`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Store)
+	fc.Result = res
+	return ec.marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_closeStore(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Store_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_Store_merchantId(ctx, field)
+			case "name":
+				return ec.fieldContext_Store_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Store_slug(ctx, field)
+			case "businessEmail":
+				return ec.fieldContext_Store_businessEmail(ctx, field)
+			case "businessPhone":
+				return ec.fieldContext_Store_businessPhone(ctx, field)
+			case "description":
+				return ec.fieldContext_Store_description(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_Store_logoUrl(ctx, field)
+			case "address":
+				return ec.fieldContext_Store_address(ctx, field)
+			case "isVacationMode":
+				return ec.fieldContext_Store_isVacationMode(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_Store_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
+			case "bankAccount":
+				return ec.fieldContext_Store_bankAccount(ctx, field)
+			case "avgStoreRating":
+				return ec.fieldContext_Store_avgStoreRating(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Store_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Store_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Store", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_closeStore_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -14793,10 +16098,16 @@ func (ec *executionContext) fieldContext_Query_store(ctx context.Context, field 
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -14905,10 +16216,16 @@ func (ec *executionContext) fieldContext_Query_myStore(_ context.Context, field 
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -14977,6 +16294,105 @@ func (ec *executionContext) fieldContext_Query_stores(ctx context.Context, field
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_stores_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_storeAppeals(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_storeAppeals(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().StoreAppeals(rctx, fc.Args["storeId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT", "ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.([]*model.StoreAppeal); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be []*github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.StoreAppeal`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.StoreAppeal)
+	fc.Result = res
+	return ec.marshalNStoreAppeal2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppealᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_storeAppeals(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StoreAppeal_id(ctx, field)
+			case "storeId":
+				return ec.fieldContext_StoreAppeal_storeId(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_StoreAppeal_merchantId(ctx, field)
+			case "reason":
+				return ec.fieldContext_StoreAppeal_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_StoreAppeal_status(ctx, field)
+			case "adminComment":
+				return ec.fieldContext_StoreAppeal_adminComment(ctx, field)
+			case "reviewedAt":
+				return ec.fieldContext_StoreAppeal_reviewedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_StoreAppeal_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_StoreAppeal_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StoreAppeal", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_storeAppeals_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -16941,6 +18357,173 @@ func (ec *executionContext) fieldContext_Store_rejectionReason(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Store_isPublished(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Store_isPublished(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsPublished, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Store_isPublished(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Store",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Store_kycStatus(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Store_kycStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.KycStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Store_kycStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Store",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Store_businessRegistration(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Store_businessRegistration(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BusinessRegistration, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Store_businessRegistration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Store",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Store_gstin(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Store_gstin(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gstin, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Store_gstin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Store",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Store_bankAccount(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Store_bankAccount(ctx, field)
 	if err != nil {
@@ -16985,51 +18568,12 @@ func (ec *executionContext) fieldContext_Store_bankAccount(_ context.Context, fi
 				return ec.fieldContext_BankAccount_accountNumber(ctx, field)
 			case "routingNumber":
 				return ec.fieldContext_BankAccount_routingNumber(ctx, field)
-			case "taxId":
-				return ec.fieldContext_BankAccount_taxId(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_BankAccount_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_BankAccount_gstin(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type BankAccount", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Store_bankAccountDetails(ctx context.Context, field graphql.CollectedField, obj *model.Store) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Store_bankAccountDetails(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.BankAccountDetails, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Store_bankAccountDetails(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Store",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -17167,6 +18711,396 @@ func (ec *executionContext) fieldContext_Store_updatedAt(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _StoreAppeal_id(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_storeId(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_storeId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StoreID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_storeId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_merchantId(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_merchantId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MerchantID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_merchantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_reason(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_status(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_adminComment(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_adminComment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AdminComment, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_adminComment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_reviewedAt(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_reviewedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ReviewedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_reviewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StoreAppeal_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.StoreAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StoreAppeal_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StoreAppeal_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StoreAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _StoreList_stores(ctx context.Context, field graphql.CollectedField, obj *model.StoreList) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_StoreList_stores(ctx, field)
 	if err != nil {
@@ -17230,10 +19164,16 @@ func (ec *executionContext) fieldContext_StoreList_stores(_ context.Context, fie
 				return ec.fieldContext_Store_approvalStatus(ctx, field)
 			case "rejectionReason":
 				return ec.fieldContext_Store_rejectionReason(ctx, field)
+			case "isPublished":
+				return ec.fieldContext_Store_isPublished(ctx, field)
+			case "kycStatus":
+				return ec.fieldContext_Store_kycStatus(ctx, field)
+			case "businessRegistration":
+				return ec.fieldContext_Store_businessRegistration(ctx, field)
+			case "gstin":
+				return ec.fieldContext_Store_gstin(ctx, field)
 			case "bankAccount":
 				return ec.fieldContext_Store_bankAccount(ctx, field)
-			case "bankAccountDetails":
-				return ec.fieldContext_Store_bankAccountDetails(ctx, field)
 			case "avgStoreRating":
 				return ec.fieldContext_Store_avgStoreRating(ctx, field)
 			case "createdAt":
@@ -19923,7 +21863,7 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"accountHolderName", "bankName", "accountNumber", "routingNumber", "taxId"}
+	fieldsInOrder := [...]string{"accountHolderName", "bankName", "accountNumber", "routingNumber", "businessRegistration", "gstin"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -19958,13 +21898,20 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 				return it, err
 			}
 			it.RoutingNumber = data
-		case "taxId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("taxId"))
+		case "businessRegistration":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessRegistration"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.TaxID = data
+			it.BusinessRegistration = data
+		case "gstin":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gstin"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Gstin = data
 		}
 	}
 
@@ -20260,7 +22207,7 @@ func (ec *executionContext) unmarshalInputCreateStoreInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "slug", "businessEmail", "businessPhone", "description", "logo", "logoUrl", "address", "bankAccount", "bankAccountDetails"}
+	fieldsInOrder := [...]string{"name", "slug", "businessEmail", "businessPhone", "description", "logo", "logoUrl", "address", "bankAccount"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -20330,13 +22277,6 @@ func (ec *executionContext) unmarshalInputCreateStoreInput(ctx context.Context, 
 				return it, err
 			}
 			it.BankAccount = data
-		case "bankAccountDetails":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bankAccountDetails"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BankAccountDetails = data
 		}
 	}
 
@@ -20719,6 +22659,75 @@ func (ec *executionContext) unmarshalInputSendNotificationInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, obj interface{}) (model.SubmitKYCInput, error) {
+	var it model.SubmitKYCInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"storeId", "businessRegistration", "bankName", "accountNumber", "accountHolderName", "routingNumber", "gstin"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "storeId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("storeId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StoreID = data
+		case "businessRegistration":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("businessRegistration"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BusinessRegistration = data
+		case "bankName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bankName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BankName = data
+		case "accountNumber":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("accountNumber"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AccountNumber = data
+		case "accountHolderName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("accountHolderName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AccountHolderName = data
+		case "routingNumber":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("routingNumber"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RoutingNumber = data
+		case "gstin":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gstin"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Gstin = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateAddressInput(ctx context.Context, obj interface{}) (model.UpdateAddressInput, error) {
 	var it model.UpdateAddressInput
 	asMap := map[string]interface{}{}
@@ -20926,7 +22935,7 @@ func (ec *executionContext) unmarshalInputUpdateStoreInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "name", "slug", "businessEmail", "businessPhone", "description", "logo", "logoUrl", "address", "isVacationMode", "bankAccount", "bankAccountDetails"}
+	fieldsInOrder := [...]string{"id", "name", "slug", "businessEmail", "businessPhone", "description", "logo", "logoUrl", "address", "isVacationMode", "bankAccount"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -21010,13 +23019,6 @@ func (ec *executionContext) unmarshalInputUpdateStoreInput(ctx context.Context, 
 				return it, err
 			}
 			it.BankAccount = data
-		case "bankAccountDetails":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bankAccountDetails"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BankAccountDetails = data
 		}
 	}
 
@@ -21324,8 +23326,10 @@ func (ec *executionContext) _BankAccount(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._BankAccount_accountNumber(ctx, field, obj)
 		case "routingNumber":
 			out.Values[i] = ec._BankAccount_routingNumber(ctx, field, obj)
-		case "taxId":
-			out.Values[i] = ec._BankAccount_taxId(ctx, field, obj)
+		case "businessRegistration":
+			out.Values[i] = ec._BankAccount_businessRegistration(ctx, field, obj)
+		case "gstin":
+			out.Values[i] = ec._BankAccount_gstin(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21928,6 +23932,55 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "rejectStore":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_rejectStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "submitKYC":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_submitKYC(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_publishStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unpublishStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unpublishStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "suspendStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_suspendStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unsuspendStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unsuspendStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "appealStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_appealStore(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "closeStore":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_closeStore(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -22973,6 +25026,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "storeAppeals":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_storeAppeals(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "me":
 			field := field
 
@@ -23402,10 +25477,19 @@ func (ec *executionContext) _Store(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "rejectionReason":
 			out.Values[i] = ec._Store_rejectionReason(ctx, field, obj)
+		case "isPublished":
+			out.Values[i] = ec._Store_isPublished(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "kycStatus":
+			out.Values[i] = ec._Store_kycStatus(ctx, field, obj)
+		case "businessRegistration":
+			out.Values[i] = ec._Store_businessRegistration(ctx, field, obj)
+		case "gstin":
+			out.Values[i] = ec._Store_gstin(ctx, field, obj)
 		case "bankAccount":
 			out.Values[i] = ec._Store_bankAccount(ctx, field, obj)
-		case "bankAccountDetails":
-			out.Values[i] = ec._Store_bankAccountDetails(ctx, field, obj)
 		case "avgStoreRating":
 			out.Values[i] = ec._Store_avgStoreRating(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -23418,6 +25502,79 @@ func (ec *executionContext) _Store(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Store_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var storeAppealImplementors = []string{"StoreAppeal"}
+
+func (ec *executionContext) _StoreAppeal(ctx context.Context, sel ast.SelectionSet, obj *model.StoreAppeal) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, storeAppealImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StoreAppeal")
+		case "id":
+			out.Values[i] = ec._StoreAppeal_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "storeId":
+			out.Values[i] = ec._StoreAppeal_storeId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "merchantId":
+			out.Values[i] = ec._StoreAppeal_merchantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._StoreAppeal_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._StoreAppeal_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "adminComment":
+			out.Values[i] = ec._StoreAppeal_adminComment(ctx, field, obj)
+		case "reviewedAt":
+			out.Values[i] = ec._StoreAppeal_reviewedAt(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._StoreAppeal_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._StoreAppeal_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -24754,6 +26911,64 @@ func (ec *executionContext) marshalNStore2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoC
 	return ec._Store(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNStoreAppeal2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppeal(ctx context.Context, sel ast.SelectionSet, v model.StoreAppeal) graphql.Marshaler {
+	return ec._StoreAppeal(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNStoreAppeal2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppealᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.StoreAppeal) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStoreAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppeal(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNStoreAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreAppeal(ctx context.Context, sel ast.SelectionSet, v *model.StoreAppeal) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StoreAppeal(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNStoreList2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStoreList(ctx context.Context, sel ast.SelectionSet, v model.StoreList) graphql.Marshaler {
 	return ec._StoreList(ctx, sel, &v)
 }
@@ -24827,6 +27042,11 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalNSubmitKYCInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐSubmitKYCInput(ctx context.Context, v interface{}) (model.SubmitKYCInput, error) {
+	res, err := ec.unmarshalInputSubmitKYCInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNUpdateAddressInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateAddressInput(ctx context.Context, v interface{}) (model.UpdateAddressInput, error) {

@@ -7,6 +7,7 @@ import (
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/service"
@@ -15,15 +16,67 @@ import (
 )
 
 type mockStoreRepo struct {
-	stores map[string]*model.Store
-	slugs  map[string]string
+	stores  map[string]*model.Store
+	slugs   map[string]string
+	appeals map[string]*model.StoreAppeal
 }
 
 func newMockRepo() *mockStoreRepo {
 	return &mockStoreRepo{
-		stores: make(map[string]*model.Store),
-		slugs:  make(map[string]string),
+		stores:  make(map[string]*model.Store),
+		slugs:   make(map[string]string),
+		appeals: make(map[string]*model.StoreAppeal),
 	}
+}
+
+func (m *mockStoreRepo) CreateAppeal(ctx context.Context, appeal *model.StoreAppeal) error {
+	if appeal.ID == "" {
+		appeal.ID = "appeal-" + appeal.StoreID
+	}
+	m.appeals[appeal.ID] = appeal
+	return nil
+}
+
+func (m *mockStoreRepo) GetPendingAppealByStoreID(ctx context.Context, storeID string) (*model.StoreAppeal, error) {
+	for _, a := range m.appeals {
+		if a.StoreID == storeID && a.Status == model.AppealStatusPending {
+			cp := *a
+			return &cp, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockStoreRepo) GetAppealByID(ctx context.Context, id string) (*model.StoreAppeal, error) {
+	a, ok := m.appeals[id]
+	if !ok {
+		return nil, appErrors.NotFound("appeal not found")
+	}
+	cp := *a
+	return &cp, nil
+}
+
+func (m *mockStoreRepo) ListAppealsByStoreID(ctx context.Context, storeID string) ([]*model.StoreAppeal, error) {
+	res := make([]*model.StoreAppeal, 0)
+	for _, a := range m.appeals {
+		if a.StoreID == storeID {
+			cp := *a
+			res = append(res, &cp)
+		}
+	}
+	return res, nil
+}
+
+func (m *mockStoreRepo) UpdateAppealStatus(ctx context.Context, id string, status string, adminComment *string) (*model.StoreAppeal, error) {
+	a, ok := m.appeals[id]
+	if !ok {
+		return nil, appErrors.NotFound("appeal not found")
+	}
+	a.Status = status
+	a.AdminComment = adminComment
+	m.appeals[id] = a
+	cp := *a
+	return &cp, nil
 }
 
 func (m *mockStoreRepo) Create(ctx context.Context, s *model.Store) error {
@@ -111,6 +164,61 @@ func (m *mockStoreRepo) UpdateStatus(ctx context.Context, id string, expectedSta
 	m.stores[id] = existing
 	cp := *existing
 	return &cp, nil
+}
+
+func (m *mockStoreRepo) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string) (*model.Store, error) {
+	existing, ok := m.stores[id]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.ApprovalStatus = newStatus
+	existing.RejectionReason = rejectionReason
+	if newStatus == model.StoreStatusSuspended || newStatus == model.StoreStatusClosed {
+		existing.IsPublished = false
+	}
+	m.stores[id] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+func (m *mockStoreRepo) SubmitKYC(ctx context.Context, storeID string, kycStatus string, bankAccount *model.StoreBankAccount) (*model.Store, error) {
+	existing, ok := m.stores[storeID]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.KYCStatus = kycStatus
+	existing.BankAccount = bankAccount
+	if bankAccount != nil && bankAccount.BusinessRegistration != nil {
+		existing.BusinessRegistration = bankAccount.BusinessRegistration
+	}
+	m.stores[storeID] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+func (m *mockStoreRepo) SetPublishStatus(ctx context.Context, storeID string, isPublished bool) (*model.Store, error) {
+	existing, ok := m.stores[storeID]
+	if !ok {
+		return nil, appErrors.NotFound("store not found")
+	}
+	existing.IsPublished = isPublished
+	m.stores[storeID] = existing
+	cp := *existing
+	return &cp, nil
+}
+
+type mockGSTINClient struct{}
+
+func (m *mockGSTINClient) VerifyGSTIN(ctx context.Context, gstinStr string) (*gstin.GSTINResponse, error) {
+	return &gstin.GSTINResponse{
+		Success: true,
+		GSTIN:   gstinStr,
+		Data: &gstin.GSTINData{
+			GSTIN:       gstinStr,
+			Status:      "Active",
+			BlockStatus: "Unblocked",
+		},
+	}, nil
 }
 
 func TestGRPCHandler_CreateStore(t *testing.T) {
@@ -369,3 +477,96 @@ func TestGRPCHandler_ApproveStore_SelfApprovalDenied(t *testing.T) {
 	}
 }
 
+func TestGRPCHandler_SubmitKYC_And_Publishing(t *testing.T) {
+	repo := newMockRepo()
+	mockClient := &mockGSTINClient{}
+	svc := service.NewStoreService(repo, mockClient)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		Name:           "Approved Store",
+		Slug:           "approved-store",
+		ApprovalStatus: model.StoreStatusApproved,
+	})
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	gstinVal := "33AAACC1206D1ZN"
+	taxVal := "TAX-001"
+	// 1. Submit KYC
+	kycRes, err := h.SubmitKYC(merchantCtx, &storepb.SubmitKYCRequest{
+		StoreId:              "store-1",
+		BusinessRegistration: "REG-001",
+		TaxId:                &taxVal,
+		BankName:             "Main Bank",
+		AccountNumber:        "9876543210",
+		AccountHolderName:    "Owner Name",
+		Gstin:                &gstinVal,
+	})
+	if err != nil {
+		t.Fatalf("expected SubmitKYC success, got %v", err)
+	}
+	if kycRes.Store.KycStatus != model.KYCStatusPending {
+		t.Errorf("expected KYC status PENDING, got %s", kycRes.Store.KycStatus)
+	}
+
+	// 2. Publish Store
+	pubRes, err := h.PublishStore(merchantCtx, &storepb.PublishStoreRequest{
+		StoreId: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected PublishStore success, got %v", err)
+	}
+	if !pubRes.Store.IsPublished {
+		t.Error("expected IsPublished to be true")
+	}
+
+	// 3. Unpublish Store
+	unpubRes, err := h.UnpublishStore(merchantCtx, &storepb.UnpublishStoreRequest{
+		StoreId: "store-1",
+	})
+	if err != nil {
+		t.Fatalf("expected UnpublishStore success, got %v", err)
+	}
+	if unpubRes.Store.IsPublished {
+		t.Error("expected IsPublished to be false")
+	}
+}
+
+func TestGRPCHandler_SuspendStore(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo)
+	h := handler.NewStoreGRPCHandler(svc)
+
+	_ = repo.Create(context.Background(), &model.Store{
+		ID:             "store-1",
+		MerchantID:     "merchant-1",
+		ApprovalStatus: model.StoreStatusApproved,
+		IsPublished:    true,
+	})
+
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   auth.RoleAdmin,
+	})
+
+	susRes, err := h.SuspendStore(adminCtx, &storepb.SuspendStoreRequest{
+		StoreId: "store-1",
+		Reason:  "Fraudulent activity detected",
+	})
+	if err != nil {
+		t.Fatalf("expected SuspendStore success, got %v", err)
+	}
+
+	if susRes.Store.ApprovalStatus != model.StoreStatusSuspended {
+		t.Errorf("expected status %s, got %s", model.StoreStatusSuspended, susRes.Store.ApprovalStatus)
+	}
+	if susRes.Store.IsPublished {
+		t.Error("expected IsPublished to be false after suspension")
+	}
+}

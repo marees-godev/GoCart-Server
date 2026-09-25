@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -15,6 +16,7 @@ type Config struct {
 	Logger   LoggerConfig
 	Tracing  TracingConfig
 	Storage  StorageConfig
+	GSTIN    GSTINConfig
 }
 
 type AppConfig struct {
@@ -59,11 +61,20 @@ type StorageConfig struct {
 	PublicURLPrefix string
 }
 
+type GSTINConfig struct {
+	APIKey  string
+	BaseURL string
+	Enabled bool
+	Timeout time.Duration
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("services/store-service/.env")
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
+
+	timeoutSec := GetEnvAsInt("GSTIN_API_TIMEOUT_SECONDS", 10)
 
 	return &Config{
 		App: AppConfig{
@@ -100,6 +111,12 @@ func LoadEnv() *Config {
 			SecretAccessKey: GetEnv("STORE_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
 			Bucket:          GetEnv("STORE_S3_BUCKET", GetEnv("S3_BUCKET", "stores")),
 			PublicURLPrefix: GetEnv("STORE_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
+		},
+		GSTIN: GSTINConfig{
+			APIKey:  GetEnv("GSTIN_API_KEY", ""),
+			BaseURL: GetEnv("GSTIN_API_BASE_URL", "https://www.gstinapi.in/v1"),
+			Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", true),
+			Timeout: time.Duration(timeoutSec) * time.Second,
 		},
 	}
 }

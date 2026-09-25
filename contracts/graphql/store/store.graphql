@@ -2,6 +2,7 @@ extend type Query {
   store(id: ID!): Store
   myStore: Store @auth(requires: [MERCHANT])
   stores(merchantId: ID, limit: Int, offset: Int): StoreList!
+  storeAppeals(storeId: ID!): [StoreAppeal!]! @auth(requires: [MERCHANT, ADMIN])
 }
 
 extend type Mutation {
@@ -11,6 +12,25 @@ extend type Mutation {
   submitStore(id: ID!): Store! @auth(requires: [MERCHANT])
   approveStore(id: ID!): Store! @auth(requires: [ADMIN])
   rejectStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  submitKYC(input: SubmitKYCInput!): Store! @auth(requires: [MERCHANT])
+  publishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  unpublishStore(id: ID!): Store! @auth(requires: [MERCHANT])
+  suspendStore(id: ID!, reason: String!): Store! @auth(requires: [ADMIN])
+  unsuspendStore(id: ID!, reason: String): Store! @auth(requires: [ADMIN])
+  appealStore(id: ID!, reason: String!): StoreAppeal! @auth(requires: [MERCHANT])
+  closeStore(id: ID!, reason: String): Store! @auth(requires: [MERCHANT, ADMIN])
+}
+
+type StoreAppeal {
+  id: ID!
+  storeId: ID!
+  merchantId: ID!
+  reason: String!
+  status: String!
+  adminComment: String
+  reviewedAt: String
+  createdAt: String!
+  updatedAt: String!
 }
 
 type BankAccount {
@@ -18,7 +38,8 @@ type BankAccount {
   bankName: String
   accountNumber: String
   routingNumber: String
-  taxId: String
+  businessRegistration: String
+  gstin: String
 }
 
 type Store {
@@ -34,8 +55,11 @@ type Store {
   isVacationMode: Boolean!
   approvalStatus: String!
   rejectionReason: String
+  isPublished: Boolean!
+  kycStatus: String
+  businessRegistration: String
+  gstin: String
   bankAccount: BankAccount
-  bankAccountDetails: String
   avgStoreRating: Float!
   createdAt: String!
   updatedAt: String!
@@ -58,7 +82,18 @@ input BankAccountInput {
   bankName: String!
   accountNumber: String!
   routingNumber: String
-  taxId: String
+  businessRegistration: String
+  gstin: String
+}
+
+input SubmitKYCInput {
+  storeId: ID!
+  businessRegistration: String!
+  bankName: String!
+  accountNumber: String!
+  accountHolderName: String!
+  routingNumber: String
+  gstin: String!
 }
 
 input GenerateStoreUploadUrlInput {
@@ -77,7 +112,6 @@ input CreateStoreInput {
   logoUrl: String
   address: String
   bankAccount: BankAccountInput
-  bankAccountDetails: String
 }
 
 input UpdateStoreInput {
@@ -92,5 +126,4 @@ input UpdateStoreInput {
   address: String
   isVacationMode: Boolean
   bankAccount: BankAccountInput
-  bankAccountDetails: String
 }

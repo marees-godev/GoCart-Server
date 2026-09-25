@@ -1,0 +1,12 @@
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'store_kyc_status') THEN
+        CREATE TYPE store_kyc_status AS ENUM ('NOT_SUBMITTED', 'PENDING', 'VERIFIED', 'REJECTED');
+    END IF;
+END $$;
+
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS kyc_status store_kyc_status NOT NULL DEFAULT 'NOT_SUBMITTED';
+ALTER TABLE store_bank_accounts ADD COLUMN IF NOT EXISTS business_registration VARCHAR(100);
+ALTER TABLE store_bank_accounts ADD COLUMN IF NOT EXISTS gstin VARCHAR(15);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS gstin VARCHAR(15);
+

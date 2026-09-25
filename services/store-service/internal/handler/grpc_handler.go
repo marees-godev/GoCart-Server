@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"log/slog"
 
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/service"
 	"google.golang.org/grpc/codes"
@@ -15,11 +17,17 @@ import (
 type StoreGRPCHandler struct {
 	storepb.UnimplementedStoreServiceServer
 	storeService service.StoreService
+	logger       *slog.Logger
 }
 
-func NewStoreGRPCHandler(storeService service.StoreService) *StoreGRPCHandler {
+func NewStoreGRPCHandler(storeService service.StoreService, log ...*slog.Logger) *StoreGRPCHandler {
+	var l *slog.Logger
+	if len(log) > 0 {
+		l = log[0]
+	}
 	return &StoreGRPCHandler{
 		storeService: storeService,
+		logger:       l,
 	}
 }
 
@@ -238,6 +246,210 @@ func (h *StoreGRPCHandler) RejectStore(ctx context.Context, req *storepb.RejectS
 	}
 
 	return &storepb.RejectStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) SubmitKYC(ctx context.Context, req *storepb.SubmitKYCRequest) (*storepb.SubmitKYCResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	var routing *string
+	if req.RoutingNumber != nil {
+		routing = req.RoutingNumber
+	}
+
+	var gstin *string
+	if req.Gstin != nil {
+		gstin = req.Gstin
+	}
+
+	kycReq := dto.SubmitKYCRequest{
+		StoreID:              req.StoreId,
+		MerchantID:           merchantID,
+		BusinessRegistration: req.BusinessRegistration,
+		TaxID:                req.TaxId,
+		BankName:             req.BankName,
+		AccountNumber:        req.AccountNumber,
+		AccountHolderName:    req.AccountHolderName,
+		RoutingNumber:        routing,
+		GSTIN:                gstin,
+	}
+
+	store, err := h.storeService.SubmitKYC(ctx, merchantID, kycReq)
+	if err != nil {
+		logger.FromContext(ctx).Error("SubmitKYC failed in store service", "error", err)
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.SubmitKYCResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) PublishStore(ctx context.Context, req *storepb.PublishStoreRequest) (*storepb.PublishStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	pubReq := dto.PublishStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: merchantID,
+	}
+
+	store, err := h.storeService.PublishStore(ctx, merchantID, pubReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.PublishStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) UnpublishStore(ctx context.Context, req *storepb.UnpublishStoreRequest) (*storepb.UnpublishStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	unpubReq := dto.UnpublishStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: merchantID,
+	}
+
+	store, err := h.storeService.UnpublishStore(ctx, merchantID, unpubReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.UnpublishStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) SuspendStore(ctx context.Context, req *storepb.SuspendStoreRequest) (*storepb.SuspendStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	suspendReq := dto.SuspendStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+		Reason:  req.Reason,
+	}
+
+	store, err := h.storeService.SuspendStore(ctx, adminID, suspendReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.SuspendStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) UnsuspendStore(ctx context.Context, req *storepb.UnsuspendStoreRequest) (*storepb.UnsuspendStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	adminID := extractAdminID(ctx, req.AdminId)
+
+	var reason string
+	if req.Reason != nil {
+		reason = *req.Reason
+	}
+
+	unsuspendReq := dto.UnsuspendStoreRequest{
+		StoreID: req.StoreId,
+		AdminID: adminID,
+		Reason:  reason,
+	}
+
+	store, err := h.storeService.UnsuspendStore(ctx, adminID, unsuspendReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.UnsuspendStoreResponse{
+		Store: dto.ToStorePB(store),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) AppealStore(ctx context.Context, req *storepb.AppealStoreRequest) (*storepb.AppealStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	merchantID := extractMerchantID(ctx, req.MerchantId)
+
+	appealReq := dto.AppealStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: merchantID,
+		Reason:     req.Reason,
+	}
+
+	store, appeal, err := h.storeService.AppealStore(ctx, merchantID, appealReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.AppealStoreResponse{
+		Store:  dto.ToStorePB(store),
+		Appeal: dto.ToStoreAppealPB(appeal),
+	}, nil
+}
+
+func (h *StoreGRPCHandler) GetStoreAppeals(ctx context.Context, req *storepb.GetStoreAppealsRequest) (*storepb.GetStoreAppealsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	userID := extractMerchantID(ctx, "")
+
+	appeals, err := h.storeService.GetStoreAppeals(ctx, userID, req.StoreId)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	pbAppeals := make([]*storepb.StoreAppeal, 0, len(appeals))
+	for _, a := range appeals {
+		pbAppeals = append(pbAppeals, dto.ToStoreAppealPB(a))
+	}
+
+	return &storepb.GetStoreAppealsResponse{
+		Appeals: pbAppeals,
+	}, nil
+}
+
+func (h *StoreGRPCHandler) CloseStore(ctx context.Context, req *storepb.CloseStoreRequest) (*storepb.CloseStoreResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	userID := extractMerchantID(ctx, req.MerchantId)
+
+	closeReq := dto.CloseStoreRequest{
+		StoreID:    req.StoreId,
+		MerchantID: userID,
+		Reason:     req.Reason,
+	}
+
+	store, err := h.storeService.CloseStore(ctx, userID, closeReq)
+	if err != nil {
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &storepb.CloseStoreResponse{
 		Store: dto.ToStorePB(store),
 	}, nil
 }

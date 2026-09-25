@@ -247,7 +247,11 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			ctx = tracing.ExtractMessageContext(ctx, tracingHeaders)
 		}
 
-		return handler(ctx, req)
+		resp, err := handler(ctx, req)
+		if err != nil {
+			logger.FromContext(ctx).Error("gRPC server handler error", "method", info.FullMethod, "error", err)
+		}
+		return resp, err
 	}
 }
 

@@ -11,6 +11,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
+	"github.com/marees-godev/GoCart-Server/services/store-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/repository"
@@ -28,21 +30,39 @@ type StoreService interface {
 	SubmitStore(ctx context.Context, authMerchantID string, req dto.SubmitStoreRequest) (*model.Store, error)
 	ApproveStore(ctx context.Context, authAdminID string, req dto.ApproveStoreRequest) (*model.Store, error)
 	RejectStore(ctx context.Context, authAdminID string, req dto.RejectStoreRequest) (*model.Store, error)
+	SubmitKYC(ctx context.Context, authMerchantID string, req dto.SubmitKYCRequest) (*model.Store, error)
+	PublishStore(ctx context.Context, authMerchantID string, req dto.PublishStoreRequest) (*model.Store, error)
+	UnpublishStore(ctx context.Context, authMerchantID string, req dto.UnpublishStoreRequest) (*model.Store, error)
+	SuspendStore(ctx context.Context, authAdminID string, req dto.SuspendStoreRequest) (*model.Store, error)
+	UnsuspendStore(ctx context.Context, authAdminID string, req dto.UnsuspendStoreRequest) (*model.Store, error)
+	AppealStore(ctx context.Context, authMerchantID string, req dto.AppealStoreRequest) (*model.Store, *model.StoreAppeal, error)
+	GetStoreAppeals(ctx context.Context, authUserID, storeID string) ([]*model.StoreAppeal, error)
+	CloseStore(ctx context.Context, authUserID string, req dto.CloseStoreRequest) (*model.Store, error)
 }
 
 type storeService struct {
-	repo     repository.StoreRepository
-	uploader storage.Uploader
+	repo        repository.StoreRepository
+	uploader    storage.Uploader
+	gstinClient gstin.GSTINClient
 }
 
-func NewStoreService(repo repository.StoreRepository, uploader ...storage.Uploader) StoreService {
+func NewStoreService(repo repository.StoreRepository, args ...any) StoreService {
 	var up storage.Uploader
-	if len(uploader) > 0 {
-		up = uploader[0]
+	var gClient gstin.GSTINClient
+
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case storage.Uploader:
+			up = v
+		case gstin.GSTINClient:
+			gClient = v
+		}
 	}
+
 	return &storeService{
-		repo:     repo,
-		uploader: up,
+		repo:        repo,
+		uploader:    up,
+		gstinClient: gClient,
 	}
 }
 
@@ -492,4 +512,345 @@ func (s *storeService) RejectStore(ctx context.Context, authAdminID string, req 
 	}
 
 	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusRejected, &reason)
+}
+
+func (s *storeService) SubmitKYC(ctx context.Context, authMerchantID string, req dto.SubmitKYCRequest) (*model.Store, error) {
+	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID != merchantID {
+		return nil, errors.Forbidden("merchant can only operate on their own store")
+	}
+
+	routing := req.RoutingNumber
+	busReg := strings.TrimSpace(req.BusinessRegistration)
+
+	var taxID *string
+	if req.TaxID != nil && strings.TrimSpace(*req.TaxID) != "" {
+		t := strings.TrimSpace(*req.TaxID)
+		taxID = &t
+	}
+
+	if req.GSTIN == nil || strings.TrimSpace(*req.GSTIN) == "" {
+		return nil, errors.BadRequest("GSTIN is mandatory for KYC submission")
+	}
+
+	g := strings.TrimSpace(*req.GSTIN)
+	gstinPtr := &g
+
+	if s.gstinClient == nil {
+		s.gstinClient = gstin.NewGSTINClient(config.LoadEnv().GSTIN)
+	}
+
+	resp, err := s.gstinClient.VerifyGSTIN(ctx, g)
+	if err != nil {
+		return nil, errors.BadRequest(fmt.Sprintf("GSTIN verification failed: %v", err))
+	}
+	if !resp.Success {
+		msg := resp.Message
+		if msg == "" {
+			msg = resp.Error
+		}
+		if msg == "" {
+			msg = "GSTIN verification failed"
+		}
+		return nil, errors.BadRequest(msg)
+	}
+	if resp.Data == nil || !strings.EqualFold(resp.Data.Status, "Active") {
+		return nil, errors.BadRequest("GSTIN is not active")
+	}
+	if strings.EqualFold(resp.Data.BlockStatus, "Blocked") {
+		return nil, errors.BadRequest("GSTIN is blocked")
+	}
+
+	bank := &model.StoreBankAccount{
+		StoreID:              existingStore.ID,
+		AccountHolderName:    strings.TrimSpace(req.AccountHolderName),
+		AccountNumber:        strings.TrimSpace(req.AccountNumber),
+		RoutingNumber:        routing,
+		BankName:             strings.TrimSpace(req.BankName),
+		TaxID:                taxID,
+		BusinessRegistration: &busReg,
+		GSTIN:                gstinPtr,
+	}
+
+	return s.repo.SubmitKYC(ctx, existingStore.ID, model.KYCStatusPending, bank)
+}
+
+func (s *storeService) PublishStore(ctx context.Context, authMerchantID string, req dto.PublishStoreRequest) (*model.Store, error) {
+	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID != merchantID {
+		return nil, errors.Forbidden("merchant can only operate on their own store")
+	}
+
+	if existingStore.ApprovalStatus == model.StoreStatusRejected {
+		return nil, errors.UnprocessableEntity("rejected stores cannot be published")
+	}
+
+	if existingStore.ApprovalStatus == model.StoreStatusSuspended {
+		return nil, errors.UnprocessableEntity("suspended stores cannot be published")
+	}
+
+	if existingStore.ApprovalStatus != model.StoreStatusApproved {
+		return nil, errors.UnprocessableEntity("unapproved stores cannot be published")
+	}
+
+	return s.repo.SetPublishStatus(ctx, existingStore.ID, true)
+}
+
+func (s *storeService) UnpublishStore(ctx context.Context, authMerchantID string, req dto.UnpublishStoreRequest) (*model.Store, error) {
+	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID != merchantID {
+		return nil, errors.Forbidden("merchant can only operate on their own store")
+	}
+
+	return s.repo.SetPublishStatus(ctx, existingStore.ID, false)
+}
+
+func (s *storeService) SuspendStore(ctx context.Context, authAdminID string, req dto.SuspendStoreRequest) (*model.Store, error) {
+	adminID, err := resolveAdminContext(ctx, authAdminID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID == adminID {
+		return nil, errors.Forbidden("merchant cannot suspend their own store as admin")
+	}
+
+	reason := strings.TrimSpace(req.Reason)
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusSuspended, &reason)
+}
+
+func (s *storeService) UnsuspendStore(ctx context.Context, authAdminID string, req dto.UnsuspendStoreRequest) (*model.Store, error) {
+	adminID, err := resolveAdminContext(ctx, authAdminID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID == adminID {
+		return nil, errors.Forbidden("merchant cannot unsuspend their own store as admin")
+	}
+
+	if existingStore.ApprovalStatus != model.StoreStatusSuspended {
+		return nil, errors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot be unsuspended (must be %s)", existingStore.ApprovalStatus, model.StoreStatusSuspended))
+	}
+
+	pendingAppeal, err := s.repo.GetPendingAppealByStoreID(ctx, existingStore.ID)
+	if err != nil {
+		return nil, err
+	}
+	if pendingAppeal != nil {
+		comment := strings.TrimSpace(req.Reason)
+		if comment == "" {
+			comment = "Store unsuspended by admin"
+		}
+		_, err = s.repo.UpdateAppealStatus(ctx, pendingAppeal.ID, model.AppealStatusApproved, &comment)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusApproved, nil)
+}
+
+func (s *storeService) AppealStore(ctx context.Context, authMerchantID string, req dto.AppealStoreRequest) (*model.Store, *model.StoreAppeal, error) {
+	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := req.Validate(); err != nil {
+		return nil, nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, nil, err
+	}
+	if existingStore == nil {
+		return nil, nil, errors.NotFound("store not found")
+	}
+
+	if existingStore.MerchantID != merchantID {
+		return nil, nil, errors.Forbidden("merchant can only operate on their own store")
+	}
+
+	if existingStore.ApprovalStatus != model.StoreStatusSuspended && existingStore.ApprovalStatus != model.StoreStatusRejected {
+		return nil, nil, errors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot be appealed (must be %s or %s)", existingStore.ApprovalStatus, model.StoreStatusSuspended, model.StoreStatusRejected))
+	}
+
+	pendingAppeal, err := s.repo.GetPendingAppealByStoreID(ctx, existingStore.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if pendingAppeal != nil {
+		return nil, nil, errors.Conflict("an appeal is already pending review for this store")
+	}
+
+	appeal := &model.StoreAppeal{
+		StoreID:    existingStore.ID,
+		MerchantID: merchantID,
+		Reason:     strings.TrimSpace(req.Reason),
+		Status:     model.AppealStatusPending,
+	}
+
+	if err := s.repo.CreateAppeal(ctx, appeal); err != nil {
+		return nil, nil, err
+	}
+
+	return existingStore, appeal, nil
+}
+
+func (s *storeService) GetStoreAppeals(ctx context.Context, authUserID, storeID string) ([]*model.StoreAppeal, error) {
+	trimmedStoreID := strings.TrimSpace(storeID)
+	if trimmedStoreID == "" {
+		return nil, errors.BadRequest("store_id is required")
+	}
+	existingStore, err := s.repo.GetByID(ctx, trimmedStoreID)
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	user, _ := auth.UserFromContext(ctx)
+	userID := ""
+	role := ""
+	if user != nil {
+		userID = strings.TrimSpace(user.UserID)
+		role = strings.ToUpper(strings.TrimSpace(user.Role))
+	}
+	if userID == "" {
+		userID = grpcclient.GetUserID(ctx)
+	}
+	if role == "" {
+		role = strings.ToUpper(strings.TrimSpace(grpcclient.GetUserRole(ctx)))
+	}
+	if userID == "" {
+		userID = strings.TrimSpace(authUserID)
+	}
+
+	if role != auth.RoleAdmin && existingStore.MerchantID != userID {
+		return nil, errors.Forbidden("merchant can only view appeals for their own store")
+	}
+
+	return s.repo.ListAppealsByStoreID(ctx, trimmedStoreID)
+}
+
+func (s *storeService) CloseStore(ctx context.Context, authUserID string, req dto.CloseStoreRequest) (*model.Store, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	existingStore, err := s.repo.GetByID(ctx, strings.TrimSpace(req.StoreID))
+	if err != nil {
+		return nil, err
+	}
+	if existingStore == nil {
+		return nil, errors.NotFound("store not found")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	userID := ""
+	role := ""
+	if userCtx != nil {
+		userID = strings.TrimSpace(userCtx.UserID)
+		role = strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	}
+	if userID == "" {
+		userID = strings.TrimSpace(grpcclient.GetUserID(ctx))
+	}
+	if role == "" {
+		role = strings.ToUpper(strings.TrimSpace(grpcclient.GetUserRole(ctx)))
+	}
+	if userID == "" {
+		userID = strings.TrimSpace(authUserID)
+	}
+
+	if userID == "" {
+		return nil, errors.Unauthorized("missing authenticated context")
+	}
+
+	if role != auth.RoleAdmin && existingStore.MerchantID != userID {
+		return nil, errors.Forbidden("merchant can only operate on their own store")
+	}
+
+	var reason *string
+	if req.Reason != "" {
+		r := strings.TrimSpace(req.Reason)
+		reason = &r
+	}
+
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusClosed, reason)
 }

@@ -42,46 +42,85 @@ func MapStore(s *storepb.Store) *model.Store {
 		rej = &s.RejectionReason
 	}
 
-	var bankRaw *string
 	var bankAccount *model.BankAccount
 	if s.BankAccountDetails != "" {
-		bankRaw = &s.BankAccountDetails
 		var parsed model.BankAccount
 		if err := json.Unmarshal([]byte(s.BankAccountDetails), &parsed); err == nil {
 			bankAccount = &parsed
 		}
 	}
 
+	var kycStat *string
+	if s.KycStatus != "" {
+		kycStat = &s.KycStatus
+	}
+
+	var busReg *string
+	if s.BusinessRegistration != "" {
+		busReg = &s.BusinessRegistration
+	}
+
+	var gstin *string
+	if s.Gstin != "" {
+		gstin = &s.Gstin
+	}
+
 	return &model.Store{
-		ID:                 s.Id,
-		MerchantID:         s.MerchantId,
-		Name:               s.Name,
-		Slug:               s.Slug,
-		BusinessEmail:      email,
-		BusinessPhone:      phone,
-		Description:        desc,
-		LogoURL:            logo,
-		Address:            addr,
-		IsVacationMode:     s.IsVacationMode,
-		ApprovalStatus:     s.ApprovalStatus,
-		RejectionReason:    rej,
-		BankAccount:        bankAccount,
-		BankAccountDetails: bankRaw,
-		AvgStoreRating:     s.AvgStoreRating,
-		CreatedAt:          s.CreatedAt,
-		UpdatedAt:          s.UpdatedAt,
+		ID:                   s.Id,
+		MerchantID:           s.MerchantId,
+		Name:                 s.Name,
+		Slug:                 s.Slug,
+		BusinessEmail:        email,
+		BusinessPhone:        phone,
+		Description:          desc,
+		LogoURL:              logo,
+		Address:              addr,
+		IsVacationMode:       s.IsVacationMode,
+		ApprovalStatus:       s.ApprovalStatus,
+		RejectionReason:      rej,
+		IsPublished:          s.IsPublished,
+		KycStatus:            kycStat,
+		BusinessRegistration: busReg,
+		Gstin:                gstin,
+		BankAccount:          bankAccount,
+		AvgStoreRating:       s.AvgStoreRating,
+		CreatedAt:            s.CreatedAt,
+		UpdatedAt:            s.UpdatedAt,
 	}
 }
 
-func SerializeBankAccount(account *model.BankAccountInput, rawDetails *string) string {
+func SerializeBankAccount(account *model.BankAccountInput) string {
 	if account != nil {
 		bytes, err := json.Marshal(account)
 		if err == nil {
 			return string(bytes)
 		}
 	}
-	if rawDetails != nil {
-		return *rawDetails
-	}
 	return ""
+}
+
+func MapStoreAppeal(a *storepb.StoreAppeal) *model.StoreAppeal {
+	if a == nil {
+		return nil
+	}
+	var adminComment *string
+	if a.AdminComment != "" {
+		adminComment = &a.AdminComment
+	}
+	var reviewedAt *string
+	if a.ReviewedAt != "" {
+		reviewedAt = &a.ReviewedAt
+	}
+
+	return &model.StoreAppeal{
+		ID:           a.Id,
+		StoreID:      a.StoreId,
+		MerchantID:   a.MerchantId,
+		Reason:       a.Reason,
+		Status:       a.Status,
+		AdminComment: adminComment,
+		ReviewedAt:   reviewedAt,
+		CreatedAt:    a.CreatedAt,
+		UpdatedAt:    a.UpdatedAt,
+	}
 }

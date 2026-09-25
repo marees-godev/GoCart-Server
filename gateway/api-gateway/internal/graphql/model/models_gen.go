@@ -59,19 +59,21 @@ type AuthPayload struct {
 }
 
 type BankAccount struct {
-	AccountHolderName *string `json:"accountHolderName,omitempty"`
-	BankName          *string `json:"bankName,omitempty"`
-	AccountNumber     *string `json:"accountNumber,omitempty"`
-	RoutingNumber     *string `json:"routingNumber,omitempty"`
-	TaxID             *string `json:"taxId,omitempty"`
+	AccountHolderName    *string `json:"accountHolderName,omitempty"`
+	BankName             *string `json:"bankName,omitempty"`
+	AccountNumber        *string `json:"accountNumber,omitempty"`
+	RoutingNumber        *string `json:"routingNumber,omitempty"`
+	BusinessRegistration *string `json:"businessRegistration,omitempty"`
+	Gstin                *string `json:"gstin,omitempty"`
 }
 
 type BankAccountInput struct {
-	AccountHolderName string  `json:"accountHolderName"`
-	BankName          string  `json:"bankName"`
-	AccountNumber     string  `json:"accountNumber"`
-	RoutingNumber     *string `json:"routingNumber,omitempty"`
-	TaxID             *string `json:"taxId,omitempty"`
+	AccountHolderName    string  `json:"accountHolderName"`
+	BankName             string  `json:"bankName"`
+	AccountNumber        string  `json:"accountNumber"`
+	RoutingNumber        *string `json:"routingNumber,omitempty"`
+	BusinessRegistration *string `json:"businessRegistration,omitempty"`
+	Gstin                *string `json:"gstin,omitempty"`
 }
 
 type Cart struct {
@@ -144,16 +146,15 @@ type CreateProductInput struct {
 }
 
 type CreateStoreInput struct {
-	Name               string            `json:"name"`
-	Slug               *string           `json:"slug,omitempty"`
-	BusinessEmail      *string           `json:"businessEmail,omitempty"`
-	BusinessPhone      *string           `json:"businessPhone,omitempty"`
-	Description        *string           `json:"description,omitempty"`
-	Logo               *graphql.Upload   `json:"logo,omitempty"`
-	LogoURL            *string           `json:"logoUrl,omitempty"`
-	Address            *string           `json:"address,omitempty"`
-	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
-	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+	Name          string            `json:"name"`
+	Slug          *string           `json:"slug,omitempty"`
+	BusinessEmail *string           `json:"businessEmail,omitempty"`
+	BusinessPhone *string           `json:"businessPhone,omitempty"`
+	Description   *string           `json:"description,omitempty"`
+	Logo          *graphql.Upload   `json:"logo,omitempty"`
+	LogoURL       *string           `json:"logoUrl,omitempty"`
+	Address       *string           `json:"address,omitempty"`
+	BankAccount   *BankAccountInput `json:"bankAccount,omitempty"`
 }
 
 type DeactivateAccountInput struct {
@@ -357,23 +358,38 @@ type StockItem struct {
 }
 
 type Store struct {
-	ID                 string       `json:"id"`
-	MerchantID         string       `json:"merchantId"`
-	Name               string       `json:"name"`
-	Slug               string       `json:"slug"`
-	BusinessEmail      *string      `json:"businessEmail,omitempty"`
-	BusinessPhone      *string      `json:"businessPhone,omitempty"`
-	Description        *string      `json:"description,omitempty"`
-	LogoURL            *string      `json:"logoUrl,omitempty"`
-	Address            *string      `json:"address,omitempty"`
-	IsVacationMode     bool         `json:"isVacationMode"`
-	ApprovalStatus     string       `json:"approvalStatus"`
-	RejectionReason    *string      `json:"rejectionReason,omitempty"`
-	BankAccount        *BankAccount `json:"bankAccount,omitempty"`
-	BankAccountDetails *string      `json:"bankAccountDetails,omitempty"`
-	AvgStoreRating     float64      `json:"avgStoreRating"`
-	CreatedAt          string       `json:"createdAt"`
-	UpdatedAt          string       `json:"updatedAt"`
+	ID                   string       `json:"id"`
+	MerchantID           string       `json:"merchantId"`
+	Name                 string       `json:"name"`
+	Slug                 string       `json:"slug"`
+	BusinessEmail        *string      `json:"businessEmail,omitempty"`
+	BusinessPhone        *string      `json:"businessPhone,omitempty"`
+	Description          *string      `json:"description,omitempty"`
+	LogoURL              *string      `json:"logoUrl,omitempty"`
+	Address              *string      `json:"address,omitempty"`
+	IsVacationMode       bool         `json:"isVacationMode"`
+	ApprovalStatus       string       `json:"approvalStatus"`
+	RejectionReason      *string      `json:"rejectionReason,omitempty"`
+	IsPublished          bool         `json:"isPublished"`
+	KycStatus            *string      `json:"kycStatus,omitempty"`
+	BusinessRegistration *string      `json:"businessRegistration,omitempty"`
+	Gstin                *string      `json:"gstin,omitempty"`
+	BankAccount          *BankAccount `json:"bankAccount,omitempty"`
+	AvgStoreRating       float64      `json:"avgStoreRating"`
+	CreatedAt            string       `json:"createdAt"`
+	UpdatedAt            string       `json:"updatedAt"`
+}
+
+type StoreAppeal struct {
+	ID           string  `json:"id"`
+	StoreID      string  `json:"storeId"`
+	MerchantID   string  `json:"merchantId"`
+	Reason       string  `json:"reason"`
+	Status       string  `json:"status"`
+	AdminComment *string `json:"adminComment,omitempty"`
+	ReviewedAt   *string `json:"reviewedAt,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
 }
 
 type StoreList struct {
@@ -386,6 +402,16 @@ type StoreUploadURLPayload struct {
 	PublicURL        string `json:"publicUrl"`
 	Key              string `json:"key"`
 	ExpiresInSeconds int    `json:"expiresInSeconds"`
+}
+
+type SubmitKYCInput struct {
+	StoreID              string  `json:"storeId"`
+	BusinessRegistration string  `json:"businessRegistration"`
+	BankName             string  `json:"bankName"`
+	AccountNumber        string  `json:"accountNumber"`
+	AccountHolderName    string  `json:"accountHolderName"`
+	RoutingNumber        *string `json:"routingNumber,omitempty"`
+	Gstin                string  `json:"gstin"`
 }
 
 type UpdateAddressInput struct {
@@ -418,18 +444,17 @@ type UpdateProductInput struct {
 }
 
 type UpdateStoreInput struct {
-	ID                 *string           `json:"id,omitempty"`
-	Name               *string           `json:"name,omitempty"`
-	Slug               *string           `json:"slug,omitempty"`
-	BusinessEmail      *string           `json:"businessEmail,omitempty"`
-	BusinessPhone      *string           `json:"businessPhone,omitempty"`
-	Description        *string           `json:"description,omitempty"`
-	Logo               *graphql.Upload   `json:"logo,omitempty"`
-	LogoURL            *string           `json:"logoUrl,omitempty"`
-	Address            *string           `json:"address,omitempty"`
-	IsVacationMode     *bool             `json:"isVacationMode,omitempty"`
-	BankAccount        *BankAccountInput `json:"bankAccount,omitempty"`
-	BankAccountDetails *string           `json:"bankAccountDetails,omitempty"`
+	ID             *string           `json:"id,omitempty"`
+	Name           *string           `json:"name,omitempty"`
+	Slug           *string           `json:"slug,omitempty"`
+	BusinessEmail  *string           `json:"businessEmail,omitempty"`
+	BusinessPhone  *string           `json:"businessPhone,omitempty"`
+	Description    *string           `json:"description,omitempty"`
+	Logo           *graphql.Upload   `json:"logo,omitempty"`
+	LogoURL        *string           `json:"logoUrl,omitempty"`
+	Address        *string           `json:"address,omitempty"`
+	IsVacationMode *bool             `json:"isVacationMode,omitempty"`
+	BankAccount    *BankAccountInput `json:"bankAccount,omitempty"`
 }
 
 type UpdateUserInput struct {
