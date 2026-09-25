@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -93,3 +94,96 @@ func TestRedactSensitiveKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestLoggerLocationMark(t *testing.T) {
+	t.Run("default configuration includes location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Output:      &buf,
+		})
+
+		l.Info("testing default location mark")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v, raw: %s", err, buf.String())
+		}
+
+		source, ok := logEntry["source"].(map[string]any)
+		if !ok || source == nil {
+			t.Fatalf("Expected 'source' location mark to be present, got: %v", logEntry)
+		}
+		file, ok := source["file"].(string)
+		if !ok || file == "" || !strings.Contains(file, ":") {
+			t.Errorf("Expected 'file' to contain file:line location, got: %v", source["file"])
+		}
+		loc, ok := source["location"].(string)
+		if !ok || loc == "" || !strings.Contains(loc, ":") {
+			t.Errorf("Expected 'location' to contain file:line location, got: %v", source["location"])
+		}
+		if line, ok := source["line"].(float64); !ok || line == 0 {
+			t.Errorf("Expected non-zero 'line' in location mark, got: %v", source["line"])
+		}
+		if function, ok := source["function"].(string); !ok || function == "" {
+			t.Errorf("Expected 'function' in location mark, got: %v", source["function"])
+		}
+	})
+
+	t.Run("DisableSource disables location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName:   "test-service",
+			DisableSource: true,
+			Output:        &buf,
+		})
+
+		l.Info("testing disabled location mark")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v", err)
+		}
+
+		if _, exists := logEntry["source"]; exists {
+			t.Errorf("Expected 'source' to be absent when DisableSource is true, got: %v", logEntry["source"])
+		}
+	})
+
+	t.Run("LOG_ADD_SOURCE=false disables location mark", func(t *testing.T) {
+		t.Setenv("LOG_ADD_SOURCE", "false")
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Output:      &buf,
+		})
+
+		l.Info("testing LOG_ADD_SOURCE=false")
+
+		var logEntry map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &logEntry); err != nil {
+			t.Fatalf("Failed to parse log JSON: %v", err)
+		}
+
+		if _, exists := logEntry["source"]; exists {
+			t.Errorf("Expected 'source' to be absent when LOG_ADD_SOURCE=false, got: %v", logEntry["source"])
+		}
+	})
+
+	t.Run("text format includes location mark", func(t *testing.T) {
+		var buf bytes.Buffer
+		l := New(Config{
+			ServiceName: "test-service",
+			Format:      "text",
+			Output:      &buf,
+		})
+
+		l.Info("testing text format location mark")
+
+		raw := buf.String()
+		if !bytes.Contains(buf.Bytes(), []byte("source=")) {
+			t.Errorf("Expected 'source=' in text log output, got: %s", raw)
+		}
+	})
+}
+

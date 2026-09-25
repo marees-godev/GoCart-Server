@@ -2,9 +2,12 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"go.opentelemetry.io/otel/trace"
@@ -20,12 +23,14 @@ const (
 )
 
 type Config struct {
-	ServiceName string
-	Environment string
-	Version     string
-	Level       string
-	Format      string
-	Output      io.Writer
+	ServiceName   string
+	Environment   string
+	Version       string
+	Level         string
+	Format        string
+	AddSource     bool
+	DisableSource bool
+	Output        io.Writer
 }
 
 func DefaultConfig(serviceName string) Config {
@@ -47,13 +52,22 @@ func DefaultConfig(serviceName string) Config {
 		format = "json"
 	}
 
+	addSource := true
+	if src := os.Getenv("LOG_ADD_SOURCE"); src != "" {
+		if val, err := strconv.ParseBool(src); err == nil {
+			addSource = val
+		}
+	}
+
 	return Config{
-		ServiceName: serviceName,
-		Environment: env,
-		Version:     os.Getenv("SERVICE_VERSION"),
-		Level:       level,
-		Format:      format,
-		Output:      os.Stdout,
+		ServiceName:   serviceName,
+		Environment:   env,
+		Version:       os.Getenv("SERVICE_VERSION"),
+		Level:         level,
+		Format:        format,
+		AddSource:     addSource,
+		DisableSource: false,
+		Output:        os.Stdout,
 	}
 }
 
@@ -109,9 +123,43 @@ func New(cfg Config) *slog.Logger {
 		level = slog.LevelInfo
 	}
 
+	addSource := true
+	if cfg.DisableSource {
+		addSource = false
+	} else if envVal := os.Getenv("LOG_ADD_SOURCE"); envVal != "" {
+		if parsed, err := strconv.ParseBool(envVal); err == nil {
+			addSource = parsed
+		}
+	}
+	if cfg.AddSource {
+		addSource = true
+	}
+
+	format := strings.ToLower(cfg.Format)
+	replaceAttr := func(groups []string, a slog.Attr) slog.Attr {
+		a = RedactAttr(groups, a)
+		if a.Key == slog.SourceKey {
+			if source, ok := a.Value.Any().(*slog.Source); ok && source != nil {
+				cleanPath := filepath.ToSlash(source.File)
+				loc := fmt.Sprintf("%s:%d", cleanPath, source.Line)
+				if format == "text" {
+					return slog.String(slog.SourceKey, loc)
+				}
+				return slog.Group(slog.SourceKey,
+					slog.String("location", loc),
+					slog.String("file", loc),
+					slog.Int("line", source.Line),
+					slog.String("function", source.Function),
+				)
+			}
+		}
+		return a
+	}
+
 	opts := &slog.HandlerOptions{
+		AddSource:   addSource,
 		Level:       level,
-		ReplaceAttr: RedactAttr,
+		ReplaceAttr: replaceAttr,
 	}
 
 	out := cfg.Output
