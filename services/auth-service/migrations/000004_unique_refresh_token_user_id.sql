@@ -14,4 +14,5 @@ WHERE a.user_id = b.user_id AND a.created_at < b.created_at;
 
 ALTER TABLE refresh_tokens DROP CONSTRAINT IF EXISTS refresh_tokens_user_id_key;
 DROP INDEX IF EXISTS idx_refresh_tokens_user_id;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_refresh_tokens_user_id_unique ON refresh_tokens (user_id);
+DROP INDEX IF EXISTS idx_refresh_tokens_user_id_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_refresh_tokens_user_id_active_unique ON refresh_tokens (user_id) WHERE revoked = FALSE;
