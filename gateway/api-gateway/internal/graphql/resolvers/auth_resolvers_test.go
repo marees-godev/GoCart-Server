@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
-	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	grpcPkg "google.golang.org/grpc"
 )
@@ -42,6 +43,16 @@ func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opt
 		ExpiresIn:    900,
 		UserId:       "user-uuid-123",
 		Role:         role,
+	}, nil
+}
+
+func (m *mockAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, opts ...grpcPkg.CallOption) (*authpb.LogoutResponse, error) {
+	if in.AccessToken == "invalid-token" {
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.Unauthorized("invalid access token"))
+	}
+	return &authpb.LogoutResponse{
+		Success: true,
+		Message: "Logged out successfully",
 	}, nil
 }
 
@@ -320,5 +331,43 @@ func TestRefreshTokenResolver(t *testing.T) {
 	})
 	if errInvalid == nil {
 		t.Errorf("expected error for invalid refresh token, got nil")
+	}
+}
+
+func TestLogoutResolver(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	ctxWithAuth := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Email:  "user123@example.com",
+		Role:   "CUSTOMER",
+	})
+
+	// 1. Authenticated logout
+	payload, err := r.Logout(ctxWithAuth)
+	if err != nil {
+		t.Fatalf("expected successful logout, got: %v", err)
+	}
+
+	if !payload.Success {
+		t.Errorf("expected payload success true, got false")
+	}
+	if payload.Message == nil || *payload.Message != "Logged out successfully" {
+		t.Errorf("expected message 'Logged out successfully', got %v", payload.Message)
+	}
+
+	// 2. Unauthenticated logout should fail
+	_, errUnauth := r.Logout(context.Background())
+	if errUnauth == nil {
+		t.Errorf("expected error for unauthenticated logout, got nil")
 	}
 }

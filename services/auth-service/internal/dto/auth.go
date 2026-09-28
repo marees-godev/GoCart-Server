@@ -44,6 +44,15 @@ type RefreshTokenRequest struct {
 	AccessToken  string `json:"access_token,omitempty"`
 }
 
+type LogoutRequest struct {
+	AccessToken string `json:"access_token,omitempty"`
+}
+
+type LogoutResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type VerifyEmailRequest struct {
 	Email string `json:"email,omitempty"`
 	OTP   string `json:"otp,omitempty"`
