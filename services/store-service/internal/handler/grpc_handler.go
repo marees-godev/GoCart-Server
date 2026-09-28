@@ -302,6 +302,7 @@ func (h *StoreGRPCHandler) PublishStore(ctx context.Context, req *storepb.Publis
 
 	store, err := h.storeService.PublishStore(ctx, merchantID, pubReq)
 	if err != nil {
+		logger.FromContext(ctx).Error("PublishStore failed", "error", err, "store_id", req.StoreId, "merchant_id", merchantID)
 		return nil, grpcclient.ToGRPCError(err)
 	}
 
@@ -324,6 +325,7 @@ func (h *StoreGRPCHandler) UnpublishStore(ctx context.Context, req *storepb.Unpu
 
 	store, err := h.storeService.UnpublishStore(ctx, merchantID, unpubReq)
 	if err != nil {
+		logger.FromContext(ctx).Error("UnpublishStore failed", "error", err, "store_id", req.StoreId, "merchant_id", merchantID)
 		return nil, grpcclient.ToGRPCError(err)
 	}
 
