@@ -1,9 +1,11 @@
 package resolvers
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
+	"github.com/99designs/gqlgen/graphql"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
@@ -17,6 +19,7 @@ import (
 type mockUserClientForUserResolvers struct {
 	userpb.UserServiceClient
 	lastReactivateReq *userpb.ReactivateUserRequest
+	lastUpdateReq     *userpb.UpdateUserRequest
 	reactivateErr     error
 	updateErr         error
 }
@@ -34,12 +37,14 @@ func (m *mockUserClientForUserResolvers) ReactivateUser(ctx context.Context, in 
 }
 
 func (m *mockUserClientForUserResolvers) UpdateUser(ctx context.Context, in *userpb.UpdateUserRequest, opts ...grpcPkg.CallOption) (*userpb.UpdateUserResponse, error) {
+	m.lastUpdateReq = in
 	if m.updateErr != nil {
 		return nil, m.updateErr
 	}
 	return &userpb.UpdateUserResponse{
 		User: &userpb.User{
-			Id: in.Id,
+			Id:        in.Id,
+			AvatarUrl: in.AvatarUrl,
 		},
 	}, nil
 }
@@ -171,3 +176,57 @@ func TestUpdateUser_InvalidArgument_MapsToBadRequest(t *testing.T) {
 		t.Errorf("expected 400 HTTP status, got %d", appErr.HTTPStatus)
 	}
 }
+
+func TestUpdateUser_AvatarUpload_ForwardsToGRPC(t *testing.T) {
+	userMock := &mockUserClientForUserResolvers{}
+	clients := &grpc.Clients{
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "CUSTOMER",
+	})
+
+	uploadData := []byte("fake-png-image-content")
+	input := model.UpdateUserInput{
+		Avatar: &graphql.Upload{
+			File:        bytes.NewReader(uploadData),
+			ContentType: "image/png",
+			Filename:    "my-avatar.png",
+			Size:        int64(len(uploadData)),
+		},
+	}
+
+	res, err := r.UpdateUser(ctx, "user-123", input)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if res.ID != "user-123" {
+		t.Errorf("expected user id 'user-123', got '%s'", res.ID)
+	}
+
+	if userMock.lastUpdateReq == nil {
+		t.Fatal("expected gRPC UpdateUser to be called, but lastUpdateReq is nil")
+	}
+
+	if !bytes.Equal(userMock.lastUpdateReq.AvatarImage, uploadData) {
+		t.Errorf("expected AvatarImage bytes %v, got %v", uploadData, userMock.lastUpdateReq.AvatarImage)
+	}
+
+	if userMock.lastUpdateReq.AvatarContentType == nil || *userMock.lastUpdateReq.AvatarContentType != "image/png" {
+		t.Errorf("expected AvatarContentType 'image/png', got %v", userMock.lastUpdateReq.AvatarContentType)
+	}
+
+	if userMock.lastUpdateReq.AvatarFilename == nil || *userMock.lastUpdateReq.AvatarFilename != "my-avatar.png" {
+		t.Errorf("expected AvatarFilename 'my-avatar.png', got %v", userMock.lastUpdateReq.AvatarFilename)
+	}
+}
+

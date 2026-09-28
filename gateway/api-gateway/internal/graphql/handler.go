@@ -150,13 +150,18 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 			role = userCtx.Role
 		}
 
+		errLogMsg := e.Error()
+		if appErr != nil {
+			errLogMsg = appErr.Error()
+		}
+
 		logger.FromContext(ctx).Warn("GraphQL operation error",
 			"operation_name", opName,
 			"error_code", errorCode,
 			"request_id", middleware.GetRequestID(ctx),
 			"user_id", userID,
 			"role", role,
-			"error", e.Error(),
+			"error", errLogMsg,
 		)
 
 		return err

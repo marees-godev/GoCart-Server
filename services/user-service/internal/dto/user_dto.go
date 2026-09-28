@@ -71,7 +71,10 @@ type UpdateUserRequest struct {
 	Gender         *string `json:"gender,omitempty"`
 	Bio            *string `json:"bio,omitempty"`
 	About          *string `json:"about,omitempty"`
-	AvatarURL      *string `json:"avatar_url,omitempty"`
+	AvatarURL         *string `json:"avatar_url,omitempty"`
+	AvatarImage       []byte  `json:"-"`
+	AvatarContentType *string `json:"avatar_content_type,omitempty"`
+	AvatarFilename    *string `json:"avatar_filename,omitempty"`
 }
 
 func (r *UpdateUserRequest) GetEmail() *string {

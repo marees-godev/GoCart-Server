@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/repository"
@@ -24,11 +25,26 @@ type UserService interface {
 }
 
 type userService struct {
-	repo repository.UserRepository
+	repo           repository.UserRepository
+	imageProcessor ImageProcessor
 }
 
-func NewUserService(repo repository.UserRepository) UserService {
-	return &userService{repo: repo}
+func NewUserService(repo repository.UserRepository, args ...any) UserService {
+	var imgProc ImageProcessor
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case ImageProcessor:
+			imgProc = v
+		case storage.Uploader:
+			if v != nil {
+				imgProc = NewImageProcessor(v)
+			}
+		}
+	}
+	return &userService{
+		repo:           repo,
+		imageProcessor: imgProc,
+	}
 }
 
 func (s *userService) CreateUser(ctx context.Context, req dto.CreateUserRequest) (*model.User, error) {
@@ -240,7 +256,54 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 		user.Bio = bio
 	}
 
-	if req.AvatarURL != nil {
+	if req.AvatarImage != nil {
+		if s.imageProcessor == nil {
+			slog.WarnContext(ctx, "image processor not configured in UpdateUser", "user_id", targetUserID)
+			return nil, errors.Internal(nil, "storage uploader is not configured")
+		}
+
+		contentType := ""
+		if req.AvatarContentType != nil {
+			contentType = *req.AvatarContentType
+		}
+		filename := ""
+		if req.AvatarFilename != nil {
+			filename = *req.AvatarFilename
+		}
+
+		avatarURL, err := s.imageProcessor.ProcessAndUploadAvatar(ctx, user.ID, AvatarInput{
+			Data:        req.AvatarImage,
+			ContentType: contentType,
+			Filename:    filename,
+		})
+		if err != nil {
+			slog.WarnContext(ctx, "failed to process avatar image in UpdateUser", "user_id", targetUserID, "error", err)
+			return nil, err
+		}
+		user.AvatarURL = &avatarURL
+	} else if req.AvatarURL != nil && strings.HasPrefix(*req.AvatarURL, "data:image/") {
+		if s.imageProcessor == nil {
+			slog.WarnContext(ctx, "image processor not configured in UpdateUser", "user_id", targetUserID)
+			return nil, errors.Internal(nil, "storage uploader is not configured")
+		}
+
+		data, contentType, err := ParseDataURI(*req.AvatarURL)
+		if err != nil {
+			slog.WarnContext(ctx, "failed to parse avatar data URI in UpdateUser", "user_id", targetUserID, "error", err)
+			return nil, err
+		}
+
+		avatarURL, err := s.imageProcessor.ProcessAndUploadAvatar(ctx, user.ID, AvatarInput{
+			Data:        data,
+			ContentType: contentType,
+			Filename:    "avatar",
+		})
+		if err != nil {
+			slog.WarnContext(ctx, "failed to process avatar image from data URI in UpdateUser", "user_id", targetUserID, "error", err)
+			return nil, err
+		}
+		user.AvatarURL = &avatarURL
+	} else if req.AvatarURL != nil {
 		user.AvatarURL = req.AvatarURL
 	}
 

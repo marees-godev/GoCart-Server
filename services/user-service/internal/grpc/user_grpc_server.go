@@ -155,6 +155,15 @@ func (s *UserGRPCServer) UpdateUser(ctx context.Context, req *userpb.UpdateUserR
 	if req.AvatarUrl != nil && *req.AvatarUrl != "" {
 		updateReq.AvatarURL = req.AvatarUrl
 	}
+	if req.AvatarImage != nil {
+		updateReq.AvatarImage = req.AvatarImage
+	}
+	if req.AvatarContentType != nil && *req.AvatarContentType != "" {
+		updateReq.AvatarContentType = req.AvatarContentType
+	}
+	if req.AvatarFilename != nil && *req.AvatarFilename != "" {
+		updateReq.AvatarFilename = req.AvatarFilename
+	}
 
 	u, err := s.userService.UpdateUser(ctx, req.Id, req.Id, updateReq)
 	if err != nil {

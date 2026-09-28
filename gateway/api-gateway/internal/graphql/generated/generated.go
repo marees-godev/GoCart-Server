@@ -3458,6 +3458,7 @@ input UpdateUserInput {
   gender: Gender
   bio: String
   avatarUrl: String
+  avatar: Upload
 }
 
 type AccountActionResponse {
@@ -23359,7 +23360,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "phone", "username", "alternatePhone", "dateOfBirth", "gender", "bio", "avatarUrl"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "phone", "username", "alternatePhone", "dateOfBirth", "gender", "bio", "avatarUrl", "avatar"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23429,6 +23430,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.AvatarURL = data
+		case "avatar":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("avatar"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Avatar = data
 		}
 	}
 

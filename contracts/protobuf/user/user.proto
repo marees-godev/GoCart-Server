@@ -84,6 +84,9 @@ message UpdateUserRequest {
   optional string gender = 8;
   optional string bio = 9;
   optional string avatar_url = 10;
+  optional bytes avatar_image = 11;
+  optional string avatar_content_type = 12;
+  optional string avatar_filename = 13;
 }
 
 message UpdateUserResponse {
