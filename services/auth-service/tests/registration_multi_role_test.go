@@ -116,6 +116,14 @@ func (r *inMemoryAuthRepo) RevokeRefreshToken(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
+func (r *inMemoryAuthRepo) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	return nil
+}
+
+func (r *inMemoryAuthRepo) RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error {
+	return nil
+}
+
 func (r *inMemoryAuthRepo) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
 	return nil
 }

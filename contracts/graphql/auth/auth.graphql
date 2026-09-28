@@ -30,10 +30,16 @@ input RefreshTokenInput {
   refreshToken: String!
 }
 
+type LogoutPayload {
+  success: Boolean!
+  message: String
+}
+
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
   refreshToken(input: RefreshTokenInput!): AuthPayload!
+  logout: LogoutPayload!
   verifyEmail(email: String!, otp: String!): Boolean!
   resendVerificationEmail(email: String!): Boolean!
 }

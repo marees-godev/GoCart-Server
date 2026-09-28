@@ -172,6 +172,24 @@ func (m *mockAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUI
 	return nil
 }
 
+func (m *mockAuthRepository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	for _, rt := range m.refreshTokens {
+		if rt.TokenHash == tokenHash {
+			rt.Revoked = true
+		}
+	}
+	return nil
+}
+
+func (m *mockAuthRepository) RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error {
+	for _, rt := range m.refreshTokens {
+		if rt.UserID == userID {
+			rt.Revoked = true
+		}
+	}
+	return nil
+}
+
 func (m *mockAuthRepository) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
 	for _, rt := range m.refreshTokens {
 		if rt.ID == oldTokenID {
@@ -1490,6 +1508,74 @@ func TestRefreshToken_WithAccessTokenJWT(t *testing.T) {
 
 	if resp.AccessToken == "" || resp.RefreshToken == "" {
 		t.Errorf("expected new access and refresh tokens, got empty")
+	}
+}
+
+func TestLogout_Success_RevokesRefreshToken(t *testing.T) {
+	svc, mockRepo, cfg := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["logoutuser@example.com"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   userID,
+		Email:    "logoutuser@example.com",
+		Role:     model.RoleCustomer,
+		IsActive: true,
+	}
+
+	rawToken := "valid-refresh-token-logout-123"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   false,
+	})
+
+	accessToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: userID.String(),
+		Email:  "logoutuser@example.com",
+		Role:   "CUSTOMER",
+	}, cfg.JWT.Secret, 15*time.Minute)
+
+	// 1. Authenticated user calls logout with AccessToken
+	logoutResp, err := svc.Logout(context.Background(), &dto.LogoutRequest{
+		AccessToken: accessToken,
+	})
+	if err != nil {
+		t.Fatalf("expected logout to succeed, got: %v", err)
+	}
+	if !logoutResp.Success {
+		t.Errorf("expected logout response success true, got false")
+	}
+
+	// 2. Try to refresh token with the revoked refresh token
+	_, err = svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawToken,
+		AccessToken:  accessToken,
+	})
+	if err == nil {
+		t.Fatalf("expected RefreshToken to fail for revoked token, but it succeeded")
+	}
+
+	// 3. Test Idempotency: Calling logout again with same access token succeeds
+	logoutResp2, err := svc.Logout(context.Background(), &dto.LogoutRequest{
+		AccessToken: accessToken,
+	})
+	if err != nil {
+		t.Fatalf("expected repeated logout to succeed idempotently, got: %v", err)
+	}
+	if !logoutResp2.Success {
+		t.Errorf("expected repeated logout success true, got false")
+	}
+}
+
+func TestLogout_Unauthenticated_NoToken(t *testing.T) {
+	svc, _, _ := setupTestService()
+
+	_, err := svc.Logout(context.Background(), &dto.LogoutRequest{})
+	if err == nil {
+		t.Errorf("expected error when logging out without auth context or identity")
 	}
 }
 

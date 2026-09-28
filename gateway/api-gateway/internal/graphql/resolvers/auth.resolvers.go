@@ -400,6 +400,45 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 	return payload, nil
 }
 
+// Logout is the resolver for the logout field.
+func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	userCtx, authenticated := auth.FromContext(ctx)
+	if !authenticated || userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required for logout")
+	}
+
+	token := userCtx.RawToken
+	if token == "" {
+		token = userCtx.UserID
+	}
+
+	req := &authpb.LogoutRequest{
+		AccessToken: token,
+	}
+
+	res, err := authClient.Logout(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	msg := res.GetMessage()
+	return &model.LogoutPayload{
+		Success: res.GetSuccess(),
+		Message: &msg,
+	}, nil
+}
+
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
 	var authClient authpb.AuthServiceClient
