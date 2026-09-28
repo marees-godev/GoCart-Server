@@ -21,6 +21,10 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(grpcclient.UnaryClientInterceptor(cfg.GRPC.DefaultTimeout)),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(10*1024*1024),
+			grpc.MaxCallSendMsgSize(10*1024*1024),
+		),
 	}
 	opts = append(opts, extraOpts...)
 

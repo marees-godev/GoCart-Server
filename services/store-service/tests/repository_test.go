@@ -9,20 +9,6 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/model"
 )
 
-type mockOutboxStore struct {
-	events []*outbox.Event
-}
-
-func newMockOutboxStore() *mockOutboxStore {
-	return &mockOutboxStore{
-		events: make([]*outbox.Event, 0),
-	}
-}
-
-func (m *mockOutboxStore) Insert(evt *outbox.Event) {
-	m.events = append(m.events, evt)
-}
-
 func TestRepositoryOutboxEvents(t *testing.T) {
 	now := time.Now().UTC()
 

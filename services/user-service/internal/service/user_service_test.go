@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
@@ -1165,6 +1166,251 @@ func TestPolicy_DeactivateAccount_ReactivationRejectedAndDeletedAfter30Days_Befo
 		t.Errorf("expected status deleted after expired reactivation attempt, got %s", repo.users[user.ID].Status)
 	}
 }
+
+type mockCustomImageProcessor struct {
+	processFunc func(ctx context.Context, userID string, input service.AvatarInput) (string, error)
+	calls       int
+}
+
+func (m *mockCustomImageProcessor) ProcessAndUploadAvatar(ctx context.Context, userID string, input service.AvatarInput) (string, error) {
+	m.calls++
+	if m.processFunc != nil {
+		return m.processFunc(ctx, userID, input)
+	}
+	return "https://storage.example.com/avatars/" + userID + "/avatar.png", nil
+}
+
+func TestUpdateUser_AvatarAttachment_Success(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{}
+	svc := service.NewUserService(repo, imgProc)
+
+	user := &model.User{
+		ID:        "user-avatar-1",
+		Email:     "avatar1@example.com",
+		FirstName: "John",
+		LastName:  "Doe",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	pngData := createTestPNG(100, 100)
+	ct := "image/png"
+	fn := "profile.png"
+
+	req := dto.UpdateUserRequest{
+		AvatarImage:       pngData,
+		AvatarContentType: &ct,
+		AvatarFilename:    &fn,
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err != nil {
+		t.Fatalf("expected update success, got %v", err)
+	}
+
+	if imgProc.calls != 1 {
+		t.Errorf("expected 1 call to image processor, got %d", imgProc.calls)
+	}
+
+	expectedURL := "https://storage.example.com/avatars/user-avatar-1/avatar.png"
+	if updated.AvatarURL == nil || *updated.AvatarURL != expectedURL {
+		t.Errorf("expected avatar url %s, got %v", expectedURL, updated.AvatarURL)
+	}
+
+	// Verify database was updated
+	if repo.users[user.ID].AvatarURL == nil || *repo.users[user.ID].AvatarURL != expectedURL {
+		t.Errorf("expected repo avatar url to be updated to %s", expectedURL)
+	}
+}
+
+func TestUpdateUser_AvatarDataURI_Success(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{}
+	svc := service.NewUserService(repo, imgProc)
+
+	user := &model.User{
+		ID:        "user-avatar-2",
+		Email:     "avatar2@example.com",
+		FirstName: "Jane",
+		LastName:  "Doe",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	pngData := createTestPNG(80, 80)
+	b64 := base64.StdEncoding.EncodeToString(pngData)
+	dataURI := "data:image/png;base64," + b64
+
+	req := dto.UpdateUserRequest{
+		AvatarURL: &dataURI,
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err != nil {
+		t.Fatalf("expected update success, got %v", err)
+	}
+
+	if imgProc.calls != 1 {
+		t.Errorf("expected 1 call to image processor for data URI, got %d", imgProc.calls)
+	}
+
+	expectedURL := "https://storage.example.com/avatars/user-avatar-2/avatar.png"
+	if updated.AvatarURL == nil || *updated.AvatarURL != expectedURL {
+		t.Errorf("expected avatar url %s, got %v", expectedURL, updated.AvatarURL)
+	}
+}
+
+func TestUpdateUser_AvatarNormalURL_Success(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{}
+	svc := service.NewUserService(repo, imgProc)
+
+	user := &model.User{
+		ID:        "user-avatar-3",
+		Email:     "avatar3@example.com",
+		FirstName: "Alice",
+		LastName:  "Smith",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	normalURL := "https://cdn.example.com/users/alice.jpg"
+	req := dto.UpdateUserRequest{
+		AvatarURL: &normalURL,
+	}
+
+	updated, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err != nil {
+		t.Fatalf("expected update success, got %v", err)
+	}
+
+	// Normal URL must not invoke image processor
+	if imgProc.calls != 0 {
+		t.Errorf("expected 0 calls to image processor for standard URL, got %d", imgProc.calls)
+	}
+
+	if updated.AvatarURL == nil || *updated.AvatarURL != normalURL {
+		t.Errorf("expected avatar url %s, got %v", normalURL, updated.AvatarURL)
+	}
+}
+
+func TestUpdateUser_AvatarUpload_ProcessingError_DoesNotUpdateDatabase(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{
+		processFunc: func(ctx context.Context, userID string, input service.AvatarInput) (string, error) {
+			return "", appErrors.BadRequest("invalid or corrupted image data")
+		},
+	}
+	svc := service.NewUserService(repo, imgProc)
+
+	initialAvatar := "https://example.com/old-avatar.jpg"
+	user := &model.User{
+		ID:        "user-avatar-4",
+		Email:     "avatar4@example.com",
+		FirstName: "Bob",
+		LastName:  "Jones",
+		Status:    "active",
+		AvatarURL: &initialAvatar,
+	}
+	repo.users[user.ID] = user
+
+	req := dto.UpdateUserRequest{
+		AvatarImage: []byte{0x00, 0x01, 0x02},
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected error from image processor, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BAD_REQUEST code, got %s", appErr.Code)
+	}
+
+	// Database must NOT be updated
+	if *repo.users[user.ID].AvatarURL != initialAvatar {
+		t.Errorf("expected database avatar url to remain '%s', got '%s'", initialAvatar, *repo.users[user.ID].AvatarURL)
+	}
+}
+
+func TestUpdateUser_AvatarUpload_StorageError_DoesNotUpdateDatabase(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{
+		processFunc: func(ctx context.Context, userID string, input service.AvatarInput) (string, error) {
+			return "", appErrors.Internal(nil, "failed to store avatar image")
+		},
+	}
+	svc := service.NewUserService(repo, imgProc)
+
+	initialAvatar := "https://example.com/old-avatar.jpg"
+	user := &model.User{
+		ID:        "user-avatar-5",
+		Email:     "avatar5@example.com",
+		FirstName: "Charlie",
+		LastName:  "Brown",
+		Status:    "active",
+		AvatarURL: &initialAvatar,
+	}
+	repo.users[user.ID] = user
+
+	req := dto.UpdateUserRequest{
+		AvatarImage: createTestPNG(50, 50),
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected storage error, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeInternalError {
+		t.Errorf("expected INTERNAL code, got %s", appErr.Code)
+	}
+
+	// Database must NOT be updated
+	if *repo.users[user.ID].AvatarURL != initialAvatar {
+		t.Errorf("expected database avatar url to remain unchanged, got '%s'", *repo.users[user.ID].AvatarURL)
+	}
+}
+
+func TestUpdateUser_AvatarUpload_NoImageProcessor_ReturnsInternalError(t *testing.T) {
+	repo := newMockRepo()
+	// No image processor passed to constructor
+	svc := service.NewUserService(repo)
+
+	initialAvatar := "https://example.com/initial.jpg"
+	user := &model.User{
+		ID:        "user-avatar-6",
+		Email:     "avatar6@example.com",
+		FirstName: "Dave",
+		LastName:  "Miller",
+		Status:    "active",
+		AvatarURL: &initialAvatar,
+	}
+	repo.users[user.ID] = user
+
+	req := dto.UpdateUserRequest{
+		AvatarImage: createTestPNG(50, 50),
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected error when image processor is nil, got nil")
+	}
+
+	appErr := appErrors.AsAppError(err)
+	if appErr.Code != appErrors.CodeInternalError {
+		t.Errorf("expected INTERNAL code, got %s", appErr.Code)
+	}
+
+	// Database must NOT be updated
+	if *repo.users[user.ID].AvatarURL != initialAvatar {
+		t.Errorf("expected database avatar to remain unchanged")
+	}
+}
+
 
 
 

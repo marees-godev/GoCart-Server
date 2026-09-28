@@ -518,19 +518,22 @@ func (x *GetUserResponse) GetUser() *User {
 }
 
 type UpdateUserRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	FirstName      string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
-	LastName       string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
-	Phone          string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
-	Username       *string                `protobuf:"bytes,5,opt,name=username,proto3,oneof" json:"username,omitempty"`
-	AlternatePhone *string                `protobuf:"bytes,6,opt,name=alternate_phone,json=alternatePhone,proto3,oneof" json:"alternate_phone,omitempty"`
-	DateOfBirth    *string                `protobuf:"bytes,7,opt,name=date_of_birth,json=dateOfBirth,proto3,oneof" json:"date_of_birth,omitempty"`
-	Gender         *string                `protobuf:"bytes,8,opt,name=gender,proto3,oneof" json:"gender,omitempty"`
-	Bio            *string                `protobuf:"bytes,9,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
-	AvatarUrl      *string                `protobuf:"bytes,10,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FirstName         string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName          string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Phone             string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
+	Username          *string                `protobuf:"bytes,5,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	AlternatePhone    *string                `protobuf:"bytes,6,opt,name=alternate_phone,json=alternatePhone,proto3,oneof" json:"alternate_phone,omitempty"`
+	DateOfBirth       *string                `protobuf:"bytes,7,opt,name=date_of_birth,json=dateOfBirth,proto3,oneof" json:"date_of_birth,omitempty"`
+	Gender            *string                `protobuf:"bytes,8,opt,name=gender,proto3,oneof" json:"gender,omitempty"`
+	Bio               *string                `protobuf:"bytes,9,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	AvatarUrl         *string                `protobuf:"bytes,10,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
+	AvatarImage       []byte                 `protobuf:"bytes,11,opt,name=avatar_image,json=avatarImage,proto3,oneof" json:"avatar_image,omitempty"`
+	AvatarContentType *string                `protobuf:"bytes,12,opt,name=avatar_content_type,json=avatarContentType,proto3,oneof" json:"avatar_content_type,omitempty"`
+	AvatarFilename    *string                `protobuf:"bytes,13,opt,name=avatar_filename,json=avatarFilename,proto3,oneof" json:"avatar_filename,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *UpdateUserRequest) Reset() {
@@ -629,6 +632,27 @@ func (x *UpdateUserRequest) GetBio() string {
 func (x *UpdateUserRequest) GetAvatarUrl() string {
 	if x != nil && x.AvatarUrl != nil {
 		return *x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetAvatarImage() []byte {
+	if x != nil {
+		return x.AvatarImage
+	}
+	return nil
+}
+
+func (x *UpdateUserRequest) GetAvatarContentType() string {
+	if x != nil && x.AvatarContentType != nil {
+		return *x.AvatarContentType
+	}
+	return ""
+}
+
+func (x *UpdateUserRequest) GetAvatarFilename() string {
+	if x != nil && x.AvatarFilename != nil {
+		return *x.AvatarFilename
 	}
 	return ""
 }
@@ -1884,7 +1908,7 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\x0eGetUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\";\n" +
 	"\x0fGetUserResponse\x12(\n" +
-	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"\x9a\x03\n" +
+	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"\xe2\x04\n" +
 	"\x11UpdateUserRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1898,13 +1922,19 @@ const file_contracts_protobuf_user_user_proto_rawDesc = "" +
 	"\x03bio\x18\t \x01(\tH\x04R\x03bio\x88\x01\x01\x12\"\n" +
 	"\n" +
 	"avatar_url\x18\n" +
-	" \x01(\tH\x05R\tavatarUrl\x88\x01\x01B\v\n" +
+	" \x01(\tH\x05R\tavatarUrl\x88\x01\x01\x12&\n" +
+	"\favatar_image\x18\v \x01(\fH\x06R\vavatarImage\x88\x01\x01\x123\n" +
+	"\x13avatar_content_type\x18\f \x01(\tH\aR\x11avatarContentType\x88\x01\x01\x12,\n" +
+	"\x0favatar_filename\x18\r \x01(\tH\bR\x0eavatarFilename\x88\x01\x01B\v\n" +
 	"\t_usernameB\x12\n" +
 	"\x10_alternate_phoneB\x10\n" +
 	"\x0e_date_of_birthB\t\n" +
 	"\a_genderB\x06\n" +
 	"\x04_bioB\r\n" +
-	"\v_avatar_url\">\n" +
+	"\v_avatar_urlB\x0f\n" +
+	"\r_avatar_imageB\x16\n" +
+	"\x14_avatar_content_typeB\x12\n" +
+	"\x10_avatar_filename\">\n" +
 	"\x12UpdateUserResponse\x12(\n" +
 	"\x04user\x18\x01 \x01(\v2\x14.gocart.user.v1.UserR\x04user\"\xd5\x02\n" +
 	"\x18CreateUserAddressRequest\x12\x17\n" +

@@ -48,6 +48,7 @@ input UpdateUserInput {
   gender: Gender
   bio: String
   avatarUrl: String
+  avatar: Upload
 }
 
 type AccountActionResponse {
