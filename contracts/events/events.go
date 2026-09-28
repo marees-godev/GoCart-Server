@@ -57,9 +57,9 @@ type ReservedItemPayload struct {
 
 // InventoryReservationFailedEvent represents the payload when inventory reservation fails.
 type InventoryReservationFailedEvent struct {
-	OrderID   string    `json:"order_id"`
-	Reason    string    `json:"reason"`
-	FailedAt  time.Time `json:"failed_at"`
+	OrderID  string    `json:"order_id"`
+	Reason   string    `json:"reason"`
+	FailedAt time.Time `json:"failed_at"`
 }
 
 // UserRegisteredEvent represents the payload for auth.user.registered domain event.
@@ -84,3 +84,46 @@ type MerchantRegisteredEvent struct {
 	RegisteredAt time.Time `json:"registered_at,omitempty"`
 }
 
+// StoreCreatedEvent represents the payload for StoreCreated domain event.
+type StoreCreatedEvent struct {
+	StoreID       string    `json:"store_id"`
+	MerchantID    string    `json:"merchant_id"`
+	Name          string    `json:"name"`
+	Slug          string    `json:"slug"`
+	BusinessEmail string    `json:"business_email,omitempty"`
+	BusinessPhone string    `json:"business_phone,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// StoreSubmittedEvent represents the payload for StoreSubmitted domain event.
+type StoreSubmittedEvent struct {
+	StoreID     string    `json:"store_id"`
+	MerchantID  string    `json:"merchant_id"`
+	SubmittedAt time.Time `json:"submitted_at"`
+}
+
+// StoreApprovedEvent represents the payload for StoreApproved domain event.
+type StoreApprovedEvent struct {
+	StoreID    string    `json:"store_id"`
+	MerchantID string    `json:"merchant_id"`
+	AdminID    string    `json:"admin_id,omitempty"`
+	ApprovedAt time.Time `json:"approved_at"`
+}
+
+// StoreRejectedEvent represents the payload for StoreRejected domain event.
+type StoreRejectedEvent struct {
+	StoreID    string    `json:"store_id"`
+	MerchantID string    `json:"merchant_id"`
+	AdminID    string    `json:"admin_id,omitempty"`
+	Reason     string    `json:"reason"`
+	RejectedAt time.Time `json:"rejected_at"`
+}
+
+// StoreSuspendedEvent represents the payload for StoreSuspended domain event.
+type StoreSuspendedEvent struct {
+	StoreID     string    `json:"store_id"`
+	MerchantID  string    `json:"merchant_id"`
+	AdminID     string    `json:"admin_id,omitempty"`
+	Reason      string    `json:"reason,omitempty"`
+	SuspendedAt time.Time `json:"suspended_at"`
+}

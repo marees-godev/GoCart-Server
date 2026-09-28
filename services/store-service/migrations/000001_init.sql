@@ -58,3 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_stores_is_vacation_mode ON stores(is_vacation_mod
 CREATE INDEX IF NOT EXISTS idx_store_bank_accounts_store_id ON store_bank_accounts(store_id);
 CREATE INDEX IF NOT EXISTS idx_store_outbox_status_created ON outbox_events(status, created_at);
 
+ALTER TABLE store_bank_accounts ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(100);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS gstin VARCHAR(15);
+
+

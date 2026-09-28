@@ -17,13 +17,26 @@ const (
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
+
+	// Store Service Events
+	EventTypeStoreCreated   = "StoreCreated"
+	EventTypeStoreSubmitted = "StoreSubmitted"
+	EventTypeStoreApproved  = "StoreApproved"
+	EventTypeStoreRejected  = "StoreRejected"
+	EventTypeStoreSuspended = "StoreSuspended"
 )
 
 // Standard Topic Constants
 const (
 	TopicUserRegistered = "gocart.auth.user-registered"
-)
 
+	// Store Service Topics
+	TopicStoreCreated   = "gocart.store.store-created"
+	TopicStoreSubmitted = "gocart.store.store-submitted"
+	TopicStoreApproved  = "gocart.store.store-approved"
+	TopicStoreRejected  = "gocart.store.store-rejected"
+	TopicStoreSuspended = "gocart.store.store-suspended"
+)
 
 // EventEnvelope is the standard envelope for all domain events across GoCart.
 type EventEnvelope struct {

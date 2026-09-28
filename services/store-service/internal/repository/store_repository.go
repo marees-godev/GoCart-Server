@@ -11,7 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/model"
 )
 
@@ -24,8 +26,8 @@ type StoreRepository interface {
 	GetBySlug(ctx context.Context, slug string) (*model.Store, error)
 	List(ctx context.Context, merchantID string, limit, offset int) ([]*model.Store, int, error)
 	Update(ctx context.Context, store *model.Store) error
-	UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error)
-	UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string) (*model.Store, error)
+	UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error)
+	UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error)
 	SubmitKYC(ctx context.Context, storeID string, kycStatus string, bankAccount *model.StoreBankAccount) (*model.Store, error)
 	SetPublishStatus(ctx context.Context, storeID string, isPublished bool) (*model.Store, error)
 	IsSlugAvailable(ctx context.Context, slug string, excludeID string) (bool, error)
@@ -37,11 +39,21 @@ type StoreRepository interface {
 }
 
 type pgStoreRepository struct {
-	pool *pgxpool.Pool
+	pool        *pgxpool.Pool
+	outboxStore *outbox.Store
 }
 
-func NewStoreRepository(pool *pgxpool.Pool) StoreRepository {
-	return &pgStoreRepository{pool: pool}
+func NewStoreRepository(pool *pgxpool.Pool, outboxStore ...*outbox.Store) StoreRepository {
+	var ob *outbox.Store
+	if len(outboxStore) > 0 && outboxStore[0] != nil {
+		ob = outboxStore[0]
+	} else {
+		ob = outbox.NewStore()
+	}
+	return &pgStoreRepository{
+		pool:        pool,
+		outboxStore: ob,
+	}
 }
 
 func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
@@ -127,6 +139,35 @@ func (r *pgStoreRepository) Create(ctx context.Context, s *model.Store) error {
 		s.BankAccount = ba
 	}
 
+	// Publish StoreCreated Event into Outbox within the SAME transaction
+	evtPayload := events.StoreCreatedEvent{
+		StoreID:       s.ID,
+		MerchantID:    s.MerchantID,
+		Name:          s.Name,
+		Slug:          s.Slug,
+		BusinessEmail: s.BusinessEmail,
+		BusinessPhone: s.BusinessPhone,
+		CreatedAt:     s.CreatedAt,
+	}
+	env, err := events.NewEventEnvelope(events.EventTypeStoreCreated, "store-service", evtPayload)
+	if err != nil {
+		return appErrors.Internal(err, "failed to create StoreCreated event envelope")
+	}
+	payloadBytes, err := env.Marshal()
+	if err != nil {
+		return appErrors.Internal(err, "failed to marshal StoreCreated event envelope")
+	}
+	outboxEvt := &outbox.Event{
+		AggregateType: "store",
+		AggregateID:   s.ID,
+		EventType:     events.EventTypeStoreCreated,
+		Payload:       payloadBytes,
+		Topic:         events.TopicStoreCreated,
+	}
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		return appErrors.Internal(err, "failed to insert outbox event for StoreCreated")
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return appErrors.Internal(err, "failed to commit create store transaction")
 	}
@@ -140,14 +181,14 @@ const selectStoreWithBankSQL = `
 		s.description, s.logo_url, s.address, s.is_vacation_mode, s.approval_status,
 		s.rejection_reason, s.is_published, s.kyc_status, s.gstin, s.avg_store_rating, s.created_at, s.updated_at,
 		b.id, b.account_holder_name, b.account_number, b.ifsc_code,
-		b.bank_name, b.gstin, b.created_at, b.updated_at
+		b.bank_name, b.created_at, b.updated_at
 	FROM stores s
 	LEFT JOIN store_bank_accounts b ON s.id = b.store_id
 `
 
 func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 	var s model.Store
-	var bID, bHolder, bNumber, bIFSC, bBank, bGSTIN *string
+	var bID, bHolder, bNumber, bIFSC, bBank *string
 	var bCreatedAt, bUpdatedAt *time.Time
 
 	err := row.Scan(
@@ -174,7 +215,6 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 		&bNumber,
 		&bIFSC,
 		&bBank,
-		&bGSTIN,
 		&bCreatedAt,
 		&bUpdatedAt,
 	)
@@ -204,7 +244,7 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 			AccountNumber:     number,
 			IfscCode:          bIFSC,
 			BankName:          bankName,
-			GSTIN:             bGSTIN,
+			GSTIN:             s.GSTIN,
 		}
 		if bCreatedAt != nil {
 			ba.CreatedAt = *bCreatedAt
@@ -213,7 +253,6 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 			ba.UpdatedAt = *bUpdatedAt
 		}
 		s.BankAccount = ba
-		s.GSTIN = bGSTIN
 
 		if bytes, jsonErr := json.Marshal(ba); jsonErr == nil {
 			str := string(bytes)
@@ -225,12 +264,20 @@ func (r *pgStoreRepository) scanStoreRow(row pgx.Row) (*model.Store, error) {
 }
 
 func (r *pgStoreRepository) GetByID(ctx context.Context, id string) (*model.Store, error) {
+	trimmedID := strings.TrimSpace(id)
+	if trimmedID == "" {
+		return nil, appErrors.BadRequest("store ID is required")
+	}
+	if !uuidRegex.MatchString(trimmedID) {
+		return nil, appErrors.NotFound("store not found")
+	}
+
 	query := selectStoreWithBankSQL + " WHERE s.id = $1"
-	row := r.pool.QueryRow(ctx, query, id)
+	row := r.pool.QueryRow(ctx, query, trimmedID)
 
 	s, err := r.scanStoreRow(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(err.Error(), "invalid input syntax") {
 			return nil, appErrors.NotFound("store not found")
 		}
 		return nil, appErrors.Internal(err, "failed to query store by id")
@@ -240,12 +287,20 @@ func (r *pgStoreRepository) GetByID(ctx context.Context, id string) (*model.Stor
 }
 
 func (r *pgStoreRepository) GetByMerchantID(ctx context.Context, merchantID string) (*model.Store, error) {
+	trimmedID := strings.TrimSpace(merchantID)
+	if trimmedID == "" {
+		return nil, appErrors.BadRequest("merchant ID is required")
+	}
+	if !uuidRegex.MatchString(trimmedID) {
+		return nil, appErrors.NotFound("store not found for this merchant")
+	}
+
 	query := selectStoreWithBankSQL + " WHERE s.merchant_id = $1 ORDER BY s.created_at DESC LIMIT 1"
-	row := r.pool.QueryRow(ctx, query, merchantID)
+	row := r.pool.QueryRow(ctx, query, trimmedID)
 
 	s, err := r.scanStoreRow(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || strings.Contains(err.Error(), "invalid input syntax") {
 			return nil, appErrors.NotFound("store not found for this merchant")
 		}
 		return nil, appErrors.Internal(err, "failed to query store by merchant_id")
@@ -465,16 +520,16 @@ func (r *pgStoreRepository) IsSlugAvailable(ctx context.Context, slug string, ex
 	return count == 0, nil
 }
 
-func (r *pgStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error) {
+func (r *pgStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return nil, appErrors.Internal(err, "failed to start transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var currentStatus string
-	checkQuery := `SELECT approval_status FROM stores WHERE id = $1 FOR UPDATE`
-	err = tx.QueryRow(ctx, checkQuery, id).Scan(&currentStatus)
+	var currentStatus, merchantID string
+	checkQuery := `SELECT approval_status, merchant_id FROM stores WHERE id = $1 FOR UPDATE`
+	err = tx.QueryRow(ctx, checkQuery, id).Scan(&currentStatus, &merchantID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, appErrors.NotFound("store not found")
@@ -496,6 +551,66 @@ func (r *pgStoreRepository) UpdateStatus(ctx context.Context, id string, expecte
 		return nil, appErrors.Internal(err, "failed to update store status")
 	}
 
+	var actor string
+	if len(actorID) > 0 {
+		actor = actorID[0]
+	}
+
+	var env *events.EventEnvelope
+	var topic string
+
+	switch newStatus {
+	case model.StoreStatusPendingApproval:
+		env, err = events.NewEventEnvelope(events.EventTypeStoreSubmitted, "store-service", events.StoreSubmittedEvent{
+			StoreID:     id,
+			MerchantID:  merchantID,
+			SubmittedAt: time.Now().UTC(),
+		})
+		topic = events.TopicStoreSubmitted
+
+	case model.StoreStatusApproved:
+		env, err = events.NewEventEnvelope(events.EventTypeStoreApproved, "store-service", events.StoreApprovedEvent{
+			StoreID:    id,
+			MerchantID: merchantID,
+			AdminID:    actor,
+			ApprovedAt: time.Now().UTC(),
+		})
+		topic = events.TopicStoreApproved
+
+	case model.StoreStatusRejected:
+		reason := ""
+		if rejectionReason != nil {
+			reason = *rejectionReason
+		}
+		env, err = events.NewEventEnvelope(events.EventTypeStoreRejected, "store-service", events.StoreRejectedEvent{
+			StoreID:    id,
+			MerchantID: merchantID,
+			AdminID:    actor,
+			Reason:     reason,
+			RejectedAt: time.Now().UTC(),
+		})
+		topic = events.TopicStoreRejected
+	}
+
+	if env != nil && err == nil {
+		payloadBytes, marshalErr := env.Marshal()
+		if marshalErr != nil {
+			return nil, appErrors.Internal(marshalErr, "failed to marshal outbox event envelope")
+		}
+		outboxEvt := &outbox.Event{
+			AggregateType: "store",
+			AggregateID:   id,
+			EventType:     env.EventType,
+			Payload:       payloadBytes,
+			Topic:         topic,
+		}
+		if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+			return nil, appErrors.Internal(err, "failed to insert outbox event")
+		}
+	} else if err != nil {
+		return nil, appErrors.Internal(err, "failed to create outbox event envelope")
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, appErrors.Internal(err, "failed to commit status update transaction")
 	}
@@ -503,7 +618,23 @@ func (r *pgStoreRepository) UpdateStatus(ctx context.Context, id string, expecte
 	return r.GetByID(ctx, id)
 }
 
-func (r *pgStoreRepository) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string) (*model.Store, error) {
+func (r *pgStoreRepository) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to start transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var currentStatus, merchantID string
+	checkQuery := `SELECT approval_status, merchant_id FROM stores WHERE id = $1 FOR UPDATE`
+	err = tx.QueryRow(ctx, checkQuery, id).Scan(&currentStatus, &merchantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("store not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query store status")
+	}
+
 	var updateQuery string
 	if newStatus == model.StoreStatusSuspended || newStatus == model.StoreStatusClosed {
 		updateQuery = `
@@ -518,13 +649,57 @@ func (r *pgStoreRepository) UpdateApprovalStatus(ctx context.Context, id string,
 			WHERE id = $3
 		`
 	}
-	tag, err := r.pool.Exec(ctx, updateQuery, newStatus, rejectionReason, id)
+	_, err = tx.Exec(ctx, updateQuery, newStatus, rejectionReason, id)
 	if err != nil {
 		return nil, appErrors.Internal(err, "failed to update approval status")
 	}
-	if tag.RowsAffected() == 0 {
-		return nil, appErrors.NotFound("store not found")
+
+	var actor string
+	if len(actorID) > 0 {
+		actor = actorID[0]
 	}
+
+	var env *events.EventEnvelope
+	var topic string
+
+	if newStatus == model.StoreStatusSuspended {
+		reason := ""
+		if rejectionReason != nil {
+			reason = *rejectionReason
+		}
+		env, err = events.NewEventEnvelope(events.EventTypeStoreSuspended, "store-service", events.StoreSuspendedEvent{
+			StoreID:     id,
+			MerchantID:  merchantID,
+			AdminID:     actor,
+			Reason:      reason,
+			SuspendedAt: time.Now().UTC(),
+		})
+		topic = events.TopicStoreSuspended
+	}
+
+	if env != nil && err == nil {
+		payloadBytes, marshalErr := env.Marshal()
+		if marshalErr != nil {
+			return nil, appErrors.Internal(marshalErr, "failed to marshal outbox event envelope")
+		}
+		outboxEvt := &outbox.Event{
+			AggregateType: "store",
+			AggregateID:   id,
+			EventType:     env.EventType,
+			Payload:       payloadBytes,
+			Topic:         topic,
+		}
+		if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+			return nil, appErrors.Internal(err, "failed to insert outbox event")
+		}
+	} else if err != nil {
+		return nil, appErrors.Internal(err, "failed to create outbox event envelope")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, appErrors.Internal(err, "failed to commit approval status transaction")
+	}
+
 	return r.GetByID(ctx, id)
 }
 
@@ -556,16 +731,14 @@ func (r *pgStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycSt
 					account_number = $2,
 					ifsc_code = $3,
 					bank_name = $4,
-					gstin = $5,
 					updated_at = NOW()
-				WHERE id = $6 AND store_id = $7
+				WHERE id = $5 AND store_id = $6
 			`
 			_, err = tx.Exec(ctx, updateBankSQL,
 				bank.AccountHolderName,
 				bank.AccountNumber,
 				bank.IfscCode,
 				bank.BankName,
-				bank.GSTIN,
 				existingID,
 				storeID,
 			)
@@ -573,9 +746,9 @@ func (r *pgStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycSt
 			insertBankSQL := `
 				INSERT INTO store_bank_accounts (
 					store_id, account_holder_name, account_number, ifsc_code,
-					bank_name, gstin, created_at, updated_at
+					bank_name, created_at, updated_at
 				) VALUES (
-					$1, $2, $3, $4, $5, $6, NOW(), NOW()
+					$1, $2, $3, $4, $5, NOW(), NOW()
 				)
 			`
 			_, err = tx.Exec(ctx, insertBankSQL,
@@ -584,7 +757,6 @@ func (r *pgStoreRepository) SubmitKYC(ctx context.Context, storeID string, kycSt
 				bank.AccountNumber,
 				bank.IfscCode,
 				bank.BankName,
-				bank.GSTIN,
 			)
 		}
 		if err != nil {
