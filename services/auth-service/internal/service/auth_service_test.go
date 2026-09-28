@@ -101,7 +101,13 @@ func (m *mockAuthRepository) CreateLoginSession(ctx context.Context, refreshToke
 	if m.createSessionErr != nil {
 		return m.createSessionErr
 	}
-	m.refreshTokens = append(m.refreshTokens, refreshToken)
+	filtered := make([]*model.RefreshToken, 0, len(m.refreshTokens))
+	for _, rt := range m.refreshTokens {
+		if rt.UserID != refreshToken.UserID {
+			filtered = append(filtered, rt)
+		}
+	}
+	m.refreshTokens = append(filtered, refreshToken)
 	if evt != nil {
 		m.outboxEvents = append(m.outboxEvents, evt)
 	}
@@ -132,9 +138,24 @@ func (m *mockAuthRepository) DeleteCredential(ctx context.Context, id uuid.UUID)
 }
 
 
-func (m *mockAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
+func (m *mockAuthRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error) {
+	for _, cred := range m.byEmail {
+		if cred.UserID == userID {
+			return cred, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (m *mockAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	for _, rt := range m.refreshTokens {
 		if rt.TokenHash == tokenHash {
+			if userIDOrEmail != "" {
+				cred, _ := m.GetByUserID(ctx, rt.UserID)
+				if rt.UserID.String() != userIDOrEmail && (cred == nil || cred.Email != userIDOrEmail) {
+					continue
+				}
+			}
 			return rt, nil
 		}
 	}
@@ -148,6 +169,16 @@ func (m *mockAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUI
 			return nil
 		}
 	}
+	return nil
+}
+
+func (m *mockAuthRepository) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
+	for _, rt := range m.refreshTokens {
+		if rt.ID == oldTokenID {
+			rt.Revoked = true
+		}
+	}
+	m.refreshTokens = append(m.refreshTokens, newToken)
 	return nil
 }
 
@@ -1230,6 +1261,238 @@ func TestOTP_CaseInsensitiveEmailHandling(t *testing.T) {
 		t.Errorf("expected ErrOTPNotFound after deletion, got: %v", err)
 	}
 }
+
+func TestRefreshToken_Success_And_Rotation(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	userEmail := "refresh.user@example.com"
+	mockRepo.byEmail[userEmail] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         userEmail,
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+
+	rawInitialToken := "valid-initial-refresh-token-12345"
+	initialTokenHash := hashToken(rawInitialToken)
+	initialTokenModel := &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: initialTokenHash,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		Revoked:   false,
+	}
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, initialTokenModel)
+
+	resp, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawInitialToken,
+	})
+	if err != nil {
+		t.Fatalf("expected successful refresh, got: %v", err)
+	}
+
+	if resp.AccessToken == "" {
+		t.Error("expected non-empty access token")
+	}
+	if resp.RefreshToken == "" || resp.RefreshToken == rawInitialToken {
+		t.Errorf("expected new rotated refresh token, got %s", resp.RefreshToken)
+	}
+	if resp.UserID != userID.String() {
+		t.Errorf("expected user_id %s, got %s", userID.String(), resp.UserID)
+	}
+
+	// Verify old initial refresh token is marked revoked
+	if !initialTokenModel.Revoked {
+		t.Error("expected initial refresh token to be revoked after rotation")
+	}
+
+	// Verify new rotated refresh token exists in repository
+	rotatedHash := hashToken(resp.RefreshToken)
+	foundRotated := false
+	for _, rt := range mockRepo.refreshTokens {
+		if rt.TokenHash == rotatedHash {
+			foundRotated = true
+			if rt.Revoked {
+				t.Error("expected new rotated token to be active, not revoked")
+			}
+			if rt.ExpiresAt.Before(time.Now().Add(6 * 24 * time.Hour)) {
+				t.Error("expected new rotated token to have 7-day expiration")
+			}
+		}
+	}
+	if !foundRotated {
+		t.Error("expected new rotated refresh token to be stored in repository")
+	}
+
+	// Reusing rotated/revoked initial refresh token must fail
+	_, err = svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawInitialToken,
+	})
+	if err == nil {
+		t.Error("expected reuse of rotated refresh token to be rejected")
+	}
+}
+
+func TestRefreshToken_ExpiredToken_Rejected(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["expired@example.com"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   userID,
+		Email:    "expired@example.com",
+		Role:     model.RoleCustomer,
+		IsActive: true,
+	}
+
+	rawExpiredToken := "expired-refresh-token-999"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: hashToken(rawExpiredToken),
+		ExpiresAt: time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
+		Revoked:   false,
+	})
+
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawExpiredToken,
+	})
+	if err == nil {
+		t.Error("expected expired refresh token to be rejected")
+	}
+}
+
+func TestRefreshToken_RevokedToken_Rejected(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["revoked@example.com"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   userID,
+		Email:    "revoked@example.com",
+		Role:     model.RoleCustomer,
+		IsActive: true,
+	}
+
+	rawRevokedToken := "revoked-refresh-token-888"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: hashToken(rawRevokedToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   true,
+	})
+
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawRevokedToken,
+	})
+	if err == nil {
+		t.Error("expected revoked refresh token to be rejected")
+	}
+}
+
+func TestRefreshToken_InvalidToken_Rejected(t *testing.T) {
+	svc, _, _ := setupTestService()
+
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: "non-existent-token-abc",
+	})
+	if err == nil {
+		t.Error("expected invalid refresh token to be rejected")
+	}
+}
+
+func TestRefreshToken_DeactivatedUser_Rejected(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["deactivated@example.com"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   userID,
+		Email:    "deactivated@example.com",
+		Role:     model.RoleCustomer,
+		IsActive: false, // Deactivated!
+	}
+
+	rawToken := "deactivated-user-token-777"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   false,
+	})
+
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawToken,
+	})
+	if err == nil {
+		t.Error("expected deactivated user session refresh to be rejected")
+	}
+}
+
+func TestRefreshToken_MissingToken_Rejected(t *testing.T) {
+	svc, _, _ := setupTestService()
+
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: "",
+	})
+	if err == nil {
+		t.Error("expected empty refresh token to be rejected")
+	}
+
+	_, err = svc.RefreshToken(context.Background(), nil)
+	if err == nil {
+		t.Error("expected nil request to be rejected")
+	}
+}
+
+func TestRefreshToken_WithAccessTokenJWT(t *testing.T) {
+	svc, mockRepo, cfg := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["jwtuser@example.com"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   userID,
+		Email:    "jwtuser@example.com",
+		Role:     model.RoleCustomer,
+		IsActive: true,
+	}
+
+	rawToken := "jwt-refresh-token-999"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: hashToken(rawToken),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   false,
+	})
+
+	accessToken, err := auth.GenerateToken(auth.UserContext{
+		UserID: userID.String(),
+		Email:  "jwtuser@example.com",
+		Role:   "CUSTOMER",
+	}, cfg.JWT.Secret, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+
+	resp, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawToken,
+		AccessToken:  accessToken,
+	})
+	if err != nil {
+		t.Fatalf("expected successful refresh with access token, got: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Errorf("expected new access and refresh tokens, got empty")
+	}
+}
+
 
 
 

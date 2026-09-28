@@ -454,13 +454,6 @@ func TestE2E_GatewayRateLimiting(t *testing.T) {
 	}()
 
 	cfg := &config.Config{
-		App: config.AppConfig{
-			Name: "api-gateway",
-		},
-		GRPC: config.GRPCConfig{
-			CartServiceAddr: "passthrough://bufnet",
-			DefaultTimeout:  2 * time.Second,
-		},
 		RateLimit: config.RateLimitConfig{
 			Enabled: true,
 			Max:     2,

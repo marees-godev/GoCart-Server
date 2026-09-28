@@ -13,6 +13,7 @@ import (
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"google.golang.org/grpc/metadata"
@@ -73,6 +74,18 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		Token: res.AccessToken,
 		User:  user,
 	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
 	if res.Role != "" {
 		rStr := res.Role
 		payload.Role = &rStr
@@ -130,9 +143,14 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		}
 
 		if merchantClient != nil && res.UserId != "" {
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: res.UserId,
+				Role:   string(model.RoleMerchant),
+				Email:  input.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", res.UserId,
-				"x-user-role", "MERCHANT",
+				"x-user-role", string(model.RoleMerchant),
 			))
 			mRes, _ := merchantClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{UserId: res.UserId})
 			if mRes != nil && mRes.Merchant != nil {
@@ -246,6 +264,18 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		Token: res.AccessToken,
 		User:  user,
 	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
 
 	if res.Role != "" {
 		rStr := res.Role
@@ -306,6 +336,65 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 			BusinessEmail: &bEmail,
 			Status:        status,
 		}
+	}
+
+	return payload, nil
+}
+
+// RefreshToken is the resolver for the refreshToken field.
+func (r *mutationResolver) RefreshToken(ctx context.Context, input model.RefreshTokenInput) (*model.AuthPayload, error) {
+	if strings.TrimSpace(input.RefreshToken) == "" {
+		return nil, appErrors.BadRequest("refresh_token is required")
+	}
+
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.RefreshToken(ctx, &authpb.RefreshTokenRequest{
+		RefreshToken: input.RefreshToken,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	refToken := res.GetRefreshToken()
+	tokenType := res.GetTokenType()
+	expiresIn := int(res.GetExpiresIn())
+
+	payload := &model.AuthPayload{
+		Token:        res.GetAccessToken(),
+		RefreshToken: &refToken,
+		TokenType:    &tokenType,
+		ExpiresIn:    &expiresIn,
+	}
+	if res.GetUserId() != "" {
+		payload.User = &model.User{
+			ID: res.GetUserId(),
+		}
+	}
+	if res.GetRole() != "" {
+		roleStr := res.GetRole()
+		payload.Role = &roleStr
+	}
+	if res.GetMerchantId() != "" {
+		mID := res.GetMerchantId()
+		payload.MerchantID = &mID
+	}
+	if res.GetFirstName() != "" {
+		fn := res.GetFirstName()
+		payload.FirstName = &fn
+	}
+	if res.GetLastName() != "" {
+		ln := res.GetLastName()
+		payload.LastName = &ln
 	}
 
 	return payload, nil
