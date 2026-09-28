@@ -73,6 +73,18 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		Token: res.AccessToken,
 		User:  user,
 	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
 	if res.Role != "" {
 		rStr := res.Role
 		payload.Role = &rStr
@@ -245,6 +257,18 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	payload := &model.AuthPayload{
 		Token: res.AccessToken,
 		User:  user,
+	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
 	}
 
 	if res.Role != "" {

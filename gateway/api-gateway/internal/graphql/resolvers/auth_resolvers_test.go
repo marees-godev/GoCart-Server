@@ -21,10 +21,11 @@ type mockAuthClient struct {
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
 	m.lastRegisterReq = in
 	return &authpb.AuthResponse{
-		AccessToken: "test-access-token",
-		TokenType:   "Bearer",
-		ExpiresIn:   900,
-		UserId:      "user-uuid-123",
+		AccessToken:  "test-access-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "user-uuid-123",
 	}, nil
 }
 
@@ -35,11 +36,12 @@ func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opt
 		role = "MERCHANT"
 	}
 	return &authpb.AuthResponse{
-		AccessToken: "test-login-token",
-		TokenType:   "Bearer",
-		ExpiresIn:   900,
-		UserId:      "user-uuid-123",
-		Role:        role,
+		AccessToken:  "test-login-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "user-uuid-123",
+		Role:         role,
 	}, nil
 }
 
@@ -209,6 +211,9 @@ func TestLoginResolver_Customer(t *testing.T) {
 
 	if payload.Token != "test-login-token" {
 		t.Errorf("expected token 'test-login-token', got '%s'", payload.Token)
+	}
+	if payload.RefreshToken == nil || *payload.RefreshToken != "test-refresh-token" {
+		t.Errorf("expected refresh token 'test-refresh-token', got %v", payload.RefreshToken)
 	}
 	if authMock.lastLoginReq == nil {
 		t.Fatal("expected AuthClient.Login to be called")
