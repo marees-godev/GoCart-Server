@@ -49,6 +49,9 @@ type Address struct {
 
 type AuthPayload struct {
 	Token         string    `json:"token"`
+	RefreshToken  *string   `json:"refreshToken,omitempty"`
+	TokenType     *string   `json:"tokenType,omitempty"`
+	ExpiresIn     *int      `json:"expiresIn,omitempty"`
 	User          *User     `json:"user"`
 	MerchantID    *string   `json:"merchantId,omitempty"`
 	BusinessEmail *string   `json:"businessEmail,omitempty"`
@@ -298,6 +301,10 @@ type Rating struct {
 	Rating    int     `json:"rating"`
 	Comment   *string `json:"comment,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
+}
+
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refreshToken"`
 }
 
 type RefundPayload struct {

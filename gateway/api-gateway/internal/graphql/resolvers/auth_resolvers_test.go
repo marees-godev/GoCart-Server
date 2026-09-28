@@ -8,6 +8,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	grpcPkg "google.golang.org/grpc"
 )
 
@@ -20,10 +21,11 @@ type mockAuthClient struct {
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
 	m.lastRegisterReq = in
 	return &authpb.AuthResponse{
-		AccessToken: "test-access-token",
-		TokenType:   "Bearer",
-		ExpiresIn:   900,
-		UserId:      "user-uuid-123",
+		AccessToken:  "test-access-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "user-uuid-123",
 	}, nil
 }
 
@@ -34,11 +36,12 @@ func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opt
 		role = "MERCHANT"
 	}
 	return &authpb.AuthResponse{
-		AccessToken: "test-login-token",
-		TokenType:   "Bearer",
-		ExpiresIn:   900,
-		UserId:      "user-uuid-123",
-		Role:        role,
+		AccessToken:  "test-login-token",
+		RefreshToken: "test-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "user-uuid-123",
+		Role:         role,
 	}, nil
 }
 
@@ -209,6 +212,9 @@ func TestLoginResolver_Customer(t *testing.T) {
 	if payload.Token != "test-login-token" {
 		t.Errorf("expected token 'test-login-token', got '%s'", payload.Token)
 	}
+	if payload.RefreshToken == nil || *payload.RefreshToken != "test-refresh-token" {
+		t.Errorf("expected refresh token 'test-refresh-token', got %v", payload.RefreshToken)
+	}
 	if authMock.lastLoginReq == nil {
 		t.Fatal("expected AuthClient.Login to be called")
 	}
@@ -266,5 +272,53 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	}
 	if payload.Merchant == nil {
 		t.Errorf("expected Merchant payload to be populated")
+	}
+}
+
+func (m *mockAuthClient) RefreshToken(ctx context.Context, in *authpb.RefreshTokenRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	if in.GetRefreshToken() == "valid-refresh-token" {
+		return &authpb.AuthResponse{
+			AccessToken:  "new-access-token",
+			RefreshToken: "new-refresh-token",
+			TokenType:    "Bearer",
+			ExpiresIn:    900,
+			UserId:       "user-123",
+			Role:         "CUSTOMER",
+		}, nil
+	}
+	return nil, appErrors.MapAppErrorToGRPC(appErrors.Unauthorized("invalid refresh token"))
+}
+
+func TestRefreshTokenResolver(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	payload, err := r.RefreshToken(context.Background(), model.RefreshTokenInput{
+		RefreshToken: "valid-refresh-token",
+	})
+	if err != nil {
+		t.Fatalf("expected successful refresh, got: %v", err)
+	}
+
+	if payload.Token != "new-access-token" {
+		t.Errorf("expected token 'new-access-token', got '%s'", payload.Token)
+	}
+	if payload.RefreshToken == nil || *payload.RefreshToken != "new-refresh-token" {
+		t.Errorf("expected refresh token 'new-refresh-token', got %v", payload.RefreshToken)
+	}
+
+	_, errInvalid := r.RefreshToken(context.Background(), model.RefreshTokenInput{
+		RefreshToken: "invalid-token",
+	})
+	if errInvalid == nil {
+		t.Errorf("expected error for invalid refresh token, got nil")
 	}
 }

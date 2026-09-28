@@ -74,6 +74,7 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			} else if uID, ok := ctx.Value(userIDKey).(string); ok && uID != "" {
 				md.Set(HeaderUserID, uID)
 			}
+
 			if role, ok := ctx.Value(userRoleKey).(string); ok && role != "" {
 				md.Set(HeaderUserRole, role)
 			}

@@ -1,5 +1,8 @@
 type AuthPayload {
   token: String!
+  refreshToken: String
+  tokenType: String
+  expiresIn: Int
   user: User!
   merchantId: ID
   businessEmail: String
@@ -23,10 +26,16 @@ input RegisterInput {
   isMerchant: Boolean!
 }
 
+input RefreshTokenInput {
+  refreshToken: String!
+}
+
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  refreshToken(input: RefreshTokenInput!): AuthPayload!
   verifyEmail(email: String!, otp: String!): Boolean!
   resendVerificationEmail(email: String!): Boolean!
 }
+
 

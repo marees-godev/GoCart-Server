@@ -99,11 +99,24 @@ func (r *inMemoryAuthRepo) CreateLoginSession(ctx context.Context, refreshToken 
 	return nil
 }
 
-func (r *inMemoryAuthRepo) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
+func (r *inMemoryAuthRepo) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error) {
+	for _, cred := range r.byEmailRole {
+		if cred.UserID == userID {
+			return cred, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (r *inMemoryAuthRepo) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	return nil, repository.ErrNotFound
 }
 
 func (r *inMemoryAuthRepo) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (r *inMemoryAuthRepo) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
 	return nil
 }
 

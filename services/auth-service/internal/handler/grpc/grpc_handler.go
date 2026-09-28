@@ -98,6 +98,7 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.RefreshToken(ctx, &dto.RefreshTokenRequest{
 		RefreshToken: req.GetRefreshToken(),
+		AccessToken:  req.GetAccessToken(),
 	})
 	if err != nil {
 		h.logger.Error("Failed to bind request", slog.Any("error", err))

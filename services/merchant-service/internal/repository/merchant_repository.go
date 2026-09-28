@@ -66,7 +66,7 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 
 func (r *pgMerchantRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Merchant, error) {
 	query := `
-		SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at
+		SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status::text, rejection_reason, created_at, updated_at
 		FROM merchants
 		WHERE id = $1
 	`
@@ -89,14 +89,14 @@ func (r *pgMerchantRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, appErrors.NotFound("merchant not found")
 		}
-		return nil, appErrors.Internal(err, "failed to query merchant by id")
+		return nil, appErrors.Internal(err, "failed to query merchant by id: "+err.Error())
 	}
 	return &m, nil
 }
 
 func (r *pgMerchantRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.Merchant, error) {
 	query := `
-		SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at
+		SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status::text, rejection_reason, created_at, updated_at
 		FROM merchants
 		WHERE user_id = $1
 	`
@@ -119,7 +119,7 @@ func (r *pgMerchantRepository) GetByUserID(ctx context.Context, userID uuid.UUID
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, appErrors.NotFound("merchant not found")
 		}
-		return nil, appErrors.Internal(err, "failed to query merchant by user id")
+		return nil, appErrors.Internal(err, "failed to query merchant by user id: "+err.Error())
 	}
 	return &m, nil
 }
@@ -138,12 +138,12 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 	var countArgs []interface{}
 
 	if status != "" {
-		countQuery = `SELECT COUNT(*) FROM merchants WHERE status = $1`
+		countQuery = `SELECT COUNT(*) FROM merchants WHERE status::text = $1`
 		countArgs = append(countArgs, status)
 		listQuery = `
-			SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at
+			SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status::text, rejection_reason, created_at, updated_at
 			FROM merchants
-			WHERE status = $1
+			WHERE status::text = $1
 			ORDER BY created_at DESC
 			LIMIT $2 OFFSET $3
 		`
@@ -151,7 +151,7 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 	} else {
 		countQuery = `SELECT COUNT(*) FROM merchants`
 		listQuery = `
-			SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at
+			SELECT id, user_id, business_name, first_name, last_name, business_email, business_phone, tax_id, status::text, rejection_reason, created_at, updated_at
 			FROM merchants
 			ORDER BY created_at DESC
 			LIMIT $1 OFFSET $2
