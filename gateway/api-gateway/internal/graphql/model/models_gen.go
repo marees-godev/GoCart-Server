@@ -466,15 +466,16 @@ type UpdateStoreInput struct {
 }
 
 type UpdateUserInput struct {
-	FirstName      *string `json:"firstName,omitempty"`
-	LastName       *string `json:"lastName,omitempty"`
-	Phone          *string `json:"phone,omitempty"`
-	Username       *string `json:"username,omitempty"`
-	AlternatePhone *string `json:"alternatePhone,omitempty"`
-	DateOfBirth    *string `json:"dateOfBirth,omitempty"`
-	Gender         *Gender `json:"gender,omitempty"`
-	Bio            *string `json:"bio,omitempty"`
-	AvatarURL      *string `json:"avatarUrl,omitempty"`
+	FirstName      *string         `json:"firstName,omitempty"`
+	LastName       *string         `json:"lastName,omitempty"`
+	Phone          *string         `json:"phone,omitempty"`
+	Username       *string         `json:"username,omitempty"`
+	AlternatePhone *string         `json:"alternatePhone,omitempty"`
+	DateOfBirth    *string         `json:"dateOfBirth,omitempty"`
+	Gender         *Gender         `json:"gender,omitempty"`
+	Bio            *string         `json:"bio,omitempty"`
+	AvatarURL      *string         `json:"avatarUrl,omitempty"`
+	Avatar         *graphql.Upload `json:"avatar,omitempty"`
 }
 
 type User struct {

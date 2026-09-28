@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	urlRegex            = regexp.MustCompile(`^(https?://|data:image/|/).+`)
 	slugNonAlphaNumeric = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
@@ -97,25 +96,25 @@ func (r *UpdateStoreRequest) Validate() error {
 }
 
 type StoreResponse struct {
-	ID                   string  `json:"id"`
-	MerchantID           string  `json:"merchant_id"`
-	Name                 string  `json:"name"`
-	Slug                 string  `json:"slug"`
-	BusinessEmail        string  `json:"business_email"`
-	BusinessPhone        string  `json:"business_phone"`
-	Description          string  `json:"description"`
-	LogoURL              string  `json:"logo_url"`
-	Address              string  `json:"address"`
-	IsVacationMode       bool    `json:"is_vacation_mode"`
-	ApprovalStatus       string  `json:"approval_status"`
-	RejectionReason      *string `json:"rejection_reason,omitempty"`
-	IsPublished          bool    `json:"is_published"`
-	KYCStatus            string  `json:"kyc_status"`
-	GSTIN                *string `json:"gstin,omitempty"`
-	BankAccountDetails   *string `json:"bank_account_details,omitempty"`
-	AvgStoreRating       float64 `json:"avg_store_rating"`
-	CreatedAt            string  `json:"created_at"`
-	UpdatedAt            string  `json:"updated_at"`
+	ID                 string  `json:"id"`
+	MerchantID         string  `json:"merchant_id"`
+	Name               string  `json:"name"`
+	Slug               string  `json:"slug"`
+	BusinessEmail      string  `json:"business_email"`
+	BusinessPhone      string  `json:"business_phone"`
+	Description        string  `json:"description"`
+	LogoURL            string  `json:"logo_url"`
+	Address            string  `json:"address"`
+	IsVacationMode     bool    `json:"is_vacation_mode"`
+	ApprovalStatus     string  `json:"approval_status"`
+	RejectionReason    *string `json:"rejection_reason,omitempty"`
+	IsPublished        bool    `json:"is_published"`
+	KYCStatus          string  `json:"kyc_status"`
+	GSTIN              *string `json:"gstin,omitempty"`
+	BankAccountDetails *string `json:"bank_account_details,omitempty"`
+	AvgStoreRating     float64 `json:"avg_store_rating"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
 }
 
 func ToStoreResponse(s *model.Store) *StoreResponse {
@@ -129,25 +128,25 @@ func ToStoreResponse(s *model.Store) *StoreResponse {
 	}
 
 	return &StoreResponse{
-		ID:                   s.ID,
-		MerchantID:           s.MerchantID,
-		Name:                 s.Name,
-		Slug:                 s.Slug,
-		BusinessEmail:        s.BusinessEmail,
-		BusinessPhone:        s.BusinessPhone,
-		Description:          s.Description,
-		LogoURL:              s.LogoURL,
-		Address:              s.Address,
-		IsVacationMode:       s.IsVacationMode,
-		ApprovalStatus:       s.ApprovalStatus,
-		RejectionReason:      s.RejectionReason,
-		IsPublished:          s.IsPublished,
-		KYCStatus:            kycStat,
-		GSTIN:                s.GSTIN,
-		BankAccountDetails:   s.BankAccountDetails,
-		AvgStoreRating:       s.AvgStoreRating,
-		CreatedAt:            s.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:            s.UpdatedAt.Format(time.RFC3339),
+		ID:                 s.ID,
+		MerchantID:         s.MerchantID,
+		Name:               s.Name,
+		Slug:               s.Slug,
+		BusinessEmail:      s.BusinessEmail,
+		BusinessPhone:      s.BusinessPhone,
+		Description:        s.Description,
+		LogoURL:            s.LogoURL,
+		Address:            s.Address,
+		IsVacationMode:     s.IsVacationMode,
+		ApprovalStatus:     s.ApprovalStatus,
+		RejectionReason:    s.RejectionReason,
+		IsPublished:        s.IsPublished,
+		KYCStatus:          kycStat,
+		GSTIN:              s.GSTIN,
+		BankAccountDetails: s.BankAccountDetails,
+		AvgStoreRating:     s.AvgStoreRating,
+		CreatedAt:          s.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:          s.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -179,25 +178,25 @@ func ToStorePB(s *model.Store) *storepb.Store {
 	}
 
 	return &storepb.Store{
-		Id:                   s.ID,
-		MerchantId:           s.MerchantID,
-		Name:                 s.Name,
-		Slug:                 s.Slug,
-		BusinessEmail:        s.BusinessEmail,
-		BusinessPhone:        s.BusinessPhone,
-		Description:          s.Description,
-		LogoUrl:              s.LogoURL,
-		Address:              s.Address,
-		IsVacationMode:       s.IsVacationMode,
-		ApprovalStatus:       s.ApprovalStatus,
-		RejectionReason:      rejectionReason,
-		BankAccountDetails:   bankDetails,
-		AvgStoreRating:       s.AvgStoreRating,
-		CreatedAt:            s.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:            s.UpdatedAt.Format(time.RFC3339),
-		IsPublished:          s.IsPublished,
-		KycStatus:            kycStat,
-		Gstin:                gstin,
+		Id:                 s.ID,
+		MerchantId:         s.MerchantID,
+		Name:               s.Name,
+		Slug:               s.Slug,
+		BusinessEmail:      s.BusinessEmail,
+		BusinessPhone:      s.BusinessPhone,
+		Description:        s.Description,
+		LogoUrl:            s.LogoURL,
+		Address:            s.Address,
+		IsVacationMode:     s.IsVacationMode,
+		ApprovalStatus:     s.ApprovalStatus,
+		RejectionReason:    rejectionReason,
+		BankAccountDetails: bankDetails,
+		AvgStoreRating:     s.AvgStoreRating,
+		CreatedAt:          s.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:          s.UpdatedAt.Format(time.RFC3339),
+		IsPublished:        s.IsPublished,
+		KycStatus:          kycStat,
+		Gstin:              gstin,
 	}
 }
 

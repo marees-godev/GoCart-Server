@@ -138,10 +138,14 @@ jobs:
   # Step 2: Lint & Static Code Analysis
   # ----------------------------------------------------------------------------
   lint:
-    name: Lint & Static Analysis
+    name: Lint (${{ matrix.service }})
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.services != '[]' && needs.detect-changes.outputs.services != '' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -149,7 +153,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache: true
 
       - name: Run golangci-lint
@@ -157,7 +161,8 @@ jobs:
         with:
           version: latest
           install-mode: goinstall
-          args: --timeout=5m --issues-exit-code=1
+          working-directory: ${{ matrix.service == 'api-gateway' && 'gateway/api-gateway' || format('services/{0}', matrix.service) }}
+          args: --timeout=5m --issues-exit-code=1 ./...
 
   # ----------------------------------------------------------------------------
   # Step 3: Run Unit Tests & Verify Independent Build
@@ -178,7 +183,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache: true
 
       - name: Verify GraphQL Schema & Code Generation
@@ -356,4 +361,4 @@ jobs:
           else
             echo "Notice: No Render deploy hook secret found for $SERVICE_NAME (Check RENDER_${SERVICE_KEY}_PROD_HOOK or RENDER_PROD_DEPLOY_HOOK)"
           fi
-
+  

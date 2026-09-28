@@ -48,11 +48,11 @@ func TranslateGRPCError(err error) error {
 	case codes.ResourceExhausted:
 		return appErrors.TooManyRequests(msg)
 	case codes.DeadlineExceeded:
-		return appErrors.New("GATEWAY_TIMEOUT", "downstream service request timed out", http.StatusGatewayTimeout)
+		return appErrors.Wrap(err, "GATEWAY_TIMEOUT", "downstream service request timed out", http.StatusGatewayTimeout)
 	case codes.Unavailable:
-		return appErrors.ServiceUnavailable("downstream service is unavailable")
+		return appErrors.Wrap(err, appErrors.CodeServiceUnavailable, "downstream service is unavailable", http.StatusServiceUnavailable)
 	case codes.Canceled:
-		return appErrors.New("CLIENT_CLOSED_REQUEST", "client request was canceled", 499)
+		return appErrors.Wrap(err, "CLIENT_CLOSED_REQUEST", "client request was canceled", 499)
 	default:
 		return appErrors.Internal(err, "downstream service error")
 	}
