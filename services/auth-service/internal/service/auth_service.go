@@ -484,14 +484,24 @@ func (s *authService) ValidateToken(ctx context.Context, req *dto.ValidateTokenR
 }
 
 func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error) {
-
-	if req == nil || req.RefreshToken == "" {
+	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
 		s.logger.Warn("Refresh token failed: missing refresh token")
 		return nil, appErrors.BadRequest("refresh token is required")
 	}
 
+	var identity string
+	if req.AccessToken != "" {
+		if userCtx, err := auth.ExtractClaimsWithoutExpiry(req.AccessToken, s.cfg.JWT.Secret); err == nil && userCtx != nil {
+			if userCtx.UserID != "" {
+				identity = userCtx.UserID
+			} else if userCtx.Email != "" {
+				identity = userCtx.Email
+			}
+		}
+	}
+
 	tokenHash := hashToken(req.RefreshToken)
-	tok, err := s.repo.GetRefreshToken(ctx, tokenHash)
+	tok, err := s.repo.GetRefreshToken(ctx, tokenHash, identity)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			s.logger.Warn("Refresh token failed: token not found")
@@ -501,9 +511,29 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		return nil, appErrors.Internal(err, "failed to query refresh token")
 	}
 
-	if tok.Revoked || time.Now().After(tok.ExpiresAt) {
-		s.logger.Warn("Refresh token failed: token revoked or expired", "user_id", tok.UserID.String(), "revoked", tok.Revoked, "expires_at", tok.ExpiresAt)
-		return nil, appErrors.Unauthorized("refresh token expired or revoked")
+	if tok.Revoked {
+		s.logger.Warn("Refresh token failed: token is revoked", "user_id", tok.UserID.String())
+		return nil, appErrors.Unauthorized("refresh token revoked")
+	}
+
+	if time.Now().After(tok.ExpiresAt) {
+		s.logger.Warn("Refresh token failed: token is expired", "user_id", tok.UserID.String(), "expires_at", tok.ExpiresAt)
+		return nil, appErrors.Unauthorized("refresh token expired")
+	}
+
+	cred, err := s.repo.GetByUserID(ctx, tok.UserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Refresh token failed: associated user not found", "user_id", tok.UserID.String())
+			return nil, appErrors.Unauthorized("associated user not found")
+		}
+		s.logger.Error("Refresh token failed: failed to get user", "user_id", tok.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if !cred.IsActive {
+		s.logger.Warn("Refresh token failed: user is deactivated", "user_id", tok.UserID.String())
+		return nil, appErrors.Unauthorized("user account is deactivated")
 	}
 
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
@@ -513,20 +543,42 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	accessTTL := time.Duration(ttlMinutes) * time.Minute
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
-		UserID: tok.UserID.String(),
-		Role:   model.RoleCustomer.String(),
+		UserID: cred.UserID.String(),
+		Email:  cred.Email,
+		Role:   cred.Role.String(),
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
-		s.logger.Error("Refresh token failed: generate access token error", "user_id", tok.UserID.String(), "error", err)
+		s.logger.Error("Refresh token failed: generate access token error", "user_id", cred.UserID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate access token")
+	}
+
+	newRawRefreshToken, err := generateRandomToken(32)
+	if err != nil {
+		s.logger.Error("Refresh token failed: generate new refresh token error", "user_id", cred.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to generate new refresh token")
+	}
+
+	newTokenHash := hashToken(newRawRefreshToken)
+	newRefreshTokenModel := &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    cred.UserID,
+		TokenHash: newTokenHash,
+		ExpiresAt: time.Now().Add(RefreshTokenTTL),
+		Revoked:   false,
+	}
+
+	if err := s.repo.RotateRefreshToken(ctx, tok.ID, newRefreshTokenModel); err != nil {
+		s.logger.Error("Refresh token failed: rotate token error", "user_id", cred.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to rotate refresh token")
 	}
 
 	return &dto.LoginResponse{
 		AccessToken:  accessToken,
-		RefreshToken: req.RefreshToken,
+		RefreshToken: newRawRefreshToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    int(accessTTL.Seconds()),
-		UserID:       tok.UserID.String(),
+		UserID:       cred.UserID.String(),
+		Role:         cred.Role.String(),
 	}, nil
 }
 

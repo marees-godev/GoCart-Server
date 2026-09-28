@@ -311,6 +311,65 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	return payload, nil
 }
 
+// RefreshToken is the resolver for the refreshToken field.
+func (r *mutationResolver) RefreshToken(ctx context.Context, input model.RefreshTokenInput) (*model.AuthPayload, error) {
+	if strings.TrimSpace(input.RefreshToken) == "" {
+		return nil, appErrors.BadRequest("refresh_token is required")
+	}
+
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.RefreshToken(ctx, &authpb.RefreshTokenRequest{
+		RefreshToken: input.RefreshToken,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	refToken := res.GetRefreshToken()
+	tokenType := res.GetTokenType()
+	expiresIn := int(res.GetExpiresIn())
+
+	payload := &model.AuthPayload{
+		Token:        res.GetAccessToken(),
+		RefreshToken: &refToken,
+		TokenType:    &tokenType,
+		ExpiresIn:    &expiresIn,
+	}
+	if res.GetUserId() != "" {
+		payload.User = &model.User{
+			ID: res.GetUserId(),
+		}
+	}
+	if res.GetRole() != "" {
+		roleStr := res.GetRole()
+		payload.Role = &roleStr
+	}
+	if res.GetMerchantId() != "" {
+		mID := res.GetMerchantId()
+		payload.MerchantID = &mID
+	}
+	if res.GetFirstName() != "" {
+		fn := res.GetFirstName()
+		payload.FirstName = &fn
+	}
+	if res.GetLastName() != "" {
+		ln := res.GetLastName()
+		payload.LastName = &ln
+	}
+
+	return payload, nil
+}
+
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
 	var authClient authpb.AuthServiceClient

@@ -58,11 +58,19 @@ func (m *mockRepoForGRPC) DeleteCredential(ctx context.Context, id uuid.UUID) er
 	return nil
 }
 
-func (m *mockRepoForGRPC) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
+func (m *mockRepoForGRPC) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error) {
+	return nil, repository.ErrNotFound
+}
+
+func (m *mockRepoForGRPC) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	return nil, repository.ErrNotFound
 }
 
 func (m *mockRepoForGRPC) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (m *mockRepoForGRPC) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
 	return nil
 }
 
