@@ -227,14 +227,13 @@ func (r *postgresAuthRepository) DeleteCredential(ctx context.Context, id uuid.U
 	return nil
 }
 
-
 func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	query := `
 		SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at
 		FROM refresh_tokens rt
 		LEFT JOIN auth_credentials ac ON ac.user_id = rt.user_id
 		WHERE rt.token_hash = $1
-		  AND (rt.user_id::text = $2 OR LOWER(ac.email) = LOWER($2))
+		  AND ($2 = '' OR rt.user_id::text = $2 OR LOWER(ac.email) = LOWER($2))
 		LIMIT 1
 	`
 	var tok model.RefreshToken
@@ -355,5 +354,3 @@ func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID u
 	}
 	return nil
 }
-
-
