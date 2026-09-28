@@ -70,6 +70,14 @@ func (m *mockRepoForGRPC) RevokeRefreshToken(ctx context.Context, id uuid.UUID) 
 	return nil
 }
 
+func (m *mockRepoForGRPC) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	return nil
+}
+
+func (m *mockRepoForGRPC) RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error {
+	return nil
+}
+
 func (m *mockRepoForGRPC) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
 	return nil
 }

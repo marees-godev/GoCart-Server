@@ -188,6 +188,11 @@ type LoginInput struct {
 	IsMerchant bool   `json:"isMerchant"`
 }
 
+type LogoutPayload struct {
+	Success bool    `json:"success"`
+	Message *string `json:"message,omitempty"`
+}
+
 type Merchant struct {
 	ID              string  `json:"id"`
 	MerchantID      string  `json:"merchantId"`

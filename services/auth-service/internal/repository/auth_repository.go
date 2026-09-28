@@ -27,6 +27,8 @@ type AuthRepository interface {
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
 	GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
+	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
+	RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error
 	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
 	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
 }
@@ -259,13 +261,41 @@ func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash 
 func (r *postgresAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
 	query := `
 		UPDATE refresh_tokens
-		SET revoked = true
+		SET revoked = true, revoked_at = NOW()
 		WHERE id = $1
 	`
 	_, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
 		r.logger.Error("Failed to revoke refresh token", "id", id, "error", err)
 		return fmt.Errorf("repository: revoke refresh token failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE token_hash = $1
+	`
+	_, err := r.pool.Exec(ctx, query, tokenHash)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh token by hash", "error", err)
+		return fmt.Errorf("repository: revoke refresh token by hash failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE user_id = $1 AND revoked = false
+	`
+	_, err := r.pool.Exec(ctx, query, userID)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh tokens by user id", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: revoke refresh tokens by user id failed: %w", err)
 	}
 	return nil
 }

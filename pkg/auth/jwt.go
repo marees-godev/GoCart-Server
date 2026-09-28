@@ -23,9 +23,10 @@ const (
 )
 
 type UserContext struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email,omitempty"`
+	UserID   string `json:"user_id"`
+	Role     string `json:"role"`
+	Email    string `json:"email,omitempty"`
+	RawToken string `json:"raw_token,omitempty"`
 }
 
 type UserClaims struct {
@@ -95,9 +96,10 @@ func ValidateToken(tokenStr, secret string) (*UserContext, error) {
 	}
 
 	return &UserContext{
-		UserID: userID,
-		Role:   claims.Role,
-		Email:  claims.Email,
+		UserID:   userID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+		RawToken: tokenStr,
 	}, nil
 }
 
@@ -121,9 +123,10 @@ func ExtractClaimsWithoutExpiry(tokenStr, secret string) (*UserContext, error) {
 	}
 
 	return &UserContext{
-		UserID: userID,
-		Role:   claims.Role,
-		Email:  claims.Email,
+		UserID:   userID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+		RawToken: tokenStr,
 	}, nil
 }
 

@@ -41,6 +41,7 @@ type AuthService interface {
 	Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error)
 	ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error)
 	RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
+	Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.LogoutResponse, error)
 	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error)
 	ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error)
 }
@@ -719,6 +720,68 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	return &dto.ResendVerificationEmailResponse{
 		Success: true,
 		Message: "Verification OTP sent successfully",
+	}, nil
+}
+
+func (s *authService) Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.LogoutResponse, error) {
+	if req == nil {
+		req = &dto.LogoutRequest{}
+	}
+
+	var userIDStr string
+	var emailStr string
+
+	if req.AccessToken != "" {
+		if userCtx, err := auth.ExtractClaimsWithoutExpiry(req.AccessToken, s.cfg.JWT.Secret); err == nil && userCtx != nil {
+			if userCtx.UserID != "" {
+				userIDStr = userCtx.UserID
+			}
+			if userCtx.Email != "" {
+				emailStr = userCtx.Email
+			}
+		} else {
+			userIDStr = req.AccessToken
+		}
+	}
+
+	if userIDStr == "" && emailStr == "" {
+		if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
+			if userCtx.UserID != "" {
+				userIDStr = userCtx.UserID
+			}
+			if userCtx.Email != "" {
+				emailStr = userCtx.Email
+			}
+		}
+	}
+
+	var targetUserID uuid.UUID
+	if userIDStr != "" {
+		if parsed, err := uuid.FromString(userIDStr); err == nil {
+			targetUserID = parsed
+		}
+	}
+
+	if targetUserID == uuid.Nil && emailStr != "" {
+		if cred, err := s.repo.GetByEmail(ctx, cleanEmail(emailStr)); err == nil && cred != nil {
+			targetUserID = cred.UserID
+		}
+	}
+
+	if targetUserID == uuid.Nil {
+		s.logger.Warn("Logout failed: missing authentication context or identity")
+		return nil, appErrors.Unauthorized("authentication required for logout")
+	}
+
+	if err := s.repo.RevokeRefreshTokensByUserID(ctx, targetUserID); err != nil {
+		s.logger.Error("Logout failed: failed to revoke user refresh tokens", "user_id", targetUserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to revoke refresh tokens")
+	}
+
+	s.logger.Info("Logout successful", "user_id", targetUserID.String())
+	return &dto.LogoutResponse{
+		Success: true,
+		Message: "Logged out successfully",
 	}, nil
 }
 
