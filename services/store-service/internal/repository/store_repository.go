@@ -675,6 +675,19 @@ func (r *pgStoreRepository) UpdateApprovalStatus(ctx context.Context, id string,
 			SuspendedAt: time.Now().UTC(),
 		})
 		topic = events.TopicStoreSuspended
+	} else if currentStatus == model.StoreStatusSuspended && newStatus == model.StoreStatusApproved {
+		reason := ""
+		if rejectionReason != nil {
+			reason = *rejectionReason
+		}
+		env, err = events.NewEventEnvelope(events.EventTypeStoreUnsuspended, "store-service", events.StoreUnsuspendedEvent{
+			StoreID:       id,
+			MerchantID:    merchantID,
+			AdminID:       actor,
+			Reason:        reason,
+			UnsuspendedAt: time.Now().UTC(),
+		})
+		topic = events.TopicStoreUnsuspended
 	}
 
 	if env != nil && err == nil {
@@ -807,6 +820,12 @@ func (r *pgStoreRepository) CreateAppeal(ctx context.Context, appeal *model.Stor
 		appeal.Status = model.AppealStatusPending
 	}
 
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to start transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		INSERT INTO store_appeals (
 			store_id, merchant_id, reason, status, created_at, updated_at
@@ -816,7 +835,7 @@ func (r *pgStoreRepository) CreateAppeal(ctx context.Context, appeal *model.Stor
 		RETURNING id, created_at, updated_at
 	`
 
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		appeal.StoreID,
 		appeal.MerchantID,
 		appeal.Reason,
@@ -825,6 +844,36 @@ func (r *pgStoreRepository) CreateAppeal(ctx context.Context, appeal *model.Stor
 
 	if err != nil {
 		return appErrors.Internal(err, "failed to insert store appeal")
+	}
+
+	evtPayload := events.StoreAppealedEvent{
+		AppealID:   appeal.ID,
+		StoreID:    appeal.StoreID,
+		MerchantID: appeal.MerchantID,
+		Reason:     appeal.Reason,
+		AppealedAt: appeal.CreatedAt,
+	}
+	env, err := events.NewEventEnvelope(events.EventTypeStoreAppealed, "store-service", evtPayload)
+	if err != nil {
+		return appErrors.Internal(err, "failed to create StoreAppealed event envelope")
+	}
+	payloadBytes, err := env.Marshal()
+	if err != nil {
+		return appErrors.Internal(err, "failed to marshal StoreAppealed event envelope")
+	}
+	outboxEvt := &outbox.Event{
+		AggregateType: "store",
+		AggregateID:   appeal.StoreID,
+		EventType:     events.EventTypeStoreAppealed,
+		Payload:       payloadBytes,
+		Topic:         events.TopicStoreAppealed,
+	}
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		return appErrors.Internal(err, "failed to insert outbox event for StoreAppealed")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit create appeal transaction")
 	}
 
 	return nil

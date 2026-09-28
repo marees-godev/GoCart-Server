@@ -127,3 +127,21 @@ type StoreSuspendedEvent struct {
 	Reason      string    `json:"reason,omitempty"`
 	SuspendedAt time.Time `json:"suspended_at"`
 }
+
+// StoreUnsuspendedEvent represents the payload when a store suspension is lifted by an admin.
+type StoreUnsuspendedEvent struct {
+	StoreID       string    `json:"store_id"`
+	MerchantID    string    `json:"merchant_id"`
+	AdminID       string    `json:"admin_id,omitempty"`
+	Reason        string    `json:"reason,omitempty"`
+	UnsuspendedAt time.Time `json:"unsuspended_at"`
+}
+
+// StoreAppealedEvent represents the payload when a merchant submits an appeal for a suspended/rejected store.
+type StoreAppealedEvent struct {
+	AppealID   string    `json:"appeal_id"`
+	StoreID    string    `json:"store_id"`
+	MerchantID string    `json:"merchant_id"`
+	Reason     string    `json:"reason"`
+	AppealedAt time.Time `json:"appealed_at"`
+}

@@ -19,11 +19,13 @@ const (
 	EventTypeUserRegistered             = "UserRegistered"
 
 	// Store Service Events
-	EventTypeStoreCreated   = "StoreCreated"
-	EventTypeStoreSubmitted = "StoreSubmitted"
-	EventTypeStoreApproved  = "StoreApproved"
-	EventTypeStoreRejected  = "StoreRejected"
-	EventTypeStoreSuspended = "StoreSuspended"
+	EventTypeStoreCreated     = "StoreCreated"
+	EventTypeStoreSubmitted   = "StoreSubmitted"
+	EventTypeStoreApproved    = "StoreApproved"
+	EventTypeStoreRejected    = "StoreRejected"
+	EventTypeStoreSuspended   = "StoreSuspended"
+	EventTypeStoreUnsuspended = "StoreUnsuspended"
+	EventTypeStoreAppealed    = "StoreAppealed"
 )
 
 // Standard Topic Constants
@@ -31,11 +33,13 @@ const (
 	TopicUserRegistered = "gocart.auth.user-registered"
 
 	// Store Service Topics
-	TopicStoreCreated   = "gocart.store.store-created"
-	TopicStoreSubmitted = "gocart.store.store-submitted"
-	TopicStoreApproved  = "gocart.store.store-approved"
-	TopicStoreRejected  = "gocart.store.store-rejected"
-	TopicStoreSuspended = "gocart.store.store-suspended"
+	TopicStoreCreated     = "gocart.store.store-created"
+	TopicStoreSubmitted   = "gocart.store.store-submitted"
+	TopicStoreApproved    = "gocart.store.store-approved"
+	TopicStoreRejected    = "gocart.store.store-rejected"
+	TopicStoreSuspended   = "gocart.store.store-suspended"
+	TopicStoreUnsuspended = "gocart.store.store-unsuspended"
+	TopicStoreAppealed    = "gocart.store.store-appealed"
 )
 
 // EventEnvelope is the standard envelope for all domain events across GoCart.
