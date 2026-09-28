@@ -177,9 +177,14 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		}
 
 		if mClient != nil {
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: cred.UserID.String(),
+				Role:   model.RoleMerchant.String(),
+				Email:  cred.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", cred.UserID.String(),
-				"x-user-role", "MERCHANT",
+				"x-user-role", model.RoleMerchant.String(),
 			))
 			mResp, err := mClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{
 				UserId: cred.UserID.String(),
@@ -346,9 +351,14 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 				businessName = req.Email
 			}
 
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: userID.String(),
+				Role:   model.RoleMerchant.String(),
+				Email:  req.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", userID.String(),
-				"x-user-role", "MERCHANT",
+				"x-user-role", model.RoleMerchant.String(),
 			))
 
 			createReq := &merchantpb.CreateMerchantRequest{

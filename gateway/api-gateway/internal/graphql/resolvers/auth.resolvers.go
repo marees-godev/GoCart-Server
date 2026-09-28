@@ -13,6 +13,7 @@ import (
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"google.golang.org/grpc/metadata"
@@ -142,9 +143,14 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		}
 
 		if merchantClient != nil && res.UserId != "" {
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: res.UserId,
+				Role:   string(model.RoleMerchant),
+				Email:  input.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", res.UserId,
-				"x-user-role", "MERCHANT",
+				"x-user-role", string(model.RoleMerchant),
 			))
 			mRes, _ := merchantClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{UserId: res.UserId})
 			if mRes != nil && mRes.Merchant != nil {

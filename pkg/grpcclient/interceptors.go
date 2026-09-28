@@ -54,6 +54,10 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 			md = md.Copy()
 		}
 
+		outUID := md.Get(HeaderUserID)
+		outRole := md.Get(HeaderUserRole)
+		outEmail := md.Get(HeaderUserEmail)
+
 		// Strip client-supplied identity metadata to avoid spoofing
 		md.Delete(HeaderUserID)
 		md.Delete(HeaderUserRole)
@@ -69,13 +73,22 @@ func UnaryClientInterceptor(defaultTimeout time.Duration) grpc.UnaryClientInterc
 				md.Set(HeaderUserEmail, user.Email)
 			}
 		} else {
-			if uID, ok := ctx.Value(logger.UserIDKey).(string); ok && uID != "" {
+			if len(outUID) > 0 && outUID[0] != "" {
+				md.Set(HeaderUserID, outUID[0])
+			} else if uID, ok := ctx.Value(logger.UserIDKey).(string); ok && uID != "" {
 				md.Set(HeaderUserID, uID)
 			} else if uID, ok := ctx.Value(userIDKey).(string); ok && uID != "" {
 				md.Set(HeaderUserID, uID)
 			}
-			if role, ok := ctx.Value(userRoleKey).(string); ok && role != "" {
+
+			if len(outRole) > 0 && outRole[0] != "" {
+				md.Set(HeaderUserRole, outRole[0])
+			} else if role, ok := ctx.Value(userRoleKey).(string); ok && role != "" {
 				md.Set(HeaderUserRole, role)
+			}
+
+			if len(outEmail) > 0 && outEmail[0] != "" {
+				md.Set(HeaderUserEmail, outEmail[0])
 			}
 		}
 
