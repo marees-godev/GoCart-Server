@@ -356,7 +356,7 @@ func TestSetDefaultAddress_SuccessAndOwnership(t *testing.T) {
 func TestListAddresses_Success(t *testing.T) {
 	svc, _, _ := setupAddressTestService()
 
-	svc.CreateAddress(context.Background(), "user-1", dto.CreateAddressRequest{
+	_, _ = svc.CreateAddress(context.Background(), "user-1", dto.CreateAddressRequest{
 		FullName:    "John Doe",
 		PhoneNumber: "+1 (555) 000-0000",
 		AddressLine: "100 Elm St",
@@ -365,7 +365,7 @@ func TestListAddresses_Success(t *testing.T) {
 		PostalCode:  "78701",
 		Country:     "United States",
 	})
-	svc.CreateAddress(context.Background(), "user-1", dto.CreateAddressRequest{
+	_, _ = svc.CreateAddress(context.Background(), "user-1", dto.CreateAddressRequest{
 		FullName:    "John Doe",
 		PhoneNumber: "+1 (555) 000-0000",
 		AddressLine: "200 Oak St",
