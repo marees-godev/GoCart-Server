@@ -110,3 +110,150 @@ func TestUserRegisteredEventSerialization(t *testing.T) {
 	}
 }
 
+func TestStoreEventsSerialization(t *testing.T) {
+	now := time.Now().UTC()
+
+	t.Run("StoreCreatedEvent", func(t *testing.T) {
+		payload := events.StoreCreatedEvent{
+			StoreID:       "st-1",
+			MerchantID:    "m-1",
+			Name:          "Tech Store",
+			Slug:          "tech-store",
+			BusinessEmail: "tech@example.com",
+			BusinessPhone: "+1234567890",
+			CreatedAt:     now,
+		}
+		env, err := events.NewEventEnvelope(events.EventTypeStoreCreated, "store-service", payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.StoreCreatedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.StoreID != "st-1" || restored.MerchantID != "m-1" || restored.Slug != "tech-store" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("StoreSubmittedEvent", func(t *testing.T) {
+		payload := events.StoreSubmittedEvent{
+			StoreID:     "st-1",
+			MerchantID:  "m-1",
+			SubmittedAt: now,
+		}
+		env, err := events.NewEventEnvelope(events.EventTypeStoreSubmitted, "store-service", payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.StoreSubmittedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.StoreID != "st-1" || restored.MerchantID != "m-1" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("StoreApprovedEvent", func(t *testing.T) {
+		payload := events.StoreApprovedEvent{
+			StoreID:    "st-1",
+			MerchantID: "m-1",
+			AdminID:    "admin-1",
+			ApprovedAt: now,
+		}
+		env, err := events.NewEventEnvelope(events.EventTypeStoreApproved, "store-service", payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.StoreApprovedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.StoreID != "st-1" || restored.AdminID != "admin-1" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("StoreRejectedEvent", func(t *testing.T) {
+		payload := events.StoreRejectedEvent{
+			StoreID:    "st-1",
+			MerchantID: "m-1",
+			AdminID:    "admin-1",
+			Reason:     "Invalid docs",
+			RejectedAt: now,
+		}
+		env, err := events.NewEventEnvelope(events.EventTypeStoreRejected, "store-service", payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.StoreRejectedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.StoreID != "st-1" || restored.Reason != "Invalid docs" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("StoreSuspendedEvent", func(t *testing.T) {
+		payload := events.StoreSuspendedEvent{
+			StoreID:     "st-1",
+			MerchantID:  "m-1",
+			AdminID:     "admin-1",
+			Reason:      "Policy violation",
+			SuspendedAt: now,
+		}
+		env, err := events.NewEventEnvelope(events.EventTypeStoreSuspended, "store-service", payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.StoreSuspendedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.StoreID != "st-1" || restored.Reason != "Policy violation" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+}

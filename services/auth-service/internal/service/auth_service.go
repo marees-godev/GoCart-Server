@@ -118,12 +118,12 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		s.logger.Error("Login failed: database query error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
 	}
-	
+
 	if !cred.EmailVerified {
 		s.logger.Warn("Login attempt failed: email not verified", "user_id", cred.UserID.String(), "email", cred.Email)
 		return nil, appErrors.Forbidden("email is not verified, please verify your email first and then login")
 	}
-	
+
 	if cred.Role != "" && cred.Role != role {
 		s.logger.Warn("Login attempt failed: role mismatch", "user_id", cred.UserID.String(), "email", cred.Email, "role", cred.Role.String(), "expected_role", role.String())
 		return nil, appErrors.Unauthorized("Invalid email or password")
@@ -159,7 +159,6 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	if cred.FailedLoginCount > 0 {
 		_ = s.repo.ResetFailedLogin(ctx, cred.ID)
 	}
-
 
 	var merchantID string
 	var businessEmail string
@@ -738,4 +737,3 @@ func generateRandomToken(nBytes int) (string, error) {
 func hashToken(token string) string {
 	return pkgotp.HashToken(token)
 }
-
