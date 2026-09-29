@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"log/slog"
-	"regexp"
 	"strings"
 
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -33,8 +32,6 @@ func NewCategoryService(repo repository.CategoryRepository, log ...*slog.Logger)
 	}
 	return &categoryService{repo: repo, logger: l}
 }
-
-var nonAlphaNumRegex = regexp.MustCompile(`[^a-z0-9]+`)
 
 func (s *categoryService) CreateCategory(ctx context.Context, req dto.CreateCategoryRequest) (*model.Category, error) {
 	name := strings.TrimSpace(req.Name)
