@@ -1938,17 +1938,12 @@ func (m *mockMailerWithCapture) getLastToEmail() string {
 func (m *mockMailerWithCapture) waitForOTP(timeout time.Duration) string {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		m.mu.RLock()
-		otp := m.lastOTP
-		m.mu.RUnlock()
-		if otp != "" {
+		if otp := m.getLastOTP(); otp != "" {
 			return otp
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.lastOTP
+	return m.getLastOTP()
 }
 
 func (m *mockMailerWithCapture) reset() {
