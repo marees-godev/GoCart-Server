@@ -1,10 +1,11 @@
 type Category {
   id: ID!
   name: String!
-  slug: String!
-  parentId: String
+  parentCategoryId: String
   description: String
+  isActive: Boolean!
   createdAt: String
+  updatedAt: String
 }
 
 type CategoryList {
@@ -12,18 +13,32 @@ type CategoryList {
   total: Int!
 }
 
+type DeleteCategoryResponse {
+  success: Boolean!
+  message: String!
+}
+
 input CreateCategoryInput {
   name: String!
-  slug: String!
-  parentId: String
+  parentCategoryId: String
   description: String
+}
+
+input UpdateCategoryInput {
+  name: String
+  parentCategoryId: String
+  description: String
+  isActive: Boolean
 }
 
 extend type Query {
   category(id: ID!): Category
-  categories(limit: Int, offset: Int): CategoryList!
+  categories(limit: Int, offset: Int, parentCategoryId: String, rootOnly: Boolean): CategoryList!
+  childCategories(parentCategoryId: String!, limit: Int, offset: Int): CategoryList!
 }
 
 extend type Mutation {
   createCategory(input: CreateCategoryInput!): Category @auth(requires: [ADMIN])
+  updateCategory(id: ID!, input: UpdateCategoryInput!): Category @auth(requires: [ADMIN])
+  deleteCategory(id: ID!): DeleteCategoryResponse! @auth(requires: [ADMIN])
 }

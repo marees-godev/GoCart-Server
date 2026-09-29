@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,21 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/category-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/category-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/category-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/category-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -78,7 +87,41 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize application layers
+	categoryRepo := repository.NewCategoryRepository(db.Pool, log)
+	categoryService := service.NewCategoryService(categoryRepo, log)
+	categoryGRPCHandler := handler.NewCategoryGRPCHandler(categoryService, log)
+
+	// 6. Setup gRPC Server with role-based auth interceptor
+	categoryMethodRoles := map[string][]string{
+		"/gocart.category.v1.CategoryService/CreateCategory": {auth.RoleAdmin},
+		"/gocart.category.v1.CategoryService/UpdateCategory": {auth.RoleAdmin},
+		"/gocart.category.v1.CategoryService/DeleteCategory": {auth.RoleAdmin},
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+			grpcclient.UnaryRoleAuthInterceptor(categoryMethodRoles),
+		),
+	)
+	categorypb.RegisterCategoryServiceServer(grpcServer, categoryGRPCHandler)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 7. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -95,7 +138,7 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP server listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -104,6 +147,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
