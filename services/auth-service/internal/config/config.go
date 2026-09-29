@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/marees-godev/GoCart-Server/pkg/mailer"
@@ -18,9 +19,16 @@ type Config struct {
 	Tracing         TracingConfig
 	JWT             JWTConfig
 	Email           EmailConfig
+	Security        SecurityConfig
 	Redis           redis.Config
 	UserServiceAddr string
 	Services        ServicesConfig
+}
+
+type SecurityConfig struct {
+	MaxLoginAttempts    int
+	LoginAttemptWindow  time.Duration
+	AccountLockDuration time.Duration
 }
 
 type ServicesConfig struct {
@@ -144,6 +152,11 @@ func LoadEnv() *Config {
 			TokenTTLMinutes:       GetEnvAsInt("EMAIL_OTP_TTL_MINUTES", GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 5)),
 			ResendCooldownSeconds: GetEnvAsInt("EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60),
 		},
+		Security: SecurityConfig{
+			MaxLoginAttempts:    GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			LoginAttemptWindow:  GetEnvAsDuration("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
+			AccountLockDuration: GetEnvAsDuration("ACCOUNT_LOCK_DURATION", 15*time.Minute),
+		},
 		Redis:           redis.LoadConfigFromEnv("AUTH"),
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{
@@ -181,4 +194,18 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	if d, err := time.ParseDuration(valStr); err == nil {
+		return d
+	}
+	if secs, err := strconv.Atoi(valStr); err == nil && secs > 0 {
+		return time.Duration(secs) * time.Second
+	}
+	return defaultValue
 }

@@ -34,6 +34,7 @@ const (
 	MaxFailedLoginAttempts = 5
 	AccountLockDuration    = 15 * time.Minute
 	RefreshTokenTTL        = 7 * 24 * time.Hour
+	dummyBcryptHash        = "$2a$10$e8N7z.0O2w9tP/V1O8m1o.7Hq6G3V3HkX/N1.1.1.1.1.1.1.1"
 )
 
 type AuthService interface {
@@ -51,6 +52,7 @@ type authService struct {
 	cfg            *config.Config
 	mailer         mailer.Mailer
 	otpStore       otp.Store
+	redisClient    *redis.Client
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
@@ -87,6 +89,7 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 			s.otpStore = client
 		case *redis.Client:
 			if client != nil {
+				s.redisClient = client
 				s.otpStore = otp.NewRedisStore(client)
 			}
 		}
@@ -95,6 +98,35 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 		s.otpStore = otp.NewMemoryStore()
 	}
 	return s
+}
+
+func failedLoginKey(email string) string {
+	return "auth:login:failed:" + email
+}
+
+func accountLockKey(email string) string {
+	return "auth:login:locked:" + email
+}
+
+func (s *authService) getMaxLoginAttempts() int {
+	if s.cfg != nil && s.cfg.Security.MaxLoginAttempts > 0 {
+		return s.cfg.Security.MaxLoginAttempts
+	}
+	return MaxFailedLoginAttempts
+}
+
+func (s *authService) getLoginAttemptWindow() time.Duration {
+	if s.cfg != nil && s.cfg.Security.LoginAttemptWindow > 0 {
+		return s.cfg.Security.LoginAttemptWindow
+	}
+	return 15 * time.Minute
+}
+
+func (s *authService) getAccountLockDuration() time.Duration {
+	if s.cfg != nil && s.cfg.Security.AccountLockDuration > 0 {
+		return s.cfg.Security.AccountLockDuration
+	}
+	return AccountLockDuration
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -110,16 +142,57 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		role = model.RoleMerchant
 	}
 
+	maxAttempts := s.getMaxLoginAttempts()
+	window := s.getLoginAttemptWindow()
+	lockDuration := s.getAccountLockDuration()
+
+	failedKey := failedLoginKey(email)
+	lockKey := accountLockKey(email)
+
+	// 1. Check if account is locked in Redis
+	if s.redisClient != nil {
+		isLocked, err := s.redisClient.Exists(ctx, lockKey)
+		if err != nil {
+			s.logger.Warn("Redis error checking lock status, falling back to DB check", "email", email, "error", err)
+		} else if isLocked {
+			s.logger.Warn("Login attempt failed: account locked (Redis)", "email", email)
+			return nil, appErrors.Unauthorized("Invalid email or password")
+		}
+	}
+
+	// 2. Query user credential from DB
 	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			s.logger.Warn("Login attempt failed: user not found", "email", email, "role", role.String())
+			// Perform dummy hash comparison to prevent timing attack enumeration
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(req.Password))
+
+			// Track failed attempt in Redis for normalized email even if user doesn't exist
+			if s.redisClient != nil {
+				count, rErr := s.redisClient.IncrWithExpiry(ctx, failedKey, window)
+				if rErr != nil {
+					s.logger.Warn("Redis error incrementing failed login counter", "email", email, "error", rErr)
+				} else if int(count) >= maxAttempts {
+					if lErr := s.redisClient.Set(ctx, lockKey, "locked", lockDuration); lErr != nil {
+						s.logger.Warn("Redis error setting lock key", "email", email, "error", lErr)
+					}
+				}
+			}
+
 			return nil, appErrors.Unauthorized("Invalid email or password")
 		}
 		s.logger.Error("Login failed: database query error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
 	}
 
+	// 3. Check if account is locked in DB
+	if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
+		s.logger.Warn("Login attempt failed: account locked (DB)", "user_id", cred.UserID.String(), "email", cred.Email, "locked_until", cred.LockedUntil)
+		return nil, appErrors.Unauthorized("Invalid email or password")
+	}
+
+	// 4. Validate user status and role
 	if !cred.EmailVerified {
 		s.logger.Warn("Login attempt failed: email not verified", "user_id", cred.UserID.String(), "email", cred.Email)
 		return nil, appErrors.Forbidden("email is not verified, please verify your email first and then login")
@@ -135,29 +208,53 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
-	if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
-		s.logger.Warn("Login attempt failed: account locked", "user_id", cred.UserID.String(), "email", cred.Email, "locked_until", cred.LockedUntil)
-		return nil, appErrors.Unauthorized("Invalid email or password")
-	}
-
+	// 5. Compare Password
 	if err := bcrypt.CompareHashAndPassword([]byte(cred.PasswordHash), []byte(req.Password)); err != nil {
+		var redisCount int64
+		var redisErr error
+		if s.redisClient != nil {
+			redisCount, redisErr = s.redisClient.IncrWithExpiry(ctx, failedKey, window)
+			if redisErr != nil {
+				s.logger.Warn("Redis error incrementing failed attempts", "email", email, "error", redisErr)
+			}
+		}
+
 		failedCount := cred.FailedLoginCount + 1
+		if s.redisClient != nil && redisErr == nil {
+			failedCount = int(redisCount)
+		}
+
 		var lockedUntil *time.Time
-		if failedCount >= MaxFailedLoginAttempts {
-			t := time.Now().Add(AccountLockDuration)
+		if failedCount >= maxAttempts {
+			t := time.Now().Add(lockDuration)
 			lockedUntil = &t
 			s.logger.Warn("Account locked due to max failed login attempts", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount, "locked_until", t)
+			if s.redisClient != nil {
+				if lErr := s.redisClient.Set(ctx, lockKey, "locked", lockDuration); lErr != nil {
+					s.logger.Warn("Redis error setting lock key", "email", email, "error", lErr)
+				}
+			}
 		} else {
 			s.logger.Warn("Login attempt failed: invalid password", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount)
 		}
-		err = s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
-		if err != nil {
-			return nil, appErrors.Internal(err, "failed to update failed login")
+
+		// Always update DB as fallback/persistence
+		dbErr := s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
+		if dbErr != nil {
+			s.logger.Error("Failed to update DB failed login record", "user_id", cred.UserID.String(), "error", dbErr)
 		}
+
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
-	if cred.FailedLoginCount > 0 {
+	// 6. Successful Login: Reset failed login attempt counters and locks in Redis and DB
+	if s.redisClient != nil {
+		if rErr := s.redisClient.Delete(ctx, failedKey, lockKey); rErr != nil {
+			s.logger.Warn("Redis error clearing failed login key on successful login", "email", email, "error", rErr)
+		}
+	}
+
+	if cred.FailedLoginCount > 0 || cred.LockedUntil != nil {
 		_ = s.repo.ResetFailedLogin(ctx, cred.ID)
 	}
 
