@@ -92,12 +92,13 @@ type CartItem struct {
 }
 
 type Category struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	ParentID    *string `json:"parentId,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt   *string `json:"createdAt,omitempty"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	ParentCategoryID *string `json:"parentCategoryId,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	IsActive         bool    `json:"isActive"`
+	CreatedAt        *string `json:"createdAt,omitempty"`
+	UpdatedAt        *string `json:"updatedAt,omitempty"`
 }
 
 type CategoryList struct {
@@ -129,10 +130,9 @@ type CreateAddressInput struct {
 }
 
 type CreateCategoryInput struct {
-	Name        string  `json:"name"`
-	Slug        string  `json:"slug"`
-	ParentID    *string `json:"parentId,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Name             string  `json:"name"`
+	ParentCategoryID *string `json:"parentCategoryId,omitempty"`
+	Description      *string `json:"description,omitempty"`
 }
 
 type CreateDeliveryInput struct {
@@ -174,6 +174,11 @@ type DeactivateAccountInput struct {
 
 type DeleteAccountInput struct {
 	Reason *string `json:"reason,omitempty"`
+}
+
+type DeleteCategoryResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 type Delivery struct {
@@ -465,6 +470,13 @@ type UpdateAddressInput struct {
 	PostalCode   *string `json:"postalCode,omitempty"`
 	Country      *string `json:"country,omitempty"`
 	IsDefault    *bool   `json:"isDefault,omitempty"`
+}
+
+type UpdateCategoryInput struct {
+	Name             *string `json:"name,omitempty"`
+	ParentCategoryID *string `json:"parentCategoryId,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	IsActive         *bool   `json:"isActive,omitempty"`
 }
 
 type UpdateMerchantInput struct {

@@ -5,18 +5,32 @@ package gocart.category.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/category;category";
 
 service CategoryService {
+  rpc CreateCategory (CreateCategoryRequest) returns (CreateCategoryResponse);
   rpc GetCategory (GetCategoryRequest) returns (GetCategoryResponse);
   rpc ListCategories (ListCategoriesRequest) returns (ListCategoriesResponse);
-  rpc CreateCategory (CreateCategoryRequest) returns (CreateCategoryResponse);
+  rpc GetChildCategories (GetChildCategoriesRequest) returns (GetChildCategoriesResponse);
+  rpc UpdateCategory (UpdateCategoryRequest) returns (UpdateCategoryResponse);
+  rpc DeleteCategory (DeleteCategoryRequest) returns (DeleteCategoryResponse);
 }
 
 message Category {
   string id = 1;
   string name = 2;
-  string slug = 3;
-  string parent_id = 4;
   string description = 5;
   string created_at = 6;
+  string updated_at = 7;
+  string parent_category_id = 8;
+  bool is_active = 9;
+}
+
+message CreateCategoryRequest {
+  string name = 1;
+  string description = 4;
+  string parent_category_id = 5;
+}
+
+message CreateCategoryResponse {
+  Category category = 1;
 }
 
 message GetCategoryRequest {
@@ -30,6 +44,8 @@ message GetCategoryResponse {
 message ListCategoriesRequest {
   int32 limit = 1;
   int32 offset = 2;
+  string parent_category_id = 3;
+  bool root_only = 4;
 }
 
 message ListCategoriesResponse {
@@ -37,13 +53,34 @@ message ListCategoriesResponse {
   int32 total = 2;
 }
 
-message CreateCategoryRequest {
-  string name = 1;
-  string slug = 2;
-  string parent_id = 3;
-  string description = 4;
+message GetChildCategoriesRequest {
+  string parent_category_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
 }
 
-message CreateCategoryResponse {
+message GetChildCategoriesResponse {
+  repeated Category categories = 1;
+  int32 total = 2;
+}
+
+message UpdateCategoryRequest {
+  string id = 1;
+  string name = 2;
+  string description = 4;
+  string parent_category_id = 5;
+  optional bool is_active = 6;
+}
+
+message UpdateCategoryResponse {
   Category category = 1;
+}
+
+message DeleteCategoryRequest {
+  string id = 1;
+}
+
+message DeleteCategoryResponse {
+  bool success = 1;
+  string message = 2;
 }
