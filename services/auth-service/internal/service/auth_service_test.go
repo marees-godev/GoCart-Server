@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -1897,6 +1898,7 @@ func TestFailedLoginProtection_ConfigFromEnv(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type mockMailerWithCapture struct {
+	mu          sync.RWMutex
 	lastToEmail string
 	lastOTP     string
 	resetEmails map[string]string
@@ -1913,10 +1915,47 @@ func (m *mockMailerWithCapture) SendVerificationEmail(ctx context.Context, toEma
 }
 
 func (m *mockMailerWithCapture) SendPasswordResetEmail(ctx context.Context, toEmail, otp string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.lastToEmail = toEmail
 	m.lastOTP = otp
 	m.resetEmails[toEmail] = otp
 	return nil
+}
+
+func (m *mockMailerWithCapture) getLastOTP() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastOTP
+}
+
+func (m *mockMailerWithCapture) getLastToEmail() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastToEmail
+}
+
+func (m *mockMailerWithCapture) waitForOTP(timeout time.Duration) string {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		m.mu.RLock()
+		otp := m.lastOTP
+		m.mu.RUnlock()
+		if otp != "" {
+			return otp
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastOTP
+}
+
+func (m *mockMailerWithCapture) reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lastToEmail = ""
+	m.lastOTP = ""
 }
 
 func setupPasswordTestService() (AuthService, *mockAuthRepository, *mockMailerWithCapture, otp.PasswordResetStore, *config.Config) {
@@ -1970,15 +2009,15 @@ func TestForgotPassword_EmailMasking_UniformResponse(t *testing.T) {
 	if !resp1.Success || resp1.Message != expectedMessage {
 		t.Errorf("expected success=true and uniform message, got: %+v", resp1)
 	}
-	time.Sleep(10 * time.Millisecond)
-	if mockMailer.lastToEmail != existingEmail || len(mockMailer.lastOTP) != 6 {
-		t.Errorf("expected OTP sent to %s, got to=%s, otp=%s", existingEmail, mockMailer.lastToEmail, mockMailer.lastOTP)
+	otp1 := mockMailer.waitForOTP(1 * time.Second)
+	lastTo := mockMailer.getLastToEmail()
+	if lastTo != existingEmail || len(otp1) != 6 {
+		t.Errorf("expected OTP sent to %s, got to=%s, otp=%s", existingEmail, lastTo, otp1)
 	}
 
 	// 2. Non-existent user
 	nonExistentEmail := "nobody@example.com"
-	mockMailer.lastToEmail = ""
-	mockMailer.lastOTP = ""
+	mockMailer.reset()
 	resp2, err2 := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: nonExistentEmail})
 	if err2 != nil {
 		t.Fatalf("unexpected error for non-existent email: %v", err2)
@@ -1986,9 +2025,9 @@ func TestForgotPassword_EmailMasking_UniformResponse(t *testing.T) {
 	if !resp2.Success || resp2.Message != expectedMessage {
 		t.Errorf("expected success=true and uniform message for non-existent email, got: %+v", resp2)
 	}
-	time.Sleep(10 * time.Millisecond)
-	if mockMailer.lastToEmail == nonExistentEmail {
-		t.Errorf("expected no email dispatched for non-existent user, but got: %s", mockMailer.lastToEmail)
+	time.Sleep(20 * time.Millisecond)
+	if mockMailer.getLastToEmail() == nonExistentEmail {
+		t.Errorf("expected no email dispatched for non-existent user, but got: %s", mockMailer.getLastToEmail())
 	}
 }
 
@@ -2057,8 +2096,7 @@ func TestResetPasswordWithOtp_SuccessAndLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("forgot password failed: %v", err)
 	}
-	time.Sleep(10 * time.Millisecond)
-	otpCode := mockMailer.lastOTP
+	otpCode := mockMailer.waitForOTP(1 * time.Second)
 	if otpCode == "" {
 		t.Fatal("expected OTP code captured")
 	}
@@ -2118,8 +2156,7 @@ func TestResetPasswordWithOtp_SingleUseReuseFails(t *testing.T) {
 	})
 
 	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
-	time.Sleep(10 * time.Millisecond)
-	otpCode := mockMailer.lastOTP
+	otpCode := mockMailer.waitForOTP(1 * time.Second)
 
 	_, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
 		Email:       email,
@@ -2157,8 +2194,7 @@ func TestResetPasswordWithOtp_LockoutAfter5InvalidAttempts(t *testing.T) {
 	})
 
 	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
-	time.Sleep(10 * time.Millisecond)
-	correctOTP := mockMailer.lastOTP
+	correctOTP := mockMailer.waitForOTP(1 * time.Second)
 
 	for i := 1; i <= 4; i++ {
 		_, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
@@ -2215,8 +2251,7 @@ func TestResetPasswordWithOtp_PasswordComplexity(t *testing.T) {
 	})
 
 	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
-	time.Sleep(10 * time.Millisecond)
-	otpCode := mockMailer.lastOTP
+	otpCode := mockMailer.waitForOTP(1 * time.Second)
 
 	weakPasswords := []string{
 		"short",
@@ -2376,8 +2411,7 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 	if err != nil || !respMerch.Success {
 		t.Fatalf("forgot password for merchant failed: %v", err)
 	}
-	time.Sleep(10 * time.Millisecond)
-	merchOTP := mockMailer.lastOTP
+	merchOTP := mockMailer.waitForOTP(1 * time.Second)
 	if merchOTP == "" {
 		t.Fatal("expected merchant OTP generated")
 	}
