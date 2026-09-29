@@ -273,7 +273,7 @@ func TestClientManager_TimeoutEnforcement(t *testing.T) {
 		t.Errorf("expected DeadlineExceeded error code, got: %v", err)
 	}
 
-	translated := TranslateGRPCError(err)
+	translated := grpcclient.TranslateGRPCError(err)
 	if translated == nil {
 		t.Fatalf("expected translated error")
 	}
