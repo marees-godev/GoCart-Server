@@ -107,12 +107,13 @@ type ComplexityRoot struct {
 	}
 
 	Category struct {
-		CreatedAt   func(childComplexity int) int
-		Description func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Name        func(childComplexity int) int
-		ParentID    func(childComplexity int) int
-		Slug        func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		Description      func(childComplexity int) int
+		ID               func(childComplexity int) int
+		IsActive         func(childComplexity int) int
+		Name             func(childComplexity int) int
+		ParentCategoryID func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
 	}
 
 	CategoryList struct {
@@ -121,6 +122,11 @@ type ComplexityRoot struct {
 	}
 
 	ChangePasswordPayload struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
+	DeleteCategoryResponse struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
 	}
@@ -183,6 +189,7 @@ type ComplexityRoot struct {
 		CreateUserAddress       func(childComplexity int, userID string, input model.CreateAddressInput) int
 		DeactivateAccount       func(childComplexity int, input *model.DeactivateAccountInput) int
 		DeleteAccount           func(childComplexity int, input *model.DeleteAccountInput) int
+		DeleteCategory          func(childComplexity int, id string) int
 		DeleteMerchant          func(childComplexity int, id *string, merchantID *string) int
 		DeleteProduct           func(childComplexity int, id string) int
 		DeleteUserAddress       func(childComplexity int, id string) int
@@ -210,6 +217,7 @@ type ComplexityRoot struct {
 		SuspendStore            func(childComplexity int, id string, reason string) int
 		UnpublishStore          func(childComplexity int, id string) int
 		UnsuspendStore          func(childComplexity int, id string, reason *string) int
+		UpdateCategory          func(childComplexity int, id string, input model.UpdateCategoryInput) int
 		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
 		UpdateMerchant          func(childComplexity int, id *string, merchantID *string, input model.UpdateMerchantInput) int
 		UpdateMerchantStatus    func(childComplexity int, id *string, merchantID *string, status string, rejectionReason *string) int
@@ -297,8 +305,9 @@ type ComplexityRoot struct {
 
 	Query struct {
 		Cart                 func(childComplexity int, userID string) int
-		Categories           func(childComplexity int, limit *int, offset *int) int
+		Categories           func(childComplexity int, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) int
 		Category             func(childComplexity int, id string) int
+		ChildCategories      func(childComplexity int, parentCategoryID string, limit *int, offset *int) int
 		Delivery             func(childComplexity int, id string) int
 		Health               func(childComplexity int) int
 		Me                   func(childComplexity int) int
@@ -445,6 +454,8 @@ type MutationResolver interface {
 	RemoveFromCart(ctx context.Context, userID string, productID string) (*model.Cart, error)
 	ClearCart(ctx context.Context, userID string) (bool, error)
 	CreateCategory(ctx context.Context, input model.CreateCategoryInput) (*model.Category, error)
+	UpdateCategory(ctx context.Context, id string, input model.UpdateCategoryInput) (*model.Category, error)
+	DeleteCategory(ctx context.Context, id string) (*model.DeleteCategoryResponse, error)
 	CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error)
 	UpdateDeliveryStatus(ctx context.Context, id string, status string, location *string) (*model.Delivery, error)
 	ReserveStock(ctx context.Context, orderID string, items []*model.ReservationItemInput) (*model.ReserveStockPayload, error)
@@ -491,7 +502,8 @@ type QueryResolver interface {
 	Version(ctx context.Context) (string, error)
 	Cart(ctx context.Context, userID string) (*model.Cart, error)
 	Category(ctx context.Context, id string) (*model.Category, error)
-	Categories(ctx context.Context, limit *int, offset *int) (*model.CategoryList, error)
+	Categories(ctx context.Context, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) (*model.CategoryList, error)
+	ChildCategories(ctx context.Context, parentCategoryID string, limit *int, offset *int) (*model.CategoryList, error)
 	Delivery(ctx context.Context, id string) (*model.Delivery, error)
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
 	Merchant(ctx context.Context, id *string, merchantID *string) (*model.Merchant, error)
@@ -843,6 +855,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Category.ID(childComplexity), true
 
+	case "Category.isActive":
+		if e.complexity.Category.IsActive == nil {
+			break
+		}
+
+		return e.complexity.Category.IsActive(childComplexity), true
+
 	case "Category.name":
 		if e.complexity.Category.Name == nil {
 			break
@@ -850,19 +869,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Category.Name(childComplexity), true
 
-	case "Category.parentId":
-		if e.complexity.Category.ParentID == nil {
+	case "Category.parentCategoryId":
+		if e.complexity.Category.ParentCategoryID == nil {
 			break
 		}
 
-		return e.complexity.Category.ParentID(childComplexity), true
+		return e.complexity.Category.ParentCategoryID(childComplexity), true
 
-	case "Category.slug":
-		if e.complexity.Category.Slug == nil {
+	case "Category.updatedAt":
+		if e.complexity.Category.UpdatedAt == nil {
 			break
 		}
 
-		return e.complexity.Category.Slug(childComplexity), true
+		return e.complexity.Category.UpdatedAt(childComplexity), true
 
 	case "CategoryList.categories":
 		if e.complexity.CategoryList.Categories == nil {
@@ -891,6 +910,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ChangePasswordPayload.Success(childComplexity), true
+
+	case "DeleteCategoryResponse.message":
+		if e.complexity.DeleteCategoryResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.DeleteCategoryResponse.Message(childComplexity), true
+
+	case "DeleteCategoryResponse.success":
+		if e.complexity.DeleteCategoryResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.DeleteCategoryResponse.Success(childComplexity), true
 
 	case "Delivery.courierName":
 		if e.complexity.Delivery.CourierName == nil {
@@ -1266,6 +1299,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteAccount(childComplexity, args["input"].(*model.DeleteAccountInput)), true
 
+	case "Mutation.deleteCategory":
+		if e.complexity.Mutation.DeleteCategory == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteCategory_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteCategory(childComplexity, args["id"].(string)), true
+
 	case "Mutation.deleteMerchant":
 		if e.complexity.Mutation.DeleteMerchant == nil {
 			break
@@ -1574,6 +1619,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UnsuspendStore(childComplexity, args["id"].(string), args["reason"].(*string)), true
+
+	case "Mutation.updateCategory":
+		if e.complexity.Mutation.UpdateCategory == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateCategory_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateCategory(childComplexity, args["id"].(string), args["input"].(model.UpdateCategoryInput)), true
 
 	case "Mutation.updateDeliveryStatus":
 		if e.complexity.Mutation.UpdateDeliveryStatus == nil {
@@ -2044,7 +2101,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Categories(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.Categories(childComplexity, args["limit"].(*int), args["offset"].(*int), args["parentCategoryId"].(*string), args["rootOnly"].(*bool)), true
 
 	case "Query.category":
 		if e.complexity.Query.Category == nil {
@@ -2057,6 +2114,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Category(childComplexity, args["id"].(string)), true
+
+	case "Query.childCategories":
+		if e.complexity.Query.ChildCategories == nil {
+			break
+		}
+
+		args, err := ec.field_Query_childCategories_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ChildCategories(childComplexity, args["parentCategoryId"].(string), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.delivery":
 		if e.complexity.Query.Delivery == nil {
@@ -2855,6 +2924,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSendNotificationInput,
 		ec.unmarshalInputSubmitKYCInput,
 		ec.unmarshalInputUpdateAddressInput,
+		ec.unmarshalInputUpdateCategoryInput,
 		ec.unmarshalInputUpdateMerchantInput,
 		ec.unmarshalInputUpdateProductInput,
 		ec.unmarshalInputUpdateStoreInput,
@@ -3075,10 +3145,11 @@ extend type Mutation {
 	{Name: "../../../../../contracts/graphql/category/category.graphql", Input: `type Category {
   id: ID!
   name: String!
-  slug: String!
-  parentId: String
+  parentCategoryId: String
   description: String
+  isActive: Boolean!
   createdAt: String
+  updatedAt: String
 }
 
 type CategoryList {
@@ -3086,20 +3157,34 @@ type CategoryList {
   total: Int!
 }
 
+type DeleteCategoryResponse {
+  success: Boolean!
+  message: String!
+}
+
 input CreateCategoryInput {
   name: String!
-  slug: String!
-  parentId: String
+  parentCategoryId: String
   description: String
+}
+
+input UpdateCategoryInput {
+  name: String
+  parentCategoryId: String
+  description: String
+  isActive: Boolean
 }
 
 extend type Query {
   category(id: ID!): Category
-  categories(limit: Int, offset: Int): CategoryList!
+  categories(limit: Int, offset: Int, parentCategoryId: String, rootOnly: Boolean): CategoryList!
+  childCategories(parentCategoryId: String!, limit: Int, offset: Int): CategoryList!
 }
 
 extend type Mutation {
   createCategory(input: CreateCategoryInput!): Category @auth(requires: [ADMIN])
+  updateCategory(id: ID!, input: UpdateCategoryInput!): Category @auth(requires: [ADMIN])
+  deleteCategory(id: ID!): DeleteCategoryResponse! @auth(requires: [ADMIN])
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/common/common.graphql", Input: `enum Role {
@@ -3966,6 +4051,21 @@ func (ec *executionContext) field_Mutation_deleteAccount_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteCategory_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteMerchant_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -4380,6 +4480,30 @@ func (ec *executionContext) field_Mutation_unsuspendStore_args(ctx context.Conte
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updateCategory_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 model.UpdateCategoryInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg1, err = ec.unmarshalNUpdateCategoryInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateCategoryInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateDeliveryStatus_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -4722,6 +4846,24 @@ func (ec *executionContext) field_Query_categories_args(ctx context.Context, raw
 		}
 	}
 	args["offset"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["parentCategoryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentCategoryId"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["parentCategoryId"] = arg2
+	var arg3 *bool
+	if tmp, ok := rawArgs["rootOnly"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rootOnly"))
+		arg3, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["rootOnly"] = arg3
 	return args, nil
 }
 
@@ -4737,6 +4879,39 @@ func (ec *executionContext) field_Query_category_args(ctx context.Context, rawAr
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_childCategories_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["parentCategoryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentCategoryId"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["parentCategoryId"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg2
 	return args, nil
 }
 
@@ -7104,8 +7279,8 @@ func (ec *executionContext) fieldContext_Category_name(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _Category_slug(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Category_slug(ctx, field)
+func (ec *executionContext) _Category_parentCategoryId(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Category_parentCategoryId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -7118,51 +7293,7 @@ func (ec *executionContext) _Category_slug(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Slug, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Category_slug(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Category",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Category_parentId(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Category_parentId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ParentID, nil
+		return obj.ParentCategoryID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7176,7 +7307,7 @@ func (ec *executionContext) _Category_parentId(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Category_parentId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Category_parentCategoryId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Category",
 		Field:      field,
@@ -7230,6 +7361,50 @@ func (ec *executionContext) fieldContext_Category_description(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Category_isActive(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Category_isActive(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsActive, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Category_isActive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Category",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Category_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Category_createdAt(ctx, field)
 	if err != nil {
@@ -7259,6 +7434,47 @@ func (ec *executionContext) _Category_createdAt(ctx context.Context, field graph
 }
 
 func (ec *executionContext) fieldContext_Category_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Category",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Category_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Category) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Category_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Category_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Category",
 		Field:      field,
@@ -7314,14 +7530,16 @@ func (ec *executionContext) fieldContext_CategoryList_categories(_ context.Conte
 				return ec.fieldContext_Category_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Category_name(ctx, field)
-			case "slug":
-				return ec.fieldContext_Category_slug(ctx, field)
-			case "parentId":
-				return ec.fieldContext_Category_parentId(ctx, field)
+			case "parentCategoryId":
+				return ec.fieldContext_Category_parentCategoryId(ctx, field)
 			case "description":
 				return ec.fieldContext_Category_description(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Category_isActive(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Category_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Category_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Category", field.Name)
 		},
@@ -7451,6 +7669,94 @@ func (ec *executionContext) _ChangePasswordPayload_message(ctx context.Context, 
 func (ec *executionContext) fieldContext_ChangePasswordPayload_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ChangePasswordPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeleteCategoryResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCategoryResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeleteCategoryResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeleteCategoryResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeleteCategoryResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeleteCategoryResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.DeleteCategoryResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeleteCategoryResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeleteCategoryResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeleteCategoryResponse",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -9518,14 +9824,16 @@ func (ec *executionContext) fieldContext_Mutation_createCategory(ctx context.Con
 				return ec.fieldContext_Category_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Category_name(ctx, field)
-			case "slug":
-				return ec.fieldContext_Category_slug(ctx, field)
-			case "parentId":
-				return ec.fieldContext_Category_parentId(ctx, field)
+			case "parentCategoryId":
+				return ec.fieldContext_Category_parentCategoryId(ctx, field)
 			case "description":
 				return ec.fieldContext_Category_description(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Category_isActive(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Category_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Category_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Category", field.Name)
 		},
@@ -9538,6 +9846,183 @@ func (ec *executionContext) fieldContext_Mutation_createCategory(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateCategory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateCategory(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateCategory(rctx, fc.Args["id"].(string), fc.Args["input"].(model.UpdateCategoryInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Category); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Category`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Category)
+	fc.Result = res
+	return ec.marshalOCategory2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategory(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateCategory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Category_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Category_name(ctx, field)
+			case "parentCategoryId":
+				return ec.fieldContext_Category_parentCategoryId(ctx, field)
+			case "description":
+				return ec.fieldContext_Category_description(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Category_isActive(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Category_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Category_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Category", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteCategory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteCategory(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteCategory(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeleteCategoryResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeleteCategoryResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeleteCategoryResponse)
+	fc.Result = res
+	return ec.marshalNDeleteCategoryResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteCategoryResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteCategory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeleteCategoryResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeleteCategoryResponse_message(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeleteCategoryResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15687,14 +16172,16 @@ func (ec *executionContext) fieldContext_Query_category(ctx context.Context, fie
 				return ec.fieldContext_Category_id(ctx, field)
 			case "name":
 				return ec.fieldContext_Category_name(ctx, field)
-			case "slug":
-				return ec.fieldContext_Category_slug(ctx, field)
-			case "parentId":
-				return ec.fieldContext_Category_parentId(ctx, field)
+			case "parentCategoryId":
+				return ec.fieldContext_Category_parentCategoryId(ctx, field)
 			case "description":
 				return ec.fieldContext_Category_description(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Category_isActive(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Category_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Category_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Category", field.Name)
 		},
@@ -15727,7 +16214,7 @@ func (ec *executionContext) _Query_categories(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Categories(rctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+		return ec.resolvers.Query().Categories(rctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int), fc.Args["parentCategoryId"].(*string), fc.Args["rootOnly"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15768,6 +16255,67 @@ func (ec *executionContext) fieldContext_Query_categories(ctx context.Context, f
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_categories_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_childCategories(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_childCategories(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ChildCategories(rctx, fc.Args["parentCategoryId"].(string), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.CategoryList)
+	fc.Result = res
+	return ec.marshalNCategoryList2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategoryList(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_childCategories(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "categories":
+				return ec.fieldContext_CategoryList_categories(ctx, field)
+			case "total":
+				return ec.fieldContext_CategoryList_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CategoryList", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_childCategories_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -22988,7 +23536,7 @@ func (ec *executionContext) unmarshalInputCreateCategoryInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "slug", "parentId", "description"}
+	fieldsInOrder := [...]string{"name", "parentCategoryId", "description"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23002,20 +23550,13 @@ func (ec *executionContext) unmarshalInputCreateCategoryInput(ctx context.Contex
 				return it, err
 			}
 			it.Name = data
-		case "slug":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("slug"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Slug = data
-		case "parentId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentId"))
+		case "parentCategoryId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentCategoryId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ParentID = data
+			it.ParentCategoryID = data
 		case "description":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -23893,6 +24434,54 @@ func (ec *executionContext) unmarshalInputUpdateAddressInput(ctx context.Context
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUpdateCategoryInput(ctx context.Context, obj interface{}) (model.UpdateCategoryInput, error) {
+	var it model.UpdateCategoryInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "parentCategoryId", "description", "isActive"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "parentCategoryId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parentCategoryId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ParentCategoryID = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		case "isActive":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isActive"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsActive = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateMerchantInput(ctx context.Context, obj interface{}) (model.UpdateMerchantInput, error) {
 	var it model.UpdateMerchantInput
 	asMap := map[string]interface{}{}
@@ -24568,17 +25157,19 @@ func (ec *executionContext) _Category(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "slug":
-			out.Values[i] = ec._Category_slug(ctx, field, obj)
+		case "parentCategoryId":
+			out.Values[i] = ec._Category_parentCategoryId(ctx, field, obj)
+		case "description":
+			out.Values[i] = ec._Category_description(ctx, field, obj)
+		case "isActive":
+			out.Values[i] = ec._Category_isActive(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "parentId":
-			out.Values[i] = ec._Category_parentId(ctx, field, obj)
-		case "description":
-			out.Values[i] = ec._Category_description(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Category_createdAt(ctx, field, obj)
+		case "updatedAt":
+			out.Values[i] = ec._Category_updatedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -24664,6 +25255,50 @@ func (ec *executionContext) _ChangePasswordPayload(ctx context.Context, sel ast.
 			}
 		case "message":
 			out.Values[i] = ec._ChangePasswordPayload_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var deleteCategoryResponseImplementors = []string{"DeleteCategoryResponse"}
+
+func (ec *executionContext) _DeleteCategoryResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteCategoryResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deleteCategoryResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeleteCategoryResponse")
+		case "success":
+			out.Values[i] = ec._DeleteCategoryResponse_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._DeleteCategoryResponse_message(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -25056,6 +25691,17 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createCategory(ctx, field)
 			})
+		case "updateCategory":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateCategory(ctx, field)
+			})
+		case "deleteCategory":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteCategory(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createDelivery":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createDelivery(ctx, field)
@@ -25923,6 +26569,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_categories(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "childCategories":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_childCategories(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -27663,6 +28331,20 @@ func (ec *executionContext) unmarshalNCreateStoreInput2githubᚗcomᚋmareesᚑg
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNDeleteCategoryResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteCategoryResponse(ctx context.Context, sel ast.SelectionSet, v model.DeleteCategoryResponse) graphql.Marshaler {
+	return ec._DeleteCategoryResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDeleteCategoryResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteCategoryResponse(ctx context.Context, sel ast.SelectionSet, v *model.DeleteCategoryResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeleteCategoryResponse(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -28419,6 +29101,11 @@ func (ec *executionContext) unmarshalNSubmitKYCInput2githubᚗcomᚋmareesᚑgod
 
 func (ec *executionContext) unmarshalNUpdateAddressInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateAddressInput(ctx context.Context, v interface{}) (model.UpdateAddressInput, error) {
 	res, err := ec.unmarshalInputUpdateAddressInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateCategoryInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateCategoryInput(ctx context.Context, v interface{}) (model.UpdateCategoryInput, error) {
+	res, err := ec.unmarshalInputUpdateCategoryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
