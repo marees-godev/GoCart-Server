@@ -31,6 +31,7 @@ type AuthRepository interface {
 	RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error
 	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
 	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error
 }
 
 type postgresAuthRepository struct {
@@ -382,5 +383,54 @@ func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID u
 		r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
 		return fmt.Errorf("repository: mark email verified failed: %w", err)
 	}
+	return nil
+}
+
+func (r *postgresAuthRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	query := `
+		UPDATE auth_credentials
+		SET password_hash = $1,
+		    failed_login_count = 0,
+		    locked_until = NULL,
+		    updated_at = NOW()
+		WHERE user_id = $2
+	`
+	cmdTag, err := tx.Exec(ctx, query, passwordHash, userID)
+	if err != nil {
+		r.logger.Error("Failed to update password", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: update password failed: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE user_id = $1 AND revoked = false
+	`, userID)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh tokens on password change", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: revoke refresh tokens failed: %w", err)
+	}
+
+	if evt != nil {
+		if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+			r.logger.Error("Failed to insert outbox event on password change", "user_id", userID, "error", err)
+			return fmt.Errorf("repository: insert outbox event failed: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit password change tx", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: commit tx failed: %w", err)
+	}
+
 	return nil
 }

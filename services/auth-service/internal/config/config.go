@@ -26,9 +26,14 @@ type Config struct {
 }
 
 type SecurityConfig struct {
-	MaxLoginAttempts    int
-	LoginAttemptWindow  time.Duration
-	AccountLockDuration time.Duration
+	MaxLoginAttempts             int
+	LoginAttemptWindow           time.Duration
+	AccountLockDuration          time.Duration
+	PasswordResetOTPTTLMinutes   int
+	PasswordResetMaxRequests     int
+	PasswordResetRequestWindow   time.Duration
+	PasswordResetMaxAttempts     int
+	PasswordResetLockoutDuration time.Duration
 }
 
 type ServicesConfig struct {
@@ -74,14 +79,14 @@ type JWTConfig struct {
 }
 
 type EmailConfig struct {
-	ResendAPIKey    string
-	ResendFromEmail string
-	BrevoAPIKey     string
-	BrevoFromEmail  string
-	SMTPHost        string
-	SMTPPort        string
-	SMTPUser        string
-	SMTPPass        string
+	ResendAPIKey          string
+	ResendFromEmail       string
+	BrevoAPIKey           string
+	BrevoFromEmail        string
+	SMTPHost              string
+	SMTPPort              string
+	SMTPUser              string
+	SMTPPass              string
 	FromEmail             string
 	TokenTTLMinutes       int
 	ResendCooldownSeconds int
@@ -140,22 +145,27 @@ func LoadEnv() *Config {
 			ExpiryMinutes: GetEnvAsInt("JWT_EXPIRY_MINUTES", 60),
 		},
 		Email: EmailConfig{
-			ResendAPIKey:    GetEnv("RESEND_API_KEY", ""),
-			ResendFromEmail: GetEnv("RESEND_FROM_EMAIL", GetEnv("EMAIL_FROM", "onboarding@resend.dev")),
-			BrevoAPIKey:     GetEnv("BREVO_API_KEY", ""),
-			BrevoFromEmail:  GetEnv("BREVO_FROM_EMAIL", GetEnv("EMAIL_FROM", "nikotest122@gmail.com")),
-			SMTPHost:        GetEnv("SMTP_HOST", "smtp.gmail.com"),
-			SMTPPort:        GetEnv("SMTP_PORT", "587"),
-			SMTPUser:        GetEnv("SMTP_USER", ""),
-			SMTPPass:        GetEnv("SMTP_PASS", ""),
+			ResendAPIKey:          GetEnv("RESEND_API_KEY", ""),
+			ResendFromEmail:       GetEnv("RESEND_FROM_EMAIL", GetEnv("EMAIL_FROM", "onboarding@resend.dev")),
+			BrevoAPIKey:           GetEnv("BREVO_API_KEY", ""),
+			BrevoFromEmail:        GetEnv("BREVO_FROM_EMAIL", GetEnv("EMAIL_FROM", "nikotest122@gmail.com")),
+			SMTPHost:              GetEnv("SMTP_HOST", "smtp.gmail.com"),
+			SMTPPort:              GetEnv("SMTP_PORT", "587"),
+			SMTPUser:              GetEnv("SMTP_USER", ""),
+			SMTPPass:              GetEnv("SMTP_PASS", ""),
 			FromEmail:             GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
 			TokenTTLMinutes:       GetEnvAsInt("EMAIL_OTP_TTL_MINUTES", GetEnvAsInt("EMAIL_TOKEN_TTL_MINUTES", 5)),
 			ResendCooldownSeconds: GetEnvAsInt("EMAIL_OTP_RESEND_COOLDOWN_SECONDS", 60),
 		},
 		Security: SecurityConfig{
-			MaxLoginAttempts:    GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
-			LoginAttemptWindow:  GetEnvAsDuration("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
-			AccountLockDuration: GetEnvAsDuration("ACCOUNT_LOCK_DURATION", 15*time.Minute),
+			MaxLoginAttempts:             GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			LoginAttemptWindow:           GetEnvAsDuration("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
+			AccountLockDuration:          GetEnvAsDuration("ACCOUNT_LOCK_DURATION", 15*time.Minute),
+			PasswordResetOTPTTLMinutes:   GetEnvAsInt("PASSWORD_RESET_OTP_TTL_MINUTES", 15),
+			PasswordResetMaxRequests:     GetEnvAsInt("PASSWORD_RESET_MAX_REQUESTS", 3),
+			PasswordResetRequestWindow:   GetEnvAsDuration("PASSWORD_RESET_REQUEST_WINDOW", 15*time.Minute),
+			PasswordResetMaxAttempts:     GetEnvAsInt("PASSWORD_RESET_MAX_ATTEMPTS", 5),
+			PasswordResetLockoutDuration: GetEnvAsDuration("PASSWORD_RESET_LOCKOUT_DURATION", 1*time.Hour),
 		},
 		Redis:           redis.LoadConfigFromEnv("AUTH"),
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),

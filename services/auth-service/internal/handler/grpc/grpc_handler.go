@@ -154,3 +154,53 @@ func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.R
 	}, nil
 }
 
+func (h *AuthGRPCHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
+	resp, err := h.authService.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
+		Email:    req.GetEmail(),
+		ClientIP:   req.GetClientIp(),
+		IsMerchant: req.GetIsMerchant(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ForgotPasswordResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ResetPasswordWithOtp(ctx context.Context, req *pb.ResetPasswordWithOtpRequest) (*pb.ResetPasswordResponse, error) {
+	resp, err := h.authService.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       req.GetEmail(),
+		OTP:         req.GetOtp(),
+		NewPassword: req.GetNewPassword(),
+		IsMerchant:  req.GetIsMerchant(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ResetPasswordResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+	userID := req.GetUserId()
+	resp, err := h.authService.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID,
+		OldPassword: req.GetOldPassword(),
+		NewPassword: req.GetNewPassword(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ChangePasswordResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+

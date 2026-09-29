@@ -105,6 +105,16 @@ type CategoryList struct {
 	Total      int         `json:"total"`
 }
 
+type ChangePasswordInput struct {
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
+}
+
+type ChangePasswordPayload struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type CreateAddressInput struct {
 	Label        *string `json:"label,omitempty"`
 	FullName     string  `json:"fullName"`
@@ -174,6 +184,16 @@ type Delivery struct {
 	Status              string  `json:"status"`
 	EstimatedDeliveryAt *string `json:"estimatedDeliveryAt,omitempty"`
 	DeliveredAt         *string `json:"deliveredAt,omitempty"`
+}
+
+type ForgotPasswordInput struct {
+	Email      string `json:"email"`
+	IsMerchant bool   `json:"isMerchant"`
+}
+
+type ForgotPasswordPayload struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 type GenerateStoreUploadURLInput struct {
@@ -341,6 +361,18 @@ type ReservationItemInput struct {
 type ReserveStockPayload struct {
 	ReservationID string `json:"reservationId"`
 	Success       bool   `json:"success"`
+}
+
+type ResetPasswordPayload struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ResetPasswordWithOtpInput struct {
+	Email       string `json:"email"`
+	Otp         string `json:"otp"`
+	NewPassword string `json:"newPassword"`
+	IsMerchant  bool   `json:"isMerchant"`
 }
 
 type ReturnOrder struct {

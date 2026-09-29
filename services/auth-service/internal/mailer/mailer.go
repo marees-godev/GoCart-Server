@@ -12,6 +12,7 @@ import (
 
 type Mailer interface {
 	SendVerificationEmail(ctx context.Context, toEmail, otp string) error
+	SendPasswordResetEmail(ctx context.Context, toEmail, otp string) error
 }
 
 type authMailer struct {
@@ -45,6 +46,36 @@ func (m *authMailer) SendVerificationEmail(ctx context.Context, toEmail, otp str
 			</div>
 			<p style="color: #64748b; font-size: 14px; line-height: 1.5; margin: 0;">
 				This code is valid for 5 minutes. If you did not request this, please safely ignore this email.
+			</p>
+		</div>
+	`, otp)
+
+	return m.client.Send(ctx, mailer.Message{
+		To:       to,
+		Subject:  subject,
+		HTMLBody: bodyHTML,
+		TextBody: bodyText,
+	})
+}
+
+func (m *authMailer) SendPasswordResetEmail(ctx context.Context, toEmail, otp string) error {
+	to := strings.ToLower(strings.TrimSpace(toEmail))
+	subject := fmt.Sprintf("Your GoCart Password Reset Code: %s", otp)
+	bodyText := fmt.Sprintf("Hello,\n\nYou requested a password reset for your GoCart account.\n\nYour 6-digit password reset code is: %s\n\nThis code will expire in 15 minutes. If you did not request a password reset, please safely ignore this email.", otp)
+	bodyHTML := fmt.Sprintf(`
+		<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+			<div style="margin-bottom: 24px;">
+				<h1 style="color: #4F46E5; font-size: 24px; font-weight: 700; margin: 0 0 8px 0;">GoCart</h1>
+				<h2 style="color: #1e293b; font-size: 20px; font-weight: 600; margin: 0;">Password Reset Request</h2>
+			</div>
+			<p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+				You recently requested to reset your password for your GoCart account. Use the 6-digit code below to set your new password:
+			</p>
+			<div style="background-color: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px;">
+				<span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #4F46E5; display: inline-block;">%s</span>
+			</div>
+			<p style="color: #64748b; font-size: 14px; line-height: 1.5; margin: 0;">
+				This code is valid for 15 minutes. If you did not request this password reset, please safely ignore this email or contact support.
 			</p>
 		</div>
 	`, otp)
