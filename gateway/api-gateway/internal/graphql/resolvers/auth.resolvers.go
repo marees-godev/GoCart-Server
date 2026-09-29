@@ -512,8 +512,9 @@ func (r *mutationResolver) ForgotPassword(ctx context.Context, input model.Forgo
 	}
 
 	res, err := authClient.ForgotPassword(ctx, &authpb.ForgotPasswordRequest{
-		Email:    input.Email,
-		ClientIp: clientIP,
+		Email:      input.Email,
+		ClientIp:   clientIP,
+		IsMerchant: input.IsMerchant,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -552,6 +553,7 @@ func (r *mutationResolver) ResetPasswordWithOtp(ctx context.Context, input model
 		Email:       input.Email,
 		Otp:         input.Otp,
 		NewPassword: input.NewPassword,
+		IsMerchant:  input.IsMerchant,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

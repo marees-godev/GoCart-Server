@@ -745,6 +745,7 @@ type ForgotPasswordRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	ClientIp      string                 `protobuf:"bytes,2,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`
+	IsMerchant    bool                   `protobuf:"varint,3,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -791,6 +792,13 @@ func (x *ForgotPasswordRequest) GetClientIp() string {
 		return x.ClientIp
 	}
 	return ""
+}
+
+func (x *ForgotPasswordRequest) GetIsMerchant() bool {
+	if x != nil {
+		return x.IsMerchant
+	}
+	return false
 }
 
 type ForgotPasswordResponse struct {
@@ -850,6 +858,7 @@ type ResetPasswordWithOtpRequest struct {
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Otp           string                 `protobuf:"bytes,2,opt,name=otp,proto3" json:"otp,omitempty"`
 	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	IsMerchant    bool                   `protobuf:"varint,4,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -903,6 +912,13 @@ func (x *ResetPasswordWithOtpRequest) GetNewPassword() string {
 		return x.NewPassword
 	}
 	return ""
+}
+
+func (x *ResetPasswordWithOtpRequest) GetIsMerchant() bool {
+	if x != nil {
+		return x.IsMerchant
+	}
+	return false
 }
 
 type ResetPasswordResponse struct {
@@ -1129,17 +1145,21 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"U\n" +
 	"\x1fResendVerificationEmailResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"J\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"k\n" +
 	"\x15ForgotPasswordRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1b\n" +
-	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\"L\n" +
+	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12\x1f\n" +
+	"\vis_merchant\x18\x03 \x01(\bR\n" +
+	"isMerchant\"L\n" +
 	"\x16ForgotPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"h\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x89\x01\n" +
 	"\x1bResetPasswordWithOtpRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12!\n" +
-	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"K\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12\x1f\n" +
+	"\vis_merchant\x18\x04 \x01(\bR\n" +
+	"isMerchant\"K\n" +
 	"\x15ResetPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"v\n" +

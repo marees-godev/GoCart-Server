@@ -38,6 +38,7 @@ type LogoutPayload {
 # --- Forgot & Reset Password Flow ---
 input ForgotPasswordInput {
   email: String!
+  isMerchant: Boolean!
 }
 
 type ForgotPasswordPayload {
@@ -49,6 +50,7 @@ input ResetPasswordWithOtpInput {
   email: String!
   otp: String!
   newPassword: String!
+  isMerchant: Boolean!
 }
 
 type ResetPasswordPayload {

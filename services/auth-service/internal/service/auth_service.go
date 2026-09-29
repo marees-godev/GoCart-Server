@@ -933,6 +933,12 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 	email := cleanEmail(req.Email)
 	clientIP := strings.TrimSpace(req.ClientIP)
 
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))
+
 	maxReqs := 3
 	if s.cfg != nil && s.cfg.Security.PasswordResetMaxRequests > 0 {
 		maxReqs = s.cfg.Security.PasswordResetMaxRequests
@@ -942,10 +948,10 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 		window = s.cfg.Security.PasswordResetRequestWindow
 	}
 
-	// 1. Rate limiting by email (Max 3 per 30 minutes)
-	allowedEmail, err := s.resetStore.RecordRequest(ctx, email, maxReqs, window)
+	// 1. Rate limiting by account (email:role)
+	allowedEmail, err := s.resetStore.RecordRequest(ctx, accountKey, maxReqs, window)
 	if err == nil && !allowedEmail {
-		s.logger.Warn("Forgot password rate limit exceeded by email", "email", email)
+		s.logger.Warn("Forgot password rate limit exceeded by account", "account", accountKey)
 		return nil, appErrors.TooManyRequests("too many password reset requests; please try again later")
 	}
 
@@ -958,22 +964,22 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 		}
 	}
 
-	// 3. Uniform response / Enumeration Defense: Check if user exists
-	cred, err := s.repo.GetByEmail(ctx, email)
+	// 3. Uniform response / Enumeration Defense: Check if user exists for email and role
+	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Info("Forgot password requested for non-existent email", "email", email)
+			s.logger.Info("Forgot password requested for non-existent email and role", "email", email, "role", role)
 			return &dto.ForgotPasswordResponse{
 				Success: true,
 				Message: uniformForgotPasswordMessage,
 			}, nil
 		}
-		s.logger.Error("Forgot password database error", "email", email, "error", err)
+		s.logger.Error("Forgot password database error", "email", email, "role", role, "error", err)
 		return nil, appErrors.Internal(err, "failed to query user credentials")
 	}
 
 	if !cred.IsActive {
-		s.logger.Warn("Forgot password requested for inactive account", "email", email)
+		s.logger.Warn("Forgot password requested for inactive account", "email", email, "role", role)
 		return &dto.ForgotPasswordResponse{
 			Success: true,
 			Message: uniformForgotPasswordMessage,
@@ -1000,7 +1006,7 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 	}
 	ttl := time.Duration(ttlMinutes) * time.Minute
 
-	if err := s.resetStore.SetResetOTP(ctx, email, otpHash, salt, ttl); err != nil {
+	if err := s.resetStore.SetResetOTP(ctx, accountKey, otpHash, salt, ttl); err != nil {
 		s.logger.Error("Failed to store password reset OTP", "error", err)
 		return nil, appErrors.Internal(err, "failed to store password reset code")
 	}
@@ -1010,7 +1016,7 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 		_ = s.mailer.SendPasswordResetEmail(context.Background(), toEmail, otpCode)
 	}(email, rawOTP)
 
-	s.logger.Info("Password reset OTP generated and email dispatched", "email", email)
+	s.logger.Info("Password reset OTP generated and email dispatched", "email", email, "role", role)
 	return &dto.ForgotPasswordResponse{
 		Success: true,
 		Message: uniformForgotPasswordMessage,
@@ -1034,28 +1040,34 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 		return nil, appErrors.BadRequest("new password is required")
 	}
 
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))
+
 	// 1. Validate password complexity first
 	if err := validator.ValidatePasswordStrength(req.NewPassword); err != nil {
 		return nil, appErrors.BadRequest(err.Error())
 	}
 
 	// 2. Check if locked out due to >= 5 failed attempts
-	if isLocked, _, err := s.resetStore.IsLocked(ctx, email); err == nil && isLocked {
-		s.logger.Warn("Reset password attempt blocked: lockout active", "email", email)
+	if isLocked, _, err := s.resetStore.IsLocked(ctx, accountKey); err == nil && isLocked {
+		s.logger.Warn("Reset password attempt blocked: lockout active", "account", accountKey)
 		return nil, appErrors.TooManyRequests("maximum invalid OTP attempts exceeded; password reset locked for 1 hour")
 	}
 
 	// 3. Retrieve stored reset OTP
-	otpData, err := s.resetStore.GetResetOTP(ctx, email)
+	otpData, err := s.resetStore.GetResetOTP(ctx, accountKey)
 	if err != nil {
-		s.logger.Warn("Reset password failed: OTP not found or expired", "email", email)
+		s.logger.Warn("Reset password failed: OTP not found or expired", "account", accountKey)
 		return nil, appErrors.BadRequest("password reset code has expired or is invalid")
 	}
 
 	// 4. Verify salted hash of OTP
 	expectedHash := hashWithSalt(otpVal, otpData.Salt)
 	if otpData.Hash != expectedHash {
-		attempts, _ := s.resetStore.IncrementAttempts(ctx, email)
+		attempts, _ := s.resetStore.IncrementAttempts(ctx, accountKey)
 		maxAttempts := 5
 		if s.cfg != nil && s.cfg.Security.PasswordResetMaxAttempts > 0 {
 			maxAttempts = s.cfg.Security.PasswordResetMaxAttempts
@@ -1066,17 +1078,17 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 		}
 
 		if attempts >= maxAttempts {
-			s.logger.Warn("Reset password locked out: max invalid OTP attempts reached", "email", email, "attempts", attempts)
-			_ = s.resetStore.LockReset(ctx, email, lockoutDuration)
+			s.logger.Warn("Reset password locked out: max invalid OTP attempts reached", "account", accountKey, "attempts", attempts)
+			_ = s.resetStore.LockReset(ctx, accountKey, lockoutDuration)
 			return nil, appErrors.TooManyRequests("maximum invalid OTP attempts exceeded; password reset locked for 1 hour")
 		}
 
-		s.logger.Warn("Reset password failed: invalid OTP code", "email", email, "attempt", attempts)
+		s.logger.Warn("Reset password failed: invalid OTP code", "account", accountKey, "attempt", attempts)
 		return nil, appErrors.BadRequest("invalid password reset code")
 	}
 
-	// 5. Look up user by email
-	cred, err := s.repo.GetByEmail(ctx, email)
+	// 5. Look up user by email and role
+	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, appErrors.NotFound("user not found")
@@ -1098,6 +1110,7 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 	evtPayload, _ := json.Marshal(map[string]any{
 		"user_id":    cred.UserID.String(),
 		"email":      cred.Email,
+		"role":       cred.Role.String(),
 		"reset_at":   time.Now().UTC(),
 		"reset_type": "otp",
 	})
@@ -1115,14 +1128,14 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 	}
 
 	// 8. Consume (delete) the OTP immediately - single use
-	_ = s.resetStore.DeleteResetOTP(ctx, email)
+	_ = s.resetStore.DeleteResetOTP(ctx, accountKey)
 
 	// 9. Session & cache invalidation
 	if s.redisClient != nil {
-		_ = s.redisClient.Delete(ctx, failedLoginKey(email), accountLockKey(email))
+		_ = s.redisClient.Delete(ctx, failedLoginKey(email), accountLockKey(email), failedLoginKey(accountKey), accountLockKey(accountKey))
 	}
 
-	s.logger.Info("Password reset successful", "user_id", cred.UserID.String(), "email", email)
+	s.logger.Info("Password reset successful", "user_id", cred.UserID.String(), "email", email, "role", role)
 	return &dto.ResetPasswordResponse{
 		Success: true,
 		Message: "Password has been reset successfully",

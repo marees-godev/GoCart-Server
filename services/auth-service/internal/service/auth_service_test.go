@@ -2333,6 +2333,105 @@ func TestChangePassword_SuccessAndCredentialVerification(t *testing.T) {
 	}
 }
 
+func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	sharedEmail := "dualrole@example.com"
+	custPassword := "CustPassword123!"
+	merchPassword := "MerchPassword123!"
+	custHashed, _ := bcrypt.GenerateFromPassword([]byte(custPassword), bcrypt.DefaultCost)
+	merchHashed, _ := bcrypt.GenerateFromPassword([]byte(merchPassword), bcrypt.DefaultCost)
+
+	custUserID := uuid.Must(uuid.NewV7())
+	merchUserID := uuid.Must(uuid.NewV7())
+
+	// 1. Create Customer account with sharedEmail
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        custUserID,
+		Email:         sharedEmail,
+		PasswordHash:  string(custHashed),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	// 2. Create Merchant account with same sharedEmail
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        merchUserID,
+		Email:         sharedEmail,
+		PasswordHash:  string(merchHashed),
+		Role:          model.RoleMerchant,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	// 3. Request password reset for MERCHANT
+	respMerch, err := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
+		Email:      sharedEmail,
+		IsMerchant: true,
+	})
+	if err != nil || !respMerch.Success {
+		t.Fatalf("forgot password for merchant failed: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	merchOTP := mockMailer.lastOTP
+	if merchOTP == "" {
+		t.Fatal("expected merchant OTP generated")
+	}
+
+	// 4. Reset MERCHANT password with OTP
+	newMerchPassword := "NewMerchSecret123!"
+	resetMerchResp, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       sharedEmail,
+		OTP:         merchOTP,
+		NewPassword: newMerchPassword,
+		IsMerchant:  true,
+	})
+	if err != nil || !resetMerchResp.Success {
+		t.Fatalf("reset password for merchant failed: %v", err)
+	}
+
+	// 5. Merchant login with new password succeeds
+	loginMerchResp, err := svc.Login(ctx, &dto.LoginRequest{
+		Email:      sharedEmail,
+		Password:   newMerchPassword,
+		IsMerchant: true,
+	})
+	if err != nil {
+		t.Fatalf("merchant login with new password failed: %v", err)
+	}
+	if loginMerchResp.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %s", loginMerchResp.Role)
+	}
+
+	// 6. Merchant login with old password fails
+	_, errOldMerch := svc.Login(ctx, &dto.LoginRequest{
+		Email:      sharedEmail,
+		Password:   merchPassword,
+		IsMerchant: true,
+	})
+	if errOldMerch == nil {
+		t.Fatal("expected old merchant password to fail")
+	}
+
+	// 7. CUSTOMER password must NOT be affected - Customer login with original password still succeeds!
+	loginCustResp, errCust := svc.Login(ctx, &dto.LoginRequest{
+		Email:      sharedEmail,
+		Password:   custPassword,
+		IsMerchant: false,
+	})
+	if errCust != nil {
+		t.Fatalf("customer login with original password should succeed, got error: %v", errCust)
+	}
+	if loginCustResp.Role != "CUSTOMER" {
+		t.Errorf("expected role CUSTOMER, got %s", loginCustResp.Role)
+	}
+}
+
+
 
 
 

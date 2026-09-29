@@ -157,7 +157,8 @@ func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.R
 func (h *AuthGRPCHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
 	resp, err := h.authService.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
 		Email:    req.GetEmail(),
-		ClientIP: req.GetClientIp(),
+		ClientIP:   req.GetClientIp(),
+		IsMerchant: req.GetIsMerchant(),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -174,6 +175,7 @@ func (h *AuthGRPCHandler) ResetPasswordWithOtp(ctx context.Context, req *pb.Rese
 		Email:       req.GetEmail(),
 		OTP:         req.GetOtp(),
 		NewPassword: req.GetNewPassword(),
+		IsMerchant:  req.GetIsMerchant(),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)

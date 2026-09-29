@@ -2996,6 +2996,7 @@ type LogoutPayload {
 # --- Forgot & Reset Password Flow ---
 input ForgotPasswordInput {
   email: String!
+  isMerchant: Boolean!
 }
 
 type ForgotPasswordPayload {
@@ -3007,6 +3008,7 @@ input ResetPasswordWithOtpInput {
   email: String!
   otp: String!
   newPassword: String!
+  isMerchant: Boolean!
 }
 
 type ResetPasswordPayload {
@@ -23315,7 +23317,7 @@ func (ec *executionContext) unmarshalInputForgotPasswordInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email"}
+	fieldsInOrder := [...]string{"email", "isMerchant"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23329,6 +23331,13 @@ func (ec *executionContext) unmarshalInputForgotPasswordInput(ctx context.Contex
 				return it, err
 			}
 			it.Email = data
+		case "isMerchant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isMerchant"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsMerchant = data
 		}
 	}
 
@@ -23636,7 +23645,7 @@ func (ec *executionContext) unmarshalInputResetPasswordWithOtpInput(ctx context.
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email", "otp", "newPassword"}
+	fieldsInOrder := [...]string{"email", "otp", "newPassword", "isMerchant"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -23664,6 +23673,13 @@ func (ec *executionContext) unmarshalInputResetPasswordWithOtpInput(ctx context.
 				return it, err
 			}
 			it.NewPassword = data
+		case "isMerchant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isMerchant"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsMerchant = data
 		}
 	}
 

@@ -92,6 +92,7 @@ message ResendVerificationEmailResponse {
 message ForgotPasswordRequest {
   string email = 1;
   string client_ip = 2;
+  bool is_merchant = 3;
 }
 
 message ForgotPasswordResponse {
@@ -103,6 +104,7 @@ message ResetPasswordWithOtpRequest {
   string email = 1;
   string otp = 2;
   string new_password = 3;
+  bool is_merchant = 4;
 }
 
 message ResetPasswordResponse {

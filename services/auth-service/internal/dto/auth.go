@@ -74,8 +74,9 @@ type ResendVerificationEmailResponse struct {
 }
 
 type ForgotPasswordRequest struct {
-	Email    string `json:"email"`
-	ClientIP string `json:"client_ip,omitempty"`
+	Email      string `json:"email"`
+	ClientIP   string `json:"client_ip,omitempty"`
+	IsMerchant bool   `json:"is_merchant,omitempty"`
 }
 
 type ForgotPasswordResponse struct {
@@ -87,6 +88,7 @@ type ResetPasswordWithOtpRequest struct {
 	Email       string `json:"email"`
 	OTP         string `json:"otp"`
 	NewPassword string `json:"new_password"`
+	IsMerchant  bool   `json:"is_merchant,omitempty"`
 }
 
 type ResetPasswordResponse struct {

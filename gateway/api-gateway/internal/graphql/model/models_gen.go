@@ -187,7 +187,8 @@ type Delivery struct {
 }
 
 type ForgotPasswordInput struct {
-	Email string `json:"email"`
+	Email      string `json:"email"`
+	IsMerchant bool   `json:"isMerchant"`
 }
 
 type ForgotPasswordPayload struct {
@@ -371,6 +372,7 @@ type ResetPasswordWithOtpInput struct {
 	Email       string `json:"email"`
 	Otp         string `json:"otp"`
 	NewPassword string `json:"newPassword"`
+	IsMerchant  bool   `json:"isMerchant"`
 }
 
 type ReturnOrder struct {

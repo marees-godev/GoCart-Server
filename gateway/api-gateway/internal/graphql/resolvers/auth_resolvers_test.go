@@ -417,7 +417,8 @@ func TestForgotPasswordResolver(t *testing.T) {
 
 	// 1. Success
 	resp, err := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
-		Email: "user@example.com",
+		Email:      "user@example.com",
+		IsMerchant: false,
 	})
 	if err != nil {
 		t.Fatalf("expected successful forgotPassword, got: %v", err)
@@ -428,7 +429,8 @@ func TestForgotPasswordResolver(t *testing.T) {
 
 	// 2. Missing email
 	_, errMissing := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
-		Email: "",
+		Email:      "",
+		IsMerchant: false,
 	})
 	if errMissing == nil {
 		t.Errorf("expected error for empty email, got nil")
@@ -452,6 +454,7 @@ func TestResetPasswordWithOtpResolver(t *testing.T) {
 		Email:       "user@example.com",
 		Otp:         "123456",
 		NewPassword: "NewPassword123!",
+		IsMerchant:  false,
 	})
 	if err != nil {
 		t.Fatalf("expected successful resetPasswordWithOtp, got: %v", err)
@@ -465,6 +468,7 @@ func TestResetPasswordWithOtpResolver(t *testing.T) {
 		Email:       "user@example.com",
 		Otp:         "invalid-otp",
 		NewPassword: "NewPassword123!",
+		IsMerchant:  false,
 	})
 	if errInvalid == nil {
 		t.Errorf("expected error for invalid otp, got nil")
