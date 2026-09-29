@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,6 +16,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
+	pkgredis "github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
@@ -207,6 +210,26 @@ func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.
 		}
 	}
 	return nil
+}
+
+func (m *mockAuthRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error {
+	for _, cred := range m.byEmail {
+		if cred.UserID == userID {
+			cred.PasswordHash = passwordHash
+			cred.FailedLoginCount = 0
+			cred.LockedUntil = nil
+			if evt != nil {
+				m.outboxEvents = append(m.outboxEvents, evt)
+			}
+			for _, rt := range m.refreshTokens {
+				if rt.UserID == userID {
+					rt.Revoked = true
+				}
+			}
+			return nil
+		}
+	}
+	return repository.ErrNotFound
 }
 
 func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
@@ -1578,6 +1601,738 @@ func TestLogout_Unauthenticated_NoToken(t *testing.T) {
 		t.Errorf("expected error when logging out without auth context or identity")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Failed Login Protection Tests
+// ---------------------------------------------------------------------------
+
+func setupTestRedis(t *testing.T) (*miniredis.Miniredis, *pkgredis.Client) {
+	t.Helper()
+	mr := miniredis.RunT(t)
+
+	cfg := pkgredis.Config{
+		Host:        mr.Host(),
+		Port:        mr.Port(),
+		DialTimeout: 1 * time.Second,
+	}
+
+	client, err := pkgredis.New(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("failed to create redis client for test: %v", err)
+	}
+
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	return mr, client
+}
+
+func createTestUserCredential(email, password string) (*model.AuthCredential, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	userID := uuid.Must(uuid.NewV7())
+	return &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         email,
+		PasswordHash:  string(hashed),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}, nil
+}
+
+func TestFailedLoginProtection_RedisTrackingAndLocking(t *testing.T) {
+	mr, redisClient := setupTestRedis(t)
+
+	email := "victim@example.com"
+	password := "CorrectPassword123!"
+	cred, err := createTestUserCredential(email, password)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
+	repo := newMockAuthRepository()
+	_ = repo.CreateCredential(context.Background(), cred)
+
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "test-secret", ExpiryMinutes: 60},
+		Security: config.SecurityConfig{
+			MaxLoginAttempts:    3,
+			LoginAttemptWindow:  5 * time.Minute,
+			AccountLockDuration: 10 * time.Minute,
+		},
+	}
+
+	svc := NewAuthService(repo, cfg, nil, redisClient)
+	ctx := context.Background()
+
+	// Attempt 1: Wrong password
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword1"})
+	if err == nil {
+		t.Fatal("expected error on attempt 1, got nil")
+	}
+
+	failedKey := "auth:login:failed:" + email
+	if val, err := mr.Get(failedKey); err != nil || val != "1" {
+		t.Errorf("expected failed count 1 in Redis, got val=%s err=%v", val, err)
+	}
+
+	// Attempt 2: Wrong password
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword2"})
+	if err == nil {
+		t.Fatal("expected error on attempt 2, got nil")
+	}
+	if val, err := mr.Get(failedKey); err != nil || val != "2" {
+		t.Errorf("expected failed count 2 in Redis, got val=%s err=%v", val, err)
+	}
+
+	// Attempt 3: Wrong password -> Reaches threshold 3 -> Account Locked
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword3"})
+	if err == nil {
+		t.Fatal("expected error on attempt 3, got nil")
+	}
+
+	lockKey := "auth:login:locked:" + email
+	if !mr.Exists(lockKey) {
+		t.Error("expected Redis lock key to exist after reaching threshold")
+	}
+
+	// Attempt 4: Try logging in with CORRECT password while locked -> Must fail!
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: password})
+	if err == nil {
+		t.Fatal("expected login to fail for locked account even with correct password")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.HTTPStatus != 401 {
+		t.Errorf("expected 401 Unauthorized for locked account, got %v", err)
+	}
+}
+
+func TestFailedLoginProtection_SuccessfulLoginResetsCounter(t *testing.T) {
+	mr, redisClient := setupTestRedis(t)
+
+	email := "user.reset@example.com"
+	password := "SecretPass123!"
+	cred, err := createTestUserCredential(email, password)
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	repo := newMockAuthRepository()
+	_ = repo.CreateCredential(context.Background(), cred)
+
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "test-secret", ExpiryMinutes: 60},
+		Security: config.SecurityConfig{
+			MaxLoginAttempts:    3,
+			LoginAttemptWindow:  5 * time.Minute,
+			AccountLockDuration: 10 * time.Minute,
+		},
+	}
+
+	svc := NewAuthService(repo, cfg, nil, redisClient)
+	ctx := context.Background()
+
+	// 2 failed attempts
+	_, _ = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword1"})
+	_, _ = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword2"})
+
+	failedKey := "auth:login:failed:" + email
+	if val, _ := mr.Get(failedKey); val != "2" {
+		t.Fatalf("expected counter 2, got %s", val)
+	}
+
+	// 3rd attempt: Correct password -> Successful Login
+	resp, err := svc.Login(ctx, &dto.LoginRequest{Email: email, Password: password})
+	if err != nil {
+		t.Fatalf("expected successful login, got: %v", err)
+	}
+	if resp.AccessToken == "" {
+		t.Fatal("expected access token in response")
+	}
+
+	// Redis counter and lock keys should be deleted
+	if mr.Exists(failedKey) {
+		t.Error("expected failed attempts counter to be cleared after successful login")
+	}
+
+	// Next failed login attempt should start count at 1 (not lock account)
+	_, _ = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPasswordAgain"})
+	if val, _ := mr.Get(failedKey); val != "1" {
+		t.Errorf("expected counter to reset to 1 after new failed attempt, got %s", val)
+	}
+}
+
+func TestFailedLoginProtection_AccountEnumerationPrevention(t *testing.T) {
+	mr, redisClient := setupTestRedis(t)
+
+	repo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "test-secret", ExpiryMinutes: 60},
+		Security: config.SecurityConfig{
+			MaxLoginAttempts:    2,
+			LoginAttemptWindow:  5 * time.Minute,
+			AccountLockDuration: 10 * time.Minute,
+		},
+	}
+
+	svc := NewAuthService(repo, cfg, nil, redisClient)
+	ctx := context.Background()
+
+	nonExistentEmail := "ghost.user@example.com"
+
+	// Attempt 1 for non-existent user
+	_, err1 := svc.Login(ctx, &dto.LoginRequest{Email: nonExistentEmail, Password: "SomePassword123!"})
+	if err1 == nil {
+		t.Fatal("expected error for non-existent user, got nil")
+	}
+	appErr1, ok1 := err1.(*appErrors.AppError)
+	if !ok1 || appErr1.Message != "Invalid email or password" {
+		t.Errorf("unexpected error message: %v", err1)
+	}
+
+	// Attempt 2 for non-existent user -> Triggers lock in Redis for non-existent email
+	_, err2 := svc.Login(ctx, &dto.LoginRequest{Email: nonExistentEmail, Password: "SomePassword123!"})
+	if err2 == nil {
+		t.Fatal("expected error on attempt 2, got nil")
+	}
+
+	lockKey := "auth:login:locked:" + nonExistentEmail
+	if !mr.Exists(lockKey) {
+		t.Error("expected lock key in Redis for non-existent email after exceeding threshold")
+	}
+
+	// Attempt 3: Blocked by Redis lock check
+	_, err3 := svc.Login(ctx, &dto.LoginRequest{Email: nonExistentEmail, Password: "SomePassword123!"})
+	if err3 == nil {
+		t.Fatal("expected error when locked, got nil")
+	}
+	appErr3, ok3 := err3.(*appErrors.AppError)
+	if !ok3 || appErr3.Message != "Invalid email or password" {
+		t.Errorf("expected generic unauthorized error message for locked non-existent account, got %v", err3)
+	}
+}
+
+func TestFailedLoginProtection_RedisFailureFallback(t *testing.T) {
+	email := "fallback.user@example.com"
+	password := "ValidPass123!"
+	cred, err := createTestUserCredential(email, password)
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
+	repo := newMockAuthRepository()
+	_ = repo.CreateCredential(context.Background(), cred)
+
+	cfg := &config.Config{
+		JWT: config.JWTConfig{Secret: "test-secret", ExpiryMinutes: 60},
+		Security: config.SecurityConfig{
+			MaxLoginAttempts:    2,
+			LoginAttemptWindow:  5 * time.Minute,
+			AccountLockDuration: 10 * time.Minute,
+		},
+	}
+
+	svc := NewAuthService(repo, cfg, nil)
+	ctx := context.Background()
+
+	// Attempt 1: Wrong password -> DB updated with failed_login_count = 1
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword1"})
+	if err == nil {
+		t.Fatal("expected error on attempt 1")
+	}
+	if repo.failedCountMap[cred.ID] != 1 {
+		t.Errorf("expected DB failed count 1, got %d", repo.failedCountMap[cred.ID])
+	}
+
+	// Attempt 2: Wrong password -> Reaches threshold 2 -> DB locked_until set
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: "WrongPassword2"})
+	if err == nil {
+		t.Fatal("expected error on attempt 2")
+	}
+	if repo.failedCountMap[cred.ID] != 2 {
+		t.Errorf("expected DB failed count 2, got %d", repo.failedCountMap[cred.ID])
+	}
+	if repo.lockedUntilMap[cred.ID] == nil || time.Now().After(*repo.lockedUntilMap[cred.ID]) {
+		t.Errorf("expected DB locked_until to be set in the future, got %v", repo.lockedUntilMap[cred.ID])
+	}
+
+	// Attempt 3: Try logging in with CORRECT password -> Fails because DB is locked
+	_, err = svc.Login(ctx, &dto.LoginRequest{Email: email, Password: password})
+	if err == nil {
+		t.Fatal("expected login to fail when account is locked in DB")
+	}
+}
+
+func TestFailedLoginProtection_ConfigFromEnv(t *testing.T) {
+	_ = os.Setenv("MAX_LOGIN_ATTEMPTS", "3")
+	_ = os.Setenv("LOGIN_ATTEMPT_WINDOW", "10m")
+	_ = os.Setenv("ACCOUNT_LOCK_DURATION", "20m")
+	defer func() {
+		_ = os.Unsetenv("MAX_LOGIN_ATTEMPTS")
+		_ = os.Unsetenv("LOGIN_ATTEMPT_WINDOW")
+		_ = os.Unsetenv("ACCOUNT_LOCK_DURATION")
+	}()
+
+	cfg := config.LoadEnv()
+	if cfg.Security.MaxLoginAttempts != 3 {
+		t.Errorf("expected MaxLoginAttempts 3, got %d", cfg.Security.MaxLoginAttempts)
+	}
+	if cfg.Security.LoginAttemptWindow != 10*time.Minute {
+		t.Errorf("expected LoginAttemptWindow 10m, got %v", cfg.Security.LoginAttemptWindow)
+	}
+	if cfg.Security.AccountLockDuration != 20*time.Minute {
+		t.Errorf("expected AccountLockDuration 20m, got %v", cfg.Security.AccountLockDuration)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Password Reset Flow Tests
+// ---------------------------------------------------------------------------
+
+type mockMailerWithCapture struct {
+	lastToEmail string
+	lastOTP     string
+	resetEmails map[string]string
+}
+
+func newMockMailerWithCapture() *mockMailerWithCapture {
+	return &mockMailerWithCapture{
+		resetEmails: make(map[string]string),
+	}
+}
+
+func (m *mockMailerWithCapture) SendVerificationEmail(ctx context.Context, toEmail, otp string) error {
+	return nil
+}
+
+func (m *mockMailerWithCapture) SendPasswordResetEmail(ctx context.Context, toEmail, otp string) error {
+	m.lastToEmail = toEmail
+	m.lastOTP = otp
+	m.resetEmails[toEmail] = otp
+	return nil
+}
+
+func setupPasswordTestService() (AuthService, *mockAuthRepository, *mockMailerWithCapture, otp.PasswordResetStore, *config.Config) {
+	mockRepo := newMockAuthRepository()
+	mockMailer := newMockMailerWithCapture()
+	resetStore := otp.NewMemoryPasswordResetStore()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-1234567890123456",
+			ExpiryMinutes: 15,
+		},
+		Security: config.SecurityConfig{
+			MaxLoginAttempts:             5,
+			LoginAttemptWindow:           15 * time.Minute,
+			AccountLockDuration:          15 * time.Minute,
+			PasswordResetOTPTTLMinutes:   15,
+			PasswordResetMaxRequests:     3,
+			PasswordResetRequestWindow:   30 * time.Minute,
+			PasswordResetMaxAttempts:     5,
+			PasswordResetLockoutDuration: 1 * time.Hour,
+		},
+	}
+
+	svc := NewAuthServiceWithMailer(mockRepo, cfg, mockMailer, nil, resetStore)
+	return svc, mockRepo, mockMailer, resetStore, cfg
+}
+
+func TestForgotPassword_EmailMasking_UniformResponse(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	existingEmail := "existing@example.com"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         existingEmail,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	expectedMessage := "If an account exists with this email address, a password reset code has been sent."
+
+	// 1. Existing user
+	resp1, err1 := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: existingEmail})
+	if err1 != nil {
+		t.Fatalf("unexpected error for existing email: %v", err1)
+	}
+	if !resp1.Success || resp1.Message != expectedMessage {
+		t.Errorf("expected success=true and uniform message, got: %+v", resp1)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if mockMailer.lastToEmail != existingEmail || len(mockMailer.lastOTP) != 6 {
+		t.Errorf("expected OTP sent to %s, got to=%s, otp=%s", existingEmail, mockMailer.lastToEmail, mockMailer.lastOTP)
+	}
+
+	// 2. Non-existent user
+	nonExistentEmail := "nobody@example.com"
+	mockMailer.lastToEmail = ""
+	mockMailer.lastOTP = ""
+	resp2, err2 := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: nonExistentEmail})
+	if err2 != nil {
+		t.Fatalf("unexpected error for non-existent email: %v", err2)
+	}
+	if !resp2.Success || resp2.Message != expectedMessage {
+		t.Errorf("expected success=true and uniform message for non-existent email, got: %+v", resp2)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if mockMailer.lastToEmail == nonExistentEmail {
+		t.Errorf("expected no email dispatched for non-existent user, but got: %s", mockMailer.lastToEmail)
+	}
+}
+
+func TestForgotPassword_RateLimiting(t *testing.T) {
+	svc, mockRepo, _, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "ratelimit@example.com"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	for i := 1; i <= 3; i++ {
+		resp, err := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+		if err != nil || !resp.Success {
+			t.Fatalf("expected request %d to succeed, got resp=%+v, err=%v", i, resp, err)
+		}
+	}
+
+	_, err := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+	if err == nil {
+		t.Fatal("expected 4th request to be blocked by rate limit, but it succeeded")
+	}
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeTooManyRequests {
+		t.Fatalf("expected CodeTooManyRequests, got: %v", err)
+	}
+}
+
+func TestResetPasswordWithOtp_SuccessAndLogin(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "resetuser@example.com"
+	oldPassword := "OldPassword123!"
+	newPassword := "NewPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.DefaultCost)
+	userID := uuid.Must(uuid.NewV7())
+
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: "active-token-hash",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   false,
+	})
+
+	_, err := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+	if err != nil {
+		t.Fatalf("forgot password failed: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	otpCode := mockMailer.lastOTP
+	if otpCode == "" {
+		t.Fatal("expected OTP code captured")
+	}
+
+	resetResp, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       email,
+		OTP:         otpCode,
+		NewPassword: newPassword,
+	})
+	if err != nil {
+		t.Fatalf("reset password failed: %v", err)
+	}
+	if !resetResp.Success {
+		t.Errorf("expected success true, got false")
+	}
+
+	for _, rt := range mockRepo.refreshTokens {
+		if rt.UserID == userID && !rt.Revoked {
+			t.Errorf("expected refresh token to be revoked")
+		}
+	}
+
+	_, errOldLogin := svc.Login(ctx, &dto.LoginRequest{
+		Email:    email,
+		Password: oldPassword,
+	})
+	if errOldLogin == nil {
+		t.Fatal("expected login with old password to fail")
+	}
+
+	loginResp, errNewLogin := svc.Login(ctx, &dto.LoginRequest{
+		Email:    email,
+		Password: newPassword,
+	})
+	if errNewLogin != nil {
+		t.Fatalf("login with new password failed: %v", errNewLogin)
+	}
+	if loginResp.AccessToken == "" {
+		t.Fatal("expected valid access token on login with new password")
+	}
+}
+
+func TestResetPasswordWithOtp_SingleUseReuseFails(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "singleuse@example.com"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+	time.Sleep(10 * time.Millisecond)
+	otpCode := mockMailer.lastOTP
+
+	_, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       email,
+		OTP:         otpCode,
+		NewPassword: "FirstResetPass123!",
+	})
+	if err != nil {
+		t.Fatalf("first reset failed: %v", err)
+	}
+
+	_, errReuse := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       email,
+		OTP:         otpCode,
+		NewPassword: "SecondResetPass123!",
+	})
+	if errReuse == nil {
+		t.Fatal("expected reuse of OTP to fail, but it succeeded")
+	}
+}
+
+func TestResetPasswordWithOtp_LockoutAfter5InvalidAttempts(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "lockout@example.com"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+	time.Sleep(10 * time.Millisecond)
+	correctOTP := mockMailer.lastOTP
+
+	for i := 1; i <= 4; i++ {
+		_, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+			Email:       email,
+			OTP:         "000000",
+			NewPassword: "NewValidPassword123!",
+		})
+		if err == nil {
+			t.Fatalf("attempt %d with wrong OTP should fail", i)
+		}
+	}
+
+	_, err5 := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       email,
+		OTP:         "000000",
+		NewPassword: "NewValidPassword123!",
+	})
+	if err5 == nil {
+		t.Fatal("attempt 5 should fail")
+	}
+	appErr5, ok := err5.(*appErrors.AppError)
+	if !ok || appErr5.Code != appErrors.CodeTooManyRequests {
+		t.Fatalf("expected CodeTooManyRequests on 5th failure, got: %v", err5)
+	}
+
+	_, errCorrect := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       email,
+		OTP:         correctOTP,
+		NewPassword: "NewValidPassword123!",
+	})
+	if errCorrect == nil {
+		t.Fatal("expected attempt with correct OTP to be blocked during lockout window")
+	}
+	appErrLock, ok := errCorrect.(*appErrors.AppError)
+	if !ok || appErrLock.Code != appErrors.CodeTooManyRequests {
+		t.Fatalf("expected CodeTooManyRequests during lockout, got: %v", errCorrect)
+	}
+}
+
+func TestResetPasswordWithOtp_PasswordComplexity(t *testing.T) {
+	svc, mockRepo, mockMailer, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "complexity@example.com"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	_, _ = svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{Email: email})
+	time.Sleep(10 * time.Millisecond)
+	otpCode := mockMailer.lastOTP
+
+	weakPasswords := []string{
+		"short",
+		"nouppercase123!",
+		"NOLOWERCASE123!",
+		"NoNumber!",
+		"NoSpecialChar123",
+	}
+
+	for _, weak := range weakPasswords {
+		_, err := svc.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+			Email:       email,
+			OTP:         otpCode,
+			NewPassword: weak,
+		})
+		if err == nil {
+			t.Errorf("expected weak password '%s' to be rejected", weak)
+		}
+	}
+}
+
+func TestChangePassword_SuccessAndCredentialVerification(t *testing.T) {
+	svc, mockRepo, _, _, _ := setupPasswordTestService()
+	ctx := context.Background()
+
+	email := "changepass@example.com"
+	oldPassword := "OldPassword123!"
+	newPassword := "NewPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.DefaultCost)
+	userID := uuid.Must(uuid.NewV7())
+
+	_ = mockRepo.CreateCredential(ctx, &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         email,
+		PasswordHash:  string(hashedPassword),
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	})
+
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: "active-token-change-pass",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Revoked:   false,
+	})
+
+	// 1. Calling changePassword with incorrect old password -> must fail with INVALID_CREDENTIALS
+	_, errWrongOld := svc.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID.String(),
+		OldPassword: "WrongOldPassword123!",
+		NewPassword: newPassword,
+	})
+	if errWrongOld == nil {
+		t.Fatal("expected changePassword with wrong old password to fail")
+	}
+	appErrWrong, ok := errWrongOld.(*appErrors.AppError)
+	if !ok || appErrWrong.Code != appErrors.CodeInvalidCredentials {
+		t.Fatalf("expected CodeInvalidCredentials, got: %v", errWrongOld)
+	}
+
+	// 2. Calling with newPassword == oldPassword -> must fail
+	_, errSame := svc.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID.String(),
+		OldPassword: oldPassword,
+		NewPassword: oldPassword,
+	})
+	if errSame == nil {
+		t.Fatal("expected changePassword with same new password to fail")
+	}
+
+	// 3. Calling with weak newPassword -> must fail
+	_, errWeak := svc.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID.String(),
+		OldPassword: oldPassword,
+		NewPassword: "weak",
+	})
+	if errWeak == nil {
+		t.Fatal("expected changePassword with weak new password to fail")
+	}
+
+	// 4. Calling with correct old password and valid new password -> succeeds!
+	resp, err := svc.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID.String(),
+		OldPassword: oldPassword,
+		NewPassword: newPassword,
+	})
+	if err != nil {
+		t.Fatalf("changePassword failed: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true, got false")
+	}
+
+	for _, rt := range mockRepo.refreshTokens {
+		if rt.UserID == userID && !rt.Revoked {
+			t.Errorf("expected refresh token to be revoked")
+		}
+	}
+
+	_, errOld := svc.Login(ctx, &dto.LoginRequest{Email: email, Password: oldPassword})
+	if errOld == nil {
+		t.Fatal("expected login with old password to fail")
+	}
+
+	loginResp, errNew := svc.Login(ctx, &dto.LoginRequest{Email: email, Password: newPassword})
+	if errNew != nil {
+		t.Fatalf("login with new password failed: %v", errNew)
+	}
+	if loginResp.AccessToken == "" {
+		t.Fatal("expected valid access token on login with new password")
+	}
+}
+
 
 
 

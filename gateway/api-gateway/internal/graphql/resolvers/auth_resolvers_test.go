@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
@@ -369,5 +370,156 @@ func TestLogoutResolver(t *testing.T) {
 	_, errUnauth := r.Logout(context.Background())
 	if errUnauth == nil {
 		t.Errorf("expected error for unauthenticated logout, got nil")
+	}
+}
+
+func (m *mockAuthClient) ForgotPassword(ctx context.Context, in *authpb.ForgotPasswordRequest, opts ...grpcPkg.CallOption) (*authpb.ForgotPasswordResponse, error) {
+	if in.GetEmail() == "" {
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("email is required"))
+	}
+	return &authpb.ForgotPasswordResponse{
+		Success: true,
+		Message: "If an account exists with this email address, a password reset code has been sent.",
+	}, nil
+}
+
+func (m *mockAuthClient) ResetPasswordWithOtp(ctx context.Context, in *authpb.ResetPasswordWithOtpRequest, opts ...grpcPkg.CallOption) (*authpb.ResetPasswordResponse, error) {
+	if in.GetOtp() == "invalid-otp" {
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.BadRequest("invalid password reset code"))
+	}
+	return &authpb.ResetPasswordResponse{
+		Success: true,
+		Message: "Password has been reset successfully",
+	}, nil
+}
+
+func (m *mockAuthClient) ChangePassword(ctx context.Context, in *authpb.ChangePasswordRequest, opts ...grpcPkg.CallOption) (*authpb.ChangePasswordResponse, error) {
+	if in.GetOldPassword() == "wrong-old-password" {
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.InvalidCredentials("invalid current password"))
+	}
+	return &authpb.ChangePasswordResponse{
+		Success: true,
+		Message: "Password changed successfully",
+	}, nil
+}
+
+func TestForgotPasswordResolver(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	// 1. Success
+	resp, err := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
+		Email: "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("expected successful forgotPassword, got: %v", err)
+	}
+	if !resp.Success || !strings.Contains(resp.Message, "password reset code has been sent") {
+		t.Errorf("unexpected payload: %+v", resp)
+	}
+
+	// 2. Missing email
+	_, errMissing := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
+		Email: "",
+	})
+	if errMissing == nil {
+		t.Errorf("expected error for empty email, got nil")
+	}
+}
+
+func TestResetPasswordWithOtpResolver(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	// 1. Success
+	resp, err := r.ResetPasswordWithOtp(context.Background(), model.ResetPasswordWithOtpInput{
+		Email:       "user@example.com",
+		Otp:         "123456",
+		NewPassword: "NewPassword123!",
+	})
+	if err != nil {
+		t.Fatalf("expected successful resetPasswordWithOtp, got: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true, got false")
+	}
+
+	// 2. Invalid OTP
+	_, errInvalid := r.ResetPasswordWithOtp(context.Background(), model.ResetPasswordWithOtpInput{
+		Email:       "user@example.com",
+		Otp:         "invalid-otp",
+		NewPassword: "NewPassword123!",
+	})
+	if errInvalid == nil {
+		t.Errorf("expected error for invalid otp, got nil")
+	}
+}
+
+func TestChangePasswordResolver(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	ctxWithAuth := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Email:  "user123@example.com",
+		Role:   "CUSTOMER",
+	})
+
+	// 1. Unauthenticated changePassword must fail
+	_, errUnauth := r.ChangePassword(context.Background(), model.ChangePasswordInput{
+		OldPassword: "OldPassword123!",
+		NewPassword: "NewPassword123!",
+	})
+	if errUnauth == nil {
+		t.Fatalf("expected unauthenticated changePassword to fail")
+	}
+
+	// 2. Incorrect old password -> rejected with INVALID_CREDENTIALS
+	_, errWrong := r.ChangePassword(ctxWithAuth, model.ChangePasswordInput{
+		OldPassword: "wrong-old-password",
+		NewPassword: "NewPassword123!",
+	})
+	if errWrong == nil {
+		t.Fatalf("expected incorrect old password to fail")
+	}
+	appErr, ok := errWrong.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeInvalidCredentials {
+		t.Errorf("expected CodeInvalidCredentials, got: %v", errWrong)
+	}
+
+	// 3. Success
+	resp, err := r.ChangePassword(ctxWithAuth, model.ChangePasswordInput{
+		OldPassword: "CorrectOldPassword123!",
+		NewPassword: "NewValidPassword123!",
+	})
+	if err != nil {
+		t.Fatalf("expected changePassword to succeed, got: %v", err)
+	}
+	if !resp.Success {
+		t.Errorf("expected success true, got false")
 	}
 }

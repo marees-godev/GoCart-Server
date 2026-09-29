@@ -73,3 +73,35 @@ type ResendVerificationEmailResponse struct {
 	Message string `json:"message"`
 }
 
+type ForgotPasswordRequest struct {
+	Email    string `json:"email"`
+	ClientIP string `json:"client_ip,omitempty"`
+}
+
+type ForgotPasswordResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ResetPasswordWithOtpRequest struct {
+	Email       string `json:"email"`
+	OTP         string `json:"otp"`
+	NewPassword string `json:"new_password"`
+}
+
+type ResetPasswordResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ChangePasswordRequest struct {
+	UserID      string `json:"user_id"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+type ChangePasswordResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+

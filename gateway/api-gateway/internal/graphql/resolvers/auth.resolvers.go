@@ -488,3 +488,117 @@ func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email st
 	}
 	return res.GetSuccess(), nil
 }
+
+// ForgotPassword is the resolver for the forgotPassword field.
+func (r *mutationResolver) ForgotPassword(ctx context.Context, input model.ForgotPasswordInput) (*model.ForgotPasswordPayload, error) {
+	if strings.TrimSpace(input.Email) == "" {
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	var clientIP string
+	if ip, ok := ctx.Value("clientIP").(string); ok {
+		clientIP = ip
+	}
+
+	res, err := authClient.ForgotPassword(ctx, &authpb.ForgotPasswordRequest{
+		Email:    input.Email,
+		ClientIp: clientIP,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ForgotPasswordPayload{
+		Success: res.GetSuccess(),
+		Message: res.GetMessage(),
+	}, nil
+}
+
+// ResetPasswordWithOtp is the resolver for the resetPasswordWithOtp field.
+func (r *mutationResolver) ResetPasswordWithOtp(ctx context.Context, input model.ResetPasswordWithOtpInput) (*model.ResetPasswordPayload, error) {
+	if strings.TrimSpace(input.Email) == "" {
+		return nil, appErrors.BadRequest("email is required")
+	}
+	if strings.TrimSpace(input.Otp) == "" {
+		return nil, appErrors.BadRequest("otp is required")
+	}
+	if input.NewPassword == "" {
+		return nil, appErrors.BadRequest("newPassword is required")
+	}
+
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.ResetPasswordWithOtp(ctx, &authpb.ResetPasswordWithOtpRequest{
+		Email:       input.Email,
+		Otp:         input.Otp,
+		NewPassword: input.NewPassword,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ResetPasswordPayload{
+		Success: res.GetSuccess(),
+		Message: res.GetMessage(),
+	}, nil
+}
+
+// ChangePassword is the resolver for the changePassword field.
+func (r *mutationResolver) ChangePassword(ctx context.Context, input model.ChangePasswordInput) (*model.ChangePasswordPayload, error) {
+	userCtx, authenticated := auth.FromContext(ctx)
+	if !authenticated || userCtx == nil || userCtx.UserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	if input.OldPassword == "" {
+		return nil, appErrors.BadRequest("oldPassword is required")
+	}
+	if input.NewPassword == "" {
+		return nil, appErrors.BadRequest("newPassword is required")
+	}
+
+	var authClient authpb.AuthServiceClient
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		authClient = r.Clients.AuthClient
+	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		authClient = r.ClientMgr.AuthClient
+	}
+
+	if authClient == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+
+	res, err := authClient.ChangePassword(ctx, &authpb.ChangePasswordRequest{
+		UserId:      userCtx.UserID,
+		OldPassword: input.OldPassword,
+		NewPassword: input.NewPassword,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ChangePasswordPayload{
+		Success: res.GetSuccess(),
+		Message: res.GetMessage(),
+	}, nil
+}

@@ -24,6 +24,7 @@ import (
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -103,7 +104,7 @@ func extractField(src, pattern string) string {
 }
 
 func writeGraphQLError(c *fiber.Ctx, err error) error {
-	translated := client.TranslateGRPCError(err)
+	translated := grpcclient.TranslateGRPCError(err)
 	var appErr *appErrors.AppError
 	code := appErrors.CodeInternalError
 	msg := err.Error()

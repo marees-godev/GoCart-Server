@@ -20,6 +20,7 @@ const (
 	CodeInternalError       = "INTERNAL_SERVER_ERROR"
 	CodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
 	CodeTooManyRequests     = "TOO_MANY_REQUESTS"
+	CodeInvalidCredentials  = "INVALID_CREDENTIALS"
 )
 
 type ErrorDetail struct {
@@ -105,6 +106,13 @@ func Unauthorized(message string) *AppError {
 	return New(CodeUnauthorized, message, http.StatusUnauthorized)
 }
 
+func InvalidCredentials(message string) *AppError {
+	if message == "" {
+		message = "Invalid credentials"
+	}
+	return New(CodeInvalidCredentials, message, http.StatusUnauthorized)
+}
+
 func Forbidden(message string) *AppError {
 	if message == "" {
 		message = "Access forbidden"
@@ -171,6 +179,10 @@ func AsAppError(err error) *AppError {
 		case codes.AlreadyExists:
 			return Conflict(st.Message())
 		case codes.Unauthenticated:
+			lower := strings.ToLower(st.Message())
+			if strings.Contains(lower, "credential") || strings.Contains(st.Message(), "INVALID_CREDENTIALS") || strings.Contains(lower, "password") {
+				return InvalidCredentials(st.Message())
+			}
 			return Unauthorized(st.Message())
 		case codes.PermissionDenied:
 			return Forbidden(st.Message())
@@ -209,7 +221,7 @@ func MapAppErrorToGRPC(err error) error {
 	switch appErr.Code {
 	case CodeNotFound:
 		return status.Error(codes.NotFound, appErr.Message)
-	case CodeUnauthorized:
+	case CodeUnauthorized, CodeInvalidCredentials:
 		return status.Error(codes.Unauthenticated, appErr.Message)
 	case CodeForbidden:
 		return status.Error(codes.PermissionDenied, appErr.Message)
