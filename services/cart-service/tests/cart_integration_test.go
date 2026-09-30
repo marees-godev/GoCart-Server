@@ -264,7 +264,7 @@ func TestCartService_E2EIntegration(t *testing.T) {
 	}
 
 	// 4. Duplicate addition increments quantity
-	addResp2, err := client.AddToCart(aliceCtx, &cartpb.AddToCartRequest{
+	addResp2, err := client.AddCartItem(aliceCtx, &cartpb.AddCartItemRequest{
 		UserId:    userAlice,
 		ProductId: "prod-mobile-1",
 		VariantId: "var-red-128gb",
@@ -273,7 +273,7 @@ func TestCartService_E2EIntegration(t *testing.T) {
 		Quantity:  2,
 	})
 	if err != nil {
-		t.Fatalf("failed AddToCart duplicate for Alice: %v", err)
+		t.Fatalf("failed AddCartItem duplicate for Alice: %v", err)
 	}
 	if len(addResp2.Cart.Items) != 1 || addResp2.Cart.Items[0].Quantity != 3 {
 		t.Errorf("expected 1 item with quantity 3, got %+v", addResp2.Cart)

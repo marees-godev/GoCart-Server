@@ -7,10 +7,8 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/ca
 service CartService {
   rpc GetCart (GetCartRequest) returns (GetCartResponse);
   rpc AddCartItem (AddCartItemRequest) returns (AddCartItemResponse);
-  rpc AddToCart (AddToCartRequest) returns (AddToCartResponse);
   rpc UpdateCartItem (UpdateCartItemRequest) returns (UpdateCartItemResponse);
   rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
-  rpc RemoveFromCart (RemoveFromCartRequest) returns (RemoveFromCartResponse);
   rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
 }
 
@@ -52,19 +50,6 @@ message AddCartItemResponse {
   Cart cart = 1;
 }
 
-message AddToCartRequest {
-  string user_id = 1;
-  string product_id = 2;
-  string variant_id = 3;
-  string store_id = 4;
-  double unit_price = 5;
-  int32 quantity = 6;
-}
-
-message AddToCartResponse {
-  Cart cart = 1;
-}
-
 message UpdateCartItemRequest {
   string user_id = 1;
   string product_id = 2;
@@ -86,16 +71,6 @@ message RemoveCartItemResponse {
   Cart cart = 1;
 }
 
-message RemoveFromCartRequest {
-  string user_id = 1;
-  string product_id = 2;
-  string variant_id = 3;
-}
-
-message RemoveFromCartResponse {
-  Cart cart = 1;
-}
-
 message ClearCartRequest {
   string user_id = 1;
 }
@@ -104,4 +79,3 @@ message ClearCartResponse {
   bool success = 1;
   Cart cart = 2;
 }
-

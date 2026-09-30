@@ -397,134 +397,6 @@ func (x *AddCartItemResponse) GetCart() *Cart {
 	return nil
 }
 
-type AddToCartRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ProductId     string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	VariantId     string                 `protobuf:"bytes,3,opt,name=variant_id,json=variantId,proto3" json:"variant_id,omitempty"`
-	StoreId       string                 `protobuf:"bytes,4,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	UnitPrice     float64                `protobuf:"fixed64,5,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`
-	Quantity      int32                  `protobuf:"varint,6,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AddToCartRequest) Reset() {
-	*x = AddToCartRequest{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AddToCartRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AddToCartRequest) ProtoMessage() {}
-
-func (x *AddToCartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AddToCartRequest.ProtoReflect.Descriptor instead.
-func (*AddToCartRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *AddToCartRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-func (x *AddToCartRequest) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *AddToCartRequest) GetVariantId() string {
-	if x != nil {
-		return x.VariantId
-	}
-	return ""
-}
-
-func (x *AddToCartRequest) GetStoreId() string {
-	if x != nil {
-		return x.StoreId
-	}
-	return ""
-}
-
-func (x *AddToCartRequest) GetUnitPrice() float64 {
-	if x != nil {
-		return x.UnitPrice
-	}
-	return 0
-}
-
-func (x *AddToCartRequest) GetQuantity() int32 {
-	if x != nil {
-		return x.Quantity
-	}
-	return 0
-}
-
-type AddToCartResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cart          *Cart                  `protobuf:"bytes,1,opt,name=cart,proto3" json:"cart,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AddToCartResponse) Reset() {
-	*x = AddToCartResponse{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AddToCartResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AddToCartResponse) ProtoMessage() {}
-
-func (x *AddToCartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AddToCartResponse.ProtoReflect.Descriptor instead.
-func (*AddToCartResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *AddToCartResponse) GetCart() *Cart {
-	if x != nil {
-		return x.Cart
-	}
-	return nil
-}
-
 type UpdateCartItemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -537,7 +409,7 @@ type UpdateCartItemRequest struct {
 
 func (x *UpdateCartItemRequest) Reset() {
 	*x = UpdateCartItemRequest{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +421,7 @@ func (x *UpdateCartItemRequest) String() string {
 func (*UpdateCartItemRequest) ProtoMessage() {}
 
 func (x *UpdateCartItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -562,7 +434,7 @@ func (x *UpdateCartItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCartItemRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCartItemRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{8}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateCartItemRequest) GetUserId() string {
@@ -602,7 +474,7 @@ type UpdateCartItemResponse struct {
 
 func (x *UpdateCartItemResponse) Reset() {
 	*x = UpdateCartItemResponse{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -614,7 +486,7 @@ func (x *UpdateCartItemResponse) String() string {
 func (*UpdateCartItemResponse) ProtoMessage() {}
 
 func (x *UpdateCartItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +499,7 @@ func (x *UpdateCartItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCartItemResponse.ProtoReflect.Descriptor instead.
 func (*UpdateCartItemResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{9}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateCartItemResponse) GetCart() *Cart {
@@ -648,7 +520,7 @@ type RemoveCartItemRequest struct {
 
 func (x *RemoveCartItemRequest) Reset() {
 	*x = RemoveCartItemRequest{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +532,7 @@ func (x *RemoveCartItemRequest) String() string {
 func (*RemoveCartItemRequest) ProtoMessage() {}
 
 func (x *RemoveCartItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +545,7 @@ func (x *RemoveCartItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveCartItemRequest.ProtoReflect.Descriptor instead.
 func (*RemoveCartItemRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{10}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RemoveCartItemRequest) GetUserId() string {
@@ -706,7 +578,7 @@ type RemoveCartItemResponse struct {
 
 func (x *RemoveCartItemResponse) Reset() {
 	*x = RemoveCartItemResponse{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -718,7 +590,7 @@ func (x *RemoveCartItemResponse) String() string {
 func (*RemoveCartItemResponse) ProtoMessage() {}
 
 func (x *RemoveCartItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -731,114 +603,10 @@ func (x *RemoveCartItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveCartItemResponse.ProtoReflect.Descriptor instead.
 func (*RemoveCartItemResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{11}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RemoveCartItemResponse) GetCart() *Cart {
-	if x != nil {
-		return x.Cart
-	}
-	return nil
-}
-
-type RemoveFromCartRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ProductId     string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	VariantId     string                 `protobuf:"bytes,3,opt,name=variant_id,json=variantId,proto3" json:"variant_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RemoveFromCartRequest) Reset() {
-	*x = RemoveFromCartRequest{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RemoveFromCartRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RemoveFromCartRequest) ProtoMessage() {}
-
-func (x *RemoveFromCartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RemoveFromCartRequest.ProtoReflect.Descriptor instead.
-func (*RemoveFromCartRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *RemoveFromCartRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-func (x *RemoveFromCartRequest) GetProductId() string {
-	if x != nil {
-		return x.ProductId
-	}
-	return ""
-}
-
-func (x *RemoveFromCartRequest) GetVariantId() string {
-	if x != nil {
-		return x.VariantId
-	}
-	return ""
-}
-
-type RemoveFromCartResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cart          *Cart                  `protobuf:"bytes,1,opt,name=cart,proto3" json:"cart,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RemoveFromCartResponse) Reset() {
-	*x = RemoveFromCartResponse{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RemoveFromCartResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RemoveFromCartResponse) ProtoMessage() {}
-
-func (x *RemoveFromCartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RemoveFromCartResponse.ProtoReflect.Descriptor instead.
-func (*RemoveFromCartResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *RemoveFromCartResponse) GetCart() *Cart {
 	if x != nil {
 		return x.Cart
 	}
@@ -854,7 +622,7 @@ type ClearCartRequest struct {
 
 func (x *ClearCartRequest) Reset() {
 	*x = ClearCartRequest{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -866,7 +634,7 @@ func (x *ClearCartRequest) String() string {
 func (*ClearCartRequest) ProtoMessage() {}
 
 func (x *ClearCartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +647,7 @@ func (x *ClearCartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearCartRequest.ProtoReflect.Descriptor instead.
 func (*ClearCartRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{14}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ClearCartRequest) GetUserId() string {
@@ -899,7 +667,7 @@ type ClearCartResponse struct {
 
 func (x *ClearCartResponse) Reset() {
 	*x = ClearCartResponse{}
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -911,7 +679,7 @@ func (x *ClearCartResponse) String() string {
 func (*ClearCartResponse) ProtoMessage() {}
 
 func (x *ClearCartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_cart_cart_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -924,7 +692,7 @@ func (x *ClearCartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearCartResponse.ProtoReflect.Descriptor instead.
 func (*ClearCartResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{15}
+	return file_contracts_protobuf_cart_cart_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ClearCartResponse) GetSuccess() bool {
@@ -978,18 +746,6 @@ const file_contracts_protobuf_cart_cart_proto_rawDesc = "" +
 	"unit_price\x18\x05 \x01(\x01R\tunitPrice\x12\x1a\n" +
 	"\bquantity\x18\x06 \x01(\x05R\bquantity\"?\n" +
 	"\x13AddCartItemResponse\x12(\n" +
-	"\x04cart\x18\x01 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart\"\xbf\x01\n" +
-	"\x10AddToCartRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x02 \x01(\tR\tproductId\x12\x1d\n" +
-	"\n" +
-	"variant_id\x18\x03 \x01(\tR\tvariantId\x12\x19\n" +
-	"\bstore_id\x18\x04 \x01(\tR\astoreId\x12\x1d\n" +
-	"\n" +
-	"unit_price\x18\x05 \x01(\x01R\tunitPrice\x12\x1a\n" +
-	"\bquantity\x18\x06 \x01(\x05R\bquantity\"=\n" +
-	"\x11AddToCartResponse\x12(\n" +
 	"\x04cart\x18\x01 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart\"\x8a\x01\n" +
 	"\x15UpdateCartItemRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
@@ -1007,27 +763,17 @@ const file_contracts_protobuf_cart_cart_proto_rawDesc = "" +
 	"\n" +
 	"variant_id\x18\x03 \x01(\tR\tvariantId\"B\n" +
 	"\x16RemoveCartItemResponse\x12(\n" +
-	"\x04cart\x18\x01 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart\"n\n" +
-	"\x15RemoveFromCartRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
-	"\n" +
-	"product_id\x18\x02 \x01(\tR\tproductId\x12\x1d\n" +
-	"\n" +
-	"variant_id\x18\x03 \x01(\tR\tvariantId\"B\n" +
-	"\x16RemoveFromCartResponse\x12(\n" +
 	"\x04cart\x18\x01 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart\"+\n" +
 	"\x10ClearCartRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"W\n" +
 	"\x11ClearCartResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12(\n" +
-	"\x04cart\x18\x02 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart2\xf8\x04\n" +
+	"\x04cart\x18\x02 \x01(\v2\x14.gocart.cart.v1.CartR\x04cart2\xc5\x03\n" +
 	"\vCartService\x12J\n" +
 	"\aGetCart\x12\x1e.gocart.cart.v1.GetCartRequest\x1a\x1f.gocart.cart.v1.GetCartResponse\x12V\n" +
-	"\vAddCartItem\x12\".gocart.cart.v1.AddCartItemRequest\x1a#.gocart.cart.v1.AddCartItemResponse\x12P\n" +
-	"\tAddToCart\x12 .gocart.cart.v1.AddToCartRequest\x1a!.gocart.cart.v1.AddToCartResponse\x12_\n" +
+	"\vAddCartItem\x12\".gocart.cart.v1.AddCartItemRequest\x1a#.gocart.cart.v1.AddCartItemResponse\x12_\n" +
 	"\x0eUpdateCartItem\x12%.gocart.cart.v1.UpdateCartItemRequest\x1a&.gocart.cart.v1.UpdateCartItemResponse\x12_\n" +
-	"\x0eRemoveCartItem\x12%.gocart.cart.v1.RemoveCartItemRequest\x1a&.gocart.cart.v1.RemoveCartItemResponse\x12_\n" +
-	"\x0eRemoveFromCart\x12%.gocart.cart.v1.RemoveFromCartRequest\x1a&.gocart.cart.v1.RemoveFromCartResponse\x12P\n" +
+	"\x0eRemoveCartItem\x12%.gocart.cart.v1.RemoveCartItemRequest\x1a&.gocart.cart.v1.RemoveCartItemResponse\x12P\n" +
 	"\tClearCart\x12 .gocart.cart.v1.ClearCartRequest\x1a!.gocart.cart.v1.ClearCartResponseBDZBgithub.com/marees-godev/GoCart-Server/contracts/protobuf/cart;cartb\x06proto3"
 
 var (
@@ -1042,7 +788,7 @@ func file_contracts_protobuf_cart_cart_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_cart_cart_proto_rawDescData
 }
 
-var file_contracts_protobuf_cart_cart_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_contracts_protobuf_cart_cart_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_contracts_protobuf_cart_cart_proto_goTypes = []any{
 	(*CartItem)(nil),               // 0: gocart.cart.v1.CartItem
 	(*Cart)(nil),                   // 1: gocart.cart.v1.Cart
@@ -1050,45 +796,35 @@ var file_contracts_protobuf_cart_cart_proto_goTypes = []any{
 	(*GetCartResponse)(nil),        // 3: gocart.cart.v1.GetCartResponse
 	(*AddCartItemRequest)(nil),     // 4: gocart.cart.v1.AddCartItemRequest
 	(*AddCartItemResponse)(nil),    // 5: gocart.cart.v1.AddCartItemResponse
-	(*AddToCartRequest)(nil),       // 6: gocart.cart.v1.AddToCartRequest
-	(*AddToCartResponse)(nil),      // 7: gocart.cart.v1.AddToCartResponse
-	(*UpdateCartItemRequest)(nil),  // 8: gocart.cart.v1.UpdateCartItemRequest
-	(*UpdateCartItemResponse)(nil), // 9: gocart.cart.v1.UpdateCartItemResponse
-	(*RemoveCartItemRequest)(nil),  // 10: gocart.cart.v1.RemoveCartItemRequest
-	(*RemoveCartItemResponse)(nil), // 11: gocart.cart.v1.RemoveCartItemResponse
-	(*RemoveFromCartRequest)(nil),  // 12: gocart.cart.v1.RemoveFromCartRequest
-	(*RemoveFromCartResponse)(nil), // 13: gocart.cart.v1.RemoveFromCartResponse
-	(*ClearCartRequest)(nil),       // 14: gocart.cart.v1.ClearCartRequest
-	(*ClearCartResponse)(nil),      // 15: gocart.cart.v1.ClearCartResponse
+	(*UpdateCartItemRequest)(nil),  // 6: gocart.cart.v1.UpdateCartItemRequest
+	(*UpdateCartItemResponse)(nil), // 7: gocart.cart.v1.UpdateCartItemResponse
+	(*RemoveCartItemRequest)(nil),  // 8: gocart.cart.v1.RemoveCartItemRequest
+	(*RemoveCartItemResponse)(nil), // 9: gocart.cart.v1.RemoveCartItemResponse
+	(*ClearCartRequest)(nil),       // 10: gocart.cart.v1.ClearCartRequest
+	(*ClearCartResponse)(nil),      // 11: gocart.cart.v1.ClearCartResponse
 }
 var file_contracts_protobuf_cart_cart_proto_depIdxs = []int32{
 	0,  // 0: gocart.cart.v1.Cart.items:type_name -> gocart.cart.v1.CartItem
 	1,  // 1: gocart.cart.v1.GetCartResponse.cart:type_name -> gocart.cart.v1.Cart
 	1,  // 2: gocart.cart.v1.AddCartItemResponse.cart:type_name -> gocart.cart.v1.Cart
-	1,  // 3: gocart.cart.v1.AddToCartResponse.cart:type_name -> gocart.cart.v1.Cart
-	1,  // 4: gocart.cart.v1.UpdateCartItemResponse.cart:type_name -> gocart.cart.v1.Cart
-	1,  // 5: gocart.cart.v1.RemoveCartItemResponse.cart:type_name -> gocart.cart.v1.Cart
-	1,  // 6: gocart.cart.v1.RemoveFromCartResponse.cart:type_name -> gocart.cart.v1.Cart
-	1,  // 7: gocart.cart.v1.ClearCartResponse.cart:type_name -> gocart.cart.v1.Cart
-	2,  // 8: gocart.cart.v1.CartService.GetCart:input_type -> gocart.cart.v1.GetCartRequest
-	4,  // 9: gocart.cart.v1.CartService.AddCartItem:input_type -> gocart.cart.v1.AddCartItemRequest
-	6,  // 10: gocart.cart.v1.CartService.AddToCart:input_type -> gocart.cart.v1.AddToCartRequest
-	8,  // 11: gocart.cart.v1.CartService.UpdateCartItem:input_type -> gocart.cart.v1.UpdateCartItemRequest
-	10, // 12: gocart.cart.v1.CartService.RemoveCartItem:input_type -> gocart.cart.v1.RemoveCartItemRequest
-	12, // 13: gocart.cart.v1.CartService.RemoveFromCart:input_type -> gocart.cart.v1.RemoveFromCartRequest
-	14, // 14: gocart.cart.v1.CartService.ClearCart:input_type -> gocart.cart.v1.ClearCartRequest
-	3,  // 15: gocart.cart.v1.CartService.GetCart:output_type -> gocart.cart.v1.GetCartResponse
-	5,  // 16: gocart.cart.v1.CartService.AddCartItem:output_type -> gocart.cart.v1.AddCartItemResponse
-	7,  // 17: gocart.cart.v1.CartService.AddToCart:output_type -> gocart.cart.v1.AddToCartResponse
-	9,  // 18: gocart.cart.v1.CartService.UpdateCartItem:output_type -> gocart.cart.v1.UpdateCartItemResponse
-	11, // 19: gocart.cart.v1.CartService.RemoveCartItem:output_type -> gocart.cart.v1.RemoveCartItemResponse
-	13, // 20: gocart.cart.v1.CartService.RemoveFromCart:output_type -> gocart.cart.v1.RemoveFromCartResponse
-	15, // 21: gocart.cart.v1.CartService.ClearCart:output_type -> gocart.cart.v1.ClearCartResponse
-	15, // [15:22] is the sub-list for method output_type
-	8,  // [8:15] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	1,  // 3: gocart.cart.v1.UpdateCartItemResponse.cart:type_name -> gocart.cart.v1.Cart
+	1,  // 4: gocart.cart.v1.RemoveCartItemResponse.cart:type_name -> gocart.cart.v1.Cart
+	1,  // 5: gocart.cart.v1.ClearCartResponse.cart:type_name -> gocart.cart.v1.Cart
+	2,  // 6: gocart.cart.v1.CartService.GetCart:input_type -> gocart.cart.v1.GetCartRequest
+	4,  // 7: gocart.cart.v1.CartService.AddCartItem:input_type -> gocart.cart.v1.AddCartItemRequest
+	6,  // 8: gocart.cart.v1.CartService.UpdateCartItem:input_type -> gocart.cart.v1.UpdateCartItemRequest
+	8,  // 9: gocart.cart.v1.CartService.RemoveCartItem:input_type -> gocart.cart.v1.RemoveCartItemRequest
+	10, // 10: gocart.cart.v1.CartService.ClearCart:input_type -> gocart.cart.v1.ClearCartRequest
+	3,  // 11: gocart.cart.v1.CartService.GetCart:output_type -> gocart.cart.v1.GetCartResponse
+	5,  // 12: gocart.cart.v1.CartService.AddCartItem:output_type -> gocart.cart.v1.AddCartItemResponse
+	7,  // 13: gocart.cart.v1.CartService.UpdateCartItem:output_type -> gocart.cart.v1.UpdateCartItemResponse
+	9,  // 14: gocart.cart.v1.CartService.RemoveCartItem:output_type -> gocart.cart.v1.RemoveCartItemResponse
+	11, // 15: gocart.cart.v1.CartService.ClearCart:output_type -> gocart.cart.v1.ClearCartResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_cart_cart_proto_init() }
@@ -1102,7 +838,7 @@ func file_contracts_protobuf_cart_cart_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_cart_cart_proto_rawDesc), len(file_contracts_protobuf_cart_cart_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

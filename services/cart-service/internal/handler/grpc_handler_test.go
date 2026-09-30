@@ -198,8 +198,8 @@ func TestCartGRPCHandler_Operations(t *testing.T) {
 	userID := "user-1"
 	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: userID, Role: "CUSTOMER"})
 
-	// AddToCart
-	addResp, err := h.AddToCart(ctx, &cartpb.AddToCartRequest{
+	// AddCartItem
+	addResp, err := h.AddCartItem(ctx, &cartpb.AddCartItemRequest{
 		UserId:    userID,
 		ProductId: "prod-1",
 		VariantId: "var-1",
@@ -208,10 +208,10 @@ func TestCartGRPCHandler_Operations(t *testing.T) {
 		Quantity:  2,
 	})
 	if err != nil {
-		t.Fatalf("failed AddToCart: %v", err)
+		t.Fatalf("failed AddCartItem: %v", err)
 	}
 	if len(addResp.Cart.Items) != 1 || addResp.Cart.TotalAmount != 51.00 {
-		t.Errorf("unexpected cart after AddToCart: %+v", addResp.Cart)
+		t.Errorf("unexpected cart after AddCartItem: %+v", addResp.Cart)
 	}
 
 	// AddCartItem

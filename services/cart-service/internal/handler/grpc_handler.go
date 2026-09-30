@@ -87,32 +87,6 @@ func (h *CartGRPCHandler) AddCartItem(ctx context.Context, req *cartpb.AddCartIt
 	}, nil
 }
 
-func (h *CartGRPCHandler) AddToCart(ctx context.Context, req *cartpb.AddToCartRequest) (*cartpb.AddToCartResponse, error) {
-	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
-	}
-	userID, err := h.validateUserAuth(ctx, req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-
-	cart, err := h.cartService.AddCartItem(ctx, dto.AddCartItemRequest{
-		UserID:    userID,
-		ProductID: req.GetProductId(),
-		VariantID: req.GetVariantId(),
-		StoreID:   req.GetStoreId(),
-		UnitPrice: req.GetUnitPrice(),
-		Quantity:  req.GetQuantity(),
-	})
-	if err != nil {
-		return nil, appErrors.ToGRPC(err)
-	}
-
-	return &cartpb.AddToCartResponse{
-		Cart: cartToProto(cart),
-	}, nil
-}
-
 func (h *CartGRPCHandler) UpdateCartItem(ctx context.Context, req *cartpb.UpdateCartItemRequest) (*cartpb.UpdateCartItemResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
@@ -156,29 +130,6 @@ func (h *CartGRPCHandler) RemoveCartItem(ctx context.Context, req *cartpb.Remove
 	}
 
 	return &cartpb.RemoveCartItemResponse{
-		Cart: cartToProto(cart),
-	}, nil
-}
-
-func (h *CartGRPCHandler) RemoveFromCart(ctx context.Context, req *cartpb.RemoveFromCartRequest) (*cartpb.RemoveFromCartResponse, error) {
-	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
-	}
-	userID, err := h.validateUserAuth(ctx, req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-
-	cart, err := h.cartService.RemoveCartItem(ctx, dto.RemoveCartItemRequest{
-		UserID:    userID,
-		ProductID: req.GetProductId(),
-		VariantID: req.GetVariantId(),
-	})
-	if err != nil {
-		return nil, appErrors.ToGRPC(err)
-	}
-
-	return &cartpb.RemoveFromCartResponse{
 		Cart: cartToProto(cart),
 	}, nil
 }
