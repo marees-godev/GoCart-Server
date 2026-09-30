@@ -75,9 +75,9 @@ func toModelMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 		da := m.DeletedAt.AsTime().Format(time.RFC3339)
 		res.DeletedAt = &da
 	}
-	if m.TaxId != "" {
-		tid := m.TaxId
-		res.TaxID = &tid
+	if m.PanCardNumber != "" {
+		tid := m.PanCardNumber
+		res.PanCardNumber = &tid
 	}
 	if m.BusinessEmail != "" {
 		be := m.BusinessEmail

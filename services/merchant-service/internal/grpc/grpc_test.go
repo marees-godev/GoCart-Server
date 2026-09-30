@@ -45,12 +45,9 @@ func (m *mockService) CreateMerchant(ctx context.Context, req dto.CreateMerchant
 	}
 	merch := &model.Merchant{
 		ID:            id,
-		BusinessName:  "",
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
 		BusinessEmail: req.BusinessEmail,
-		BusinessPhone: "",
-		TaxID:         "",
 		Status:        string(model.MerchantStatusPending),
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -83,8 +80,8 @@ func (m *mockService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.
 	if req.BusinessPhone != "" {
 		merch.BusinessPhone = req.BusinessPhone
 	}
-	if req.TaxID != "" {
-		merch.TaxID = req.TaxID
+	if req.PanCardNumber != "" {
+		merch.PanCardNumber = req.PanCardNumber
 	}
 	merch.UpdatedAt = time.Now()
 	return merch, nil
@@ -217,7 +214,7 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 		Id:            merchantID,
 		BusinessName:  "Best Merchant Updated",
 		BusinessPhone: "+19876543210",
-		TaxId:         "TAX-999",
+		PanCardNumber:         "TAX-999",
 	})
 	if err != nil {
 		t.Fatalf("UpdateMerchant failed: %v", err)
@@ -228,8 +225,8 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	if updateRes.Merchant.BusinessPhone != "+19876543210" {
 		t.Errorf("expected +19876543210, got %s", updateRes.Merchant.BusinessPhone)
 	}
-	if updateRes.Merchant.TaxId != "TAX-999" {
-		t.Errorf("expected TAX-999, got %s", updateRes.Merchant.TaxId)
+	if updateRes.Merchant.PanCardNumber != "TAX-999" {
+		t.Errorf("expected TAX-999, got %s", updateRes.Merchant.PanCardNumber)
 	}
 	// Verify non-editable fields remain unchanged
 	if updateRes.Merchant.FirstName != "John" || updateRes.Merchant.LastName != "Doe" {
@@ -247,7 +244,7 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 		Id:            uuid.New().String(),
 		BusinessName:  "NonExistent",
 		BusinessPhone: "+1234567890",
-		TaxId:         "TAX-001",
+		PanCardNumber:         "TAX-001",
 	})
 	if err == nil || status.Code(err) != codes.NotFound {
 		t.Errorf("expected NotFound for non-existent merchant on update, got %v", err)

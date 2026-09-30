@@ -16,7 +16,7 @@ type CreateMerchantRequest struct {
 type UpdateMerchantRequest struct {
 	BusinessName  string `json:"business_name"`
 	BusinessPhone string `json:"business_phone"`
-	TaxID         string `json:"tax_id"`
+	PanCardNumber string `json:"pan_card_number"`
 }
 
 type UpdateMerchantStatusRequest struct {
@@ -31,7 +31,7 @@ type MerchantResponse struct {
 	LastName        string `json:"last_name,omitempty"`
 	BusinessEmail   string `json:"business_email,omitempty"`
 	BusinessPhone   string `json:"business_phone,omitempty"`
-	TaxID           string `json:"tax_id,omitempty"`
+	PanCardNumber   string `json:"pan_card_number,omitempty"`
 	Status          string `json:"status"`
 	RejectionReason string `json:"rejection_reason,omitempty"`
 	CreatedAt       string `json:"created_at"`
@@ -56,7 +56,7 @@ func ToMerchantResponse(m *model.Merchant) MerchantResponse {
 		LastName:        m.LastName,
 		BusinessEmail:   m.BusinessEmail,
 		BusinessPhone:   m.BusinessPhone,
-		TaxID:           m.TaxID,
+		PanCardNumber:   m.PanCardNumber,
 		Status:          m.Status,
 		RejectionReason: m.RejectionReason,
 		CreatedAt:       m.CreatedAt.Format(time.RFC3339),

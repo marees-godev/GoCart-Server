@@ -36,9 +36,9 @@ func ToGraphQLMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 		deletedAt := m.DeletedAt.AsTime().Format(time.RFC3339)
 		res.DeletedAt = &deletedAt
 	}
-	if m.TaxId != "" {
-		taxId := m.TaxId
-		res.TaxID = &taxId
+	if m.PanCardNumber != "" {
+		taxId := m.PanCardNumber
+		res.PanCardNumber = &taxId
 	}
 	if m.BusinessEmail != "" {
 		email := m.BusinessEmail

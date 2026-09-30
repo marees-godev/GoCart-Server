@@ -225,7 +225,7 @@ type Merchant struct {
 	LastName        *string `json:"lastName,omitempty"`
 	BusinessEmail   *string `json:"businessEmail,omitempty"`
 	BusinessPhone   *string `json:"businessPhone,omitempty"`
-	TaxID           *string `json:"taxId,omitempty"`
+	PanCardNumber   *string `json:"panCardNumber,omitempty"`
 	Status          string  `json:"status"`
 	RejectionReason *string `json:"rejectionReason,omitempty"`
 	CreatedAt       *string `json:"createdAt,omitempty"`
@@ -482,9 +482,8 @@ type UpdateMerchantInput struct {
 	BusinessName  *string `json:"businessName,omitempty"`
 	FirstName     *string `json:"firstName,omitempty"`
 	LastName      *string `json:"lastName,omitempty"`
-	BusinessEmail *string `json:"businessEmail,omitempty"`
 	BusinessPhone *string `json:"businessPhone,omitempty"`
-	TaxID         *string `json:"taxId,omitempty"`
+	PanCardNumber *string `json:"panCardNumber,omitempty"`
 }
 
 type UpdateProductInput struct {

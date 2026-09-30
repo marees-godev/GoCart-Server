@@ -93,7 +93,7 @@ func (m *mockMerchantRepository) Update(ctx context.Context, merchant *model.Mer
 	// Persist only mutable fields: business_name, business_phone, tax_id, and updated_at
 	existing.BusinessName = merchant.BusinessName
 	existing.BusinessPhone = merchant.BusinessPhone
-	existing.TaxID = merchant.TaxID
+	existing.PanCardNumber = merchant.PanCardNumber
 	existing.UpdatedAt = time.Now().UTC()
 
 	merchant.UpdatedAt = existing.UpdatedAt
@@ -214,7 +214,7 @@ func TestGetMerchantByID(t *testing.T) {
 		LastName:      "Wonder",
 		BusinessEmail: "alice@store.com",
 		BusinessPhone: "+1234567890",
-		TaxID:         "TAX-999",
+		PanCardNumber: "TAX-999",
 		Status:        string(model.MerchantStatusPending),
 	}
 	_ = repo.Create(context.Background(), merchant)
@@ -276,7 +276,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			_, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  name,
 				BusinessPhone: "+1234567890",
-				TaxID:         "TAX-123",
+				PanCardNumber:         "TAX-123",
 			})
 			if err == nil {
 				t.Errorf("expected error for empty business_name %q", name)
@@ -287,7 +287,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 		_, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 			BusinessName:  "A",
 			BusinessPhone: "+1234567890",
-			TaxID:         "TAX-123",
+			PanCardNumber:         "TAX-123",
 		})
 		if err == nil {
 			t.Error("expected error for business_name < 2 chars")
@@ -298,7 +298,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 		_, err = svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 			BusinessName:  longName,
 			BusinessPhone: "+1234567890",
-			TaxID:         "TAX-123",
+			PanCardNumber:         "TAX-123",
 		})
 		if err == nil {
 			t.Error("expected error for business_name > 100 chars")
@@ -309,7 +309,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			updated, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  validName,
 				BusinessPhone: "+1234567890",
-				TaxID:         "TAX-123",
+				PanCardNumber:         "TAX-123",
 			})
 			if err != nil {
 				t.Errorf("expected valid business_name %q to succeed, got %v", validName, err)
@@ -326,9 +326,9 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			"",
 			"   ",
 			"phone123",
-			"123",          // too short (< 7 digits)
-			"+0123456789",  // country code cannot start with 0
-			"++1234567890", // double plus
+			"123",                  // too short (< 7 digits)
+			"+0123456789",          // country code cannot start with 0
+			"++1234567890",         // double plus
 			"12345678901234567890", // too long (> 15 digits)
 			"abc-def-ghij",
 		}
@@ -336,7 +336,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			_, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  "Valid Name",
 				BusinessPhone: phone,
-				TaxID:         "TAX-123",
+				PanCardNumber:         "TAX-123",
 			})
 			if err == nil {
 				t.Errorf("expected error for invalid phone %q, but succeeded", phone)
@@ -354,7 +354,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			updated, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  "Valid Name",
 				BusinessPhone: phone,
-				TaxID:         "TAX-123",
+				PanCardNumber:         "TAX-123",
 			})
 			if err != nil {
 				t.Errorf("expected phone %q to succeed, got: %v", phone, err)
@@ -370,16 +370,16 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 		invalidTaxIDs := []string{
 			"",
 			"   ",
-			"12",                       // too short (< 3 chars)
-			strings.Repeat("X", 51),    // too long (> 50 chars)
-			"TAX@123",                  // invalid special characters
+			"12",                    // too short (< 3 chars)
+			strings.Repeat("X", 51), // too long (> 50 chars)
+			"TAX@123",               // invalid special characters
 			"TAX$#*",
 		}
 		for _, tid := range invalidTaxIDs {
 			_, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  "Valid Name",
 				BusinessPhone: "+1234567890",
-				TaxID:         tid,
+				PanCardNumber:         tid,
 			})
 			if err == nil {
 				t.Errorf("expected error for invalid tax_id %q, but succeeded", tid)
@@ -397,13 +397,13 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 			updated, err := svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 				BusinessName:  "Valid Name",
 				BusinessPhone: "+1234567890",
-				TaxID:         tid,
+				PanCardNumber:         tid,
 			})
 			if err != nil {
 				t.Errorf("expected tax_id %q to succeed, got: %v", tid, err)
 			}
-			if updated.TaxID != tid {
-				t.Errorf("expected tax_id %s, got %s", tid, updated.TaxID)
+			if updated.PanCardNumber != tid {
+				t.Errorf("expected tax_id %s, got %s", tid, updated.PanCardNumber)
 			}
 		}
 	})
@@ -414,7 +414,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 		_, err := svc.UpdateMerchant(context.Background(), uuid.Nil, dto.UpdateMerchantRequest{
 			BusinessName:  "Valid Name",
 			BusinessPhone: "+1234567890",
-			TaxID:         "TAX-123",
+			PanCardNumber:         "TAX-123",
 		})
 		if err == nil {
 			t.Fatal("expected error for nil UUID on update")
@@ -424,7 +424,7 @@ func TestUpdateMerchant_Validations(t *testing.T) {
 		_, err = svc.UpdateMerchant(context.Background(), uuid.New(), dto.UpdateMerchantRequest{
 			BusinessName:  "Valid Name",
 			BusinessPhone: "+1234567890",
-			TaxID:         "TAX-123",
+			PanCardNumber:         "TAX-123",
 		})
 		if err == nil {
 			t.Fatal("expected NotFound error for non-existent merchant")
@@ -451,7 +451,7 @@ func TestUpdateMerchant_ImmutabilityAndPersistence(t *testing.T) {
 		LastName:        "OriginalLast",
 		BusinessEmail:   "original@example.com",
 		BusinessPhone:   "+1111111111",
-		TaxID:           "TAX-ORIGINAL",
+		PanCardNumber:   "TAX-ORIGINAL",
 		Status:          string(model.MerchantStatusApproved),
 		RejectionReason: "Original Reason",
 		CreatedAt:       initialCreatedAt,
@@ -468,7 +468,7 @@ func TestUpdateMerchant_ImmutabilityAndPersistence(t *testing.T) {
 	updated, err := svc.UpdateMerchant(context.Background(), merchantID, dto.UpdateMerchantRequest{
 		BusinessName:  "Updated Super Store",
 		BusinessPhone: "+19999999999",
-		TaxID:         "TAX-UPDATED-999",
+		PanCardNumber:         "TAX-UPDATED-999",
 	})
 	if err != nil {
 		t.Fatalf("UpdateMerchant failed: %v", err)
@@ -481,8 +481,8 @@ func TestUpdateMerchant_ImmutabilityAndPersistence(t *testing.T) {
 	if updated.BusinessPhone != "+19999999999" {
 		t.Errorf("expected updated business_phone, got %s", updated.BusinessPhone)
 	}
-	if updated.TaxID != "TAX-UPDATED-999" {
-		t.Errorf("expected updated tax_id, got %s", updated.TaxID)
+	if updated.PanCardNumber != "TAX-UPDATED-999" {
+		t.Errorf("expected updated tax_id, got %s", updated.PanCardNumber)
 	}
 
 	// 2. Verify updated_at was automatically refreshed
@@ -524,8 +524,8 @@ func TestUpdateMerchant_ImmutabilityAndPersistence(t *testing.T) {
 	if persisted.BusinessPhone != "+19999999999" {
 		t.Errorf("persisted business_phone mismatch: %s", persisted.BusinessPhone)
 	}
-	if persisted.TaxID != "TAX-UPDATED-999" {
-		t.Errorf("persisted tax_id mismatch: %s", persisted.TaxID)
+	if persisted.PanCardNumber != "TAX-UPDATED-999" {
+		t.Errorf("persisted tax_id mismatch: %s", persisted.PanCardNumber)
 	}
 	if persisted.FirstName != "OriginalFirst" || persisted.LastName != "OriginalLast" {
 		t.Errorf("persisted names must remain unchanged: %s %s", persisted.FirstName, persisted.LastName)
@@ -638,7 +638,7 @@ func TestMerchantService_Logging(t *testing.T) {
 	_, err = svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 		BusinessName:  "Logged Business",
 		BusinessPhone: "+1234567890",
-		TaxID:         "TAX-LOG-1",
+		PanCardNumber:         "TAX-LOG-1",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error updating merchant: %v", err)
@@ -704,7 +704,7 @@ func TestDeleteMerchant_SoftDelete(t *testing.T) {
 	_, err = svc.UpdateMerchant(context.Background(), created.ID, dto.UpdateMerchantRequest{
 		BusinessName:  "Updated Name",
 		BusinessPhone: "+1234567890",
-		TaxID:         "TAX-12345",
+		PanCardNumber:         "TAX-12345",
 	})
 	if err == nil {
 		t.Fatalf("expected not found error when updating soft-deleted merchant, got nil")

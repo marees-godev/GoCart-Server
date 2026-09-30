@@ -101,19 +101,19 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	}
 	if res.FirstName != "" {
 		fnStr := res.FirstName
-		payload.FirstName = &fnStr
+		payload.Merchant.FirstName = &fnStr
 	} else if user != nil && user.FirstName != nil {
-		payload.FirstName = user.FirstName
+		payload.Merchant.FirstName = user.FirstName
 	}
 	if res.LastName != "" {
 		lnStr := res.LastName
-		payload.LastName = &lnStr
+		payload.Merchant.LastName = &lnStr
 	} else if user != nil && user.LastName != nil {
-		payload.LastName = user.LastName
+		payload.Merchant.LastName = user.LastName
 	}
 	if res.MerchantId != "" {
 		mID := res.MerchantId
-		payload.MerchantID = &mID
+		payload.Merchant.ID = mID
 	}
 	if res.BusinessEmail != "" {
 		bEmail := res.BusinessEmail

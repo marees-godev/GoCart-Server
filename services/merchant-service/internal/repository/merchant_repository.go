@@ -56,7 +56,7 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 		merchant.LastName,
 		merchant.BusinessEmail,
 		merchant.BusinessPhone,
-		merchant.TaxID,
+		merchant.PanCardNumber,
 		merchant.Status,
 	).Scan(&merchant.ID, &merchant.CreatedAt, &merchant.UpdatedAt)
 	if err != nil {
@@ -78,7 +78,7 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 
 func (r *pgMerchantRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Merchant, error) {
 	query := `
-		SELECT id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at, deleted_at
+		SELECT id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 		FROM merchants
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -90,7 +90,7 @@ func (r *pgMerchantRepository) GetByID(ctx context.Context, id uuid.UUID) (*mode
 		&m.LastName,
 		&m.BusinessEmail,
 		&m.BusinessPhone,
-		&m.TaxID,
+		&m.PanCardNumber,
 		&m.Status,
 		&m.RejectionReason,
 		&m.CreatedAt,
@@ -168,7 +168,7 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 			&m.LastName,
 			&m.BusinessEmail,
 			&m.BusinessPhone,
-			&m.TaxID,
+			&m.PanCardNumber,
 			&m.Status,
 			&m.RejectionReason,
 			&m.CreatedAt,
@@ -192,14 +192,14 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 func (r *pgMerchantRepository) Update(ctx context.Context, merchant *model.Merchant) error {
 	query := `
 		UPDATE merchants
-		SET business_name = $1, business_phone = $2, tax_id = $3, updated_at = NOW()
+		SET business_name = $1, business_phone = $2, pan_card_number = $3, updated_at = NOW()
 		WHERE id = $4 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 	err := r.db.Pool.QueryRow(ctx, query,
 		merchant.BusinessName,
 		merchant.BusinessPhone,
-		merchant.TaxID,
+		merchant.PanCardNumber,
 		merchant.ID,
 	).Scan(&merchant.UpdatedAt)
 	if err != nil {
@@ -229,7 +229,7 @@ func (r *pgMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, s
 		&m.LastName,
 		&m.BusinessEmail,
 		&m.BusinessPhone,
-		&m.TaxID,
+		&m.PanCardNumber,
 		&m.Status,
 		&m.RejectionReason,
 		&m.CreatedAt,

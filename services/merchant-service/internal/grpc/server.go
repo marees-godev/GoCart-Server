@@ -62,7 +62,7 @@ func toProtoMerchant(m *model.Merchant) *merchantpb.MerchantResponseData {
 		LastName:        m.LastName,
 		BusinessEmail:   m.BusinessEmail,
 		BusinessPhone:   m.BusinessPhone,
-		TaxId:           m.TaxID,
+		PanCardNumber:   m.PanCardNumber,
 		Status:          m.Status,
 		RejectionReason: m.RejectionReason,
 		CreatedAt:       timestamppb.New(m.CreatedAt),
@@ -118,7 +118,7 @@ func (s *MerchantGRPCServer) UpdateMerchant(ctx context.Context, req *merchantpb
 	dtoReq := dto.UpdateMerchantRequest{
 		BusinessName:  req.BusinessName,
 		BusinessPhone: req.BusinessPhone,
-		TaxID:         req.TaxId,
+		PanCardNumber:         req.PanCardNumber,
 	}
 
 	merchant, err := s.merchantService.UpdateMerchant(ctx, id, dtoReq)
