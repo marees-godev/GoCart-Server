@@ -451,14 +451,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 
 		if mClient != nil {
-			businessName := strings.TrimSpace(req.BusinessName)
-			if businessName == "" {
-				businessName = strings.TrimSpace(req.FirstName + " " + req.LastName)
-			}
-			if businessName == "" {
-				businessName = req.Email
-			}
-
 			mCtx := auth.WithUser(ctx, &auth.UserContext{
 				UserID: userID.String(),
 				Role:   model.RoleMerchant.String(),
