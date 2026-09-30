@@ -48,17 +48,12 @@ type Address struct {
 }
 
 type AuthPayload struct {
-	Token         string    `json:"token"`
-	RefreshToken  *string   `json:"refreshToken,omitempty"`
-	TokenType     *string   `json:"tokenType,omitempty"`
-	ExpiresIn     *int      `json:"expiresIn,omitempty"`
-	User          *User     `json:"user"`
-	MerchantID    *string   `json:"merchantId,omitempty"`
-	BusinessEmail *string   `json:"businessEmail,omitempty"`
-	FirstName     *string   `json:"firstName,omitempty"`
-	LastName      *string   `json:"lastName,omitempty"`
-	Role          *string   `json:"role,omitempty"`
-	Merchant      *Merchant `json:"merchant,omitempty"`
+	Token        string    `json:"token"`
+	RefreshToken *string   `json:"refreshToken,omitempty"`
+	TokenType    *string   `json:"tokenType,omitempty"`
+	ExpiresIn    *int      `json:"expiresIn,omitempty"`
+	User         *User     `json:"user"`
+	Merchant     *Merchant `json:"merchant,omitempty"`
 }
 
 type BankAccount struct {
