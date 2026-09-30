@@ -6,7 +6,10 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/ca
 
 service CartService {
   rpc GetCart (GetCartRequest) returns (GetCartResponse);
+  rpc AddCartItem (AddCartItemRequest) returns (AddCartItemResponse);
   rpc AddToCart (AddToCartRequest) returns (AddToCartResponse);
+  rpc UpdateCartItem (UpdateCartItemRequest) returns (UpdateCartItemResponse);
+  rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
   rpc RemoveFromCart (RemoveFromCartRequest) returns (RemoveFromCartResponse);
   rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
 }
@@ -14,8 +17,10 @@ service CartService {
 message CartItem {
   string id = 1;
   string product_id = 2;
-  int32 quantity = 3;
-  double unit_price = 4;
+  string variant_id = 3;
+  string store_id = 4;
+  double unit_price = 5;
+  int32 quantity = 6;
 }
 
 message Cart {
@@ -23,6 +28,7 @@ message Cart {
   string user_id = 2;
   repeated CartItem items = 3;
   double total_amount = 4;
+  string updated_at = 5;
 }
 
 message GetCartRequest {
@@ -33,20 +39,57 @@ message GetCartResponse {
   Cart cart = 1;
 }
 
+message AddCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+  string store_id = 4;
+  double unit_price = 5;
+  int32 quantity = 6;
+}
+
+message AddCartItemResponse {
+  Cart cart = 1;
+}
+
 message AddToCartRequest {
   string user_id = 1;
   string product_id = 2;
-  int32 quantity = 3;
-  double unit_price = 4;
+  string variant_id = 3;
+  string store_id = 4;
+  double unit_price = 5;
+  int32 quantity = 6;
 }
 
 message AddToCartResponse {
   Cart cart = 1;
 }
 
+message UpdateCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+  int32 quantity = 4;
+}
+
+message UpdateCartItemResponse {
+  Cart cart = 1;
+}
+
+message RemoveCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+}
+
+message RemoveCartItemResponse {
+  Cart cart = 1;
+}
+
 message RemoveFromCartRequest {
   string user_id = 1;
   string product_id = 2;
+  string variant_id = 3;
 }
 
 message RemoveFromCartResponse {
@@ -59,4 +102,6 @@ message ClearCartRequest {
 
 message ClearCartResponse {
   bool success = 1;
+  Cart cart = 2;
 }
+

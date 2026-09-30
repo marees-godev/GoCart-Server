@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
@@ -16,6 +17,7 @@ type Clients struct {
 	UserClient     userpb.UserServiceClient
 	StoreClient    store.StoreServiceClient
 	CategoryClient categorypb.CategoryServiceClient
+	CartClient     cartpb.CartServiceClient
 	conns          []*grpc.ClientConn
 }
 
@@ -131,6 +133,7 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		UserClient:     userpb.NewUserServiceClient(userConn),
 		StoreClient:    store.NewStoreServiceClient(storeConn),
 		CategoryClient: categorypb.NewCategoryServiceClient(categoryConn),
+		CartClient:     cartpb.NewCartServiceClient(cartConn),
 		conns: []*grpc.ClientConn{
 			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn,
 		},
