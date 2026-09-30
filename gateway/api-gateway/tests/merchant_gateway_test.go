@@ -287,12 +287,12 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 			updateMerchant(id: "%s", input: {
 				businessName: "Acme Super Store"
 				businessPhone: "+1234567890"
-				taxId: "TAX-123"
+				panCardNumber: "ABCDE1234F"
 			}) {
 				id
 				businessName
 				businessPhone
-				taxId
+				panCardNumber
 			}
 		}
 	`, merchantID)
@@ -312,7 +312,7 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 				ID            string  `json:"id"`
 				BusinessName  string  `json:"businessName"`
 				BusinessPhone *string `json:"businessPhone"`
-				TaxID         *string `json:"taxId"`
+				PanCardNumber *string `json:"panCardNumber"`
 			} `json:"updateMerchant"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
@@ -327,8 +327,8 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	if updateRes.Data.UpdateMerchant.BusinessPhone == nil || *updateRes.Data.UpdateMerchant.BusinessPhone != "+1234567890" {
 		t.Errorf("expected +1234567890, got %v", updateRes.Data.UpdateMerchant.BusinessPhone)
 	}
-	if updateRes.Data.UpdateMerchant.TaxID == nil || *updateRes.Data.UpdateMerchant.TaxID != "TAX-123" {
-		t.Errorf("expected TAX-123, got %v", updateRes.Data.UpdateMerchant.TaxID)
+	if updateRes.Data.UpdateMerchant.PanCardNumber == nil || *updateRes.Data.UpdateMerchant.PanCardNumber != "ABCDE1234F" {
+		t.Errorf("expected ABCDE1234F, got %v", updateRes.Data.UpdateMerchant.PanCardNumber)
 	}
 
 	// 5. Query MerchantByUserID -> Rejected by schema (removed)

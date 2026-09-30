@@ -22,7 +22,7 @@ type Merchant struct {
 	LastName        string     `json:"last_name" db:"last_name"`
 	BusinessEmail   string     `json:"business_email" db:"business_email"`
 	BusinessPhone   string     `json:"business_phone" db:"business_phone"`
-	PanCardNumber   string     `json:"pan_card_number" db:"tax_id"`
+	PanCardNumber   string     `json:"pan_card_number" db:"pan_card_number"`
 	Status          string     `json:"status" db:"status"`
 	RejectionReason string     `json:"rejection_reason" db:"rejection_reason"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
