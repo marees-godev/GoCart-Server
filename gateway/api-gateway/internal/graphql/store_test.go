@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -266,6 +265,11 @@ func (m *mockStoreClient) CloseStore(ctx context.Context, in *storepb.CloseStore
 }
 
 func setupStoreTestApp(t *testing.T) (*fiber.App, string) {
+	app, _, token := setupStoreTestAppAndHandler(t)
+	return app, token
+}
+
+func setupStoreTestAppAndHandler(t *testing.T) (*fiber.App, *gwGraphQL.Handler, string) {
 	cfg := &config.Config{
 		App: config.AppConfig{
 			Version: "1.0.0",
@@ -298,7 +302,7 @@ func setupStoreTestApp(t *testing.T) (*fiber.App, string) {
 		Role:   "MERCHANT",
 	}, "test-secret-key-12345", 3600*1000000000)
 
-	return app, token
+	return app, handler, token
 }
 
 func TestStoreGraphQL_CreateStore(t *testing.T) {
@@ -683,7 +687,7 @@ func TestStoreGraphQL_RejectStore(t *testing.T) {
 }
 
 func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
-	app, token := setupStoreTestApp(t)
+	_, handler, token := setupStoreTestAppAndHandler(t)
 
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
@@ -695,16 +699,14 @@ func TestStoreGraphQL_CreateStore_MultipartUpload(t *testing.T) {
 	part, _ := w.CreateFormFile("0", "logo.png")
 	_, _ = part.Write([]byte("fake-png-binary-content"))
 	_ = w.Close()
-	fmt.Printf("STORE_TEST BUFFER:\n%s\n", b.String())
 
 	req := httptest.NewRequest(http.MethodPost, "/query", &b)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	resp := rec.Result()
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200 OK, got %d, body: %s", resp.StatusCode, string(bodyBytes))
