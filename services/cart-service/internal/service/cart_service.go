@@ -161,7 +161,12 @@ func (s *cartService) RemoveCartItem(ctx context.Context, req dto.RemoveCartItem
 		return nil, appErrors.Internal(err, "failed to remove item from cart")
 	}
 
-	_ = s.repo.SetCartInCache(ctx, updatedCart, s.ttl)
+	if len(updatedCart.Items) == 0 {
+		_ = s.repo.DeleteCartFromCache(ctx, req.UserID)
+	} else {
+		_ = s.repo.SetCartInCache(ctx, updatedCart, s.ttl)
+	}
+
 	return updatedCart, nil
 }
 
@@ -177,7 +182,7 @@ func (s *cartService) ClearCart(ctx context.Context, userID string) (*model.Cart
 				UserID: userID,
 				Items:  make([]model.CartItem, 0),
 			}
-			_ = s.repo.SetCartInCache(ctx, emptyCart, s.ttl)
+			_ = s.repo.DeleteCartFromCache(ctx, userID)
 			return emptyCart, nil
 		}
 		return nil, appErrors.Internal(err, "failed to retrieve cart")
@@ -191,6 +196,6 @@ func (s *cartService) ClearCart(ctx context.Context, userID string) (*model.Cart
 	cart.CalculateTotal()
 	cart.UpdatedAt = time.Now()
 
-	_ = s.repo.SetCartInCache(ctx, cart, s.ttl)
+	_ = s.repo.DeleteCartFromCache(ctx, userID)
 	return cart, nil
 }
