@@ -136,7 +136,9 @@ func (r *pgCartRepository) AddOrUpdateItem(ctx context.Context, cartID string, i
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var existingID string
 	var existingQty int32
