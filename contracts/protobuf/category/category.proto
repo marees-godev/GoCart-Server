@@ -5,12 +5,13 @@ package gocart.category.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/category;category";
 
 service CategoryService {
-  rpc CreateCategory (CreateCategoryRequest) returns (CreateCategoryResponse);
-  rpc GetCategory (GetCategoryRequest) returns (GetCategoryResponse);
-  rpc ListCategories (ListCategoriesRequest) returns (ListCategoriesResponse);
-  rpc GetChildCategories (GetChildCategoriesRequest) returns (GetChildCategoriesResponse);
-  rpc UpdateCategory (UpdateCategoryRequest) returns (UpdateCategoryResponse);
-  rpc DeleteCategory (DeleteCategoryRequest) returns (DeleteCategoryResponse);
+  rpc CreateCategory(CreateCategoryRequest) returns (CreateCategoryResponse);
+  rpc GetCategory(GetCategoryRequest) returns (GetCategoryResponse);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc GetChildCategories(GetChildCategoriesRequest) returns (GetChildCategoriesResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (UpdateCategoryResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (DeleteCategoryResponse);
+  rpc ValidateCategoryForAssignment(ValidateCategoryForAssignmentRequest) returns (ValidateCategoryForAssignmentResponse);
 }
 
 message Category {
@@ -27,6 +28,7 @@ message CreateCategoryRequest {
   string name = 1;
   string description = 4;
   string parent_category_id = 5;
+  optional bool is_active = 6;
 }
 
 message CreateCategoryResponse {
@@ -84,3 +86,14 @@ message DeleteCategoryResponse {
   bool success = 1;
   string message = 2;
 }
+
+message ValidateCategoryForAssignmentRequest {
+  string category_id = 1;
+}
+
+message ValidateCategoryForAssignmentResponse {
+  bool is_valid = 1;
+  string message = 2;
+  Category category = 3;
+}
+

@@ -428,3 +428,99 @@ func TestCategoryService_EndToEndHierarchyAndPermissions(t *testing.T) {
 		t.Errorf("expected specific error message, got %v", err)
 	}
 }
+
+func TestCategoryService_AvailabilityControlsIntegration(t *testing.T) {
+	client, cleanup := setupTestGRPCServer(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	adminCtx := withRole(ctx, auth.RoleAdmin)
+	custCtx := withRole(ctx, auth.RoleCustomer)
+
+	// 1. Admin creates a category (enabled by default)
+	createResp, err := client.CreateCategory(adminCtx, &categorypb.CreateCategoryRequest{
+		Name:        "Home Appliances",
+		Description: "Electronics for household",
+	})
+	if err != nil {
+		t.Fatalf("admin failed creating category: %v", err)
+	}
+	catID := createResp.Category.Id
+	if !createResp.Category.IsActive {
+		t.Fatalf("expected newly created category to be active")
+	}
+
+	// 2. Validate enabled category for assignment (should succeed)
+	valResp, err := client.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: catID,
+	})
+	if err != nil {
+		t.Fatalf("expected enabled category to pass assignment validation: %v", err)
+	}
+	if !valResp.IsValid || valResp.Category.Id != catID {
+		t.Errorf("unexpected validation response: %+v", valResp)
+	}
+
+	// 3. Customer role attempting to disable category state change is rejected (Authorization)
+	disable := false
+	_, err = client.UpdateCategory(custCtx, &categorypb.UpdateCategoryRequest{
+		Id:       catID,
+		IsActive: &disable,
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied for customer state change, got %v", status.Code(err))
+	}
+
+	// 4. Admin role disables the category state (Authorization & Persistence)
+	updateResp, err := client.UpdateCategory(adminCtx, &categorypb.UpdateCategoryRequest{
+		Id:       catID,
+		IsActive: &disable,
+	})
+	if err != nil {
+		t.Fatalf("admin failed disabling category: %v", err)
+	}
+	if updateResp.Category.IsActive {
+		t.Fatalf("expected category IsActive to be false after disable update")
+	}
+
+	// 5. Validating disabled category for NEW product assignment fails
+	_, err = client.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: catID,
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument when assigning disabled category to new product, got %v", status.Code(err))
+	}
+
+	// 6. Existing products referencing disabled category remain valid (GetCategory succeeds)
+	getResp, err := client.GetCategory(ctx, &categorypb.GetCategoryRequest{Id: catID})
+	if err != nil {
+		t.Fatalf("expected GetCategory to succeed for disabled category (historical validity), got: %v", err)
+	}
+	if getResp.Category.IsActive {
+		t.Errorf("expected retrieved category to be inactive")
+	}
+
+	// 7. Admin role re-enables the category
+	enable := true
+	updateResp, err = client.UpdateCategory(adminCtx, &categorypb.UpdateCategoryRequest{
+		Id:       catID,
+		IsActive: &enable,
+	})
+	if err != nil {
+		t.Fatalf("admin failed re-enabling category: %v", err)
+	}
+	if !updateResp.Category.IsActive {
+		t.Fatalf("expected category IsActive to be true after enable update")
+	}
+
+	// 8. Validating re-enabled category for product assignment succeeds
+	valResp, err = client.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: catID,
+	})
+	if err != nil {
+		t.Fatalf("expected re-enabled category to pass assignment validation: %v", err)
+	}
+	if !valResp.IsValid {
+		t.Errorf("expected IsValid true")
+	}
+}

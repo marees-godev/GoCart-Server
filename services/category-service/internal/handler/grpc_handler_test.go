@@ -414,3 +414,57 @@ func TestCategoryGRPCHandler_UpdateAndDelete(t *testing.T) {
 		t.Fatalf("failed deleting parent category after child deleted: %v", err)
 	}
 }
+
+func TestCategoryGRPCHandler_ValidateCategoryForAssignment(t *testing.T) {
+	h := setupHandler()
+	ctx := context.Background()
+
+	// 1. Nil request
+	_, err := h.ValidateCategoryForAssignment(ctx, nil)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for nil request, got %v", status.Code(err))
+	}
+
+	// 2. Empty category ID
+	_, err = h.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{CategoryId: ""})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for empty category ID, got %v", status.Code(err))
+	}
+
+	// 3. Create an active category
+	catResp, err := h.CreateCategory(ctx, &categorypb.CreateCategoryRequest{
+		Name: "Laptops",
+	})
+	if err != nil {
+		t.Fatalf("failed to create category: %v", err)
+	}
+
+	// 4. Validate active category (should succeed)
+	valResp, err := h.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: catResp.Category.Id,
+	})
+	if err != nil {
+		t.Fatalf("expected active category to pass validation, got %v", err)
+	}
+	if !valResp.IsValid {
+		t.Errorf("expected IsValid true for active category")
+	}
+
+	// 5. Disable category
+	disable := false
+	_, err = h.UpdateCategory(ctx, &categorypb.UpdateCategoryRequest{
+		Id:       catResp.Category.Id,
+		IsActive: &disable,
+	})
+	if err != nil {
+		t.Fatalf("failed to disable category: %v", err)
+	}
+
+	// 6. Validate disabled category (should fail with InvalidArgument/BadRequest)
+	_, err = h.ValidateCategoryForAssignment(ctx, &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: catResp.Category.Id,
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for disabled category, got %v", status.Code(err))
+	}
+}

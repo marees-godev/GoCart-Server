@@ -377,3 +377,83 @@ func TestCategoryService_HierarchyAndUniqueness(t *testing.T) {
 		t.Fatalf("failed deleting mobiles after children deleted: %v", err)
 	}
 }
+
+func TestCategoryService_AvailabilityControls(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCategoryRepo()
+	svc := service.NewCategoryService(repo)
+
+	// 1. Create category (default active)
+	cat, err := svc.CreateCategory(ctx, dto.CreateCategoryRequest{
+		Name:        "Books",
+		Description: "Books and Literature",
+	})
+	if err != nil {
+		t.Fatalf("failed to create category: %v", err)
+	}
+	if !cat.IsActive {
+		t.Fatalf("expected newly created category to be active by default")
+	}
+
+	// 2. Validate category for product assignment (should succeed when active)
+	validCat, err := svc.ValidateCategoryForAssignment(ctx, cat.ID)
+	if err != nil {
+		t.Fatalf("expected active category to be valid for assignment, got: %v", err)
+	}
+	if validCat.ID != cat.ID {
+		t.Errorf("expected category ID %s, got %s", cat.ID, validCat.ID)
+	}
+
+	// 3. Disable the category
+	disableFlag := false
+	updatedCat, err := svc.UpdateCategory(ctx, dto.UpdateCategoryRequest{
+		ID:       cat.ID,
+		IsActive: &disableFlag,
+	})
+	if err != nil {
+		t.Fatalf("failed to disable category: %v", err)
+	}
+	if updatedCat.IsActive {
+		t.Fatalf("expected category to be disabled (is_active=false)")
+	}
+
+	// 4. Validate category for product assignment (should fail when disabled)
+	_, err = svc.ValidateCategoryForAssignment(ctx, cat.ID)
+	if err == nil {
+		t.Fatalf("expected assignment validation for disabled category to fail")
+	}
+	if !strings.Contains(err.Error(), "disabled") {
+		t.Errorf("expected error message to mention 'disabled', got: %v", err)
+	}
+
+	// 5. Existing products referencing disabled category remain valid (GetCategory succeeds)
+	existingRefCat, err := svc.GetCategory(ctx, cat.ID)
+	if err != nil {
+		t.Fatalf("expected existing product reference lookup (GetCategory) to succeed for disabled category, got: %v", err)
+	}
+	if existingRefCat.IsActive {
+		t.Errorf("expected retrieved category to have IsActive=false")
+	}
+
+	// 6. Re-enable category
+	enableFlag := true
+	reEnabledCat, err := svc.UpdateCategory(ctx, dto.UpdateCategoryRequest{
+		ID:       cat.ID,
+		IsActive: &enableFlag,
+	})
+	if err != nil {
+		t.Fatalf("failed to re-enable category: %v", err)
+	}
+	if !reEnabledCat.IsActive {
+		t.Fatalf("expected category to be re-enabled (is_active=true)")
+	}
+
+	// 7. Validate category for product assignment after re-enabling (should succeed)
+	validCat, err = svc.ValidateCategoryForAssignment(ctx, cat.ID)
+	if err != nil {
+		t.Fatalf("expected re-enabled category to be valid for assignment, got: %v", err)
+	}
+	if !validCat.IsActive {
+		t.Errorf("expected validated category to be active")
+	}
+}

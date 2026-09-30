@@ -11,6 +11,7 @@ type CreateCategoryRequest struct {
 	Name             string  `json:"name"`
 	ParentCategoryID *string `json:"parent_category_id,omitempty"`
 	Description      string  `json:"description"`
+	IsActive         *bool   `json:"is_active,omitempty"`
 }
 
 type UpdateCategoryRequest struct {

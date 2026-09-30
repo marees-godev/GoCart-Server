@@ -7,11 +7,12 @@
 package category
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -118,6 +119,7 @@ type CreateCategoryRequest struct {
 	Name             string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	ParentCategoryId string                 `protobuf:"bytes,5,opt,name=parent_category_id,json=parentCategoryId,proto3" json:"parent_category_id,omitempty"`
+	IsActive         *bool                  `protobuf:"varint,6,opt,name=is_active,json=isActive,proto3,oneof" json:"is_active,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -171,6 +173,13 @@ func (x *CreateCategoryRequest) GetParentCategoryId() string {
 		return x.ParentCategoryId
 	}
 	return ""
+}
+
+func (x *CreateCategoryRequest) GetIsActive() bool {
+	if x != nil && x.IsActive != nil {
+		return *x.IsActive
+	}
+	return false
 }
 
 type CreateCategoryResponse struct {
@@ -753,6 +762,110 @@ func (x *DeleteCategoryResponse) GetMessage() string {
 	return ""
 }
 
+type ValidateCategoryForAssignmentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CategoryId    string                 `protobuf:"bytes,1,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateCategoryForAssignmentRequest) Reset() {
+	*x = ValidateCategoryForAssignmentRequest{}
+	mi := &file_contracts_protobuf_category_category_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateCategoryForAssignmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateCategoryForAssignmentRequest) ProtoMessage() {}
+
+func (x *ValidateCategoryForAssignmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_category_category_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateCategoryForAssignmentRequest.ProtoReflect.Descriptor instead.
+func (*ValidateCategoryForAssignmentRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_category_category_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ValidateCategoryForAssignmentRequest) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+type ValidateCategoryForAssignmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IsValid       bool                   `protobuf:"varint,1,opt,name=is_valid,json=isValid,proto3" json:"is_valid,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Category      *Category              `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateCategoryForAssignmentResponse) Reset() {
+	*x = ValidateCategoryForAssignmentResponse{}
+	mi := &file_contracts_protobuf_category_category_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateCategoryForAssignmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateCategoryForAssignmentResponse) ProtoMessage() {}
+
+func (x *ValidateCategoryForAssignmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_category_category_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateCategoryForAssignmentResponse.ProtoReflect.Descriptor instead.
+func (*ValidateCategoryForAssignmentResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_category_category_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ValidateCategoryForAssignmentResponse) GetIsValid() bool {
+	if x != nil {
+		return x.IsValid
+	}
+	return false
+}
+
+func (x *ValidateCategoryForAssignmentResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ValidateCategoryForAssignmentResponse) GetCategory() *Category {
+	if x != nil {
+		return x.Category
+	}
+	return nil
+}
+
 var File_contracts_protobuf_category_category_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_category_category_proto_rawDesc = "" +
@@ -767,11 +880,14 @@ const file_contracts_protobuf_category_category_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\a \x01(\tR\tupdatedAt\x12,\n" +
 	"\x12parent_category_id\x18\b \x01(\tR\x10parentCategoryId\x12\x1b\n" +
-	"\tis_active\x18\t \x01(\bR\bisActive\"{\n" +
+	"\tis_active\x18\t \x01(\bR\bisActive\"\xab\x01\n" +
 	"\x15CreateCategoryRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12,\n" +
-	"\x12parent_category_id\x18\x05 \x01(\tR\x10parentCategoryId\"R\n" +
+	"\x12parent_category_id\x18\x05 \x01(\tR\x10parentCategoryId\x12 \n" +
+	"\tis_active\x18\x06 \x01(\bH\x00R\bisActive\x88\x01\x01B\f\n" +
+	"\n" +
+	"_is_active\"R\n" +
 	"\x16CreateCategoryResponse\x128\n" +
 	"\bcategory\x18\x01 \x01(\v2\x1c.gocart.category.v1.CategoryR\bcategory\"$\n" +
 	"\x12GetCategoryRequest\x12\x0e\n" +
@@ -811,14 +927,22 @@ const file_contracts_protobuf_category_category_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"L\n" +
 	"\x16DeleteCategoryResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\x8a\x05\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"G\n" +
+	"$ValidateCategoryForAssignmentRequest\x12\x1f\n" +
+	"\vcategory_id\x18\x01 \x01(\tR\n" +
+	"categoryId\"\x96\x01\n" +
+	"%ValidateCategoryForAssignmentResponse\x12\x19\n" +
+	"\bis_valid\x18\x01 \x01(\bR\aisValid\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x128\n" +
+	"\bcategory\x18\x03 \x01(\v2\x1c.gocart.category.v1.CategoryR\bcategory2\xa1\x06\n" +
 	"\x0fCategoryService\x12g\n" +
 	"\x0eCreateCategory\x12).gocart.category.v1.CreateCategoryRequest\x1a*.gocart.category.v1.CreateCategoryResponse\x12^\n" +
 	"\vGetCategory\x12&.gocart.category.v1.GetCategoryRequest\x1a'.gocart.category.v1.GetCategoryResponse\x12g\n" +
 	"\x0eListCategories\x12).gocart.category.v1.ListCategoriesRequest\x1a*.gocart.category.v1.ListCategoriesResponse\x12s\n" +
 	"\x12GetChildCategories\x12-.gocart.category.v1.GetChildCategoriesRequest\x1a..gocart.category.v1.GetChildCategoriesResponse\x12g\n" +
 	"\x0eUpdateCategory\x12).gocart.category.v1.UpdateCategoryRequest\x1a*.gocart.category.v1.UpdateCategoryResponse\x12g\n" +
-	"\x0eDeleteCategory\x12).gocart.category.v1.DeleteCategoryRequest\x1a*.gocart.category.v1.DeleteCategoryResponseBLZJgithub.com/marees-godev/GoCart-Server/contracts/protobuf/category;categoryb\x06proto3"
+	"\x0eDeleteCategory\x12).gocart.category.v1.DeleteCategoryRequest\x1a*.gocart.category.v1.DeleteCategoryResponse\x12\x94\x01\n" +
+	"\x1dValidateCategoryForAssignment\x128.gocart.category.v1.ValidateCategoryForAssignmentRequest\x1a9.gocart.category.v1.ValidateCategoryForAssignmentResponseBLZJgithub.com/marees-godev/GoCart-Server/contracts/protobuf/category;categoryb\x06proto3"
 
 var (
 	file_contracts_protobuf_category_category_proto_rawDescOnce sync.Once
@@ -832,21 +956,23 @@ func file_contracts_protobuf_category_category_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_category_category_proto_rawDescData
 }
 
-var file_contracts_protobuf_category_category_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_contracts_protobuf_category_category_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_contracts_protobuf_category_category_proto_goTypes = []any{
-	(*Category)(nil),                   // 0: gocart.category.v1.Category
-	(*CreateCategoryRequest)(nil),      // 1: gocart.category.v1.CreateCategoryRequest
-	(*CreateCategoryResponse)(nil),     // 2: gocart.category.v1.CreateCategoryResponse
-	(*GetCategoryRequest)(nil),         // 3: gocart.category.v1.GetCategoryRequest
-	(*GetCategoryResponse)(nil),        // 4: gocart.category.v1.GetCategoryResponse
-	(*ListCategoriesRequest)(nil),      // 5: gocart.category.v1.ListCategoriesRequest
-	(*ListCategoriesResponse)(nil),     // 6: gocart.category.v1.ListCategoriesResponse
-	(*GetChildCategoriesRequest)(nil),  // 7: gocart.category.v1.GetChildCategoriesRequest
-	(*GetChildCategoriesResponse)(nil), // 8: gocart.category.v1.GetChildCategoriesResponse
-	(*UpdateCategoryRequest)(nil),      // 9: gocart.category.v1.UpdateCategoryRequest
-	(*UpdateCategoryResponse)(nil),     // 10: gocart.category.v1.UpdateCategoryResponse
-	(*DeleteCategoryRequest)(nil),      // 11: gocart.category.v1.DeleteCategoryRequest
-	(*DeleteCategoryResponse)(nil),     // 12: gocart.category.v1.DeleteCategoryResponse
+	(*Category)(nil),                              // 0: gocart.category.v1.Category
+	(*CreateCategoryRequest)(nil),                 // 1: gocart.category.v1.CreateCategoryRequest
+	(*CreateCategoryResponse)(nil),                // 2: gocart.category.v1.CreateCategoryResponse
+	(*GetCategoryRequest)(nil),                    // 3: gocart.category.v1.GetCategoryRequest
+	(*GetCategoryResponse)(nil),                   // 4: gocart.category.v1.GetCategoryResponse
+	(*ListCategoriesRequest)(nil),                 // 5: gocart.category.v1.ListCategoriesRequest
+	(*ListCategoriesResponse)(nil),                // 6: gocart.category.v1.ListCategoriesResponse
+	(*GetChildCategoriesRequest)(nil),             // 7: gocart.category.v1.GetChildCategoriesRequest
+	(*GetChildCategoriesResponse)(nil),            // 8: gocart.category.v1.GetChildCategoriesResponse
+	(*UpdateCategoryRequest)(nil),                 // 9: gocart.category.v1.UpdateCategoryRequest
+	(*UpdateCategoryResponse)(nil),                // 10: gocart.category.v1.UpdateCategoryResponse
+	(*DeleteCategoryRequest)(nil),                 // 11: gocart.category.v1.DeleteCategoryRequest
+	(*DeleteCategoryResponse)(nil),                // 12: gocart.category.v1.DeleteCategoryResponse
+	(*ValidateCategoryForAssignmentRequest)(nil),  // 13: gocart.category.v1.ValidateCategoryForAssignmentRequest
+	(*ValidateCategoryForAssignmentResponse)(nil), // 14: gocart.category.v1.ValidateCategoryForAssignmentResponse
 }
 var file_contracts_protobuf_category_category_proto_depIdxs = []int32{
 	0,  // 0: gocart.category.v1.CreateCategoryResponse.category:type_name -> gocart.category.v1.Category
@@ -854,23 +980,26 @@ var file_contracts_protobuf_category_category_proto_depIdxs = []int32{
 	0,  // 2: gocart.category.v1.ListCategoriesResponse.categories:type_name -> gocart.category.v1.Category
 	0,  // 3: gocart.category.v1.GetChildCategoriesResponse.categories:type_name -> gocart.category.v1.Category
 	0,  // 4: gocart.category.v1.UpdateCategoryResponse.category:type_name -> gocart.category.v1.Category
-	1,  // 5: gocart.category.v1.CategoryService.CreateCategory:input_type -> gocart.category.v1.CreateCategoryRequest
-	3,  // 6: gocart.category.v1.CategoryService.GetCategory:input_type -> gocart.category.v1.GetCategoryRequest
-	5,  // 7: gocart.category.v1.CategoryService.ListCategories:input_type -> gocart.category.v1.ListCategoriesRequest
-	7,  // 8: gocart.category.v1.CategoryService.GetChildCategories:input_type -> gocart.category.v1.GetChildCategoriesRequest
-	9,  // 9: gocart.category.v1.CategoryService.UpdateCategory:input_type -> gocart.category.v1.UpdateCategoryRequest
-	11, // 10: gocart.category.v1.CategoryService.DeleteCategory:input_type -> gocart.category.v1.DeleteCategoryRequest
-	2,  // 11: gocart.category.v1.CategoryService.CreateCategory:output_type -> gocart.category.v1.CreateCategoryResponse
-	4,  // 12: gocart.category.v1.CategoryService.GetCategory:output_type -> gocart.category.v1.GetCategoryResponse
-	6,  // 13: gocart.category.v1.CategoryService.ListCategories:output_type -> gocart.category.v1.ListCategoriesResponse
-	8,  // 14: gocart.category.v1.CategoryService.GetChildCategories:output_type -> gocart.category.v1.GetChildCategoriesResponse
-	10, // 15: gocart.category.v1.CategoryService.UpdateCategory:output_type -> gocart.category.v1.UpdateCategoryResponse
-	12, // 16: gocart.category.v1.CategoryService.DeleteCategory:output_type -> gocart.category.v1.DeleteCategoryResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	0,  // 5: gocart.category.v1.ValidateCategoryForAssignmentResponse.category:type_name -> gocart.category.v1.Category
+	1,  // 6: gocart.category.v1.CategoryService.CreateCategory:input_type -> gocart.category.v1.CreateCategoryRequest
+	3,  // 7: gocart.category.v1.CategoryService.GetCategory:input_type -> gocart.category.v1.GetCategoryRequest
+	5,  // 8: gocart.category.v1.CategoryService.ListCategories:input_type -> gocart.category.v1.ListCategoriesRequest
+	7,  // 9: gocart.category.v1.CategoryService.GetChildCategories:input_type -> gocart.category.v1.GetChildCategoriesRequest
+	9,  // 10: gocart.category.v1.CategoryService.UpdateCategory:input_type -> gocart.category.v1.UpdateCategoryRequest
+	11, // 11: gocart.category.v1.CategoryService.DeleteCategory:input_type -> gocart.category.v1.DeleteCategoryRequest
+	13, // 12: gocart.category.v1.CategoryService.ValidateCategoryForAssignment:input_type -> gocart.category.v1.ValidateCategoryForAssignmentRequest
+	2,  // 13: gocart.category.v1.CategoryService.CreateCategory:output_type -> gocart.category.v1.CreateCategoryResponse
+	4,  // 14: gocart.category.v1.CategoryService.GetCategory:output_type -> gocart.category.v1.GetCategoryResponse
+	6,  // 15: gocart.category.v1.CategoryService.ListCategories:output_type -> gocart.category.v1.ListCategoriesResponse
+	8,  // 16: gocart.category.v1.CategoryService.GetChildCategories:output_type -> gocart.category.v1.GetChildCategoriesResponse
+	10, // 17: gocart.category.v1.CategoryService.UpdateCategory:output_type -> gocart.category.v1.UpdateCategoryResponse
+	12, // 18: gocart.category.v1.CategoryService.DeleteCategory:output_type -> gocart.category.v1.DeleteCategoryResponse
+	14, // 19: gocart.category.v1.CategoryService.ValidateCategoryForAssignment:output_type -> gocart.category.v1.ValidateCategoryForAssignmentResponse
+	13, // [13:20] is the sub-list for method output_type
+	6,  // [6:13] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_category_category_proto_init() }
@@ -878,6 +1007,7 @@ func file_contracts_protobuf_category_category_proto_init() {
 	if File_contracts_protobuf_category_category_proto != nil {
 		return
 	}
+	file_contracts_protobuf_category_category_proto_msgTypes[1].OneofWrappers = []any{}
 	file_contracts_protobuf_category_category_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -885,7 +1015,7 @@ func file_contracts_protobuf_category_category_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_category_category_proto_rawDesc), len(file_contracts_protobuf_category_category_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

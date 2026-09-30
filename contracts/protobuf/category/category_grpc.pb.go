@@ -8,6 +8,7 @@ package category
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,12 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CategoryService_CreateCategory_FullMethodName     = "/gocart.category.v1.CategoryService/CreateCategory"
-	CategoryService_GetCategory_FullMethodName        = "/gocart.category.v1.CategoryService/GetCategory"
-	CategoryService_ListCategories_FullMethodName     = "/gocart.category.v1.CategoryService/ListCategories"
-	CategoryService_GetChildCategories_FullMethodName = "/gocart.category.v1.CategoryService/GetChildCategories"
-	CategoryService_UpdateCategory_FullMethodName     = "/gocart.category.v1.CategoryService/UpdateCategory"
-	CategoryService_DeleteCategory_FullMethodName     = "/gocart.category.v1.CategoryService/DeleteCategory"
+	CategoryService_CreateCategory_FullMethodName                = "/gocart.category.v1.CategoryService/CreateCategory"
+	CategoryService_GetCategory_FullMethodName                   = "/gocart.category.v1.CategoryService/GetCategory"
+	CategoryService_ListCategories_FullMethodName                = "/gocart.category.v1.CategoryService/ListCategories"
+	CategoryService_GetChildCategories_FullMethodName            = "/gocart.category.v1.CategoryService/GetChildCategories"
+	CategoryService_UpdateCategory_FullMethodName                = "/gocart.category.v1.CategoryService/UpdateCategory"
+	CategoryService_DeleteCategory_FullMethodName                = "/gocart.category.v1.CategoryService/DeleteCategory"
+	CategoryService_ValidateCategoryForAssignment_FullMethodName = "/gocart.category.v1.CategoryService/ValidateCategoryForAssignment"
 )
 
 // CategoryServiceClient is the client API for CategoryService service.
@@ -37,6 +39,7 @@ type CategoryServiceClient interface {
 	GetChildCategories(ctx context.Context, in *GetChildCategoriesRequest, opts ...grpc.CallOption) (*GetChildCategoriesResponse, error)
 	UpdateCategory(ctx context.Context, in *UpdateCategoryRequest, opts ...grpc.CallOption) (*UpdateCategoryResponse, error)
 	DeleteCategory(ctx context.Context, in *DeleteCategoryRequest, opts ...grpc.CallOption) (*DeleteCategoryResponse, error)
+	ValidateCategoryForAssignment(ctx context.Context, in *ValidateCategoryForAssignmentRequest, opts ...grpc.CallOption) (*ValidateCategoryForAssignmentResponse, error)
 }
 
 type categoryServiceClient struct {
@@ -107,6 +110,16 @@ func (c *categoryServiceClient) DeleteCategory(ctx context.Context, in *DeleteCa
 	return out, nil
 }
 
+func (c *categoryServiceClient) ValidateCategoryForAssignment(ctx context.Context, in *ValidateCategoryForAssignmentRequest, opts ...grpc.CallOption) (*ValidateCategoryForAssignmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateCategoryForAssignmentResponse)
+	err := c.cc.Invoke(ctx, CategoryService_ValidateCategoryForAssignment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CategoryServiceServer is the server API for CategoryService service.
 // All implementations must embed UnimplementedCategoryServiceServer
 // for forward compatibility.
@@ -117,6 +130,7 @@ type CategoryServiceServer interface {
 	GetChildCategories(context.Context, *GetChildCategoriesRequest) (*GetChildCategoriesResponse, error)
 	UpdateCategory(context.Context, *UpdateCategoryRequest) (*UpdateCategoryResponse, error)
 	DeleteCategory(context.Context, *DeleteCategoryRequest) (*DeleteCategoryResponse, error)
+	ValidateCategoryForAssignment(context.Context, *ValidateCategoryForAssignmentRequest) (*ValidateCategoryForAssignmentResponse, error)
 	mustEmbedUnimplementedCategoryServiceServer()
 }
 
@@ -144,6 +158,9 @@ func (UnimplementedCategoryServiceServer) UpdateCategory(context.Context, *Updat
 }
 func (UnimplementedCategoryServiceServer) DeleteCategory(context.Context, *DeleteCategoryRequest) (*DeleteCategoryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteCategory not implemented")
+}
+func (UnimplementedCategoryServiceServer) ValidateCategoryForAssignment(context.Context, *ValidateCategoryForAssignmentRequest) (*ValidateCategoryForAssignmentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidateCategoryForAssignment not implemented")
 }
 func (UnimplementedCategoryServiceServer) mustEmbedUnimplementedCategoryServiceServer() {}
 func (UnimplementedCategoryServiceServer) testEmbeddedByValue()                         {}
@@ -274,6 +291,24 @@ func _CategoryService_DeleteCategory_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CategoryService_ValidateCategoryForAssignment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateCategoryForAssignmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CategoryServiceServer).ValidateCategoryForAssignment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CategoryService_ValidateCategoryForAssignment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CategoryServiceServer).ValidateCategoryForAssignment(ctx, req.(*ValidateCategoryForAssignmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CategoryService_ServiceDesc is the grpc.ServiceDesc for CategoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +339,10 @@ var CategoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteCategory",
 			Handler:    _CategoryService_DeleteCategory_Handler,
+		},
+		{
+			MethodName: "ValidateCategoryForAssignment",
+			Handler:    _CategoryService_ValidateCategoryForAssignment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
