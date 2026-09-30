@@ -95,7 +95,7 @@ func TestMerchantModelFields(t *testing.T) {
 		"LastName":        reflect.TypeOf(""),
 		"BusinessEmail":   reflect.TypeOf(""),
 		"BusinessPhone":   reflect.TypeOf(""),
-		"TaxID":           reflect.TypeOf(""),
+		"PanCardNumber":   reflect.TypeOf(""),
 		"Status":          reflect.TypeOf(""),
 		"RejectionReason": reflect.TypeOf(""),
 		"CreatedAt":       reflect.TypeOf(time.Time{}),

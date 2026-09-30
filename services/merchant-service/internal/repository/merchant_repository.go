@@ -44,7 +44,7 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 		merchant.ID = uuid.New()
 	}
 	query := `
-		INSERT INTO merchants (id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, created_at, updated_at)
+		INSERT INTO merchants (id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 		ON CONFLICT (id) DO NOTHING
 		RETURNING id, created_at, updated_at
@@ -125,7 +125,7 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 		countQuery = `SELECT COUNT(*) FROM merchants WHERE status = $1 AND deleted_at IS NULL`
 		countArgs = append(countArgs, status)
 		listQuery = `
-			SELECT id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at, deleted_at
+			SELECT id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 			FROM merchants
 			WHERE status = $1 AND deleted_at IS NULL
 			ORDER BY created_at DESC
@@ -135,7 +135,7 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 	} else {
 		countQuery = `SELECT COUNT(*) FROM merchants WHERE deleted_at IS NULL`
 		listQuery = `
-			SELECT id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at, deleted_at
+			SELECT id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 			FROM merchants
 			WHERE deleted_at IS NULL
 			ORDER BY created_at DESC
@@ -219,7 +219,7 @@ func (r *pgMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, s
 		UPDATE merchants
 		SET status = $1, rejection_reason = $2, updated_at = NOW()
 		WHERE id = $3 AND deleted_at IS NULL
-		RETURNING id, business_name, first_name, last_name, business_email, business_phone, tax_id, status, rejection_reason, created_at, updated_at, deleted_at
+		RETURNING id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 	`
 	var m model.Merchant
 	err := r.db.Pool.QueryRow(ctx, query, status, rejectionReason, id).Scan(
