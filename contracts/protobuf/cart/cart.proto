@@ -6,16 +6,19 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/ca
 
 service CartService {
   rpc GetCart (GetCartRequest) returns (GetCartResponse);
-  rpc AddToCart (AddToCartRequest) returns (AddToCartResponse);
-  rpc RemoveFromCart (RemoveFromCartRequest) returns (RemoveFromCartResponse);
+  rpc AddCartItem (AddCartItemRequest) returns (AddCartItemResponse);
+  rpc UpdateCartItem (UpdateCartItemRequest) returns (UpdateCartItemResponse);
+  rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
   rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
 }
 
 message CartItem {
   string id = 1;
   string product_id = 2;
-  int32 quantity = 3;
-  double unit_price = 4;
+  string variant_id = 3;
+  string store_id = 4;
+  double unit_price = 5;
+  int32 quantity = 6;
 }
 
 message Cart {
@@ -23,6 +26,7 @@ message Cart {
   string user_id = 2;
   repeated CartItem items = 3;
   double total_amount = 4;
+  string updated_at = 5;
 }
 
 message GetCartRequest {
@@ -33,23 +37,37 @@ message GetCartResponse {
   Cart cart = 1;
 }
 
-message AddToCartRequest {
+message AddCartItemRequest {
   string user_id = 1;
   string product_id = 2;
-  int32 quantity = 3;
-  double unit_price = 4;
+  string variant_id = 3;
+  string store_id = 4;
+  double unit_price = 5;
+  int32 quantity = 6;
 }
 
-message AddToCartResponse {
+message AddCartItemResponse {
   Cart cart = 1;
 }
 
-message RemoveFromCartRequest {
+message UpdateCartItemRequest {
   string user_id = 1;
   string product_id = 2;
+  string variant_id = 3;
+  int32 quantity = 4;
 }
 
-message RemoveFromCartResponse {
+message UpdateCartItemResponse {
+  Cart cart = 1;
+}
+
+message RemoveCartItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+}
+
+message RemoveCartItemResponse {
   Cart cart = 1;
 }
 
@@ -59,4 +77,5 @@ message ClearCartRequest {
 
 message ClearCartResponse {
   bool success = 1;
+  Cart cart = 2;
 }

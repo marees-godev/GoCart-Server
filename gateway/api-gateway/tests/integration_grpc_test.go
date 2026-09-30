@@ -66,7 +66,7 @@ func (m *mockCartBackend) GetCart(ctx context.Context, req *cartpb.GetCartReques
 	return &cartpb.GetCartResponse{Cart: cart}, nil
 }
 
-func (m *mockCartBackend) AddToCart(ctx context.Context, req *cartpb.AddToCartRequest) (*cartpb.AddToCartResponse, error) {
+func (m *mockCartBackend) AddCartItem(ctx context.Context, req *cartpb.AddCartItemRequest) (*cartpb.AddCartItemResponse, error) {
 	if req.Quantity <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "quantity must be greater than 0")
 	}
@@ -91,7 +91,7 @@ func (m *mockCartBackend) AddToCart(ctx context.Context, req *cartpb.AddToCartRe
 	cart.Items = append(cart.Items, newItem)
 	cart.TotalAmount += float64(req.Quantity) * req.UnitPrice
 
-	return &cartpb.AddToCartResponse{Cart: cart}, nil
+	return &cartpb.AddCartItemResponse{Cart: cart}, nil
 }
 
 func extractField(src, pattern string) string {
@@ -181,7 +181,7 @@ func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (*fiber.App, fu
 			qty, _ := strconv.Atoi(quantityStr)
 			price, _ := strconv.ParseFloat(unitPriceStr, 64)
 
-			res, err := clientMgr.CartClient.AddToCart(c.Context(), &cartpb.AddToCartRequest{
+			res, err := clientMgr.CartClient.AddCartItem(c.Context(), &cartpb.AddCartItemRequest{
 				UserId:    userId,
 				ProductId: productId,
 				Quantity:  int32(qty),

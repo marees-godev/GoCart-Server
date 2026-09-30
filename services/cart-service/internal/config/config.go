@@ -12,6 +12,8 @@ type Config struct {
 	HTTP     HTTPConfig
 	GRPC     GRPCConfig
 	Database DatabaseConfig
+	Redis    RedisConfig
+	Cart     CartConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
 }
@@ -36,6 +38,18 @@ type DatabaseConfig struct {
 	MinConns       int32
 	AutoMigrate    bool
 	MigrationsPath string
+}
+
+type RedisConfig struct {
+	URL      string
+	Host     string
+	Port     string
+	Password string
+	DB       int
+}
+
+type CartConfig struct {
+	TTLSeconds int
 }
 
 type LoggerConfig struct {
@@ -65,14 +79,24 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "8181"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50051"),
+			Port: GetEnv("GRPC_PORT", "50057"),
 		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("CART_SERVICE_DATABASE_URL", ""),
+			URL:            GetEnv("CART_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
 			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+		},
+		Redis: RedisConfig{
+			URL:      GetEnv("REDIS_URL", ""),
+			Host:     GetEnv("REDIS_HOST", "localhost"),
+			Port:     GetEnv("REDIS_PORT", "6379"),
+			Password: GetEnv("REDIS_PASSWORD", ""),
+			DB:       GetEnvAsInt("REDIS_DB", 0),
+		},
+		Cart: CartConfig{
+			TTLSeconds: GetEnvAsInt("CART_TTL_SECONDS", 604800), // Default 7 days
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),
