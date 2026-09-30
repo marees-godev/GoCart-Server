@@ -239,8 +239,8 @@ func TestLoginResolver_Customer(t *testing.T) {
 	if userMock.lastGetUserReq == nil || userMock.lastGetUserReq.Id != "user-uuid-123" {
 		t.Errorf("expected UserClient.GetUser to be called for customer")
 	}
-	if payload.Role == nil || *payload.Role != "CUSTOMER" {
-		t.Errorf("expected role CUSTOMER, got %v", payload.Role)
+	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
+		t.Errorf("expected role CUSTOMER, got %v", payload.User.Role)
 	}
 }
 
@@ -282,11 +282,8 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	if userMock.lastGetUserReq != nil {
 		t.Errorf("expected UserClient.GetUser NOT to be called for merchant")
 	}
-	if payload.Role == nil || *payload.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got %v", payload.Role)
-	}
-	if payload.Merchant == nil {
-		t.Errorf("expected Merchant payload to be populated")
+	if payload.User.Role == nil || *payload.User.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %v", payload.User.Role)
 	}
 }
 

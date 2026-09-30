@@ -124,18 +124,13 @@ func main() {
 	}
 
 	var otpStore otp.Store
-	if !cfg.RedisEnabled {
-		log.Info("Redis is not enabled, using in-memory store for OTP storage")
+	redisClient, err := redis.New(ctx, cfg.Redis)
+	if err != nil {
+		log.Warn("Failed to connect to Redis for OTP storage, falling back to in-memory store", "error", err)
 		otpStore = otp.NewMemoryStore()
 	} else {
-		redisClient, err := redis.New(ctx, cfg.Redis)
-		if err != nil {
-			log.Warn("Failed to connect to Redis for OTP storage, falling back to in-memory store", "error", err)
-			otpStore = otp.NewMemoryStore()
-		} else {
-			defer redisClient.Close()
-			otpStore = otp.NewRedisStore(redisClient)
-		}
+		defer redisClient.Close()
+		otpStore = otp.NewRedisStore(redisClient)
 	}
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
