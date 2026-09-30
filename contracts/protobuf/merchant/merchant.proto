@@ -22,7 +22,7 @@ message MerchantResponseData {
   string last_name = 4;
   string business_email = 5;
   string business_phone = 6;
-  string tax_id = 7;
+  string pan_card_number = 7;
   string status = 8;
   string rejection_reason = 9;
   google.protobuf.Timestamp created_at = 10;
@@ -42,7 +42,7 @@ message UpdateMerchantRequest {
   string id = 1;
   string business_name = 2;
   string business_phone = 3;
-  string tax_id = 4;
+  string pan_card_number = 4;
 }
 
 message UpdateMerchantResponse {

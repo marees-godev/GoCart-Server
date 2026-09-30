@@ -5,7 +5,7 @@ type Merchant {
   lastName: String
   businessEmail: String
   businessPhone: String
-  taxId: String
+  panCardNumber: String
   status: String!
   rejectionReason: String
   createdAt: String
@@ -22,9 +22,8 @@ input UpdateMerchantInput {
   businessName: String
   firstName: String
   lastName: String
-  businessEmail: String
   businessPhone: String
-  taxId: String
+  panCardNumber: String
 }
 
 extend type Query {

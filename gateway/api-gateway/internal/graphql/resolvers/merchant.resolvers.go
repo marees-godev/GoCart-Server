@@ -49,8 +49,8 @@ func (r *mutationResolver) UpdateMerchant(ctx context.Context, id string, input 
 	if input.BusinessPhone != nil {
 		req.BusinessPhone = *input.BusinessPhone
 	}
-	if input.TaxID != nil {
-		req.TaxId = *input.TaxID
+	if input.PanCardNumber != nil {
+		req.PanCardNumber = *input.PanCardNumber
 	}
 
 	res, err := r.ClientMgr.MerchantClient.UpdateMerchant(ctx, req)

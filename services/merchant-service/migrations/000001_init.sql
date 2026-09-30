@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS merchants (
     last_name VARCHAR(100) NOT NULL DEFAULT '',
     business_email VARCHAR(255) NOT NULL DEFAULT '',
     business_phone VARCHAR(20) NOT NULL DEFAULT '',
-    tax_id VARCHAR(100) NOT NULL DEFAULT '',
+    pan_card_number VARCHAR(100) NOT NULL DEFAULT '',
     status merchant_status NOT NULL DEFAULT 'PENDING',
     rejection_reason TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

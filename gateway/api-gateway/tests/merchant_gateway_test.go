@@ -45,10 +45,7 @@ func (m *mockMerchantBackend) CreateMerchant(ctx context.Context, req *merchantp
 	}
 	merch := &merchantpb.MerchantResponseData{
 		Id:            id,
-		BusinessName:  "",
 		BusinessEmail: req.BusinessEmail,
-		BusinessPhone: "",
-		TaxId:         "",
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
 		Status:        "PENDING",
@@ -91,8 +88,8 @@ func (m *mockMerchantBackend) UpdateMerchant(ctx context.Context, req *merchantp
 	if req.BusinessPhone != "" {
 		merch.BusinessPhone = req.BusinessPhone
 	}
-	if req.TaxId != "" {
-		merch.TaxId = req.TaxId
+	if req.PanCardNumber != "" {
+		merch.PanCardNumber = req.PanCardNumber
 	}
 	merch.UpdatedAt = timestamppb.Now()
 	return &merchantpb.UpdateMerchantResponse{Merchant: merch}, nil

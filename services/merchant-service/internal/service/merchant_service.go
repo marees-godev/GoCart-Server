@@ -125,12 +125,9 @@ func (s *merchantService) CreateMerchant(ctx context.Context, req dto.CreateMerc
 
 	merchant := &model.Merchant{
 		ID:            merchantID,
-		BusinessName:  "",
 		FirstName:     strings.TrimSpace(req.FirstName),
 		LastName:      strings.TrimSpace(req.LastName),
 		BusinessEmail: strings.TrimSpace(req.BusinessEmail),
-		BusinessPhone: "",
-		TaxID:         "",
 		Status:        string(model.MerchantStatusPending),
 	}
 
@@ -179,6 +176,7 @@ func (s *merchantService) ListMerchants(ctx context.Context, limit, offset int, 
 func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantRequest) (*model.Merchant, error) {
 	if id == uuid.Nil {
 		s.logger.Warn("UpdateMerchant failed: invalid nil UUID")
+		s.logger.Warn("UpdateMerchant failed: invalid nil UUID")
 		return nil, appErrors.BadRequest("valid merchant ID is required")
 	}
 
@@ -186,7 +184,7 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 		slog.String("merchant_id", id.String()),
 		slog.String("business_name", req.BusinessName),
 		slog.String("business_phone", req.BusinessPhone),
-		slog.String("tax_id", req.TaxID),
+		slog.String("pan_card_number", req.PanCardNumber),
 	)
 
 	validBusinessName, err := validateBusinessName(req.BusinessName)
@@ -207,9 +205,9 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 		return nil, err
 	}
 
-	validTaxID, err := validateTaxID(req.TaxID)
+	validTaxID, err := validateTaxID(req.PanCardNumber)
 	if err != nil {
-		s.logger.Warn("UpdateMerchant validation failed for tax_id",
+		s.logger.Warn("UpdateMerchant validation failed for pan_card_number",
 			slog.String("merchant_id", id.String()),
 			slog.Any("error", err),
 		)
@@ -232,7 +230,7 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 
 	merchant.BusinessName = validBusinessName
 	merchant.BusinessPhone = validBusinessPhone
-	merchant.TaxID = validTaxID
+	merchant.PanCardNumber = validTaxID
 
 	if err := s.repo.Update(ctx, merchant); err != nil {
 		s.logger.Error("UpdateMerchant failed to save updates",

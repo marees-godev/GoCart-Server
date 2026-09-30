@@ -40,23 +40,6 @@ func (m *mockUserServiceClient) CreateUser(ctx context.Context, req *userpb.Crea
 	}, nil
 }
 
-type mockMerchantClient struct {
-	merchantpb.MerchantServiceClient
-	createdMerchants []*merchantpb.CreateMerchantRequest
-}
-
-func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.CreateMerchantRequest, opts ...grpc.CallOption) (*merchantpb.CreateMerchantResponse, error) {
-	m.createdMerchants = append(m.createdMerchants, in)
-	return &merchantpb.CreateMerchantResponse{
-		Merchant: &merchantpb.MerchantResponseData{
-			Id:            in.Id,
-			BusinessEmail: in.BusinessEmail,
-			FirstName:     in.FirstName,
-			LastName:      in.LastName,
-		},
-	}, nil
-}
-
 type inMemoryAuthRepo struct {
 	byEmailRole  map[string]*model.AuthCredential
 	outboxEvents []*outbox.Event
