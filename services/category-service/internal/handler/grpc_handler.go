@@ -46,6 +46,7 @@ func (h *CategoryGRPCHandler) CreateCategory(ctx context.Context, req *categoryp
 		Name:             req.Name,
 		ParentCategoryID: parentIDPtr,
 		Description:      req.Description,
+		IsActive:         req.IsActive,
 	}
 
 	cat, err := h.categoryService.CreateCategory(ctx, createReq)
@@ -209,5 +210,29 @@ func (h *CategoryGRPCHandler) DeleteCategory(ctx context.Context, req *categoryp
 	return &categorypb.DeleteCategoryResponse{
 		Success: true,
 		Message: "Category deleted successfully",
+	}, nil
+}
+
+func (h *CategoryGRPCHandler) ValidateCategoryForAssignment(ctx context.Context, req *categorypb.ValidateCategoryForAssignmentRequest) (*categorypb.ValidateCategoryForAssignmentResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	cat, err := h.categoryService.ValidateCategoryForAssignment(ctx, req.CategoryId)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("ValidateCategoryForAssignment failed", "error", err, "category_id", req.CategoryId)
+		}
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	if h.logger != nil {
+		h.logger.Debug("ValidateCategoryForAssignment RPC succeeded", "id", cat.ID)
+	}
+
+	return &categorypb.ValidateCategoryForAssignmentResponse{
+		IsValid:  true,
+		Message:  "category is active and assignable",
+		Category: dto.ToCategoryPB(cat),
 	}, nil
 }

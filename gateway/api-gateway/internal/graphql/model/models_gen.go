@@ -133,6 +133,7 @@ type CreateCategoryInput struct {
 	Name             string  `json:"name"`
 	ParentCategoryID *string `json:"parentCategoryId,omitempty"`
 	Description      *string `json:"description,omitempty"`
+	IsActive         *bool   `json:"isActive,omitempty"`
 }
 
 type CreateDeliveryInput struct {
@@ -537,6 +538,12 @@ type User struct {
 	Status         *string `json:"status,omitempty"`
 	CreatedAt      *string `json:"createdAt,omitempty"`
 	UpdatedAt      *string `json:"updatedAt,omitempty"`
+}
+
+type ValidateCategoryResponse struct {
+	IsValid  bool      `json:"isValid"`
+	Message  string    `json:"message"`
+	Category *Category `json:"category,omitempty"`
 }
 
 type Gender string
