@@ -134,7 +134,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		if bName == "" {
 			bName = input.Email
 		}
-		status := "PENDING"
+		status := model.MerchantStatusPending
 
 		var merchantClient merchantpb.MerchantServiceClient
 		if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
@@ -162,9 +162,7 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 				if mRes.Merchant.BusinessName != "" {
 					bName = mRes.Merchant.BusinessName
 				}
-				if mRes.Merchant.Status != "" {
-					status = mRes.Merchant.Status
-				}
+				status = model.MerchantStatus(mRes.Merchant.Status.String())
 				if mRes.Merchant.FirstName != "" && firstName == nil {
 					fn := mRes.Merchant.FirstName
 					firstName = &fn
@@ -311,7 +309,7 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		if bName == "" {
 			bName = input.Email
 		}
-		status := "PENDING"
+		status := model.MerchantStatusPending
 		payload.Merchant = &model.Merchant{
 			ID:            mID,
 			BusinessName:  bName,

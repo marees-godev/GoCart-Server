@@ -53,6 +53,16 @@ func (m *mockMerchantRepo) UpdateStatus(ctx context.Context, id uuid.UUID, s str
 	merch.RejectionReason = r
 	return merch, nil
 }
+func (m *mockMerchantRepo) UpdateStatusWithAudit(ctx context.Context, id uuid.UUID, newStatus model.MerchantStatus, reason string, updatedBy string) (*model.Merchant, model.MerchantStatus, error) {
+	merch, ok := m.merchants[id]
+	if !ok {
+		return nil, "", status.Error(codes.NotFound, "not found")
+	}
+	prev := model.MerchantStatus(merch.Status)
+	merch.Status = string(newStatus)
+	merch.RejectionReason = reason
+	return merch, prev, nil
+}
 func (m *mockMerchantRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	delete(m.merchants, id)
 	return nil
@@ -142,19 +152,19 @@ func TestUnaryOwnershipInterceptor(t *testing.T) {
 
 	// 10. UpdateMerchantStatus: Merchant -> FORBIDDEN (ADMIN only)
 	infoStatus := &grpc.UnaryServerInfo{FullMethod: "/merchant.v1.MerchantService/UpdateMerchantStatus"}
-	_, err = interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "APPROVED"}, infoStatus, dummyHandler)
+	_, err = interceptor(ctxForUser(user1ID.String(), "MERCHANT"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: merchantpb.MerchantStatus_APPROVED}, infoStatus, dummyHandler)
 	if err == nil || status.Code(err) != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied for merchant trying to update status, got: %v", err)
 	}
 
 	// 11. UpdateMerchantStatus: Admin -> ALLOWED
-	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "APPROVED"}, infoStatus, dummyHandler)
+	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: merchantpb.MerchantStatus_APPROVED}, infoStatus, dummyHandler)
 	if err != nil {
 		t.Errorf("expected admin UpdateMerchantStatus to succeed, got: %v", err)
 	}
 
 	// 12. UpdateMerchantStatus: Admin suspending merchant -> ALLOWED
-	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: "SUSPENDED", RejectionReason: "policy violation"}, infoStatus, dummyHandler)
+	_, err = interceptor(ctxForUser("admin-uuid", "ADMIN"), &merchantpb.UpdateMerchantStatusRequest{Id: merchant1ID.String(), Status: merchantpb.MerchantStatus_SUSPENDED, RejectionReason: "policy violation"}, infoStatus, dummyHandler)
 	if err != nil {
 		t.Errorf("expected admin suspend merchant to succeed, got: %v", err)
 	}

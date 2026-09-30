@@ -214,18 +214,18 @@ type LogoutPayload struct {
 }
 
 type Merchant struct {
-	ID              string  `json:"id"`
-	BusinessName    string  `json:"businessName"`
-	FirstName       *string `json:"firstName,omitempty"`
-	LastName        *string `json:"lastName,omitempty"`
-	BusinessEmail   *string `json:"businessEmail,omitempty"`
-	BusinessPhone   *string `json:"businessPhone,omitempty"`
-	PanCardNumber   *string `json:"panCardNumber,omitempty"`
-	Status          string  `json:"status"`
-	RejectionReason *string `json:"rejectionReason,omitempty"`
-	CreatedAt       *string `json:"createdAt,omitempty"`
-	UpdatedAt       *string `json:"updatedAt,omitempty"`
-	DeletedAt       *string `json:"deletedAt,omitempty"`
+	ID              string         `json:"id"`
+	BusinessName    string         `json:"businessName"`
+	FirstName       *string        `json:"firstName,omitempty"`
+	LastName        *string        `json:"lastName,omitempty"`
+	BusinessEmail   *string        `json:"businessEmail,omitempty"`
+	BusinessPhone   *string        `json:"businessPhone,omitempty"`
+	PanCardNumber   *string        `json:"panCardNumber,omitempty"`
+	Status          MerchantStatus `json:"status"`
+	RejectionReason *string        `json:"rejectionReason,omitempty"`
+	CreatedAt       *string        `json:"createdAt,omitempty"`
+	UpdatedAt       *string        `json:"updatedAt,omitempty"`
+	DeletedAt       *string        `json:"deletedAt,omitempty"`
 }
 
 type MerchantList struct {
@@ -573,6 +573,51 @@ func (e *Gender) UnmarshalGQL(v interface{}) error {
 }
 
 func (e Gender) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type MerchantStatus string
+
+const (
+	MerchantStatusPending   MerchantStatus = "PENDING"
+	MerchantStatusApproved  MerchantStatus = "APPROVED"
+	MerchantStatusRejected  MerchantStatus = "REJECTED"
+	MerchantStatusSuspended MerchantStatus = "SUSPENDED"
+)
+
+var AllMerchantStatus = []MerchantStatus{
+	MerchantStatusPending,
+	MerchantStatusApproved,
+	MerchantStatusRejected,
+	MerchantStatusSuspended,
+}
+
+func (e MerchantStatus) IsValid() bool {
+	switch e {
+	case MerchantStatusPending, MerchantStatusApproved, MerchantStatusRejected, MerchantStatusSuspended:
+		return true
+	}
+	return false
+}
+
+func (e MerchantStatus) String() string {
+	return string(e)
+}
+
+func (e *MerchantStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MerchantStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MerchantStatus", str)
+	}
+	return nil
+}
+
+func (e MerchantStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

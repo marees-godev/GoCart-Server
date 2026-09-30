@@ -53,7 +53,7 @@ func toModelMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 	res := &model.Merchant{
 		ID:           m.Id,
 		BusinessName: m.BusinessName,
-		Status:       m.Status,
+		Status:       model.MerchantStatus(m.Status.String()),
 	}
 	if m.FirstName != "" {
 		fn := m.FirstName

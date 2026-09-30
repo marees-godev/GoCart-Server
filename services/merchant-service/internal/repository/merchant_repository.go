@@ -18,6 +18,7 @@ type MerchantRepository interface {
 	List(ctx context.Context, limit, offset int, status string) ([]*model.Merchant, int, error)
 	Update(ctx context.Context, merchant *model.Merchant) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, rejectionReason string) (*model.Merchant, error)
+	UpdateStatusWithAudit(ctx context.Context, id uuid.UUID, newStatus model.MerchantStatus, reason string, updatedBy string) (*model.Merchant, model.MerchantStatus, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -214,15 +215,56 @@ func (r *pgMerchantRepository) Update(ctx context.Context, merchant *model.Merch
 	return nil
 }
 
-func (r *pgMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, rejectionReason string) (*model.Merchant, error) {
-	query := `
+func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uuid.UUID, newStatus model.MerchantStatus, reason string, updatedBy string) (*model.Merchant, model.MerchantStatus, error) {
+	if updatedBy == "" {
+		updatedBy = "ADMIN"
+	}
+
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		r.logger.Error("Repository: failed to begin transaction for status update", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, "", appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer tx.Rollback(ctx)
+
+	var currentStatusStr string
+	queryCurrent := `
+		SELECT status
+		FROM merchants
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, queryCurrent, id).Scan(&currentStatusStr)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Warn("Repository: merchant not found for status update", slog.String("merchant_id", id.String()))
+			return nil, "", appErrors.NotFound("merchant not found")
+		}
+		r.logger.Error("Repository: failed to query merchant status", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, "", appErrors.Internal(err, "failed to query merchant status")
+	}
+
+	currentStatus := model.MerchantStatus(currentStatusStr)
+
+	validator := model.NewStateTransitionValidator()
+	if err := validator.Validate(currentStatus, newStatus); err != nil {
+		r.logger.Warn("Repository: invalid state transition",
+			slog.String("merchant_id", id.String()),
+			slog.String("from", string(currentStatus)),
+			slog.String("to", string(newStatus)),
+			slog.Any("error", err),
+		)
+		return nil, currentStatus, err
+	}
+
+	queryUpdate := `
 		UPDATE merchants
 		SET status = $1, rejection_reason = $2, updated_at = NOW()
 		WHERE id = $3 AND deleted_at IS NULL
 		RETURNING id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 	`
 	var m model.Merchant
-	err := r.db.Pool.QueryRow(ctx, query, status, rejectionReason, id).Scan(
+	err = tx.QueryRow(ctx, queryUpdate, string(newStatus), reason, id).Scan(
 		&m.ID,
 		&m.BusinessName,
 		&m.FirstName,
@@ -237,15 +279,36 @@ func (r *pgMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, s
 		&m.DeletedAt,
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			r.logger.Warn("Repository: merchant not found for status update", slog.String("merchant_id", id.String()))
-			return nil, appErrors.NotFound("merchant not found")
-		}
-		r.logger.Error("Repository: failed to update merchant status", slog.String("merchant_id", id.String()), slog.Any("error", err))
-		return nil, appErrors.Internal(err, "failed to update merchant status")
+		r.logger.Error("Repository: failed to update merchant record in tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to update merchant status")
 	}
-	r.logger.Debug("Repository: merchant status updated successfully", slog.String("merchant_id", id.String()), slog.String("status", status))
-	return &m, nil
+
+	auditQuery := `
+		INSERT INTO merchant_status_audit (merchant_id, from_status, to_status, reason, updated_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+	`
+	_, err = tx.Exec(ctx, auditQuery, id, string(currentStatus), string(newStatus), reason, updatedBy)
+	if err != nil {
+		r.logger.Error("Repository: failed to write to merchant_status_audit in tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant status audit")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Repository: failed to commit status update tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	r.logger.Info("Repository: merchant status updated and audited successfully",
+		slog.String("merchant_id", id.String()),
+		slog.String("previous_status", string(currentStatus)),
+		slog.String("status", string(newStatus)),
+	)
+	return &m, currentStatus, nil
+}
+
+func (r *pgMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, rejectionReason string) (*model.Merchant, error) {
+	m, _, err := r.UpdateStatusWithAudit(ctx, id, model.MerchantStatus(status), rejectionReason, "ADMIN")
+	return m, err
 }
 
 func (r *pgMerchantRepository) Delete(ctx context.Context, id uuid.UUID) error {

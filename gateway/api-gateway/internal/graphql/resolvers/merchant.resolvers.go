@@ -62,7 +62,7 @@ func (r *mutationResolver) UpdateMerchant(ctx context.Context, id string, input 
 }
 
 // UpdateMerchantStatus is the resolver for the updateMerchantStatus field.
-func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, status string, rejectionReason *string) (*model.Merchant, error) {
+func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, status model.MerchantStatus, rejectionReason *string) (*model.Merchant, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
@@ -70,9 +70,14 @@ func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, 
 		return nil, appErrors.BadRequest("id and status are required")
 	}
 
+	statusVal, ok := merchantpb.MerchantStatus_value[string(status)]
+	if !ok {
+		return nil, appErrors.BadRequest("invalid merchant status")
+	}
+
 	req := &merchantpb.UpdateMerchantStatusRequest{
 		Id:     id,
-		Status: status,
+		Status: merchantpb.MerchantStatus(statusVal),
 	}
 	if rejectionReason != nil {
 		req.RejectionReason = *rejectionReason
@@ -140,14 +145,17 @@ func (r *queryResolver) Merchant(ctx context.Context, id string) (*model.Merchan
 }
 
 // Merchants is the resolver for the merchants field.
-func (r *queryResolver) Merchants(ctx context.Context, status *string, limit *int, offset *int) (*model.MerchantList, error) {
+func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantStatus, limit *int, offset *int) (*model.MerchantList, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
 
 	req := &merchantpb.ListMerchantsRequest{}
 	if status != nil {
-		req.Status = *status
+		if statusVal, ok := merchantpb.MerchantStatus_value[string(*status)]; ok {
+			st := merchantpb.MerchantStatus(statusVal)
+			req.Status = &st
+		}
 	}
 	if limit != nil {
 		req.Limit = int32(*limit)
