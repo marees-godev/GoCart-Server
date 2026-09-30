@@ -26,6 +26,8 @@ type mockCategoryClient struct {
 	updateErr    error
 	deleteResp   *categorypb.DeleteCategoryResponse
 	deleteErr    error
+	validateResp *categorypb.ValidateCategoryForAssignmentResponse
+	validateErr  error
 }
 
 func (m *mockCategoryClient) CreateCategory(ctx context.Context, in *categorypb.CreateCategoryRequest, opts ...grpcPkg.CallOption) (*categorypb.CreateCategoryResponse, error) {
@@ -68,6 +70,13 @@ func (m *mockCategoryClient) DeleteCategory(ctx context.Context, in *categorypb.
 		return nil, m.deleteErr
 	}
 	return m.deleteResp, nil
+}
+
+func (m *mockCategoryClient) ValidateCategoryForAssignment(ctx context.Context, in *categorypb.ValidateCategoryForAssignmentRequest, opts ...grpcPkg.CallOption) (*categorypb.ValidateCategoryForAssignmentResponse, error) {
+	if m.validateErr != nil {
+		return nil, m.validateErr
+	}
+	return m.validateResp, nil
 }
 
 func TestCategoryResolvers_CreateCategory_Success(t *testing.T) {
@@ -124,6 +133,7 @@ func TestCategoryResolvers_GetCategory_NotFound(t *testing.T) {
 
 func TestCategoryResolvers_ListCategories_Success(t *testing.T) {
 	mockClient := &mockCategoryClient{
+
 		listResp: &categorypb.ListCategoriesResponse{
 			Categories: []*categorypb.Category{
 				{Id: "cat-1", Name: "Electronics", IsActive: true},
@@ -212,5 +222,33 @@ func TestCategoryResolvers_DeleteCategory_Success(t *testing.T) {
 	}
 	if !res.Success {
 		t.Errorf("expected success true, got %v", res.Success)
+	}
+}
+
+func TestCategoryResolvers_ValidateCategoryForAssignment_Success(t *testing.T) {
+	mockClient := &mockCategoryClient{
+		validateResp: &categorypb.ValidateCategoryForAssignmentResponse{
+			IsValid: true,
+			Message: "category is active and assignable",
+			Category: &categorypb.Category{
+				Id:       "cat-1",
+				Name:     "Electronics",
+				IsActive: true,
+			},
+		},
+	}
+
+	clients := &grpc.Clients{CategoryClient: mockClient}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+
+	res, err := r.ValidateCategoryForAssignment(context.Background(), "cat-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !res.IsValid {
+		t.Errorf("expected IsValid true")
+	}
+	if res.Category.ID != "cat-1" {
+		t.Errorf("expected category ID cat-1, got %s", res.Category.ID)
 	}
 }

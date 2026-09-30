@@ -18,10 +18,17 @@ type DeleteCategoryResponse {
   message: String!
 }
 
+type ValidateCategoryResponse {
+  isValid: Boolean!
+  message: String!
+  category: Category
+}
+
 input CreateCategoryInput {
   name: String!
   parentCategoryId: String
   description: String
+  isActive: Boolean
 }
 
 input UpdateCategoryInput {
@@ -35,6 +42,7 @@ extend type Query {
   category(id: ID!): Category
   categories(limit: Int, offset: Int, parentCategoryId: String, rootOnly: Boolean): CategoryList!
   childCategories(parentCategoryId: String!, limit: Int, offset: Int): CategoryList!
+  validateCategoryForAssignment(categoryId: ID!): ValidateCategoryResponse!
 }
 
 extend type Mutation {
@@ -42,3 +50,4 @@ extend type Mutation {
   updateCategory(id: ID!, input: UpdateCategoryInput!): Category @auth(requires: [ADMIN])
   deleteCategory(id: ID!): DeleteCategoryResponse! @auth(requires: [ADMIN])
 }
+

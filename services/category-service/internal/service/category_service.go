@@ -18,6 +18,7 @@ type CategoryService interface {
 	GetChildCategories(ctx context.Context, req dto.GetChildCategoriesRequest) ([]*model.Category, int32, error)
 	UpdateCategory(ctx context.Context, req dto.UpdateCategoryRequest) (*model.Category, error)
 	DeleteCategory(ctx context.Context, id string) error
+	ValidateCategoryForAssignment(ctx context.Context, id string) (*model.Category, error)
 }
 
 type categoryService struct {
@@ -65,11 +66,16 @@ func (s *categoryService) CreateCategory(ctx context.Context, req dto.CreateCate
 		return nil, appErrors.Conflict("category name already exists in this parent scope")
 	}
 
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
 	cat := &model.Category{
 		Name:             name,
 		ParentCategoryID: parentID,
 		Description:      strings.TrimSpace(req.Description),
-		IsActive:         true,
+		IsActive:         isActive,
 	}
 
 	if err := s.repo.CreateCategory(ctx, cat); err != nil {
@@ -326,4 +332,35 @@ func (s *categoryService) DeleteCategory(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *categoryService) ValidateCategoryForAssignment(ctx context.Context, id string) (*model.Category, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		if s.logger != nil {
+			s.logger.Warn("Category ID is required for assignment validation")
+		}
+		return nil, appErrors.BadRequest("category ID is required")
+	}
+
+	cat, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Warn("Category not found for assignment validation", "id", id, "error", err)
+		}
+		return nil, err
+	}
+
+	if !cat.IsActive {
+		if s.logger != nil {
+			s.logger.Warn("Disabled category cannot be assigned to new product", "id", id, "name", cat.Name)
+		}
+		return nil, appErrors.BadRequest("category is disabled and cannot be assigned to newly created products")
+	}
+
+	if s.logger != nil {
+		s.logger.Debug("Category validated successfully for assignment", "id", cat.ID, "name", cat.Name)
+	}
+
+	return cat, nil
 }

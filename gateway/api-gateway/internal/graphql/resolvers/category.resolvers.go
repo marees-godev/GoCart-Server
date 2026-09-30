@@ -35,6 +35,7 @@ func (r *mutationResolver) CreateCategory(ctx context.Context, input model.Creat
 		Name:             input.Name,
 		ParentCategoryId: parentID,
 		Description:      desc,
+		IsActive:         input.IsActive,
 	}
 
 	resp, err := client.CreateCategory(ctx, req)
@@ -200,6 +201,29 @@ func (r *queryResolver) ChildCategories(ctx context.Context, parentCategoryID st
 	return &model.CategoryList{
 		Categories: maps.MapCategories(resp.GetCategories()),
 		Total:      int(resp.GetTotal()),
+	}, nil
+}
+
+// ValidateCategoryForAssignment is the resolver for the validateCategoryForAssignment field.
+func (r *queryResolver) ValidateCategoryForAssignment(ctx context.Context, categoryID string) (*model.ValidateCategoryResponse, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: categoryID,
+	}
+
+	resp, err := client.ValidateCategoryForAssignment(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ValidateCategoryResponse{
+		IsValid:  resp.GetIsValid(),
+		Message:  resp.GetMessage(),
+		Category: maps.MapCategory(resp.GetCategory()),
 	}, nil
 }
 
