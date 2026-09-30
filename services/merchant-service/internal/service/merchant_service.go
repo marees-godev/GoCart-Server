@@ -58,7 +58,7 @@ type MerchantService interface {
 	CreateMerchant(ctx context.Context, req dto.CreateMerchantRequest) (*model.Merchant, error)
 	ListMerchants(ctx context.Context, limit, offset int, status string) ([]*model.Merchant, int, error)
 	UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantRequest) (*model.Merchant, error)
-	UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, error)
+	UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, string, error)
 	DeleteMerchant(ctx context.Context, id uuid.UUID) error
 }
 
@@ -247,48 +247,50 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 	return merchant, nil
 }
 
-func (s *merchantService) UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, error) {
+func (s *merchantService) UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, string, error) {
 	if id == uuid.Nil {
 		s.logger.Warn("UpdateMerchantStatus failed: invalid nil UUID")
-		return nil, appErrors.BadRequest("valid merchant ID is required")
+		return nil, "", appErrors.BadRequest("valid merchant ID is required")
 	}
 
-	status := strings.ToUpper(strings.TrimSpace(req.Status))
-	switch status {
-	case string(model.MerchantStatusPending),
-		string(model.MerchantStatusApproved),
-		string(model.MerchantStatusRejected),
-		string(model.MerchantStatusSuspended):
-	default:
+	trimmedStatus := strings.ToUpper(strings.TrimSpace(req.Status))
+	if trimmedStatus == "" {
+		s.logger.Warn("UpdateMerchantStatus failed: missing status field", slog.String("merchant_id", id.String()))
+		return nil, "", appErrors.BadRequest("missing status field")
+	}
+
+	if !model.IsValidStatus(trimmedStatus) {
 		s.logger.Warn("UpdateMerchantStatus failed: invalid status",
 			slog.String("merchant_id", id.String()),
 			slog.String("provided_status", req.Status),
 		)
-		return nil, appErrors.BadRequest("invalid merchant status, must be PENDING, APPROVED, REJECTED, or SUSPENDED")
+		return nil, "", appErrors.BadRequest("invalid merchant status, must be PENDING, APPROVED, REJECTED, or SUSPENDED")
 	}
 
+	newStatus := model.MerchantStatus(trimmedStatus)
 	reason := strings.TrimSpace(req.RejectionReason)
 	s.logger.Info("Updating merchant status",
 		slog.String("merchant_id", id.String()),
-		slog.String("new_status", status),
+		slog.String("new_status", string(newStatus)),
 		slog.String("rejection_reason", reason),
 	)
 
-	updated, err := s.repo.UpdateStatus(ctx, id, status, reason)
+	updated, prevStatus, err := s.repo.UpdateStatusWithAudit(ctx, id, newStatus, reason, "ADMIN")
 	if err != nil {
-		s.logger.Error("UpdateMerchantStatus failed in repository",
+		s.logger.Warn("UpdateMerchantStatus failed in repository",
 			slog.String("merchant_id", id.String()),
-			slog.String("status", status),
+			slog.String("status", string(newStatus)),
 			slog.Any("error", err),
 		)
-		return nil, err
+		return nil, string(prevStatus), err
 	}
 
 	s.logger.Info("Merchant status updated successfully",
 		slog.String("merchant_id", id.String()),
+		slog.String("previous_status", string(prevStatus)),
 		slog.String("status", updated.Status),
 	)
-	return updated, nil
+	return updated, string(prevStatus), nil
 }
 
 func (s *merchantService) DeleteMerchant(ctx context.Context, id uuid.UUID) error {

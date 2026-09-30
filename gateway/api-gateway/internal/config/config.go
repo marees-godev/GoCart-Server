@@ -196,7 +196,7 @@ func LoadEnv() *Config {
 		OrderServiceAddr:            orderServiceAddr,
 		MerchantServiceURL:          merchantServiceURL,
 		GraphQLIntrospectionEnabled: introEnabled,
-		AdminAPIKey:                 GetEnv("ADMIN_API_KEY", ""),
+		AdminAPIKey:                 GetEnv("ADMIN_KEY", GetEnv("ADMIN_API_KEY", "")),
 		AdminUserID:                 GetEnv("ADMIN_USER_ID", "admin"),
 	}
 }

@@ -101,19 +101,31 @@ func (m *mockMerchantRepository) Update(ctx context.Context, merchant *model.Mer
 }
 
 func (m *mockMerchantRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, rejectionReason string) (*model.Merchant, error) {
+	merch, _, err := m.UpdateStatusWithAudit(ctx, id, model.MerchantStatus(status), rejectionReason, "ADMIN")
+	return merch, err
+}
+
+func (m *mockMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uuid.UUID, newStatus model.MerchantStatus, reason string, updatedBy string) (*model.Merchant, model.MerchantStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	merch, exists := m.merchantsByID[id]
 	if !exists || merch.DeletedAt != nil {
-		return nil, appErrors.NotFound("merchant not found")
+		return nil, "", appErrors.NotFound("merchant not found")
 	}
-	merch.Status = status
-	merch.RejectionReason = rejectionReason
+
+	currentStatus := model.MerchantStatus(merch.Status)
+	validator := model.NewStateTransitionValidator()
+	if err := validator.Validate(currentStatus, newStatus); err != nil {
+		return nil, currentStatus, err
+	}
+
+	merch.Status = string(newStatus)
+	merch.RejectionReason = reason
 	merch.UpdatedAt = time.Now().UTC()
 	c := *merch
 	m.merchantsByID[id] = &c
-	return &c, nil
+	return &c, currentStatus, nil
 }
 
 func (m *mockMerchantRepository) Delete(ctx context.Context, id uuid.UUID) error {
@@ -549,8 +561,8 @@ func TestUpdateMerchantStatus(t *testing.T) {
 		t.Fatalf("failed to create merchant: %v", err)
 	}
 
-	// Update to APPROVED
-	updated, err := svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+	// 1. Update to APPROVED (PENDING -> APPROVED: Valid)
+	updated, prevStatus, err := svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
 		Status: "APPROVED",
 	})
 	if err != nil {
@@ -559,25 +571,65 @@ func TestUpdateMerchantStatus(t *testing.T) {
 	if updated.Status != "APPROVED" {
 		t.Errorf("expected APPROVED, got %s", updated.Status)
 	}
+	if prevStatus != "PENDING" {
+		t.Errorf("expected prevStatus PENDING, got %s", prevStatus)
+	}
 
-	// Update to REJECTED with reason
+	// 2. Update to SUSPENDED (APPROVED -> SUSPENDED: Valid)
+	suspendReason := "Policy violation"
+	updated, prevStatus, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+		Status:          "SUSPENDED",
+		RejectionReason: suspendReason,
+	})
+	if err != nil {
+		t.Fatalf("expected SUSPENDED to succeed, got %v", err)
+	}
+	if updated.Status != "SUSPENDED" {
+		t.Errorf("expected SUSPENDED, got %s", updated.Status)
+	}
+	if prevStatus != "APPROVED" {
+		t.Errorf("expected prevStatus APPROVED, got %s", prevStatus)
+	}
+
+	// 3. Test PENDING -> REJECTED with a fresh merchant
+	merch2, err := svc.CreateMerchant(context.Background(), dto.CreateMerchantRequest{
+		ID:            uuid.New().String(),
+		FirstName:     "Rejected",
+		LastName:      "Merchant",
+		BusinessEmail: "rejected@example.com",
+	})
+	if err != nil {
+		t.Fatalf("failed to create merchant2: %v", err)
+	}
+
 	reason := "Incomplete documentation"
-	updated, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+	updated2, prevStatus2, err := svc.UpdateMerchantStatus(context.Background(), merch2.ID, dto.UpdateMerchantStatusRequest{
 		Status:          "REJECTED",
 		RejectionReason: reason,
 	})
 	if err != nil {
 		t.Fatalf("expected REJECTED to succeed, got %v", err)
 	}
-	if updated.Status != "REJECTED" {
-		t.Errorf("expected REJECTED, got %s", updated.Status)
+	if updated2.Status != "REJECTED" {
+		t.Errorf("expected REJECTED, got %s", updated2.Status)
 	}
-	if updated.RejectionReason != reason {
-		t.Errorf("expected reason %s, got %s", reason, updated.RejectionReason)
+	if prevStatus2 != "PENDING" {
+		t.Errorf("expected prevStatus2 PENDING, got %s", prevStatus2)
+	}
+	if updated2.RejectionReason != reason {
+		t.Errorf("expected reason %s, got %s", reason, updated2.RejectionReason)
 	}
 
-	// Invalid status rejected
-	_, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+	// 4. Invalid transition: REJECTED -> APPROVED must fail
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch2.ID, dto.UpdateMerchantStatusRequest{
+		Status: "APPROVED",
+	})
+	if err == nil {
+		t.Error("expected error for invalid transition REJECTED -> APPROVED")
+	}
+
+	// 5. Invalid status rejected
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
 		Status: "INVALID_STATUS",
 	})
 	if err == nil {
@@ -638,7 +690,7 @@ func TestMerchantService_Logging(t *testing.T) {
 	_, err = svc.UpdateMerchant(context.Background(), merch.ID, dto.UpdateMerchantRequest{
 		BusinessName:  "Logged Business",
 		BusinessPhone: "+1234567890",
-		PanCardNumber:         "TAX-LOG-1",
+		PanCardNumber: "TAX-LOG-1",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error updating merchant: %v", err)

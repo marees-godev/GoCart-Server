@@ -22,6 +22,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MerchantStatus int32
+
+const (
+	MerchantStatus_PENDING   MerchantStatus = 0
+	MerchantStatus_APPROVED  MerchantStatus = 1
+	MerchantStatus_REJECTED  MerchantStatus = 2
+	MerchantStatus_SUSPENDED MerchantStatus = 3
+)
+
+// Enum value maps for MerchantStatus.
+var (
+	MerchantStatus_name = map[int32]string{
+		0: "PENDING",
+		1: "APPROVED",
+		2: "REJECTED",
+		3: "SUSPENDED",
+	}
+	MerchantStatus_value = map[string]int32{
+		"PENDING":   0,
+		"APPROVED":  1,
+		"REJECTED":  2,
+		"SUSPENDED": 3,
+	}
+)
+
+func (x MerchantStatus) Enum() *MerchantStatus {
+	p := new(MerchantStatus)
+	*p = x
+	return p
+}
+
+func (x MerchantStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MerchantStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_protobuf_merchant_merchant_proto_enumTypes[0].Descriptor()
+}
+
+func (MerchantStatus) Type() protoreflect.EnumType {
+	return &file_contracts_protobuf_merchant_merchant_proto_enumTypes[0]
+}
+
+func (x MerchantStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MerchantStatus.Descriptor instead.
+func (MerchantStatus) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_protobuf_merchant_merchant_proto_rawDescGZIP(), []int{0}
+}
+
 type MerchantResponseData struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -31,7 +83,7 @@ type MerchantResponseData struct {
 	BusinessEmail   string                 `protobuf:"bytes,5,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
 	BusinessPhone   string                 `protobuf:"bytes,6,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
 	PanCardNumber   string                 `protobuf:"bytes,7,opt,name=pan_card_number,json=panCardNumber,proto3" json:"pan_card_number,omitempty"`
-	Status          string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	Status          MerchantStatus         `protobuf:"varint,8,opt,name=status,proto3,enum=merchant.v1.MerchantStatus" json:"status,omitempty"`
 	RejectionReason string                 `protobuf:"bytes,9,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
 	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -119,11 +171,11 @@ func (x *MerchantResponseData) GetPanCardNumber() string {
 	return ""
 }
 
-func (x *MerchantResponseData) GetStatus() string {
+func (x *MerchantResponseData) GetStatus() MerchantStatus {
 	if x != nil {
 		return x.Status
 	}
-	return ""
+	return MerchantStatus_PENDING
 }
 
 func (x *MerchantResponseData) GetRejectionReason() string {
@@ -470,7 +522,7 @@ type ListMerchantsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
-	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Status        *MerchantStatus        `protobuf:"varint,3,opt,name=status,proto3,enum=merchant.v1.MerchantStatus,oneof" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -519,11 +571,11 @@ func (x *ListMerchantsRequest) GetOffset() int32 {
 	return 0
 }
 
-func (x *ListMerchantsRequest) GetStatus() string {
-	if x != nil {
-		return x.Status
+func (x *ListMerchantsRequest) GetStatus() MerchantStatus {
+	if x != nil && x.Status != nil {
+		return *x.Status
 	}
-	return ""
+	return MerchantStatus_PENDING
 }
 
 type ListMerchantsResponse struct {
@@ -581,7 +633,7 @@ func (x *ListMerchantsResponse) GetTotal() int32 {
 type UpdateMerchantStatusRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Status          string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Status          MerchantStatus         `protobuf:"varint,2,opt,name=status,proto3,enum=merchant.v1.MerchantStatus" json:"status,omitempty"`
 	RejectionReason string                 `protobuf:"bytes,3,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -624,11 +676,11 @@ func (x *UpdateMerchantStatusRequest) GetId() string {
 	return ""
 }
 
-func (x *UpdateMerchantStatusRequest) GetStatus() string {
+func (x *UpdateMerchantStatusRequest) GetStatus() MerchantStatus {
 	if x != nil {
 		return x.Status
 	}
-	return ""
+	return MerchantStatus_PENDING
 }
 
 func (x *UpdateMerchantStatusRequest) GetRejectionReason() string {
@@ -639,10 +691,11 @@ func (x *UpdateMerchantStatusRequest) GetRejectionReason() string {
 }
 
 type UpdateMerchantStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Merchant      *MerchantResponseData  `protobuf:"bytes,1,opt,name=merchant,proto3" json:"merchant,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Merchant       *MerchantResponseData  `protobuf:"bytes,1,opt,name=merchant,proto3" json:"merchant,omitempty"`
+	PreviousStatus MerchantStatus         `protobuf:"varint,2,opt,name=previous_status,json=previousStatus,proto3,enum=merchant.v1.MerchantStatus" json:"previous_status,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateMerchantStatusResponse) Reset() {
@@ -680,6 +733,13 @@ func (x *UpdateMerchantStatusResponse) GetMerchant() *MerchantResponseData {
 		return x.Merchant
 	}
 	return nil
+}
+
+func (x *UpdateMerchantStatusResponse) GetPreviousStatus() MerchantStatus {
+	if x != nil {
+		return x.PreviousStatus
+	}
+	return MerchantStatus_PENDING
 }
 
 type DeleteMerchantRequest struct {
@@ -774,7 +834,7 @@ var File_contracts_protobuf_merchant_merchant_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\n" +
-	"*contracts/protobuf/merchant/merchant.proto\x12\vmerchant.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf1\x03\n" +
+	"*contracts/protobuf/merchant/merchant.proto\x12\vmerchant.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8e\x04\n" +
 	"\x14MerchantResponseData\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rbusiness_name\x18\x02 \x01(\tR\fbusinessName\x12\x1d\n" +
@@ -783,8 +843,8 @@ const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12%\n" +
 	"\x0ebusiness_email\x18\x05 \x01(\tR\rbusinessEmail\x12%\n" +
 	"\x0ebusiness_phone\x18\x06 \x01(\tR\rbusinessPhone\x12&\n" +
-	"\x0fpan_card_number\x18\a \x01(\tR\rpanCardNumber\x12\x16\n" +
-	"\x06status\x18\b \x01(\tR\x06status\x12)\n" +
+	"\x0fpan_card_number\x18\a \x01(\tR\rpanCardNumber\x123\n" +
+	"\x06status\x18\b \x01(\x0e2\x1b.merchant.v1.MerchantStatusR\x06status\x12)\n" +
 	"\x10rejection_reason\x18\t \x01(\tR\x0frejectionReason\x129\n" +
 	"\n" +
 	"created_at\x18\n" +
@@ -811,24 +871,31 @@ const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\tlast_name\x18\x03 \x01(\tR\blastName\x12%\n" +
 	"\x0ebusiness_email\x18\x04 \x01(\tR\rbusinessEmail\"W\n" +
 	"\x16CreateMerchantResponse\x12=\n" +
-	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"\\\n" +
+	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"\x89\x01\n" +
 	"\x14ListMerchantsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x16\n" +
-	"\x06status\x18\x03 \x01(\tR\x06status\"n\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\x128\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x1b.merchant.v1.MerchantStatusH\x00R\x06status\x88\x01\x01B\t\n" +
+	"\a_status\"n\n" +
 	"\x15ListMerchantsResponse\x12?\n" +
 	"\tmerchants\x18\x01 \x03(\v2!.merchant.v1.MerchantResponseDataR\tmerchants\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"p\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x8d\x01\n" +
 	"\x1bUpdateMerchantStatusRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12)\n" +
-	"\x10rejection_reason\x18\x03 \x01(\tR\x0frejectionReason\"]\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x1b.merchant.v1.MerchantStatusR\x06status\x12)\n" +
+	"\x10rejection_reason\x18\x03 \x01(\tR\x0frejectionReason\"\xa3\x01\n" +
 	"\x1cUpdateMerchantStatusResponse\x12=\n" +
-	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"'\n" +
+	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\x12D\n" +
+	"\x0fprevious_status\x18\x02 \x01(\x0e2\x1b.merchant.v1.MerchantStatusR\x0epreviousStatus\"'\n" +
 	"\x15DeleteMerchantRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"2\n" +
 	"\x16DeleteMerchantResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\xb9\x04\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*H\n" +
+	"\x0eMerchantStatus\x12\v\n" +
+	"\aPENDING\x10\x00\x12\f\n" +
+	"\bAPPROVED\x10\x01\x12\f\n" +
+	"\bREJECTED\x10\x02\x12\r\n" +
+	"\tSUSPENDED\x10\x032\xb9\x04\n" +
 	"\x0fMerchantService\x12P\n" +
 	"\vGetMerchant\x12\x1f.merchant.v1.GetMerchantRequest\x1a .merchant.v1.GetMerchantResponse\x12Y\n" +
 	"\x0eUpdateMerchant\x12\".merchant.v1.UpdateMerchantRequest\x1a#.merchant.v1.UpdateMerchantResponse\x12Y\n" +
@@ -849,49 +916,55 @@ func file_contracts_protobuf_merchant_merchant_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_merchant_merchant_proto_rawDescData
 }
 
+var file_contracts_protobuf_merchant_merchant_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_contracts_protobuf_merchant_merchant_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_contracts_protobuf_merchant_merchant_proto_goTypes = []any{
-	(*MerchantResponseData)(nil),         // 0: merchant.v1.MerchantResponseData
-	(*GetMerchantRequest)(nil),           // 1: merchant.v1.GetMerchantRequest
-	(*GetMerchantResponse)(nil),          // 2: merchant.v1.GetMerchantResponse
-	(*UpdateMerchantRequest)(nil),        // 3: merchant.v1.UpdateMerchantRequest
-	(*UpdateMerchantResponse)(nil),       // 4: merchant.v1.UpdateMerchantResponse
-	(*CreateMerchantRequest)(nil),        // 5: merchant.v1.CreateMerchantRequest
-	(*CreateMerchantResponse)(nil),       // 6: merchant.v1.CreateMerchantResponse
-	(*ListMerchantsRequest)(nil),         // 7: merchant.v1.ListMerchantsRequest
-	(*ListMerchantsResponse)(nil),        // 8: merchant.v1.ListMerchantsResponse
-	(*UpdateMerchantStatusRequest)(nil),  // 9: merchant.v1.UpdateMerchantStatusRequest
-	(*UpdateMerchantStatusResponse)(nil), // 10: merchant.v1.UpdateMerchantStatusResponse
-	(*DeleteMerchantRequest)(nil),        // 11: merchant.v1.DeleteMerchantRequest
-	(*DeleteMerchantResponse)(nil),       // 12: merchant.v1.DeleteMerchantResponse
-	(*timestamppb.Timestamp)(nil),        // 13: google.protobuf.Timestamp
+	(MerchantStatus)(0),                  // 0: merchant.v1.MerchantStatus
+	(*MerchantResponseData)(nil),         // 1: merchant.v1.MerchantResponseData
+	(*GetMerchantRequest)(nil),           // 2: merchant.v1.GetMerchantRequest
+	(*GetMerchantResponse)(nil),          // 3: merchant.v1.GetMerchantResponse
+	(*UpdateMerchantRequest)(nil),        // 4: merchant.v1.UpdateMerchantRequest
+	(*UpdateMerchantResponse)(nil),       // 5: merchant.v1.UpdateMerchantResponse
+	(*CreateMerchantRequest)(nil),        // 6: merchant.v1.CreateMerchantRequest
+	(*CreateMerchantResponse)(nil),       // 7: merchant.v1.CreateMerchantResponse
+	(*ListMerchantsRequest)(nil),         // 8: merchant.v1.ListMerchantsRequest
+	(*ListMerchantsResponse)(nil),        // 9: merchant.v1.ListMerchantsResponse
+	(*UpdateMerchantStatusRequest)(nil),  // 10: merchant.v1.UpdateMerchantStatusRequest
+	(*UpdateMerchantStatusResponse)(nil), // 11: merchant.v1.UpdateMerchantStatusResponse
+	(*DeleteMerchantRequest)(nil),        // 12: merchant.v1.DeleteMerchantRequest
+	(*DeleteMerchantResponse)(nil),       // 13: merchant.v1.DeleteMerchantResponse
+	(*timestamppb.Timestamp)(nil),        // 14: google.protobuf.Timestamp
 }
 var file_contracts_protobuf_merchant_merchant_proto_depIdxs = []int32{
-	13, // 0: merchant.v1.MerchantResponseData.created_at:type_name -> google.protobuf.Timestamp
-	13, // 1: merchant.v1.MerchantResponseData.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 2: merchant.v1.MerchantResponseData.deleted_at:type_name -> google.protobuf.Timestamp
-	0,  // 3: merchant.v1.GetMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
-	0,  // 4: merchant.v1.UpdateMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
-	0,  // 5: merchant.v1.CreateMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
-	0,  // 6: merchant.v1.ListMerchantsResponse.merchants:type_name -> merchant.v1.MerchantResponseData
-	0,  // 7: merchant.v1.UpdateMerchantStatusResponse.merchant:type_name -> merchant.v1.MerchantResponseData
-	1,  // 8: merchant.v1.MerchantService.GetMerchant:input_type -> merchant.v1.GetMerchantRequest
-	3,  // 9: merchant.v1.MerchantService.UpdateMerchant:input_type -> merchant.v1.UpdateMerchantRequest
-	5,  // 10: merchant.v1.MerchantService.CreateMerchant:input_type -> merchant.v1.CreateMerchantRequest
-	7,  // 11: merchant.v1.MerchantService.ListMerchants:input_type -> merchant.v1.ListMerchantsRequest
-	9,  // 12: merchant.v1.MerchantService.UpdateMerchantStatus:input_type -> merchant.v1.UpdateMerchantStatusRequest
-	11, // 13: merchant.v1.MerchantService.DeleteMerchant:input_type -> merchant.v1.DeleteMerchantRequest
-	2,  // 14: merchant.v1.MerchantService.GetMerchant:output_type -> merchant.v1.GetMerchantResponse
-	4,  // 15: merchant.v1.MerchantService.UpdateMerchant:output_type -> merchant.v1.UpdateMerchantResponse
-	6,  // 16: merchant.v1.MerchantService.CreateMerchant:output_type -> merchant.v1.CreateMerchantResponse
-	8,  // 17: merchant.v1.MerchantService.ListMerchants:output_type -> merchant.v1.ListMerchantsResponse
-	10, // 18: merchant.v1.MerchantService.UpdateMerchantStatus:output_type -> merchant.v1.UpdateMerchantStatusResponse
-	12, // 19: merchant.v1.MerchantService.DeleteMerchant:output_type -> merchant.v1.DeleteMerchantResponse
-	14, // [14:20] is the sub-list for method output_type
-	8,  // [8:14] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	0,  // 0: merchant.v1.MerchantResponseData.status:type_name -> merchant.v1.MerchantStatus
+	14, // 1: merchant.v1.MerchantResponseData.created_at:type_name -> google.protobuf.Timestamp
+	14, // 2: merchant.v1.MerchantResponseData.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 3: merchant.v1.MerchantResponseData.deleted_at:type_name -> google.protobuf.Timestamp
+	1,  // 4: merchant.v1.GetMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
+	1,  // 5: merchant.v1.UpdateMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
+	1,  // 6: merchant.v1.CreateMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
+	0,  // 7: merchant.v1.ListMerchantsRequest.status:type_name -> merchant.v1.MerchantStatus
+	1,  // 8: merchant.v1.ListMerchantsResponse.merchants:type_name -> merchant.v1.MerchantResponseData
+	0,  // 9: merchant.v1.UpdateMerchantStatusRequest.status:type_name -> merchant.v1.MerchantStatus
+	1,  // 10: merchant.v1.UpdateMerchantStatusResponse.merchant:type_name -> merchant.v1.MerchantResponseData
+	0,  // 11: merchant.v1.UpdateMerchantStatusResponse.previous_status:type_name -> merchant.v1.MerchantStatus
+	2,  // 12: merchant.v1.MerchantService.GetMerchant:input_type -> merchant.v1.GetMerchantRequest
+	4,  // 13: merchant.v1.MerchantService.UpdateMerchant:input_type -> merchant.v1.UpdateMerchantRequest
+	6,  // 14: merchant.v1.MerchantService.CreateMerchant:input_type -> merchant.v1.CreateMerchantRequest
+	8,  // 15: merchant.v1.MerchantService.ListMerchants:input_type -> merchant.v1.ListMerchantsRequest
+	10, // 16: merchant.v1.MerchantService.UpdateMerchantStatus:input_type -> merchant.v1.UpdateMerchantStatusRequest
+	12, // 17: merchant.v1.MerchantService.DeleteMerchant:input_type -> merchant.v1.DeleteMerchantRequest
+	3,  // 18: merchant.v1.MerchantService.GetMerchant:output_type -> merchant.v1.GetMerchantResponse
+	5,  // 19: merchant.v1.MerchantService.UpdateMerchant:output_type -> merchant.v1.UpdateMerchantResponse
+	7,  // 20: merchant.v1.MerchantService.CreateMerchant:output_type -> merchant.v1.CreateMerchantResponse
+	9,  // 21: merchant.v1.MerchantService.ListMerchants:output_type -> merchant.v1.ListMerchantsResponse
+	11, // 22: merchant.v1.MerchantService.UpdateMerchantStatus:output_type -> merchant.v1.UpdateMerchantStatusResponse
+	13, // 23: merchant.v1.MerchantService.DeleteMerchant:output_type -> merchant.v1.DeleteMerchantResponse
+	18, // [18:24] is the sub-list for method output_type
+	12, // [12:18] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_merchant_merchant_proto_init() }
@@ -899,18 +972,20 @@ func file_contracts_protobuf_merchant_merchant_proto_init() {
 	if File_contracts_protobuf_merchant_merchant_proto != nil {
 		return
 	}
+	file_contracts_protobuf_merchant_merchant_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_merchant_merchant_proto_rawDesc), len(file_contracts_protobuf_merchant_merchant_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_contracts_protobuf_merchant_merchant_proto_goTypes,
 		DependencyIndexes: file_contracts_protobuf_merchant_merchant_proto_depIdxs,
+		EnumInfos:         file_contracts_protobuf_merchant_merchant_proto_enumTypes,
 		MessageInfos:      file_contracts_protobuf_merchant_merchant_proto_msgTypes,
 	}.Build()
 	File_contracts_protobuf_merchant_merchant_proto = out.File

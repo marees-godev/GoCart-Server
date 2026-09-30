@@ -87,14 +87,15 @@ func (m *mockService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.
 	return merch, nil
 }
 
-func (m *mockService) UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, error) {
+func (m *mockService) UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, string, error) {
 	merch, exists := m.merchants[id]
 	if !exists {
-		return nil, appErrors.NotFound("merchant not found")
+		return nil, "", appErrors.NotFound("merchant not found")
 	}
+	prev := merch.Status
 	merch.Status = req.Status
 	merch.RejectionReason = req.RejectionReason
-	return merch, nil
+	return merch, prev, nil
 }
 
 func (m *mockService) DeleteMerchant(ctx context.Context, id uuid.UUID) error {
@@ -146,7 +147,7 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateMerchant failed: %v", err)
 	}
-	if createRes.Merchant.Status != "PENDING" {
+	if createRes.Merchant.Status != merchantpb.MerchantStatus_PENDING {
 		t.Errorf("expected status PENDING, got %s", createRes.Merchant.Status)
 	}
 	if createRes.Merchant.BusinessName != "" {
@@ -235,7 +236,7 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	if updateRes.Merchant.BusinessEmail != "john@example.com" {
 		t.Errorf("expected non-editable email to remain unchanged, got %s", updateRes.Merchant.BusinessEmail)
 	}
-	if updateRes.Merchant.Status != "PENDING" {
+	if updateRes.Merchant.Status != merchantpb.MerchantStatus_PENDING {
 		t.Errorf("expected status to remain PENDING, got %s", updateRes.Merchant.Status)
 	}
 
@@ -253,12 +254,12 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	// 8. UpdateMerchantStatus
 	statusRes, err := client.UpdateMerchantStatus(ctx, &merchantpb.UpdateMerchantStatusRequest{
 		Id:     merchantID,
-		Status: "APPROVED",
+		Status: merchantpb.MerchantStatus_APPROVED,
 	})
 	if err != nil {
 		t.Fatalf("UpdateMerchantStatus failed: %v", err)
 	}
-	if statusRes.Merchant.Status != "APPROVED" {
+	if statusRes.Merchant.Status != merchantpb.MerchantStatus_APPROVED {
 		t.Errorf("expected APPROVED, got %s", statusRes.Merchant.Status)
 	}
 

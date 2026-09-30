@@ -6,6 +6,13 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/me
 
 import "google/protobuf/timestamp.proto";
 
+enum MerchantStatus {
+  PENDING = 0;
+  APPROVED = 1;
+  REJECTED = 2;
+  SUSPENDED = 3;
+}
+
 service MerchantService {
   rpc GetMerchant (GetMerchantRequest) returns (GetMerchantResponse);
   rpc UpdateMerchant (UpdateMerchantRequest) returns (UpdateMerchantResponse);
@@ -23,7 +30,7 @@ message MerchantResponseData {
   string business_email = 5;
   string business_phone = 6;
   string pan_card_number = 7;
-  string status = 8;
+  MerchantStatus status = 8;
   string rejection_reason = 9;
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
@@ -63,7 +70,7 @@ message CreateMerchantResponse {
 message ListMerchantsRequest {
   int32 limit = 1;
   int32 offset = 2;
-  string status = 3;
+  optional MerchantStatus status = 3;
 }
 
 message ListMerchantsResponse {
@@ -73,12 +80,13 @@ message ListMerchantsResponse {
 
 message UpdateMerchantStatusRequest {
   string id = 1;
-  string status = 2;
+  MerchantStatus status = 2;
   string rejection_reason = 3;
 }
 
 message UpdateMerchantStatusResponse {
   MerchantResponseData merchant = 1;
+  MerchantStatus previous_status = 2;
 }
 
 message DeleteMerchantRequest {

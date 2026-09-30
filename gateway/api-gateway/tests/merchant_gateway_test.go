@@ -48,7 +48,7 @@ func (m *mockMerchantBackend) CreateMerchant(ctx context.Context, req *merchantp
 		BusinessEmail: req.BusinessEmail,
 		FirstName:     req.FirstName,
 		LastName:      req.LastName,
-		Status:        "PENDING",
+		Status:        merchantpb.MerchantStatus_PENDING,
 		CreatedAt:     timestamppb.Now(),
 		UpdatedAt:     timestamppb.Now(),
 	}
@@ -67,7 +67,7 @@ func (m *mockMerchantBackend) GetMerchant(ctx context.Context, req *merchantpb.G
 func (m *mockMerchantBackend) ListMerchants(ctx context.Context, req *merchantpb.ListMerchantsRequest) (*merchantpb.ListMerchantsResponse, error) {
 	var list []*merchantpb.MerchantResponseData
 	for _, merch := range m.merchants {
-		if req.Status == "" || merch.Status == req.Status {
+		if req.Status == nil || merch.Status == *req.Status {
 			list = append(list, merch)
 		}
 	}
@@ -100,10 +100,14 @@ func (m *mockMerchantBackend) UpdateMerchantStatus(ctx context.Context, req *mer
 	if !exists {
 		return nil, status.Error(codes.NotFound, "merchant not found")
 	}
+	prev := merch.Status
 	merch.Status = req.Status
 	merch.RejectionReason = req.RejectionReason
 	merch.UpdatedAt = timestamppb.Now()
-	return &merchantpb.UpdateMerchantStatusResponse{Merchant: merch}, nil
+	return &merchantpb.UpdateMerchantStatusResponse{
+		Merchant:       merch,
+		PreviousStatus: prev,
+	}, nil
 }
 
 func (m *mockMerchantBackend) DeleteMerchant(ctx context.Context, req *merchantpb.DeleteMerchantRequest) (*merchantpb.DeleteMerchantResponse, error) {
@@ -211,7 +215,7 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 		BusinessName: "Acme Retail",
 		FirstName:    "Alice",
 		LastName:     "Smith",
-		Status:       "PENDING",
+		Status:       merchantpb.MerchantStatus_PENDING,
 		CreatedAt:    timestamppb.Now(),
 		UpdatedAt:    timestamppb.Now(),
 	}
@@ -248,7 +252,7 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	// 3. UpdateMerchantStatus Mutation
 	statusMutation := fmt.Sprintf(`
 		mutation {
-			updateMerchantStatus(id: "%s", status: "APPROVED") {
+			updateMerchantStatus(id: "%s", status: APPROVED) {
 				id
 				status
 			}
@@ -404,7 +408,7 @@ func TestE2E_GraphQLMerchant_CRUD(t *testing.T) {
 	}
 
 	// 7b. Admin can suspend the merchant
-	suspendMutation := fmt.Sprintf(`mutation { updateMerchantStatus(id: "%s", status: "SUSPENDED", rejectionReason: "Suspicious activity") { id status } }`, merchantID)
+	suspendMutation := fmt.Sprintf(`mutation { updateMerchantStatus(id: "%s", status: SUSPENDED, rejectionReason: "Suspicious activity") { id status } }`, merchantID)
 	reqBody, _ = json.Marshal(map[string]string{"query": suspendMutation})
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -467,7 +471,7 @@ func TestE2E_GraphQLMerchant_RoleAuthorization(t *testing.T) {
 	backend.merchants["m-1"] = &merchantpb.MerchantResponseData{
 		Id:           "m-1",
 		BusinessName: "Original Shop",
-		Status:       "PENDING",
+		Status:       merchantpb.MerchantStatus_PENDING,
 		CreatedAt:    timestamppb.Now(),
 		UpdatedAt:    timestamppb.Now(),
 	}
@@ -566,7 +570,7 @@ func TestE2E_GraphQLMerchant_RoleAuthorization(t *testing.T) {
 	}
 
 	// 4. Role MERCHANT updating status -> FORBIDDEN (requires ADMIN)
-	statusMutation := `mutation { updateMerchantStatus(id: "m-1", status: "APPROVED") { id status } }`
+	statusMutation := `mutation { updateMerchantStatus(id: "m-1", status: APPROVED) { id status } }`
 	reqBody, _ = json.Marshal(map[string]string{"query": statusMutation})
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")

@@ -1,3 +1,10 @@
+enum MerchantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 type Merchant {
   id: ID!
   businessName: String!
@@ -6,7 +13,7 @@ type Merchant {
   businessEmail: String
   businessPhone: String
   panCardNumber: String
-  status: String!
+  status: MerchantStatus!
   rejectionReason: String
   createdAt: String
   updatedAt: String
@@ -28,14 +35,11 @@ input UpdateMerchantInput {
 
 extend type Query {
   merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: String, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchants(status: MerchantStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
   updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
-  updateMerchantStatus(id: ID!, status: String!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
+  updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
   deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
 }
-
-
-

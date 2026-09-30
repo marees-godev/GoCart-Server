@@ -214,7 +214,7 @@ type ComplexityRoot struct {
 		UpdateCategory          func(childComplexity int, id string, input model.UpdateCategoryInput) int
 		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
 		UpdateMerchant          func(childComplexity int, id string, input model.UpdateMerchantInput) int
-		UpdateMerchantStatus    func(childComplexity int, id string, status string, rejectionReason *string) int
+		UpdateMerchantStatus    func(childComplexity int, id string, status model.MerchantStatus, rejectionReason *string) int
 		UpdateOrderStatus       func(childComplexity int, id string, status string) int
 		UpdateProduct           func(childComplexity int, id string, input model.UpdateProductInput) int
 		UpdateReturnStatus      func(childComplexity int, id string, status string) int
@@ -306,7 +306,7 @@ type ComplexityRoot struct {
 		Health                        func(childComplexity int) int
 		Me                            func(childComplexity int) int
 		Merchant                      func(childComplexity int, id string) int
-		Merchants                     func(childComplexity int, status *string, limit *int, offset *int) int
+		Merchants                     func(childComplexity int, status *model.MerchantStatus, limit *int, offset *int) int
 		MyStore                       func(childComplexity int) int
 		Notifications                 func(childComplexity int, userID string, limit *int, offset *int) int
 		Order                         func(childComplexity int, id string) int
@@ -462,7 +462,7 @@ type MutationResolver interface {
 	ReleaseStock(ctx context.Context, reservationID string) (bool, error)
 	UpdateStock(ctx context.Context, productID string, quantity int) (*model.StockItem, error)
 	UpdateMerchant(ctx context.Context, id string, input model.UpdateMerchantInput) (*model.Merchant, error)
-	UpdateMerchantStatus(ctx context.Context, id string, status string, rejectionReason *string) (*model.Merchant, error)
+	UpdateMerchantStatus(ctx context.Context, id string, status model.MerchantStatus, rejectionReason *string) (*model.Merchant, error)
 	DeleteMerchant(ctx context.Context, id string) (bool, error)
 	SendNotification(ctx context.Context, input model.SendNotificationInput) (bool, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
@@ -508,7 +508,7 @@ type QueryResolver interface {
 	Delivery(ctx context.Context, id string) (*model.Delivery, error)
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
 	Merchant(ctx context.Context, id string) (*model.Merchant, error)
-	Merchants(ctx context.Context, status *string, limit *int, offset *int) (*model.MerchantList, error)
+	Merchants(ctx context.Context, status *model.MerchantStatus, limit *int, offset *int) (*model.MerchantList, error)
 	Notifications(ctx context.Context, userID string, limit *int, offset *int) (*model.NotificationList, error)
 	Order(ctx context.Context, id string) (*model.Order, error)
 	Orders(ctx context.Context, userID string, limit *int, offset *int) (*model.OrderList, error)
@@ -1623,7 +1623,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateMerchantStatus(childComplexity, args["id"].(string), args["status"].(string), args["rejectionReason"].(*string)), true
+		return e.complexity.Mutation.UpdateMerchantStatus(childComplexity, args["id"].(string), args["status"].(model.MerchantStatus), args["rejectionReason"].(*string)), true
 
 	case "Mutation.updateOrderStatus":
 		if e.complexity.Mutation.UpdateOrderStatus == nil {
@@ -2132,7 +2132,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Merchants(childComplexity, args["status"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.Merchants(childComplexity, args["status"].(*model.MerchantStatus), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.myStore":
 		if e.complexity.Query.MyStore == nil {
@@ -3235,7 +3235,14 @@ extend type Mutation {
   updateStock(productId: ID!, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
 }
 `, BuiltIn: false},
-	{Name: "../../../../../contracts/graphql/merchant/merchant.graphql", Input: `type Merchant {
+	{Name: "../../../../../contracts/graphql/merchant/merchant.graphql", Input: `enum MerchantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+type Merchant {
   id: ID!
   businessName: String!
   firstName: String
@@ -3243,7 +3250,7 @@ extend type Mutation {
   businessEmail: String
   businessPhone: String
   panCardNumber: String
-  status: String!
+  status: MerchantStatus!
   rejectionReason: String
   createdAt: String
   updatedAt: String
@@ -3265,17 +3272,14 @@ input UpdateMerchantInput {
 
 extend type Query {
   merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: String, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchants(status: MerchantStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
   updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
-  updateMerchantStatus(id: ID!, status: String!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
+  updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
   deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
 }
-
-
-
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/notification/notification.graphql", Input: `type Notification {
   id: ID!
@@ -4515,10 +4519,10 @@ func (ec *executionContext) field_Mutation_updateMerchantStatus_args(ctx context
 		}
 	}
 	args["id"] = arg0
-	var arg1 string
+	var arg1 model.MerchantStatus
 	if tmp, ok := rawArgs["status"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		arg1, err = ec.unmarshalNMerchantStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -4896,10 +4900,10 @@ func (ec *executionContext) field_Query_merchant_args(ctx context.Context, rawAr
 func (ec *executionContext) field_Query_merchants_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
+	var arg0 *model.MerchantStatus
 	if tmp, ok := rawArgs["status"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg0, err = ec.unmarshalOMerchantStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -8277,9 +8281,9 @@ func (ec *executionContext) _Merchant_status(ctx context.Context, field graphql.
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(model.MerchantStatus)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNMerchantStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Merchant_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8289,7 +8293,7 @@ func (ec *executionContext) fieldContext_Merchant_status(_ context.Context, fiel
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type MerchantStatus does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10210,7 +10214,7 @@ func (ec *executionContext) _Mutation_updateMerchantStatus(ctx context.Context, 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateMerchantStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(string), fc.Args["rejectionReason"].(*string))
+			return ec.resolvers.Mutation().UpdateMerchantStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(model.MerchantStatus), fc.Args["rejectionReason"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
@@ -16026,8 +16030,8 @@ func (ec *executionContext) fieldContext_Query_validateCategoryForAssignment(ctx
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_validateCategoryForAssignment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_validateCategoryForAssignment(ctx, field)
+func (ec *executionContext) _Query_delivery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_delivery(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -16291,7 +16295,7 @@ func (ec *executionContext) _Query_merchants(ctx context.Context, field graphql.
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().Merchants(rctx, fc.Args["status"].(*string), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+			return ec.resolvers.Query().Merchants(rctx, fc.Args["status"].(*model.MerchantStatus), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
@@ -26294,10 +26298,10 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "validateCategoryForAssignment":
+		case "delivery":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -28202,6 +28206,16 @@ func (ec *executionContext) marshalNMerchantList2ᚖgithubᚗcomᚋmareesᚑgode
 	return ec._MerchantList(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNMerchantStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx context.Context, v interface{}) (model.MerchantStatus, error) {
+	var res model.MerchantStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNMerchantStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx context.Context, sel ast.SelectionSet, v model.MerchantStatus) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNNotification2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐNotificationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Notification) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -29261,6 +29275,22 @@ func (ec *executionContext) marshalOMerchant2ᚖgithubᚗcomᚋmareesᚑgodevᚋ
 		return graphql.Null
 	}
 	return ec._Merchant(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOMerchantStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx context.Context, v interface{}) (*model.MerchantStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.MerchantStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMerchantStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx context.Context, sel ast.SelectionSet, v *model.MerchantStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) marshalOOrder2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐOrder(ctx context.Context, sel ast.SelectionSet, v *model.Order) graphql.Marshaler {

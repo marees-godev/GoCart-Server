@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -51,6 +52,13 @@ func NewMerchantGRPCServer(svc service.MerchantService, log ...*slog.Logger) *Me
 	}
 }
 
+func toProtoStatus(s string) merchantpb.MerchantStatus {
+	if val, ok := merchantpb.MerchantStatus_value[strings.ToUpper(strings.TrimSpace(s))]; ok {
+		return merchantpb.MerchantStatus(val)
+	}
+	return merchantpb.MerchantStatus_PENDING
+}
+
 func toProtoMerchant(m *model.Merchant) *merchantpb.MerchantResponseData {
 	if m == nil {
 		return nil
@@ -63,7 +71,7 @@ func toProtoMerchant(m *model.Merchant) *merchantpb.MerchantResponseData {
 		BusinessEmail:   m.BusinessEmail,
 		BusinessPhone:   m.BusinessPhone,
 		PanCardNumber:   m.PanCardNumber,
-		Status:          m.Status,
+		Status:          toProtoStatus(m.Status),
 		RejectionReason: m.RejectionReason,
 		CreatedAt:       timestamppb.New(m.CreatedAt),
 		UpdatedAt:       timestamppb.New(m.UpdatedAt),
@@ -179,7 +187,9 @@ func (s *MerchantGRPCServer) ListMerchants(ctx context.Context, req *merchantpb.
 		if req.Offset >= 0 {
 			offset = int(req.Offset)
 		}
-		reqStatus = req.Status
+		if req.Status != nil {
+			reqStatus = req.Status.String()
+		}
 	}
 
 	s.logger.Info("gRPC ListMerchants: listing merchants",
@@ -219,22 +229,27 @@ func (s *MerchantGRPCServer) UpdateMerchantStatus(ctx context.Context, req *merc
 
 	s.logger.Info("gRPC UpdateMerchantStatus: updating status",
 		slog.String("merchant_id", id.String()),
-		slog.String("status", req.Status),
+		slog.String("status", req.Status.String()),
 	)
 
 	dtoReq := dto.UpdateMerchantStatusRequest{
-		Status:          req.Status,
+		Status:          req.Status.String(),
 		RejectionReason: req.RejectionReason,
 	}
 
-	merchant, err := s.merchantService.UpdateMerchantStatus(ctx, id, dtoReq)
+	merchant, prevStatus, err := s.merchantService.UpdateMerchantStatus(ctx, id, dtoReq)
 	if err != nil {
 		s.logger.Warn("gRPC UpdateMerchantStatus: update failed", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		var transErr *model.InvalidStateTransitionError
+		if errors.As(err, &transErr) {
+			return nil, status.Error(codes.FailedPrecondition, transErr.Error())
+		}
 		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &merchantpb.UpdateMerchantStatusResponse{
-		Merchant: toProtoMerchant(merchant),
+		Merchant:       toProtoMerchant(merchant),
+		PreviousStatus: toProtoStatus(prevStatus),
 	}, nil
 }
 

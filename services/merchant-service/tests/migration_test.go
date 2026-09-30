@@ -114,3 +114,57 @@ func TestMerchantModelFields(t *testing.T) {
 		}
 	}
 }
+
+func TestMerchantStatusAuditMigration(t *testing.T) {
+	auditPath := filepath.Join("..", "migrations", "000007_create_merchant_status_audit.sql")
+	auditContent, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatalf("failed to read 000007_create_merchant_status_audit.sql: %v", err)
+	}
+
+	auditSQL := string(auditContent)
+	requiredStatements := []string{
+		"CREATE TABLE IF NOT EXISTS merchant_status_audit",
+		"id UUID PRIMARY KEY",
+		"merchant_id UUID NOT NULL REFERENCES merchants(id) ON DELETE CASCADE",
+		"from_status merchant_status NOT NULL",
+		"to_status merchant_status NOT NULL",
+		"reason TEXT NOT NULL DEFAULT ''",
+		"updated_by VARCHAR(100) NOT NULL DEFAULT 'ADMIN'",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"idx_merchant_status_audit_merchant_id",
+		"idx_merchant_status_audit_created_at",
+	}
+
+	for _, stmt := range requiredStatements {
+		if !strings.Contains(auditSQL, stmt) {
+			t.Errorf("000007_create_merchant_status_audit.sql missing expected statement: %s", stmt)
+		}
+	}
+}
+
+func TestMerchantStatusAuditModelFields(t *testing.T) {
+	a := model.MerchantStatusAudit{}
+	v := reflect.TypeOf(a)
+
+	expectedFields := map[string]reflect.Type{
+		"ID":         reflect.TypeOf(uuid.UUID{}),
+		"MerchantID": reflect.TypeOf(uuid.UUID{}),
+		"FromStatus": reflect.TypeOf(model.MerchantStatus("")),
+		"ToStatus":   reflect.TypeOf(model.MerchantStatus("")),
+		"Reason":     reflect.TypeOf(""),
+		"UpdatedBy":  reflect.TypeOf(""),
+		"CreatedAt":  reflect.TypeOf(time.Time{}),
+	}
+
+	for fieldName, expectedType := range expectedFields {
+		f, ok := v.FieldByName(fieldName)
+		if !ok {
+			t.Errorf("MerchantStatusAudit model missing field %s", fieldName)
+			continue
+		}
+		if f.Type != expectedType {
+			t.Errorf("MerchantStatusAudit field %s expected type %v, got %v", fieldName, expectedType, f.Type)
+		}
+	}
+}
