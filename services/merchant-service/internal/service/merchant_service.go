@@ -176,6 +176,7 @@ func (s *merchantService) ListMerchants(ctx context.Context, limit, offset int, 
 func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantRequest) (*model.Merchant, error) {
 	if id == uuid.Nil {
 		s.logger.Warn("UpdateMerchant failed: invalid nil UUID")
+		s.logger.Warn("UpdateMerchant failed: invalid nil UUID")
 		return nil, appErrors.BadRequest("valid merchant ID is required")
 	}
 
