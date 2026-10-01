@@ -3,19 +3,20 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
-	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func extractRole(ctx context.Context) string {
@@ -35,69 +36,69 @@ func extractRole(ctx context.Context) string {
 type MerchantGRPCServer struct {
 	merchantpb.UnimplementedMerchantServiceServer
 	merchantService service.MerchantService
+	logger          *slog.Logger
 }
 
-func NewMerchantGRPCServer(svc service.MerchantService) *MerchantGRPCServer {
-	return &MerchantGRPCServer{merchantService: svc}
+func NewMerchantGRPCServer(svc service.MerchantService, log ...*slog.Logger) *MerchantGRPCServer {
+	var l *slog.Logger
+	if len(log) > 0 && log[0] != nil {
+		l = log[0]
+	} else {
+		l = slog.Default()
+	}
+	return &MerchantGRPCServer{
+		merchantService: svc,
+		logger:          l,
+	}
 }
 
-func toProtoMerchant(m *model.Merchant) *merchantpb.Merchant {
+func toProtoStatus(s string) merchantpb.MerchantStatus {
+	if val, ok := merchantpb.MerchantStatus_value[strings.ToUpper(strings.TrimSpace(s))]; ok {
+		return merchantpb.MerchantStatus(val)
+	}
+	return merchantpb.MerchantStatus_PENDING
+}
+
+func toProtoMerchant(m *model.Merchant) *merchantpb.MerchantResponseData {
 	if m == nil {
 		return nil
 	}
-	return &merchantpb.Merchant{
+	res := &merchantpb.MerchantResponseData{
 		Id:              m.ID.String(),
-		UserId:          m.UserID.String(),
 		BusinessName:    m.BusinessName,
-		Status:          m.Status,
-		TaxId:           m.TaxID,
-		BusinessEmail:   m.BusinessEmail,
-		BusinessPhone:   m.BusinessPhone,
-		RejectionReason: m.RejectionReason,
-		CreatedAt:       m.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:       m.UpdatedAt.Format(time.RFC3339),
 		FirstName:       m.FirstName,
 		LastName:        m.LastName,
+		BusinessEmail:   m.BusinessEmail,
+		BusinessPhone:   m.BusinessPhone,
+		PanCardNumber:   m.PanCardNumber,
+		Status:          toProtoStatus(m.Status),
+		RejectionReason: m.RejectionReason,
+		CreatedAt:       timestamppb.New(m.CreatedAt),
+		UpdatedAt:       timestamppb.New(m.UpdatedAt),
 	}
-}
-
-func toGRPCError(err error) error {
-	if err == nil {
-		return nil
+	if m.DeletedAt != nil {
+		res.DeletedAt = timestamppb.New(*m.DeletedAt)
 	}
-	var appErr *appErrors.AppError
-	if errors.As(err, &appErr) {
-		switch appErr.Code {
-		case appErrors.CodeNotFound:
-			return status.Error(codes.NotFound, appErr.Message)
-		case appErrors.CodeBadRequest:
-			return status.Error(codes.InvalidArgument, appErr.Message)
-		case appErrors.CodeConflict:
-			return status.Error(codes.AlreadyExists, appErr.Message)
-		case appErrors.CodeUnauthorized:
-			return status.Error(codes.Unauthenticated, appErr.Message)
-		case appErrors.CodeForbidden:
-			return status.Error(codes.PermissionDenied, appErr.Message)
-		default:
-			return status.Error(codes.Internal, appErr.Message)
-		}
-	}
-	return status.Error(codes.Internal, err.Error())
+	return res
 }
 
 func (s *MerchantGRPCServer) GetMerchant(ctx context.Context, req *merchantpb.GetMerchantRequest) (*merchantpb.GetMerchantResponse, error) {
-	if req == nil || req.Id == "" {
+	if req == nil || strings.TrimSpace(req.Id) == "" {
+		s.logger.Warn("gRPC GetMerchant: missing merchant ID")
 		return nil, status.Error(codes.InvalidArgument, "merchant id is required")
 	}
 
-	id, err := uuid.Parse(req.Id)
+	id, err := uuid.Parse(strings.TrimSpace(req.Id))
 	if err != nil {
+		s.logger.Warn("gRPC GetMerchant: invalid merchant ID format", slog.String("id", req.Id), slog.Any("error", err))
 		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
 	}
 
+	s.logger.Info("gRPC GetMerchant: fetching merchant", slog.String("merchant_id", id.String()))
 	merchant, err := s.merchantService.GetMerchantByID(ctx, id)
 	if err != nil {
-		return nil, toGRPCError(err)
+		s.logger.Warn("gRPC GetMerchant: failed to get merchant", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &merchantpb.GetMerchantResponse{
@@ -105,22 +106,74 @@ func (s *MerchantGRPCServer) GetMerchant(ctx context.Context, req *merchantpb.Ge
 	}, nil
 }
 
-func (s *MerchantGRPCServer) GetMerchantByUserID(ctx context.Context, req *merchantpb.GetMerchantByUserIDRequest) (*merchantpb.GetMerchantResponse, error) {
-	if req == nil || req.UserId == "" {
-		return nil, status.Error(codes.InvalidArgument, "user id is required")
+func (s *MerchantGRPCServer) UpdateMerchant(ctx context.Context, req *merchantpb.UpdateMerchantRequest) (*merchantpb.UpdateMerchantResponse, error) {
+	if req == nil || strings.TrimSpace(req.Id) == "" {
+		s.logger.Warn("gRPC UpdateMerchant: missing merchant ID")
+		return nil, status.Error(codes.InvalidArgument, "merchant id is required")
 	}
 
-	userID, err := uuid.Parse(req.UserId)
+	id, err := uuid.Parse(strings.TrimSpace(req.Id))
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user id format")
+		s.logger.Warn("gRPC UpdateMerchant: invalid merchant ID format", slog.String("id", req.Id), slog.Any("error", err))
+		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
 	}
 
-	merchant, err := s.merchantService.GetMerchantByUserID(ctx, userID)
+	s.logger.Info("gRPC UpdateMerchant: updating merchant details",
+		slog.String("merchant_id", id.String()),
+		slog.String("business_name", req.BusinessName),
+	)
+
+	dtoReq := dto.UpdateMerchantRequest{
+		BusinessName:  req.BusinessName,
+		FirstName:     req.FirstName,
+		LastName:      req.LastName,
+		BusinessPhone: req.BusinessPhone,
+		PanCardNumber: req.PanCardNumber,
+	}
+
+	merchant, err := s.merchantService.UpdateMerchant(ctx, id, dtoReq)
 	if err != nil {
-		return nil, toGRPCError(err)
+		s.logger.Warn("gRPC UpdateMerchant: update failed", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
-	return &merchantpb.GetMerchantResponse{
+	return &merchantpb.UpdateMerchantResponse{
+		Merchant: toProtoMerchant(merchant),
+	}, nil
+}
+
+func (s *MerchantGRPCServer) CreateMerchant(ctx context.Context, req *merchantpb.CreateMerchantRequest) (*merchantpb.CreateMerchantResponse, error) {
+	if req == nil {
+		s.logger.Warn("gRPC CreateMerchant: nil request received")
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	role := extractRole(ctx)
+	if role != "" && role != "MERCHANT" && role != "ADMIN" {
+		s.logger.Warn("gRPC CreateMerchant: forbidden caller role", slog.String("role", role))
+		return nil, status.Error(codes.PermissionDenied, "only users with MERCHANT role can create a merchant account")
+	}
+
+	s.logger.Info("gRPC CreateMerchant: creating merchant account",
+		slog.String("id", req.Id),
+		slog.String("business_email", req.BusinessEmail),
+		slog.String("role", role),
+	)
+
+	dtoReq := dto.CreateMerchantRequest{
+		ID:            req.Id,
+		FirstName:     req.FirstName,
+		LastName:      req.LastName,
+		BusinessEmail: req.BusinessEmail,
+	}
+
+	merchant, err := s.merchantService.CreateMerchant(ctx, dtoReq)
+	if err != nil {
+		s.logger.Warn("gRPC CreateMerchant: creation failed", slog.String("id", req.Id), slog.Any("error", err))
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &merchantpb.CreateMerchantResponse{
 		Merchant: toProtoMerchant(merchant),
 	}, nil
 }
@@ -136,15 +189,24 @@ func (s *MerchantGRPCServer) ListMerchants(ctx context.Context, req *merchantpb.
 		if req.Offset >= 0 {
 			offset = int(req.Offset)
 		}
-		reqStatus = req.Status
+		if req.Status != nil {
+			reqStatus = req.Status.String()
+		}
 	}
+
+	s.logger.Info("gRPC ListMerchants: listing merchants",
+		slog.Int("limit", limit),
+		slog.Int("offset", offset),
+		slog.String("status", reqStatus),
+	)
 
 	merchants, total, err := s.merchantService.ListMerchants(ctx, limit, offset, reqStatus)
 	if err != nil {
-		return nil, toGRPCError(err)
+		s.logger.Warn("gRPC ListMerchants: query failed", slog.Any("error", err))
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
-	pbList := make([]*merchantpb.Merchant, len(merchants))
+	pbList := make([]*merchantpb.MerchantResponseData, len(merchants))
 	for i, m := range merchants {
 		pbList[i] = toProtoMerchant(m)
 	}
@@ -155,102 +217,60 @@ func (s *MerchantGRPCServer) ListMerchants(ctx context.Context, req *merchantpb.
 	}, nil
 }
 
-func (s *MerchantGRPCServer) CreateMerchant(ctx context.Context, req *merchantpb.CreateMerchantRequest) (*merchantpb.CreateMerchantResponse, error) {
-	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "request is required")
-	}
-
-	role := extractRole(ctx)
-	if role != "" && role != "MERCHANT" && role != "ADMIN" {
-		return nil, status.Error(codes.PermissionDenied, "only users with MERCHANT role can create a merchant account")
-	}
-
-	dtoReq := dto.CreateMerchantRequest{
-		UserID:        req.UserId,
-		BusinessName:  req.BusinessName,
-		FirstName:     req.FirstName,
-		LastName:      req.LastName,
-		TaxID:         req.TaxId,
-		BusinessEmail: req.BusinessEmail,
-		BusinessPhone: req.BusinessPhone,
-	}
-
-	merchant, err := s.merchantService.CreateMerchant(ctx, dtoReq)
-	if err != nil {
-		return nil, toGRPCError(err)
-	}
-
-	return &merchantpb.CreateMerchantResponse{
-		Merchant: toProtoMerchant(merchant),
-	}, nil
-}
-
-func (s *MerchantGRPCServer) UpdateMerchant(ctx context.Context, req *merchantpb.UpdateMerchantRequest) (*merchantpb.UpdateMerchantResponse, error) {
-	if req == nil || req.Id == "" {
-		return nil, status.Error(codes.InvalidArgument, "merchant id is required")
-	}
-
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
-	}
-
-	dtoReq := dto.UpdateMerchantRequest{
-		BusinessName:  req.BusinessName,
-		FirstName:     req.FirstName,
-		LastName:      req.LastName,
-		BusinessEmail: req.BusinessEmail,
-		BusinessPhone: req.BusinessPhone,
-		TaxID:         req.TaxId,
-	}
-
-	merchant, err := s.merchantService.UpdateMerchant(ctx, id, dtoReq)
-	if err != nil {
-		return nil, toGRPCError(err)
-	}
-
-	return &merchantpb.UpdateMerchantResponse{
-		Merchant: toProtoMerchant(merchant),
-	}, nil
-}
-
 func (s *MerchantGRPCServer) UpdateMerchantStatus(ctx context.Context, req *merchantpb.UpdateMerchantStatusRequest) (*merchantpb.UpdateMerchantStatusResponse, error) {
-	if req == nil || req.Id == "" {
+	if req == nil || strings.TrimSpace(req.Id) == "" {
+		s.logger.Warn("gRPC UpdateMerchantStatus: missing merchant ID")
 		return nil, status.Error(codes.InvalidArgument, "merchant id is required")
 	}
 
-	id, err := uuid.Parse(req.Id)
+	id, err := uuid.Parse(strings.TrimSpace(req.Id))
 	if err != nil {
+		s.logger.Warn("gRPC UpdateMerchantStatus: invalid merchant ID format", slog.String("id", req.Id), slog.Any("error", err))
 		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
 	}
+
+	s.logger.Info("gRPC UpdateMerchantStatus: updating status",
+		slog.String("merchant_id", id.String()),
+		slog.String("status", req.Status.String()),
+	)
 
 	dtoReq := dto.UpdateMerchantStatusRequest{
-		Status:          req.Status,
+		Status:          req.Status.String(),
 		RejectionReason: req.RejectionReason,
 	}
 
-	merchant, err := s.merchantService.UpdateMerchantStatus(ctx, id, dtoReq)
+	merchant, prevStatus, err := s.merchantService.UpdateMerchantStatus(ctx, id, dtoReq)
 	if err != nil {
-		return nil, toGRPCError(err)
+		s.logger.Warn("gRPC UpdateMerchantStatus: update failed", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		var transErr *model.InvalidStateTransitionError
+		if errors.As(err, &transErr) {
+			return nil, status.Error(codes.FailedPrecondition, transErr.Error())
+		}
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &merchantpb.UpdateMerchantStatusResponse{
-		Merchant: toProtoMerchant(merchant),
+		Merchant:       toProtoMerchant(merchant),
+		PreviousStatus: toProtoStatus(prevStatus),
 	}, nil
 }
 
 func (s *MerchantGRPCServer) DeleteMerchant(ctx context.Context, req *merchantpb.DeleteMerchantRequest) (*merchantpb.DeleteMerchantResponse, error) {
-	if req == nil || req.Id == "" {
+	if req == nil || strings.TrimSpace(req.Id) == "" {
+		s.logger.Warn("gRPC DeleteMerchant: missing merchant ID")
 		return nil, status.Error(codes.InvalidArgument, "merchant id is required")
 	}
 
-	id, err := uuid.Parse(req.Id)
+	id, err := uuid.Parse(strings.TrimSpace(req.Id))
 	if err != nil {
+		s.logger.Warn("gRPC DeleteMerchant: invalid merchant ID format", slog.String("id", req.Id), slog.Any("error", err))
 		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
 	}
 
+	s.logger.Info("gRPC DeleteMerchant: deleting merchant", slog.String("merchant_id", id.String()))
 	if err := s.merchantService.DeleteMerchant(ctx, id); err != nil {
-		return nil, toGRPCError(err)
+		s.logger.Warn("gRPC DeleteMerchant: deletion failed", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, grpcclient.ToGRPCError(err)
 	}
 
 	return &merchantpb.DeleteMerchantResponse{

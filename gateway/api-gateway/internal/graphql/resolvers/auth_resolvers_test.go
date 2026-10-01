@@ -92,13 +92,13 @@ func TestRegisterResolver_Customer(t *testing.T) {
 
 	fn := "John"
 	ln := "Doe"
-	isMerch := false
+	isMerchCust := false
 	input := model.RegisterInput{
 		Email:      "customer@example.com",
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: isMerch,
+		IsMerchant: isMerchCust,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -130,6 +130,9 @@ func TestRegisterResolver_Customer(t *testing.T) {
 	if payload.User.CreatedAt == nil || *payload.User.CreatedAt != "2026-09-23T10:00:00Z" {
 		t.Errorf("expected payload user with CreatedAt '2026-09-23T10:00:00Z', got %+v", payload.User)
 	}
+	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
+		t.Errorf("expected payload user role 'CUSTOMER', got %v", payload.User.Role)
+	}
 }
 
 func TestRegisterResolver_Merchant(t *testing.T) {
@@ -149,13 +152,13 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 
 	fn := "Jane"
 	ln := "Merchant"
-	isMerch := true
+	isMerchTrue := true
 	input := model.RegisterInput{
 		Email:      "merchant@example.com",
 		Password:   "Password123!",
 		FirstName:  &fn,
 		LastName:   &ln,
-		IsMerchant: isMerch,
+		IsMerchant: isMerchTrue,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -236,8 +239,8 @@ func TestLoginResolver_Customer(t *testing.T) {
 	if userMock.lastGetUserReq == nil || userMock.lastGetUserReq.Id != "user-uuid-123" {
 		t.Errorf("expected UserClient.GetUser to be called for customer")
 	}
-	if payload.Role == nil || *payload.Role != "CUSTOMER" {
-		t.Errorf("expected role CUSTOMER, got %v", payload.Role)
+	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
+		t.Errorf("expected role CUSTOMER, got %v", payload.User.Role)
 	}
 }
 
@@ -279,11 +282,8 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	if userMock.lastGetUserReq != nil {
 		t.Errorf("expected UserClient.GetUser NOT to be called for merchant")
 	}
-	if payload.Role == nil || *payload.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got %v", payload.Role)
-	}
-	if payload.Merchant == nil {
-		t.Errorf("expected Merchant payload to be populated")
+	if payload.User.Role == nil || *payload.User.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %v", payload.User.Role)
 	}
 }
 

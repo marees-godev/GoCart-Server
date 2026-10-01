@@ -1,17 +1,23 @@
+enum MerchantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 type Merchant {
   id: ID!
-  merchantId: ID!
-  userId: String
   businessName: String!
   firstName: String
   lastName: String
   businessEmail: String
   businessPhone: String
-  taxId: String
-  status: String!
+  panCardNumber: String
+  status: MerchantStatus!
   rejectionReason: String
   createdAt: String
   updatedAt: String
+  deletedAt: String
 }
 
 type MerchantList {
@@ -23,22 +29,19 @@ input UpdateMerchantInput {
   businessName: String
   firstName: String
   lastName: String
-  businessEmail: String
   businessPhone: String
-  taxId: String
+  panCardNumber: String
 }
 
 extend type Query {
-  merchant(id: ID, merchantId: ID): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchantByMerchantId(merchantId: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchantByUserId(userId: String!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: String, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
+  merchants(status: MerchantStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
-  updateMerchant(id: ID, merchantId: ID, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
-  updateMerchantStatus(id: ID, merchantId: ID, status: String!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
-  deleteMerchant(id: ID, merchantId: ID): Boolean! @auth(requires: [ADMIN])
+  updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
+  updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
+  deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
 }
 
 

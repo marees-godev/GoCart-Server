@@ -4,11 +4,6 @@ type AuthPayload {
   tokenType: String
   expiresIn: Int
   user: User!
-  merchantId: ID
-  businessEmail: String
-  firstName: String
-  lastName: String
-  role: String
   merchant: Merchant
 }
 

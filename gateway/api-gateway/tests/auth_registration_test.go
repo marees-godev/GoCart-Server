@@ -93,11 +93,13 @@ func TestMerchantRegistration_ReturnsAllFields(t *testing.T) {
 				}
 			) {
 				token
-				merchantId
-				businessEmail
-				firstName
-				lastName
-				role
+				user {
+					id
+					email
+					firstName
+					lastName
+					role
+				}
 			}
 		}
 	`
@@ -115,12 +117,14 @@ func TestMerchantRegistration_ReturnsAllFields(t *testing.T) {
 	var result struct {
 		Data struct {
 			Register struct {
-				Token         string `json:"token"`
-				MerchantID    string `json:"merchantId"`
-				BusinessEmail string `json:"businessEmail"`
-				FirstName     string `json:"firstName"`
-				LastName      string `json:"lastName"`
-				Role          string `json:"role"`
+				Token string `json:"token"`
+				User  struct {
+					ID        string `json:"id"`
+					Email     string `json:"email"`
+					FirstName string `json:"firstName"`
+					LastName  string `json:"lastName"`
+					Role      string `json:"role"`
+				} `json:"user"`
 			} `json:"register"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
@@ -138,19 +142,16 @@ func TestMerchantRegistration_ReturnsAllFields(t *testing.T) {
 	if reg.Token != "jwt-test-token-12345" {
 		t.Errorf("expected token jwt-test-token-12345, got %s", reg.Token)
 	}
-	if reg.MerchantID != "01a0cdc0-6657-7668-8387-5dbbc958aa64" {
-		t.Errorf("expected merchantId 01a0cdc0-6657-7668-8387-5dbbc958aa64, got %s", reg.MerchantID)
+	if reg.User.Email != "mohankumar1@gmail.com" {
+		t.Errorf("expected email mohankumar1@gmail.com, got %s", reg.User.Email)
 	}
-	if reg.BusinessEmail != "mohankumar1@gmail.com" {
-		t.Errorf("expected businessEmail mohankumar1@gmail.com, got %s", reg.BusinessEmail)
+	if reg.User.FirstName != "mohan" {
+		t.Errorf("expected firstName mohan, got %s", reg.User.FirstName)
 	}
-	if reg.FirstName != "mohan" {
-		t.Errorf("expected firstName mohan, got %s", reg.FirstName)
+	if reg.User.LastName != "kumar" {
+		t.Errorf("expected lastName kumar, got %s", reg.User.LastName)
 	}
-	if reg.LastName != "kumar" {
-		t.Errorf("expected lastName kumar, got %s", reg.LastName)
-	}
-	if reg.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got %s", reg.Role)
+	if reg.User.Role != "MERCHANT" {
+		t.Errorf("expected role MERCHANT, got %s", reg.User.Role)
 	}
 }
