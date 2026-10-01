@@ -65,7 +65,7 @@ func (c *grpcProductClient) GetProduct(ctx context.Context, productID string) (*
 		StoreID:  res.Product.StoreId,
 		SKU:      res.Product.Sku,
 		Name:     res.Product.Name,
-		IsActive: res.Product.IsActive,
+		IsActive: res.Product.Status != "discontinued" && res.Product.Status != "inactive",
 	}, nil
 }
 

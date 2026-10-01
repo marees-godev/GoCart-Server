@@ -7,10 +7,21 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Bucket          string
+	PublicURLPrefix string
+}
+
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
+	Storage  StorageConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
 }
@@ -23,6 +34,12 @@ type AppConfig struct {
 
 type HTTPConfig struct {
 	Port string
+}
+
+type GRPCConfig struct {
+	Port                string
+	StoreServiceAddr    string
+	CategoryServiceAddr string
 }
 
 type DatabaseConfig struct {
@@ -59,12 +76,25 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "7070"),
 		},
+		GRPC: GRPCConfig{
+			Port:                GetEnv("PRODUCT_SERVICE_GRPC_PORT", GetEnv("GRPC_PORT", "50053")),
+			StoreServiceAddr:    GetEnv("STORE_SERVICE_GRPC_ADDR", "localhost:50055"),
+			CategoryServiceAddr: GetEnv("CATEGORY_SERVICE_GRPC_ADDR", "localhost:50054"),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("PRODUCT_SERVICE_DATABASE_URL", ""),
+			URL:            GetEnv("PRODUCT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
 			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+		},
+		Storage: StorageConfig{
+			Endpoint:        GetEnv("PRODUCT_S3_ENDPOINT", GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3")),
+			Region:          GetEnv("PRODUCT_S3_REGION", GetEnv("S3_REGION", "ap-south-1")),
+			AccessKeyID:     GetEnv("PRODUCT_S3_ACCESS_KEY_ID", GetEnv("S3_ACCESS_KEY_ID", "")),
+			SecretAccessKey: GetEnv("PRODUCT_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
+			Bucket:          GetEnv("PRODUCT_S3_BUCKET", GetEnv("S3_BUCKET", "products")),
+			PublicURLPrefix: GetEnv("PRODUCT_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),

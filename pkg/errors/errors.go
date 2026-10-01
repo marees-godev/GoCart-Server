@@ -99,6 +99,10 @@ func BadRequest(message string) *AppError {
 	return New(CodeBadRequest, message, http.StatusBadRequest)
 }
 
+func InvalidArgument(message string) *AppError {
+	return BadRequest(message)
+}
+
 func Unauthorized(message string) *AppError {
 	if message == "" {
 		message = "Unauthorized access"
@@ -132,6 +136,10 @@ func Conflict(message string) *AppError {
 		message = "Resource conflict"
 	}
 	return New(CodeConflict, message, http.StatusConflict)
+}
+
+func AlreadyExists(message string) *AppError {
+	return Conflict(message)
 }
 
 func UnprocessableEntity(message string) *AppError {
@@ -204,9 +212,6 @@ func AsAppError(err error) *AppError {
 	return Internal(err, err.Error())
 }
 
-// MapAppErrorToGRPC converts an application error into an equivalent gRPC status error.
-// If err is nil, it returns nil.
-// If err is already a gRPC status error, it is returned directly.
 func MapAppErrorToGRPC(err error) error {
 	if err == nil {
 		return nil
@@ -238,12 +243,10 @@ func MapAppErrorToGRPC(err error) error {
 	}
 }
 
-// ToGRPC converts an error into an equivalent gRPC status error.
 func ToGRPC(err error) error {
 	return MapAppErrorToGRPC(err)
 }
 
-// ToGRPC converts the AppError into an equivalent gRPC status error.
 func (e *AppError) ToGRPC() error {
 	return MapAppErrorToGRPC(e)
 }
