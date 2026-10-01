@@ -137,6 +137,14 @@ type CreateDeliveryInput struct {
 	ShippingAddress string `json:"shippingAddress"`
 }
 
+type CreateInventoryInput struct {
+	ProductID         string  `json:"productId"`
+	VariantID         *string `json:"variantId,omitempty"`
+	Sku               *string `json:"sku,omitempty"`
+	InitialQuantity   int     `json:"initialQuantity"`
+	LowStockThreshold *int    `json:"lowStockThreshold,omitempty"`
+}
+
 type CreateOrderInput struct {
 	UserID          string `json:"userId"`
 	CartID          string `json:"cartId"`
@@ -201,6 +209,18 @@ type GenerateStoreUploadURLInput struct {
 	ImageType   string  `json:"imageType"`
 	Filename    string  `json:"filename"`
 	ContentType *string `json:"contentType,omitempty"`
+}
+
+type InventoryItem struct {
+	InventoryID       string  `json:"inventoryId"`
+	ProductID         string  `json:"productId"`
+	VariantID         *string `json:"variantId,omitempty"`
+	Sku               string  `json:"sku"`
+	AvailableQuantity int     `json:"availableQuantity"`
+	ReservedQuantity  int     `json:"reservedQuantity"`
+	LowStockThreshold int     `json:"lowStockThreshold"`
+	UpdatedAt         string  `json:"updatedAt"`
+	CreatedAt         *string `json:"createdAt,omitempty"`
 }
 
 type LoginInput struct {
@@ -373,6 +393,20 @@ type ResetPasswordWithOtpInput struct {
 	Otp         string `json:"otp"`
 	NewPassword string `json:"newPassword"`
 	IsMerchant  bool   `json:"isMerchant"`
+}
+
+type RestockInventoryInput struct {
+	InventoryID *string `json:"inventoryId,omitempty"`
+	ProductID   *string `json:"productId,omitempty"`
+	VariantID   *string `json:"variantId,omitempty"`
+	Quantity    int     `json:"quantity"`
+	Notes       *string `json:"notes,omitempty"`
+	ReferenceID *string `json:"referenceId,omitempty"`
+}
+
+type RestockInventoryPayload struct {
+	Inventory *InventoryItem `json:"inventory"`
+	Success   bool           `json:"success"`
 }
 
 type ReturnOrder struct {
