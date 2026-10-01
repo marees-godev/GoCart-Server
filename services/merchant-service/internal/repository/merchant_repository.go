@@ -227,7 +227,7 @@ func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uui
 		r.logger.Error("Repository: failed to begin transaction for status update", slog.String("merchant_id", id.String()), slog.Any("error", err))
 		return nil, "", appErrors.Internal(err, "failed to begin transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var currentStatusStr string
 	queryCurrent := `
