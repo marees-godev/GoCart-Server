@@ -16,7 +16,6 @@ import (
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
-	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/rest"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
@@ -114,11 +113,6 @@ func main() {
 
 	gqlHandler := gwGraphQL.NewHandler(gqlSchema, cfg)
 	gqlHandler.RegisterRoutes(app)
-
-	// 7. Register dedicated service REST routes
-	if clientMgr != nil && clientMgr.MerchantClient != nil {
-		rest.RegisterMerchantRoutes(app, clientMgr.MerchantClient, cfg)
-	}
 
 	// Additional endpoint aliases for backward compatibility
 	legacyServer := gwGraphQL.NewServer(gqlResolver)

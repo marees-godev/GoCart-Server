@@ -39,16 +39,6 @@ type Client struct {
 	cfg Config
 }
 
-type redisLogger struct{}
-
-func (redisLogger) Printf(ctx context.Context, format string, v ...interface{}) {
-	slog.Debug(fmt.Sprintf(format, v...))
-}
-
-func init() {
-	goredis.SetLogger(redisLogger{})
-}
-
 func New(ctx context.Context, cfg Config) (*Client, error) {
 	var opts *goredis.Options
 
@@ -70,8 +60,6 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 			WriteTimeout: cfg.WriteTimeout,
 		}
 	}
-
-	opts.MaxRetries = -1 // Disable go-redis internal retries because pkg/redis manages the retry loop
 
 	if cfg.EnableTLS {
 		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
