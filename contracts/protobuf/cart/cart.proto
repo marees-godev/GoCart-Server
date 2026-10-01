@@ -10,6 +10,8 @@ service CartService {
   rpc UpdateCartItem (UpdateCartItemRequest) returns (UpdateCartItemResponse);
   rpc RemoveCartItem (RemoveCartItemRequest) returns (RemoveCartItemResponse);
   rpc ClearCart (ClearCartRequest) returns (ClearCartResponse);
+  rpc ValidateCart (ValidateCartRequest) returns (ValidateCartResponse);
+  rpc PrepareCheckout (PrepareCheckoutRequest) returns (PrepareCheckoutResponse);
 }
 
 message CartItem {
@@ -79,3 +81,49 @@ message ClearCartResponse {
   bool success = 1;
   Cart cart = 2;
 }
+
+message ValidateCartRequest {
+  string user_id = 1;
+}
+
+message ValidationError {
+  string product_id = 1;
+  string message = 2;
+  int32 code = 3;
+}
+
+message StoreOrderGroup {
+  string store_id = 1;
+  repeated CartItem items = 2;
+  double subtotal = 3;
+}
+
+message ValidateCartResponse {
+  bool is_valid = 1;
+  Cart cart = 2;
+  repeated ValidationError errors = 3;
+  repeated StoreOrderGroup store_groups = 4;
+}
+
+message PrepareCheckoutRequest {
+  string user_id = 1;
+  string shipping_address = 2;
+}
+
+message StoreOrderPayload {
+  string parent_order_id = 1;
+  string store_id = 2;
+  string user_id = 3;
+  repeated CartItem items = 4;
+  double subtotal = 5;
+  double total_amount = 6;
+  string shipping_address = 7;
+}
+
+message PrepareCheckoutResponse {
+  bool is_valid = 1;
+  string parent_order_id = 2;
+  repeated StoreOrderPayload orders = 3;
+  repeated ValidationError errors = 4;
+}
+

@@ -12,6 +12,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
@@ -20,11 +22,13 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/service"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -103,9 +107,28 @@ func main() {
 		defer redisClient.Close()
 	}
 
-	// 6. Initialize application layers
+	// 6. Initialize application layers and downstream clients
 	cartRepo := repository.NewCartRepository(db.Pool, redisClient, log)
-	cartService := service.NewCartService(cartRepo, cfg.Cart.TTLSeconds, log)
+
+	var prodClient client.ProductClient
+	productConn, prodErr := grpc.NewClient(cfg.GRPC.ProductServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if prodErr == nil {
+		prodClient = client.NewProductClient(productpb.NewProductServiceClient(productConn))
+		defer productConn.Close()
+	} else {
+		log.Warn("Failed to dial Product Service", "error", prodErr)
+	}
+
+	var invClient client.InventoryClient
+	inventoryConn, invErr := grpc.NewClient(cfg.GRPC.InventoryServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if invErr == nil {
+		invClient = client.NewInventoryClient(inventorypb.NewInventoryServiceClient(inventoryConn))
+		defer inventoryConn.Close()
+	} else {
+		log.Warn("Failed to dial Inventory Service", "error", invErr)
+	}
+
+	cartService := service.NewCartServiceWithClients(cartRepo, prodClient, invClient, cfg.GRPC.TimeoutSeconds, cfg.Cart.TTLSeconds, log)
 	cartGRPCHandler := handler.NewCartGRPCHandler(cartService, log)
 
 	// 7. Setup gRPC Server

@@ -29,7 +29,10 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Port string
+	Port                 string
+	ProductServiceAddr   string
+	InventoryServiceAddr string
+	TimeoutSeconds       int
 }
 
 type DatabaseConfig struct {
@@ -79,7 +82,10 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "8181"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50057"),
+			Port:                 GetEnv("GRPC_PORT", "50057"),
+			ProductServiceAddr:   GetEnv("PRODUCT_SERVICE_ADDR", "localhost:50053"),
+			InventoryServiceAddr: GetEnv("INVENTORY_SERVICE_ADDR", "localhost:50058"),
+			TimeoutSeconds:       GetEnvAsInt("GRPC_CLIENT_TIMEOUT", 5),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("CART_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
