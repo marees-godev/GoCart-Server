@@ -145,6 +145,68 @@ func (m *mockCartService) ClearCart(ctx context.Context, userID string) (*model.
 	return cart, nil
 }
 
+func (m *mockCartService) ValidateCart(ctx context.Context, userID string) (*dto.ValidateCartResponse, error) {
+	if userID == "" {
+		return nil, appErrors.BadRequest("user_id is required")
+	}
+	cart, _ := m.GetCart(ctx, userID)
+	storeMap := make(map[string][]model.CartItem)
+	for _, item := range cart.Items {
+		stID := item.StoreID
+		if stID == "" {
+			stID = "default"
+		}
+		storeMap[stID] = append(storeMap[stID], item)
+	}
+	storeGroups := make([]dto.StoreOrderGroup, 0, len(storeMap))
+	for stID, items := range storeMap {
+		var subtotal float64
+		for _, it := range items {
+			subtotal += float64(it.Quantity) * it.UnitPrice
+		}
+		storeGroups = append(storeGroups, dto.StoreOrderGroup{
+			StoreID:  stID,
+			Items:    items,
+			Subtotal: subtotal,
+		})
+	}
+	return &dto.ValidateCartResponse{
+		IsValid:     true,
+		Cart:        cart,
+		Errors:      nil,
+		StoreGroups: storeGroups,
+	}, nil
+}
+
+func (m *mockCartService) PrepareCheckout(ctx context.Context, req dto.PrepareCheckoutRequest) (*dto.PrepareCheckoutResponse, error) {
+	if req.UserID == "" {
+		return nil, appErrors.BadRequest("user_id is required")
+	}
+	val, err := m.ValidateCart(ctx, req.UserID)
+	if err != nil {
+		return nil, err
+	}
+	parentID := "test-parent-order-id"
+	orders := make([]dto.StoreOrderPayload, 0, len(val.StoreGroups))
+	for _, g := range val.StoreGroups {
+		orders = append(orders, dto.StoreOrderPayload{
+			ParentOrderID:   parentID,
+			StoreID:         g.StoreID,
+			UserID:          req.UserID,
+			Items:           g.Items,
+			Subtotal:        g.Subtotal,
+			TotalAmount:     g.Subtotal,
+			ShippingAddress: req.ShippingAddress,
+		})
+	}
+	return &dto.PrepareCheckoutResponse{
+		IsValid:       true,
+		ParentOrderID: parentID,
+		Orders:        orders,
+		Errors:        nil,
+	}, nil
+}
+
 func TestCartGRPCHandler_UserAuthorization(t *testing.T) {
 	svc := newMockCartService()
 	h := handler.NewCartGRPCHandler(svc, nil)
@@ -280,3 +342,42 @@ func TestCartGRPCHandler_Operations(t *testing.T) {
 		t.Errorf("expected clear cart success, got %+v", clearResp)
 	}
 }
+
+func TestCartGRPCHandler_ValidateAndPrepareCheckout(t *testing.T) {
+	svc := newMockCartService()
+	h := handler.NewCartGRPCHandler(svc, nil)
+
+	userID := "user-handler-val"
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: userID, Role: "CUSTOMER"})
+
+	_, err := h.AddCartItem(ctx, &cartpb.AddCartItemRequest{
+		UserId:    userID,
+		ProductId: "prod-h1",
+		StoreId:   "store-h1",
+		UnitPrice: 19.99,
+		Quantity:  2,
+	})
+	if err != nil {
+		t.Fatalf("failed AddCartItem: %v", err)
+	}
+
+	valResp, err := h.ValidateCart(ctx, &cartpb.ValidateCartRequest{UserId: userID})
+	if err != nil {
+		t.Fatalf("failed ValidateCart: %v", err)
+	}
+	if !valResp.IsValid || len(valResp.StoreGroups) != 1 {
+		t.Errorf("unexpected ValidateCart response: %+v", valResp)
+	}
+
+	prepResp, err := h.PrepareCheckout(ctx, &cartpb.PrepareCheckoutRequest{
+		UserId:          userID,
+		ShippingAddress: "456 Avenue, Tech City",
+	})
+	if err != nil {
+		t.Fatalf("failed PrepareCheckout: %v", err)
+	}
+	if !prepResp.IsValid || prepResp.ParentOrderId == "" || len(prepResp.Orders) != 1 {
+		t.Errorf("unexpected PrepareCheckout response: %+v", prepResp)
+	}
+}
+

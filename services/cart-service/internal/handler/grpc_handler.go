@@ -154,6 +154,115 @@ func (h *CartGRPCHandler) ClearCart(ctx context.Context, req *cartpb.ClearCartRe
 	}, nil
 }
 
+func (h *CartGRPCHandler) ValidateCart(ctx context.Context, req *cartpb.ValidateCartRequest) (*cartpb.ValidateCartResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
+	}
+	userID, err := h.validateUserAuth(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := h.cartService.ValidateCart(ctx, userID)
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	pbErrors := make([]*cartpb.ValidationError, 0, len(resp.Errors))
+	for _, e := range resp.Errors {
+		pbErrors = append(pbErrors, &cartpb.ValidationError{
+			ProductId: e.ProductID,
+			Message:   e.Message,
+			Code:      e.Code,
+		})
+	}
+
+	pbGroups := make([]*cartpb.StoreOrderGroup, 0, len(resp.StoreGroups))
+	for _, g := range resp.StoreGroups {
+		pbItems := make([]*cartpb.CartItem, 0, len(g.Items))
+		for _, item := range g.Items {
+			pbItems = append(pbItems, &cartpb.CartItem{
+				Id:        item.ID,
+				ProductId: item.ProductID,
+				VariantId: item.VariantID,
+				StoreId:   item.StoreID,
+				UnitPrice: item.UnitPrice,
+				Quantity:  item.Quantity,
+			})
+		}
+		pbGroups = append(pbGroups, &cartpb.StoreOrderGroup{
+			StoreId:  g.StoreID,
+			Items:    pbItems,
+			Subtotal: g.Subtotal,
+		})
+	}
+
+	return &cartpb.ValidateCartResponse{
+		IsValid:     resp.IsValid,
+		Cart:        cartToProto(resp.Cart),
+		Errors:      pbErrors,
+		StoreGroups: pbGroups,
+	}, nil
+}
+
+func (h *CartGRPCHandler) PrepareCheckout(ctx context.Context, req *cartpb.PrepareCheckoutRequest) (*cartpb.PrepareCheckoutResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
+	}
+	userID, err := h.validateUserAuth(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := h.cartService.PrepareCheckout(ctx, dto.PrepareCheckoutRequest{
+		UserID:          userID,
+		ShippingAddress: req.GetShippingAddress(),
+	})
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	pbErrors := make([]*cartpb.ValidationError, 0, len(resp.Errors))
+	for _, e := range resp.Errors {
+		pbErrors = append(pbErrors, &cartpb.ValidationError{
+			ProductId: e.ProductID,
+			Message:   e.Message,
+			Code:      e.Code,
+		})
+	}
+
+	pbOrders := make([]*cartpb.StoreOrderPayload, 0, len(resp.Orders))
+	for _, o := range resp.Orders {
+		pbItems := make([]*cartpb.CartItem, 0, len(o.Items))
+		for _, item := range o.Items {
+			pbItems = append(pbItems, &cartpb.CartItem{
+				Id:        item.ID,
+				ProductId: item.ProductID,
+				VariantId: item.VariantID,
+				StoreId:   item.StoreID,
+				UnitPrice: item.UnitPrice,
+				Quantity:  item.Quantity,
+			})
+		}
+		pbOrders = append(pbOrders, &cartpb.StoreOrderPayload{
+			ParentOrderId:   o.ParentOrderID,
+			StoreId:         o.StoreID,
+			UserId:          o.UserID,
+			Items:           pbItems,
+			Subtotal:        o.Subtotal,
+			TotalAmount:     o.TotalAmount,
+			ShippingAddress: o.ShippingAddress,
+		})
+	}
+
+	return &cartpb.PrepareCheckoutResponse{
+		IsValid:       resp.IsValid,
+		ParentOrderId: resp.ParentOrderID,
+		Orders:        pbOrders,
+		Errors:        pbErrors,
+	}, nil
+}
+
 func cartToProto(c *model.Cart) *cartpb.Cart {
 	if c == nil {
 		return nil
