@@ -277,7 +277,7 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 					Message:   "product not found",
 					Code:      dto.ErrCodeProductNotFound,
 				})
-			} else if !product.GetIsActive() {
+			} else if product.GetStatus() == "inactive" || product.GetStatus() == "discontinued" {
 				isValid = false
 				validationErrors = append(validationErrors, dto.ValidationError{
 					ProductID: item.ProductID,

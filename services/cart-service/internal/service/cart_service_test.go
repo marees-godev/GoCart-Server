@@ -409,7 +409,7 @@ func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
 				StoreId:  "store-1",
 				Name:     "Product 1",
 				Price:    29.99, // Authoritative price from Product Service
-				IsActive: true,
+				Status:   "stock_in",
 			},
 		},
 	}
@@ -469,7 +469,7 @@ func TestCartService_ValidateCart_OutOfStock(t *testing.T) {
 			"p1": {
 				Id:       "p1",
 				Price:    50.0,
-				IsActive: true,
+				Status:   "stock_in",
 			},
 		},
 	}
@@ -539,8 +539,8 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 
 	prodClient := &mockProductClient{
 		products: map[string]*productpb.Product{
-			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, IsActive: true},
-			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, IsActive: true},
+			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, Status: "stock_in"},
+			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, Status: "stock_in"},
 		},
 	}
 	invClient := &mockInventoryClient{

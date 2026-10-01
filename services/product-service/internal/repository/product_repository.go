@@ -46,7 +46,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := `
 		INSERT INTO products (
@@ -335,7 +335,7 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := `
 		UPDATE products
@@ -438,7 +438,7 @@ func (r *pgProductRepository) DeleteProduct(ctx context.Context, id string) erro
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now()
 	// Soft delete per product lifecycle setting status = 'discontinued' and deleted_at = NOW()
