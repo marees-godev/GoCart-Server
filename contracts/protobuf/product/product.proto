@@ -12,17 +12,49 @@ service ProductService {
   rpc DeleteProduct (DeleteProductRequest) returns (DeleteProductResponse);
 }
 
+message ProductVariant {
+  string id = 1;
+  string product_id = 2;
+  string sku = 3;
+  string name = 4;
+  double price = 5;
+  double mrp = 6;
+  int32 stock = 7;
+  string attributes_json = 8;
+  string status = 9;
+  string created_at = 10;
+  string updated_at = 11;
+  string deleted_at = 12;
+}
+
+message ProductImage {
+  string id = 1;
+  string product_id = 2;
+  string url = 3;
+  string alt_text = 4;
+  bool is_primary = 5;
+  int32 display_order = 6;
+}
+
 message Product {
   string id = 1;
   string store_id = 2;
   string category_id = 3;
-  string name = 4;
-  string description = 5;
-  double price = 6;
-  string sku = 7;
-  bool is_active = 8;
-  repeated string images = 9;
-  string created_at = 10;
+  string sku = 4;
+  string name = 5;
+  string description = 6;
+  double price = 7;
+  double mrp = 8;
+  double tax = 9;
+  string status = 10;
+  repeated string images = 11;
+  repeated ProductVariant variants = 12;
+  double avg_rating = 13;
+  string created_at = 14;
+  string updated_at = 15;
+  string productname = 16;
+  string deleted_at = 17;
+  string image_url = 18;
 }
 
 message GetProductRequest {
@@ -38,6 +70,7 @@ message ListProductsRequest {
   int32 offset = 2;
   string category_id = 3;
   string store_id = 4;
+  string status = 5;
 }
 
 message ListProductsResponse {
@@ -45,25 +78,59 @@ message ListProductsResponse {
   int32 total = 2;
 }
 
+message CreateProductVariantInput {
+  string sku = 1;
+  string name = 2;
+  double price = 3;
+  double mrp = 4;
+  int32 stock = 5;
+  string attributes_json = 6;
+}
+
 message CreateProductRequest {
   string store_id = 1;
   string category_id = 2;
-  string name = 3;
-  string description = 4;
-  double price = 5;
-  string sku = 6;
+  string sku = 3;
+  string name = 4;
+  string description = 5;
+  double price = 6;
+  double mrp = 7;
+  double tax = 8;
+  string status = 9;
+  repeated string images = 10;
+  repeated CreateProductVariantInput variants = 11;
+  string productname = 12;
+  string image_url = 13;
 }
 
 message CreateProductResponse {
   Product product = 1;
 }
 
+message UpdateProductVariantInput {
+  string id = 1;
+  string sku = 2;
+  string name = 3;
+  double price = 4;
+  double mrp = 5;
+  int32 stock = 6;
+  string attributes_json = 7;
+  string status = 8;
+}
+
 message UpdateProductRequest {
   string id = 1;
-  string name = 2;
-  string description = 3;
-  double price = 4;
-  bool is_active = 5;
+  optional string name = 2;
+  optional string description = 3;
+  optional double price = 4;
+  optional double mrp = 5;
+  optional double tax = 6;
+  optional string status = 7;
+  optional string category_id = 8;
+  repeated string images = 9;
+  repeated UpdateProductVariantInput variants = 10;
+  optional string productname = 11;
+  optional string image_url = 12;
 }
 
 message UpdateProductResponse {
@@ -76,4 +143,5 @@ message DeleteProductRequest {
 
 message DeleteProductResponse {
   bool success = 1;
+  string message = 2;
 }

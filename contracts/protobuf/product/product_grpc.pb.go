@@ -115,19 +115,19 @@ type ProductServiceServer interface {
 type UnimplementedProductServiceServer struct{}
 
 func (UnimplementedProductServiceServer) GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetProduct not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method GetProduct not implemented")
 }
 func (UnimplementedProductServiceServer) ListProducts(context.Context, *ListProductsRequest) (*ListProductsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListProducts not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method ListProducts not implemented")
 }
 func (UnimplementedProductServiceServer) CreateProduct(context.Context, *CreateProductRequest) (*CreateProductResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateProduct not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method CreateProduct not implemented")
 }
 func (UnimplementedProductServiceServer) UpdateProduct(context.Context, *UpdateProductRequest) (*UpdateProductResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method UpdateProduct not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateProduct not implemented")
 }
 func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method DeleteProduct not implemented")
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteProduct not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -140,7 +140,7 @@ type UnsafeProductServiceServer interface {
 }
 
 func RegisterProductServiceServer(s grpc.ServiceRegistrar, srv ProductServiceServer) {
-	// If the following call panics, it indicates UnimplementedProductServiceServer was
+	// If the following call pancis, it indicates UnimplementedProductServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
