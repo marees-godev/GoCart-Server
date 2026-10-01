@@ -294,8 +294,8 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 				"x-user-id", cred.UserID.String(),
 				"x-user-role", model.RoleMerchant.String(),
 			))
-			mResp, err := mClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{
-				UserId: cred.UserID.String(),
+			mResp, err := mClient.GetMerchant(mCtx, &merchantpb.GetMerchantRequest{
+				Id: cred.UserID.String(),
 			})
 			if err == nil && mResp != nil && mResp.Merchant != nil {
 				merchantID = mResp.Merchant.Id
@@ -451,14 +451,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 
 		if mClient != nil {
-			businessName := strings.TrimSpace(req.BusinessName)
-			if businessName == "" {
-				businessName = strings.TrimSpace(req.FirstName + " " + req.LastName)
-			}
-			if businessName == "" {
-				businessName = req.Email
-			}
-
 			mCtx := auth.WithUser(ctx, &auth.UserContext{
 				UserID: userID.String(),
 				Role:   model.RoleMerchant.String(),
@@ -470,11 +462,10 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			))
 
 			createReq := &merchantpb.CreateMerchantRequest{
-				UserId:        userID.String(),
+				Id:            userID.String(),
 				FirstName:     req.FirstName,
 				LastName:      req.LastName,
 				BusinessEmail: req.Email,
-				BusinessName:  businessName,
 			}
 
 			mResp, err := mClient.CreateMerchant(mCtx, createReq)

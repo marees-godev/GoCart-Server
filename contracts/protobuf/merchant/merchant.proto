@@ -1,93 +1,94 @@
 syntax = "proto3";
 
-package gocart.merchant.v1;
+package merchant.v1;
 
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant;merchant";
 
+import "google/protobuf/timestamp.proto";
+
+enum MerchantStatus {
+  PENDING = 0;
+  APPROVED = 1;
+  REJECTED = 2;
+  SUSPENDED = 3;
+}
+
 service MerchantService {
   rpc GetMerchant (GetMerchantRequest) returns (GetMerchantResponse);
-  rpc GetMerchantByUserID (GetMerchantByUserIDRequest) returns (GetMerchantResponse);
-  rpc ListMerchants (ListMerchantsRequest) returns (ListMerchantsResponse);
-  rpc CreateMerchant (CreateMerchantRequest) returns (CreateMerchantResponse);
   rpc UpdateMerchant (UpdateMerchantRequest) returns (UpdateMerchantResponse);
+  rpc CreateMerchant (CreateMerchantRequest) returns (CreateMerchantResponse);
+  rpc ListMerchants (ListMerchantsRequest) returns (ListMerchantsResponse);
   rpc UpdateMerchantStatus (UpdateMerchantStatusRequest) returns (UpdateMerchantStatusResponse);
   rpc DeleteMerchant (DeleteMerchantRequest) returns (DeleteMerchantResponse);
 }
 
-message Merchant {
+message MerchantResponseData {
   string id = 1;
-  string user_id = 2;
-  string business_name = 3;
-  string status = 4;
-  string tax_id = 5;
-  string created_at = 6;
-  string business_email = 7;
-  string business_phone = 8;
+  string business_name = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string business_email = 5;
+  string business_phone = 6;
+  string pan_card_number = 7;
+  MerchantStatus status = 8;
   string rejection_reason = 9;
-  string updated_at = 10;
-  string first_name = 11;
-  string last_name = 12;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  google.protobuf.Timestamp deleted_at = 12;
 }
 
 message GetMerchantRequest {
-  string id = 1;
-}
-
-message GetMerchantByUserIDRequest {
-  string user_id = 1;
+  string id = 1; // Pure merchant UUID lookup
 }
 
 message GetMerchantResponse {
-  Merchant merchant = 1;
-}
-
-message ListMerchantsRequest {
-  int32 limit = 1;
-  int32 offset = 2;
-  string status = 3;
-}
-
-message ListMerchantsResponse {
-  repeated Merchant merchants = 1;
-  int32 total = 2;
-}
-
-message CreateMerchantRequest {
-  string user_id = 1;
-  string business_name = 2;
-  string tax_id = 3;
-  string business_email = 4;
-  string business_phone = 5;
-  string first_name = 6;
-  string last_name = 7;
-}
-
-message CreateMerchantResponse {
-  Merchant merchant = 1;
+  MerchantResponseData merchant = 1;
 }
 
 message UpdateMerchantRequest {
   string id = 1;
   string business_name = 2;
-  string business_email = 3;
-  string business_phone = 4;
-  string tax_id = 5;
-  string first_name = 6;
-  string last_name = 7;
+  string business_phone = 3;
+  string pan_card_number = 4;
+  string first_name = 5;
+  string last_name = 6;
 }
 
 message UpdateMerchantResponse {
-  Merchant merchant = 1;
+  MerchantResponseData merchant = 1;
+}
+
+message CreateMerchantRequest {
+  string id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string business_email = 4;
+}
+
+message CreateMerchantResponse {
+  MerchantResponseData merchant = 1;
+}
+
+message ListMerchantsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  optional MerchantStatus status = 3;
+}
+
+message ListMerchantsResponse {
+  repeated MerchantResponseData merchants = 1;
+  int32 total = 2;
 }
 
 message UpdateMerchantStatusRequest {
   string id = 1;
-  string status = 2;
+  MerchantStatus status = 2;
   string rejection_reason = 3;
 }
 
 message UpdateMerchantStatusResponse {
-  Merchant merchant = 1;
+  MerchantResponseData merchant = 1;
+  MerchantStatus previous_status = 2;
 }
 
 message DeleteMerchantRequest {

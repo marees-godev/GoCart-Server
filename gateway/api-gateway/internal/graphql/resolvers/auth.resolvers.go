@@ -86,56 +86,55 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		exp := int(res.ExpiresIn)
 		payload.ExpiresIn = &exp
 	}
+	role := string(model.RoleCustomer)
+	if isMerchant {
+		role = string(model.RoleMerchant)
+	}
 	if res.Role != "" {
-		rStr := res.Role
-		payload.Role = &rStr
-	} else {
-		role := string(model.RoleCustomer)
-		if isMerchant {
-			role = string(model.RoleMerchant)
+		role = res.Role
+	}
+	if user != nil {
+		user.Role = &role
+		if res.FirstName != "" && user.FirstName == nil {
+			fnStr := res.FirstName
+			user.FirstName = &fnStr
 		}
-		payload.Role = &role
-	}
-	if res.FirstName != "" {
-		fnStr := res.FirstName
-		payload.FirstName = &fnStr
-	} else if user != nil && user.FirstName != nil {
-		payload.FirstName = user.FirstName
-	}
-	if res.LastName != "" {
-		lnStr := res.LastName
-		payload.LastName = &lnStr
-	} else if user != nil && user.LastName != nil {
-		payload.LastName = user.LastName
-	}
-	if res.MerchantId != "" {
-		mID := res.MerchantId
-		payload.MerchantID = &mID
-	}
-	if res.BusinessEmail != "" {
-		bEmail := res.BusinessEmail
-		payload.BusinessEmail = &bEmail
-	} else if isMerchant {
-		payload.BusinessEmail = &input.Email
+		if res.LastName != "" && user.LastName == nil {
+			lnStr := res.LastName
+			user.LastName = &lnStr
+		}
 	}
 
 	if isMerchant {
-		var mID string
-		if payload.MerchantID != nil {
-			mID = *payload.MerchantID
-		}
+		mID := res.MerchantId
 		bEmail := input.Email
-		if payload.BusinessEmail != nil {
-			bEmail = *payload.BusinessEmail
+		if res.BusinessEmail != "" {
+			bEmail = res.BusinessEmail
 		}
+		var firstName *string
+		if res.FirstName != "" {
+			fnStr := res.FirstName
+			firstName = &fnStr
+		} else if user != nil && user.FirstName != nil {
+			firstName = user.FirstName
+		}
+
+		var lastName *string
+		if res.LastName != "" {
+			lnStr := res.LastName
+			lastName = &lnStr
+		} else if user != nil && user.LastName != nil {
+			lastName = user.LastName
+		}
+
 		bName := ""
-		if payload.FirstName != nil && payload.LastName != nil {
-			bName = strings.TrimSpace(*payload.FirstName + " " + *payload.LastName)
+		if firstName != nil && lastName != nil {
+			bName = strings.TrimSpace(*firstName + " " + *lastName)
 		}
 		if bName == "" {
 			bName = input.Email
 		}
-		status := "PENDING"
+		status := model.MerchantStatusPending
 
 		var merchantClient merchantpb.MerchantServiceClient
 		if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
@@ -152,38 +151,34 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 				"x-user-id", res.UserId,
 				"x-user-role", string(model.RoleMerchant),
 			))
-			mRes, _ := merchantClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{UserId: res.UserId})
+			mRes, _ := merchantClient.GetMerchant(mCtx, &merchantpb.GetMerchantRequest{Id: res.UserId})
 			if mRes != nil && mRes.Merchant != nil {
 				if mRes.Merchant.Id != "" {
 					mID = mRes.Merchant.Id
-					payload.MerchantID = &mID
 				}
 				if mRes.Merchant.BusinessEmail != "" {
 					bEmail = mRes.Merchant.BusinessEmail
-					payload.BusinessEmail = &bEmail
 				}
 				if mRes.Merchant.BusinessName != "" {
 					bName = mRes.Merchant.BusinessName
 				}
-				if mRes.Merchant.Status != "" {
-					status = mRes.Merchant.Status
-				}
-				if mRes.Merchant.FirstName != "" && payload.FirstName == nil {
+				status = model.MerchantStatus(mRes.Merchant.Status.String())
+				if mRes.Merchant.FirstName != "" && firstName == nil {
 					fn := mRes.Merchant.FirstName
-					payload.FirstName = &fn
+					firstName = &fn
 				}
-				if mRes.Merchant.LastName != "" && payload.LastName == nil {
+				if mRes.Merchant.LastName != "" && lastName == nil {
 					ln := mRes.Merchant.LastName
-					payload.LastName = &ln
+					lastName = &ln
 				}
 			}
 		}
 
 		payload.Merchant = &model.Merchant{
-			MerchantID:    mID,
+			ID:            mID,
 			BusinessName:  bName,
-			FirstName:     payload.FirstName,
-			LastName:      payload.LastName,
+			FirstName:     firstName,
+			LastName:      lastName,
 			BusinessEmail: &bEmail,
 			Status:        status,
 		}
@@ -277,62 +272,49 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		payload.ExpiresIn = &exp
 	}
 
+	role := string(model.RoleCustomer)
+	if isMerchant {
+		role = string(model.RoleMerchant)
+	}
 	if res.Role != "" {
-		rStr := res.Role
-		payload.Role = &rStr
-	} else {
-		role := string(model.RoleCustomer)
-		if isMerchant {
-			role = string(model.RoleMerchant)
-		}
-		payload.Role = &role
+		role = res.Role
 	}
-
-	if res.FirstName != "" {
-		fnStr := res.FirstName
-		payload.FirstName = &fnStr
-	} else if fn != "" {
-		payload.FirstName = &fn
-	}
-
-	if res.LastName != "" {
-		lnStr := res.LastName
-		payload.LastName = &lnStr
-	} else if ln != "" {
-		payload.LastName = &ln
-	}
-
-	if res.MerchantId != "" {
-		mID := res.MerchantId
-		payload.MerchantID = &mID
-	}
-
-	if res.BusinessEmail != "" {
-		bEmail := res.BusinessEmail
-		payload.BusinessEmail = &bEmail
-	} else if isMerchant {
-		payload.BusinessEmail = &input.Email
+	if user != nil {
+		user.Role = &role
 	}
 
 	if isMerchant {
-		var mID string
-		if payload.MerchantID != nil {
-			mID = *payload.MerchantID
-		}
+		mID := res.MerchantId
 		bEmail := input.Email
-		if payload.BusinessEmail != nil {
-			bEmail = *payload.BusinessEmail
+		if res.BusinessEmail != "" {
+			bEmail = res.BusinessEmail
 		}
+		var firstName *string
+		if res.FirstName != "" {
+			fnStr := res.FirstName
+			firstName = &fnStr
+		} else if fn != "" {
+			firstName = &fn
+		}
+
+		var lastName *string
+		if res.LastName != "" {
+			lnStr := res.LastName
+			lastName = &lnStr
+		} else if ln != "" {
+			lastName = &ln
+		}
+
 		bName := strings.TrimSpace(fn + " " + ln)
 		if bName == "" {
 			bName = input.Email
 		}
-		status := "PENDING"
+		status := model.MerchantStatusPending
 		payload.Merchant = &model.Merchant{
-			MerchantID:    mID,
+			ID:            mID,
 			BusinessName:  bName,
-			FirstName:     payload.FirstName,
-			LastName:      payload.LastName,
+			FirstName:     firstName,
+			LastName:      lastName,
 			BusinessEmail: &bEmail,
 			Status:        status,
 		}
@@ -380,21 +362,38 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 			ID: res.GetUserId(),
 		}
 	}
-	if res.GetRole() != "" {
-		roleStr := res.GetRole()
-		payload.Role = &roleStr
+	if payload.User != nil {
+		if res.GetRole() != "" {
+			roleStr := res.GetRole()
+			payload.User.Role = &roleStr
+		}
+		if res.GetFirstName() != "" {
+			fn := res.GetFirstName()
+			payload.User.FirstName = &fn
+		}
+		if res.GetLastName() != "" {
+			ln := res.GetLastName()
+			payload.User.LastName = &ln
+		}
 	}
 	if res.GetMerchantId() != "" {
 		mID := res.GetMerchantId()
-		payload.MerchantID = &mID
-	}
-	if res.GetFirstName() != "" {
-		fn := res.GetFirstName()
-		payload.FirstName = &fn
-	}
-	if res.GetLastName() != "" {
-		ln := res.GetLastName()
-		payload.LastName = &ln
+		var fnPtr, lnPtr *string
+		if res.GetFirstName() != "" {
+			fn := res.GetFirstName()
+			fnPtr = &fn
+		}
+		if res.GetLastName() != "" {
+			ln := res.GetLastName()
+			lnPtr = &ln
+		}
+		bEmail := res.GetBusinessEmail()
+		payload.Merchant = &model.Merchant{
+			ID:            mID,
+			FirstName:     fnPtr,
+			LastName:      lnPtr,
+			BusinessEmail: &bEmail,
+		}
 	}
 
 	return payload, nil

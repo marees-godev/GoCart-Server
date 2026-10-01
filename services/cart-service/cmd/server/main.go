@@ -157,7 +157,7 @@ func main() {
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
-	grpcServer.GracefulStop()
+	grpcServer.GracefulStop()                                                                                                                                                                                                                                                                                                                                                                                                                        
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
