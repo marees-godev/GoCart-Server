@@ -15,6 +15,8 @@ type CreateMerchantRequest struct {
 
 type UpdateMerchantRequest struct {
 	BusinessName  string `json:"business_name"`
+	FirstName     string `json:"first_name,omitempty"`
+	LastName      string `json:"last_name,omitempty"`
 	BusinessPhone string `json:"business_phone"`
 	PanCardNumber string `json:"pan_card_number"`
 }

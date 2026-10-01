@@ -46,6 +46,12 @@ func (r *mutationResolver) UpdateMerchant(ctx context.Context, id string, input 
 	if input.BusinessName != nil {
 		req.BusinessName = *input.BusinessName
 	}
+	if input.FirstName != nil {
+		req.FirstName = *input.FirstName
+	}
+	if input.LastName != nil {
+		req.LastName = *input.LastName
+	}
 	if input.BusinessPhone != nil {
 		req.BusinessPhone = *input.BusinessPhone
 	}

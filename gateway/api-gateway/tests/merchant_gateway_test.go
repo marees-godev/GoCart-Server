@@ -85,6 +85,12 @@ func (m *mockMerchantBackend) UpdateMerchant(ctx context.Context, req *merchantp
 	if req.BusinessName != "" {
 		merch.BusinessName = req.BusinessName
 	}
+	if req.FirstName != "" {
+		merch.FirstName = req.FirstName
+	}
+	if req.LastName != "" {
+		merch.LastName = req.LastName
+	}
 	if req.BusinessPhone != "" {
 		merch.BusinessPhone = req.BusinessPhone
 	}

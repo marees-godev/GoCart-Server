@@ -21,6 +21,8 @@ type UpdateMerchantStatusPayload struct {
 
 type UpdateMerchantProfilePayload struct {
 	BusinessName  *string `json:"businessName"`
+	FirstName     *string `json:"firstName"`
+	LastName      *string `json:"lastName"`
 	BusinessPhone *string `json:"businessPhone"`
 	PanCardNumber *string `json:"panCardNumber"`
 	Status        *string `json:"status,omitempty"`
@@ -381,6 +383,12 @@ func RegisterMerchantRoutes(app *fiber.App, merchantClient merchantpb.MerchantSe
 		}
 		if payload.BusinessName != nil {
 			req.BusinessName = *payload.BusinessName
+		}
+		if payload.FirstName != nil {
+			req.FirstName = *payload.FirstName
+		}
+		if payload.LastName != nil {
+			req.LastName = *payload.LastName
 		}
 		if payload.BusinessPhone != nil {
 			req.BusinessPhone = *payload.BusinessPhone

@@ -193,12 +193,14 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 func (r *pgMerchantRepository) Update(ctx context.Context, merchant *model.Merchant) error {
 	query := `
 		UPDATE merchants
-		SET business_name = $1, business_phone = $2, pan_card_number = $3, updated_at = NOW()
-		WHERE id = $4 AND deleted_at IS NULL
+		SET business_name = $1, first_name = $2, last_name = $3, business_phone = $4, pan_card_number = $5, updated_at = NOW()
+		WHERE id = $6 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 	err := r.db.Pool.QueryRow(ctx, query,
 		merchant.BusinessName,
+		merchant.FirstName,
+		merchant.LastName,
 		merchant.BusinessPhone,
 		merchant.PanCardNumber,
 		merchant.ID,

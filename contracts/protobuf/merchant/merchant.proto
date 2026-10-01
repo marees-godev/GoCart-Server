@@ -50,6 +50,8 @@ message UpdateMerchantRequest {
   string business_name = 2;
   string business_phone = 3;
   string pan_card_number = 4;
+  string first_name = 5;
+  string last_name = 6;
 }
 
 message UpdateMerchantResponse {

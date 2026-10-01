@@ -300,6 +300,8 @@ type UpdateMerchantRequest struct {
 	BusinessName  string                 `protobuf:"bytes,2,opt,name=business_name,json=businessName,proto3" json:"business_name,omitempty"`
 	BusinessPhone string                 `protobuf:"bytes,3,opt,name=business_phone,json=businessPhone,proto3" json:"business_phone,omitempty"`
 	PanCardNumber string                 `protobuf:"bytes,4,opt,name=pan_card_number,json=panCardNumber,proto3" json:"pan_card_number,omitempty"`
+	FirstName     string                 `protobuf:"bytes,5,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      string                 `protobuf:"bytes,6,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -358,6 +360,20 @@ func (x *UpdateMerchantRequest) GetBusinessPhone() string {
 func (x *UpdateMerchantRequest) GetPanCardNumber() string {
 	if x != nil {
 		return x.PanCardNumber
+	}
+	return ""
+}
+
+func (x *UpdateMerchantRequest) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *UpdateMerchantRequest) GetLastName() string {
+	if x != nil {
+		return x.LastName
 	}
 	return ""
 }
@@ -856,12 +872,15 @@ const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\x12GetMerchantRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"T\n" +
 	"\x13GetMerchantResponse\x12=\n" +
-	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"\x9b\x01\n" +
+	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"\xd7\x01\n" +
 	"\x15UpdateMerchantRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rbusiness_name\x18\x02 \x01(\tR\fbusinessName\x12%\n" +
 	"\x0ebusiness_phone\x18\x03 \x01(\tR\rbusinessPhone\x12&\n" +
-	"\x0fpan_card_number\x18\x04 \x01(\tR\rpanCardNumber\"W\n" +
+	"\x0fpan_card_number\x18\x04 \x01(\tR\rpanCardNumber\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x05 \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\x06 \x01(\tR\blastName\"W\n" +
 	"\x16UpdateMerchantResponse\x12=\n" +
 	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\"\x8a\x01\n" +
 	"\x15CreateMerchantRequest\x12\x0e\n" +

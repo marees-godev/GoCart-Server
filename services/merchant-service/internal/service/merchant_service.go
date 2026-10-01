@@ -17,7 +17,7 @@ var (
 	// E.164 phone pattern: optionally starts with +, followed by 7-15 digits starting with 1-9
 	phoneRegex = regexp.MustCompile(`^\+?[1-9]\d{6,14}$`)
 	// Tax ID format: 3-50 alphanumeric and hyphen characters
-	taxIDRegex = regexp.MustCompile(`^[A-Za-z0-9\-]{3,50}$`)
+	panCardNumberRegex = regexp.MustCompile(`^[A-Za-z0-9\-]{3,50}$`)
 )
 
 func validateBusinessName(name string) (string, error) {
@@ -42,13 +42,13 @@ func validateBusinessPhone(phone string) (string, error) {
 	return trimmed, nil
 }
 
-func validateTaxID(taxID string) (string, error) {
-	trimmed := strings.TrimSpace(taxID)
+func validatePanCardNumber(PanCardNumber string) (string, error) {
+	trimmed := strings.TrimSpace(PanCardNumber)
 	if trimmed == "" {
-		return "", appErrors.BadRequest("tax_id is required")
+		return "", appErrors.BadRequest("PanCardNumber is required")
 	}
-	if !taxIDRegex.MatchString(trimmed) {
-		return "", appErrors.BadRequest("tax_id must match valid tax identifier format")
+	if !panCardNumberRegex.MatchString(trimmed) {
+		return "", appErrors.BadRequest("PanCardNumber must match valid tax identifier format")
 	}
 	return trimmed, nil
 }
@@ -185,6 +185,8 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 		slog.String("business_name", req.BusinessName),
 		slog.String("business_phone", req.BusinessPhone),
 		slog.String("pan_card_number", req.PanCardNumber),
+		slog.String("first_name", req.FirstName),
+		slog.String("last_name", req.LastName),
 	)
 
 	validBusinessName, err := validateBusinessName(req.BusinessName)
@@ -205,7 +207,7 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 		return nil, err
 	}
 
-	validTaxID, err := validateTaxID(req.PanCardNumber)
+	validPanCardNumber, err := validatePanCardNumber(req.PanCardNumber)
 	if err != nil {
 		s.logger.Warn("UpdateMerchant validation failed for pan_card_number",
 			slog.String("merchant_id", id.String()),
@@ -230,7 +232,20 @@ func (s *merchantService) UpdateMerchant(ctx context.Context, id uuid.UUID, req 
 
 	merchant.BusinessName = validBusinessName
 	merchant.BusinessPhone = validBusinessPhone
-	merchant.PanCardNumber = validTaxID
+	merchant.PanCardNumber = validPanCardNumber
+
+	if trimmedFirst := strings.TrimSpace(req.FirstName); trimmedFirst != "" {
+		if len(trimmedFirst) > 100 {
+			return nil, appErrors.BadRequest("first_name cannot exceed 100 characters")
+		}
+		merchant.FirstName = trimmedFirst
+	}
+	if trimmedLast := strings.TrimSpace(req.LastName); trimmedLast != "" {
+		if len(trimmedLast) > 100 {
+			return nil, appErrors.BadRequest("last_name cannot exceed 100 characters")
+		}
+		merchant.LastName = trimmedLast
+	}
 
 	if err := s.repo.Update(ctx, merchant); err != nil {
 		s.logger.Error("UpdateMerchant failed to save updates",

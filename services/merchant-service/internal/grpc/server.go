@@ -125,8 +125,10 @@ func (s *MerchantGRPCServer) UpdateMerchant(ctx context.Context, req *merchantpb
 
 	dtoReq := dto.UpdateMerchantRequest{
 		BusinessName:  req.BusinessName,
+		FirstName:     req.FirstName,
+		LastName:      req.LastName,
 		BusinessPhone: req.BusinessPhone,
-		PanCardNumber:         req.PanCardNumber,
+		PanCardNumber: req.PanCardNumber,
 	}
 
 	merchant, err := s.merchantService.UpdateMerchant(ctx, id, dtoReq)

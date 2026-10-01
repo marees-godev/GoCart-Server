@@ -83,6 +83,12 @@ func (m *mockService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.
 	if req.PanCardNumber != "" {
 		merch.PanCardNumber = req.PanCardNumber
 	}
+	if req.FirstName != "" {
+		merch.FirstName = req.FirstName
+	}
+	if req.LastName != "" {
+		merch.LastName = req.LastName
+	}
 	merch.UpdatedAt = time.Now()
 	return merch, nil
 }
@@ -238,6 +244,22 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	}
 	if updateRes.Merchant.Status != merchantpb.MerchantStatus_PENDING {
 		t.Errorf("expected status to remain PENDING, got %s", updateRes.Merchant.Status)
+	}
+
+	// 6b. UpdateMerchant with first_name and last_name
+	updateNamesRes, err := client.UpdateMerchant(ctx, &merchantpb.UpdateMerchantRequest{
+		Id:            merchantID,
+		BusinessName:  "Best Merchant Updated",
+		FirstName:     "Johnny",
+		LastName:      "Depp",
+		BusinessPhone: "+19876543210",
+		PanCardNumber: "TAX-999",
+	})
+	if err != nil {
+		t.Fatalf("UpdateMerchant with names failed: %v", err)
+	}
+	if updateNamesRes.Merchant.FirstName != "Johnny" || updateNamesRes.Merchant.LastName != "Depp" {
+		t.Errorf("expected updated names Johnny Depp, got %s %s", updateNamesRes.Merchant.FirstName, updateNamesRes.Merchant.LastName)
 	}
 
 	// 7. UpdateMerchant with non-existent UUID returns NotFound

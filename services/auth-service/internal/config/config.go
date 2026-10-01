@@ -21,7 +21,6 @@ type Config struct {
 	Email           EmailConfig
 	Security        SecurityConfig
 	Redis           redis.Config
-	RedisEnabled    bool
 	UserServiceAddr string
 	Services        ServicesConfig
 }
@@ -169,7 +168,6 @@ func LoadEnv() *Config {
 			PasswordResetLockoutDuration: GetEnvAsDuration("PASSWORD_RESET_LOCKOUT_DURATION", 1*time.Hour),
 		},
 		Redis:           redis.LoadConfigFromEnv("AUTH"),
-		RedisEnabled:    GetEnvAsBool("REDIS_ENABLED", os.Getenv("REDIS_HOST") != "" || os.Getenv("AUTH_REDIS_HOST") != "" || os.Getenv("REDIS_URL") != "" || os.Getenv("AUTH_REDIS_URL") != ""),
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{
 			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),

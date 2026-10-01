@@ -90,8 +90,10 @@ func (m *mockMerchantRepository) Update(ctx context.Context, merchant *model.Mer
 		return appErrors.NotFound("merchant not found")
 	}
 
-	// Persist only mutable fields: business_name, business_phone, tax_id, and updated_at
+	// Persist mutable fields: business_name, first_name, last_name, business_phone, tax_id, and updated_at
 	existing.BusinessName = merchant.BusinessName
+	existing.FirstName = merchant.FirstName
+	existing.LastName = merchant.LastName
 	existing.BusinessPhone = merchant.BusinessPhone
 	existing.PanCardNumber = merchant.PanCardNumber
 	existing.UpdatedAt = time.Now().UTC()
@@ -544,6 +546,52 @@ func TestUpdateMerchant_ImmutabilityAndPersistence(t *testing.T) {
 	}
 	if persisted.Status != string(model.MerchantStatusApproved) {
 		t.Errorf("persisted status must remain unchanged: %s", persisted.Status)
+	}
+}
+
+func TestUpdateMerchant_UpdateFirstAndLastName(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	merchantID := uuid.New()
+	seeded := &model.Merchant{
+		ID:            merchantID,
+		BusinessName:  "Test Store",
+		FirstName:     "John",
+		LastName:      "Doe",
+		BusinessEmail: "john.doe@example.com",
+		BusinessPhone: "+1234567890",
+		PanCardNumber: "TAX-12345",
+		Status:        string(model.MerchantStatusApproved),
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+	}
+	_ = repo.Create(context.Background(), seeded)
+
+	updated, err := svc.UpdateMerchant(context.Background(), merchantID, dto.UpdateMerchantRequest{
+		BusinessName:  "Updated Store",
+		FirstName:     "Jane",
+		LastName:      "Smith",
+		BusinessPhone: "+1987654321",
+		PanCardNumber: "TAX-99999",
+	})
+	if err != nil {
+		t.Fatalf("UpdateMerchant failed: %v", err)
+	}
+
+	if updated.FirstName != "Jane" {
+		t.Errorf("expected updated FirstName Jane, got %s", updated.FirstName)
+	}
+	if updated.LastName != "Smith" {
+		t.Errorf("expected updated LastName Smith, got %s", updated.LastName)
+	}
+
+	persisted, err := repo.GetByID(context.Background(), merchantID)
+	if err != nil {
+		t.Fatalf("failed to reload persisted merchant: %v", err)
+	}
+	if persisted.FirstName != "Jane" || persisted.LastName != "Smith" {
+		t.Errorf("expected persisted names Jane Smith, got %s %s", persisted.FirstName, persisted.LastName)
 	}
 }
 
