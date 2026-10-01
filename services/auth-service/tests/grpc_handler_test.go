@@ -167,23 +167,6 @@ func (r *inMemoryAuthRepo) UpdatePassword(ctx context.Context, userID uuid.UUID,
 	return nil
 }
 
-type mockMerchantClient struct {
-	merchantpb.MerchantServiceClient
-	createdMerchants []*merchantpb.CreateMerchantRequest
-}
-
-func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.CreateMerchantRequest, opts ...grpc.CallOption) (*merchantpb.CreateMerchantResponse, error) {
-	m.createdMerchants = append(m.createdMerchants, in)
-	return &merchantpb.CreateMerchantResponse{
-		Merchant: &merchantpb.MerchantResponseData{
-			Id:            in.Id,
-			BusinessEmail: in.BusinessEmail,
-			FirstName:     in.FirstName,
-			LastName:      in.LastName,
-		},
-	}, nil
-}
-
 // ---------------------------------------------------------------------------
 // Registration Tests
 // ---------------------------------------------------------------------------
