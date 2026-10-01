@@ -1,4 +1,4 @@
-.PHONY: build test generate-proto generate-graphql migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth run-cart run-gateway docker-up docker-down docker-build infra-up infra-down
+.PHONY: build test generate-proto gen-proto generate-graphql migrate migrate-up migrate-drop migrate-reset migrate-all migrate-reset-all run-auth run-cart run-gateway docker-up docker-down docker-build infra-up infra-down
 
 # Build all binaries
 build:
@@ -14,6 +14,10 @@ test:
 # Generate protobuf code for all services
 generate-proto:
 	protoc -I. --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contracts/protobuf/auth/auth.proto contracts/protobuf/cart/cart.proto contracts/protobuf/category/category.proto contracts/protobuf/delivery/delivery.proto contracts/protobuf/inventory/inventory.proto contracts/protobuf/merchant/merchant.proto contracts/protobuf/notification/notification.proto contracts/protobuf/order/order.proto contracts/protobuf/payment/payment.proto contracts/protobuf/product/product.proto contracts/protobuf/rating/rating.proto contracts/protobuf/return/return.proto contracts/protobuf/store/store.proto contracts/protobuf/user/user.proto
+
+# Generate protobuf code for a specific service (e.g. make gen-proto SERVICE=inventory)
+gen-proto:
+	protoc -I. --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative contracts/protobuf/$(SERVICE)/$(SERVICE).proto
 
 # Docker compose commands
 docker-up:

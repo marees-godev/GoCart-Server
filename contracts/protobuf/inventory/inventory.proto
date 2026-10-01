@@ -5,10 +5,64 @@ package gocart.inventory.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory;inventory";
 
 service InventoryService {
+  rpc GetInventory (GetInventoryRequest) returns (GetInventoryResponse);
+  rpc CreateInventory (CreateInventoryRequest) returns (CreateInventoryResponse);
+  rpc RestockInventory (RestockInventoryRequest) returns (RestockInventoryResponse);
   rpc GetStock (GetStockRequest) returns (GetStockResponse);
   rpc ReserveStock (ReserveStockRequest) returns (ReserveStockResponse);
   rpc ReleaseStock (ReleaseStockRequest) returns (ReleaseStockResponse);
   rpc UpdateStock (UpdateStockRequest) returns (UpdateStockResponse);
+}
+
+message InventoryItem {
+  string inventory_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+  string sku = 4;
+  int32 available_quantity = 5;
+  int32 reserved_quantity = 6;
+  int32 low_stock_threshold = 7;
+  string updated_at = 8;
+  string created_at = 9;
+}
+
+message GetInventoryRequest {
+  string product_id = 1;
+  string variant_id = 2;
+  string merchant_id = 3;
+  string inventory_id = 4;
+}
+
+message GetInventoryResponse {
+  InventoryItem inventory = 1;
+}
+
+message CreateInventoryRequest {
+  string merchant_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+  string sku = 4;
+  int32 initial_quantity = 5;
+  int32 low_stock_threshold = 6;
+}
+
+message CreateInventoryResponse {
+  InventoryItem inventory = 1;
+}
+
+message RestockInventoryRequest {
+  string merchant_id = 1;
+  string product_id = 2;
+  string variant_id = 3;
+  string inventory_id = 4;
+  int32 quantity = 5;
+  string reference_id = 6;
+  string notes = 7;
+}
+
+message RestockInventoryResponse {
+  InventoryItem inventory = 1;
+  bool success = 2;
 }
 
 message StockItem {
@@ -56,3 +110,4 @@ message UpdateStockRequest {
 message UpdateStockResponse {
   StockItem stock = 1;
 }
+

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,23 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/config"
+	inventoryGRPC "github.com/marees-godev/GoCart-Server/services/inventory-service/internal/grpc"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -78,7 +89,59 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize Downstream Clients & Domain Layer
+	var productClient client.ProductClient
+	prodGRPCClient, prodConn, err := grpcclient.NewProductClient(cfg.Services.ProductServiceAddr, 5*time.Second)
+	if err != nil {
+		log.Warn("Product service gRPC client initialization failed, using stub client", "error", err)
+		productClient = client.NewStubProductClient()
+	} else {
+		defer func() {
+			if prodConn != nil {
+				_ = prodConn.Close()
+			}
+		}()
+		var storeGRPCClient storepb.StoreServiceClient
+		storeCli, storeConn, err := grpcclient.NewStoreClient(cfg.Services.StoreServiceAddr, 5*time.Second)
+		if err == nil && storeCli != nil {
+			storeGRPCClient = storeCli
+			defer func() {
+				if storeConn != nil {
+					_ = storeConn.Close()
+				}
+			}()
+		}
+		var pCli productpb.ProductServiceClient = prodGRPCClient
+		productClient = client.NewGRPCProductClient(pCli, storeGRPCClient)
+	}
+
+	invRepo := repository.NewInventoryRepository(db.Pool)
+	invService := service.NewInventoryService(invRepo, productClient)
+	invGRPCServer := inventoryGRPC.NewInventoryGRPCServer(invService)
+
+	// 6. Start gRPC Server
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),
+		grpc.MaxRecvMsgSize(10*1024*1024),
+		grpc.MaxSendMsgSize(10*1024*1024),
+	)
+	inventorypb.RegisterInventoryServiceServer(grpcServer, invGRPCServer)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 7. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -95,7 +158,7 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -103,7 +166,10 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	cancel()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)

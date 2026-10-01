@@ -6,27 +6,229 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // ReserveStock is the resolver for the reserveStock field.
 func (r *mutationResolver) ReserveStock(ctx context.Context, orderID string, items []*model.ReservationItemInput) (*model.ReserveStockPayload, error) {
-	panic(fmt.Errorf("not implemented: ReserveStock - reserveStock"))
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	var protoItems []*inventorypb.ReservationItem
+	for _, it := range items {
+		if it != nil {
+			protoItems = append(protoItems, &inventorypb.ReservationItem{
+				ProductId: it.ProductID,
+				Quantity:  int32(it.Quantity),
+			})
+		}
+	}
+
+	res, err := r.Clients.InventoryClient.ReserveStock(ctx, &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items:   protoItems,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ReserveStockPayload{
+		ReservationID: res.ReservationId,
+		Success:       res.Success,
+	}, nil
 }
 
 // ReleaseStock is the resolver for the releaseStock field.
 func (r *mutationResolver) ReleaseStock(ctx context.Context, reservationID string) (bool, error) {
-	panic(fmt.Errorf("not implemented: ReleaseStock - releaseStock"))
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return false, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	res, err := r.Clients.InventoryClient.ReleaseStock(ctx, &inventorypb.ReleaseStockRequest{
+		ReservationId: reservationID,
+	})
+	if err != nil {
+		return false, grpcclient.TranslateGRPCError(err)
+	}
+
+	return res.Success, nil
 }
 
 // UpdateStock is the resolver for the updateStock field.
 func (r *mutationResolver) UpdateStock(ctx context.Context, productID string, quantity int) (*model.StockItem, error) {
-	panic(fmt.Errorf("not implemented: UpdateStock - updateStock"))
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	res, err := r.Clients.InventoryClient.UpdateStock(ctx, &inventorypb.UpdateStockRequest{
+		ProductId: productID,
+		Quantity:  int32(quantity),
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if res == nil || res.Stock == nil {
+		return nil, appErrors.NotFound("stock not found")
+	}
+
+	return &model.StockItem{
+		ProductID:         res.Stock.ProductId,
+		AvailableQuantity: int(res.Stock.AvailableQuantity),
+		ReservedQuantity:  int(res.Stock.ReservedQuantity),
+	}, nil
+}
+
+// CreateInventory is the resolver for the createInventory field.
+func (r *mutationResolver) CreateInventory(ctx context.Context, input model.CreateInventoryInput) (*model.InventoryItem, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	var variantID string
+	if input.VariantID != nil {
+		variantID = *input.VariantID
+	}
+	var sku string
+	if input.Sku != nil {
+		sku = *input.Sku
+	}
+	lowStockThreshold := int32(5)
+	if input.LowStockThreshold != nil {
+		lowStockThreshold = int32(*input.LowStockThreshold)
+	}
+
+	res, err := r.Clients.InventoryClient.CreateInventory(ctx, &inventorypb.CreateInventoryRequest{
+		MerchantId:        merchantID,
+		ProductId:         input.ProductID,
+		VariantId:         variantID,
+		Sku:               sku,
+		InitialQuantity:   int32(input.InitialQuantity),
+		LowStockThreshold: lowStockThreshold,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapInventoryItem(res.Inventory), nil
+}
+
+// RestockInventory is the resolver for the restockInventory field.
+func (r *mutationResolver) RestockInventory(ctx context.Context, input model.RestockInventoryInput) (*model.RestockInventoryPayload, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	var invID, prodID, varID, refID, notes string
+	if input.InventoryID != nil {
+		invID = *input.InventoryID
+	}
+	if input.ProductID != nil {
+		prodID = *input.ProductID
+	}
+	if input.VariantID != nil {
+		varID = *input.VariantID
+	}
+	if input.ReferenceID != nil {
+		refID = *input.ReferenceID
+	}
+	if input.Notes != nil {
+		notes = *input.Notes
+	}
+
+	res, err := r.Clients.InventoryClient.RestockInventory(ctx, &inventorypb.RestockInventoryRequest{
+		MerchantId:  merchantID,
+		InventoryId: invID,
+		ProductId:   prodID,
+		VariantId:   varID,
+		Quantity:    int32(input.Quantity),
+		ReferenceId: refID,
+		Notes:       notes,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.RestockInventoryPayload{
+		Inventory: mapInventoryItem(res.Inventory),
+		Success:   res.Success,
+	}, nil
 }
 
 // Stock is the resolver for the stock field.
 func (r *queryResolver) Stock(ctx context.Context, productID string) (*model.StockItem, error) {
-	panic(fmt.Errorf("not implemented: Stock - stock"))
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	res, err := r.Clients.InventoryClient.GetStock(ctx, &inventorypb.GetStockRequest{
+		ProductId: productID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if res == nil || res.Stock == nil {
+		return nil, appErrors.NotFound("stock not found")
+	}
+
+	return &model.StockItem{
+		ProductID:         res.Stock.ProductId,
+		AvailableQuantity: int(res.Stock.AvailableQuantity),
+		ReservedQuantity:  int(res.Stock.ReservedQuantity),
+	}, nil
+}
+
+// Inventory is the resolver for the inventory field.
+func (r *queryResolver) Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string) (*model.InventoryItem, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	merchantID := ""
+	if userCtx != nil {
+		merchantID = userCtx.UserID
+	}
+
+	var pID, vID, iID string
+	if productID != nil {
+		pID = *productID
+	}
+	if variantID != nil {
+		vID = *variantID
+	}
+	if inventoryID != nil {
+		iID = *inventoryID
+	}
+
+	res, err := r.Clients.InventoryClient.GetInventory(ctx, &inventorypb.GetInventoryRequest{
+		ProductId:   pID,
+		VariantId:   vID,
+		InventoryId: iID,
+		MerchantId:  merchantID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapInventoryItem(res.Inventory), nil
 }
