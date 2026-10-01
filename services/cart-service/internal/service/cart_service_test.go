@@ -7,11 +7,15 @@ import (
 	"testing"
 	"time"
 
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/service"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type mockCartRepo struct {
@@ -361,3 +365,237 @@ func TestCartService_Validation(t *testing.T) {
 		t.Errorf("expected product_id required error for empty AddCartItem, got %v", err)
 	}
 }
+
+type mockProductClient struct {
+	products map[string]*productpb.Product
+	err      error
+}
+
+func (m *mockProductClient) GetProduct(ctx context.Context, productID string) (*productpb.Product, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	p, ok := m.products[productID]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "product not found")
+	}
+	return p, nil
+}
+
+type mockInventoryClient struct {
+	stocks map[string]*inventorypb.StockItem
+	err    error
+}
+
+func (m *mockInventoryClient) GetStock(ctx context.Context, productID string) (*inventorypb.StockItem, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	s, ok := m.stocks[productID]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "stock not found")
+	}
+	return s, nil
+}
+
+func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"p1": {
+				Id:       "p1",
+				StoreId:  "store-1",
+				Name:     "Product 1",
+				Price:    29.99, // Authoritative price from Product Service
+				IsActive: true,
+			},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			"p1": {
+				ProductId:         "p1",
+				AvailableQuantity: 10,
+			},
+		},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+	userID := "user-val-1"
+
+	// Add item with client-supplied price 10.00 (stale/untrusted)
+	_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "p1",
+		StoreID:   "store-1",
+		UnitPrice: 10.00,
+		Quantity:  2,
+	})
+	if err != nil {
+		t.Fatalf("failed to add item: %v", err)
+	}
+
+	valResp, err := svc.ValidateCart(ctx, userID)
+	if err != nil {
+		t.Fatalf("ValidateCart failed: %v", err)
+	}
+
+	if !valResp.IsValid {
+		t.Errorf("expected cart to be valid, got errors: %+v", valResp.Errors)
+	}
+
+	// Verify price updated to authoritative 29.99
+	if len(valResp.Cart.Items) != 1 || valResp.Cart.Items[0].UnitPrice != 29.99 {
+		t.Errorf("expected unit_price to be updated to 29.99, got %v", valResp.Cart.Items[0].UnitPrice)
+	}
+
+	if valResp.Cart.TotalAmount != 59.98 {
+		t.Errorf("expected total amount to be 59.98, got %v", valResp.Cart.TotalAmount)
+	}
+
+	if len(valResp.StoreGroups) != 1 || valResp.StoreGroups[0].StoreID != "store-1" {
+		t.Errorf("expected 1 store group for store-1, got %+v", valResp.StoreGroups)
+	}
+}
+
+func TestCartService_ValidateCart_OutOfStock(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"p1": {
+				Id:       "p1",
+				Price:    50.0,
+				IsActive: true,
+			},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			"p1": {
+				ProductId:         "p1",
+				AvailableQuantity: 1, // Only 1 available, requested is 5
+			},
+		},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+	userID := "user-stock-test"
+
+	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "p1",
+		UnitPrice: 50.0,
+		Quantity:  5,
+	})
+
+	valResp, err := svc.ValidateCart(ctx, userID)
+	if err != nil {
+		t.Fatalf("ValidateCart failed: %v", err)
+	}
+
+	if valResp.IsValid {
+		t.Fatal("expected cart validation to fail due to out-of-stock")
+	}
+
+	if len(valResp.Errors) == 0 || valResp.Errors[0].Code != dto.ErrCodeOutOfStock {
+		t.Errorf("expected OUT_OF_STOCK error code %d, got %+v", dto.ErrCodeOutOfStock, valResp.Errors)
+	}
+}
+
+func TestCartService_ValidateCart_DownstreamFailureControlledError(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		err: status.Error(codes.Unavailable, "product service unavailable"),
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+	userID := "user-downstream-err"
+
+	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "p1",
+		UnitPrice: 10.0,
+		Quantity:  1,
+	})
+
+	_, err := svc.ValidateCart(ctx, userID)
+	if err == nil {
+		t.Fatal("expected controlled error on downstream service failure")
+	}
+}
+
+func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, IsActive: true},
+			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, IsActive: true},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			"p1": {ProductId: "p1", AvailableQuantity: 20},
+			"p2": {ProductId: "p2", AvailableQuantity: 20},
+		},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+	userID := "user-multi-store"
+
+	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "p1",
+		StoreID:   "store-A",
+		UnitPrice: 100.0,
+		Quantity:  2,
+	})
+	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "p2",
+		StoreID:   "store-B",
+		UnitPrice: 50.0,
+		Quantity:  1,
+	})
+
+	prepResp, err := svc.PrepareCheckout(ctx, dto.PrepareCheckoutRequest{
+		UserID:          userID,
+		ShippingAddress: "123 Main St, Tech City",
+	})
+	if err != nil {
+		t.Fatalf("PrepareCheckout failed: %v", err)
+	}
+
+	if !prepResp.IsValid {
+		t.Fatalf("expected PrepareCheckout to be valid, got errors: %+v", prepResp.Errors)
+	}
+
+	if prepResp.ParentOrderID == "" {
+		t.Error("expected non-empty ParentOrderID")
+	}
+
+	if len(prepResp.Orders) != 2 {
+		t.Fatalf("expected 2 store order payloads for multi-store cart, got %d", len(prepResp.Orders))
+	}
+
+	// Verify all store orders share the same ParentOrderID
+	for _, o := range prepResp.Orders {
+		if o.ParentOrderID != prepResp.ParentOrderID {
+			t.Errorf("expected store order parent_order_id to be %s, got %s", prepResp.ParentOrderID, o.ParentOrderID)
+		}
+		if o.ShippingAddress != "123 Main St, Tech City" {
+			t.Errorf("expected shipping address to be passed through, got %s", o.ShippingAddress)
+		}
+	}
+}
+
