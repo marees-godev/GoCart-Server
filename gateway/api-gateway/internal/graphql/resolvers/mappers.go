@@ -3,8 +3,9 @@ package resolvers
 import (
 	"time"
 
-	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 )
 
@@ -151,4 +152,31 @@ func toModelAddressList(list []*userpb.Address) []*model.Address {
 		res[i] = toModelAddress(a)
 	}
 	return res
+}
+
+func mapInventoryItem(inv *inventorypb.InventoryItem) *model.InventoryItem {
+	if inv == nil {
+		return nil
+	}
+	var variantID *string
+	if inv.VariantId != "" {
+		v := inv.VariantId
+		variantID = &v
+	}
+	var createdAt *string
+	if inv.CreatedAt != "" {
+		c := inv.CreatedAt
+		createdAt = &c
+	}
+	return &model.InventoryItem{
+		InventoryID:       inv.InventoryId,
+		ProductID:         inv.ProductId,
+		VariantID:         variantID,
+		Sku:               inv.Sku,
+		AvailableQuantity: int(inv.AvailableQuantity),
+		ReservedQuantity:  int(inv.ReservedQuantity),
+		LowStockThreshold: int(inv.LowStockThreshold),
+		UpdatedAt:         inv.UpdatedAt,
+		CreatedAt:         createdAt,
+	}
 }
