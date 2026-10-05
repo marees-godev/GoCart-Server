@@ -76,6 +76,12 @@ func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, 
 		return nil, appErrors.BadRequest("id and status are required")
 	}
 
+	if status == model.MerchantStatusRejected || status == model.MerchantStatusSuspended {
+		if rejectionReason == nil || strings.TrimSpace(*rejectionReason) == "" {
+			return nil, appErrors.BadRequest("rejection reason is required when rejecting or suspending a merchant")
+		}
+	}
+
 	statusVal, ok := merchantpb.MerchantStatus_value[string(status)]
 	if !ok {
 		return nil, appErrors.BadRequest("invalid merchant status")
@@ -133,6 +139,45 @@ func (r *mutationResolver) DeleteMerchant(ctx context.Context, id string) (bool,
 	return res.Success, nil
 }
 
+// MerchantAppeal is the resolver for the merchantAppeal field.
+func (r *mutationResolver) MerchantAppeal(ctx context.Context, merchantID string, reason string) (*model.MerchantAppeal, error) {
+	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
+		return nil, appErrors.Internal(nil, "merchant client unavailable")
+	}
+	if strings.TrimSpace(merchantID) == "" {
+		return nil, appErrors.BadRequest("merchant id is required")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return nil, appErrors.BadRequest("appeal reason is required")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && (role != "MERCHANT" || !strings.EqualFold(userCtx.UserID, merchantID)) {
+		return nil, appErrors.Forbidden("you can only submit an appeal for your own merchant profile")
+	}
+
+	res, err := r.ClientMgr.MerchantClient.CreateMerchantAppeal(ctx, &merchantpb.CreateMerchantAppealRequest{
+		MerchantId: merchantID,
+		Reason:     reason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelMerchantAppeal(res.Appeal), nil
+}
+
 // Merchant is the resolver for the merchant field.
 func (r *queryResolver) Merchant(ctx context.Context, id string) (*model.Merchant, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
@@ -151,7 +196,7 @@ func (r *queryResolver) Merchant(ctx context.Context, id string) (*model.Merchan
 }
 
 // Merchants is the resolver for the merchants field.
-func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantStatus, limit *int, offset *int) (*model.MerchantList, error) {
+func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantStatus, lifecycleStatus *model.MerchantLifecycleStatus, reactivatedOnly *bool, limit *int, offset *int) (*model.MerchantList, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
@@ -162,6 +207,28 @@ func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantSta
 			st := merchantpb.MerchantStatus(statusVal)
 			req.Status = &st
 		}
+	}
+	if lifecycleStatus != nil {
+		switch *lifecycleStatus {
+		case model.MerchantLifecycleStatusActive:
+			ls := merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_ACTIVE
+			req.LifecycleStatus = &ls
+		case model.MerchantLifecycleStatusInactive:
+			ls := merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_INACTIVE
+			req.LifecycleStatus = &ls
+		case model.MerchantLifecycleStatusPendingReview:
+			ls := merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_PENDING_REVIEW
+			req.LifecycleStatus = &ls
+		case model.MerchantLifecycleStatusSuspended:
+			ls := merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_SUSPENDED
+			req.LifecycleStatus = &ls
+		case model.MerchantLifecycleStatusTerminated:
+			ls := merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_TERMINATED
+			req.LifecycleStatus = &ls
+		}
+	}
+	if reactivatedOnly != nil {
+		req.ReactivatedOnly = reactivatedOnly
 	}
 	if limit != nil {
 		req.Limit = int32(*limit)
@@ -184,4 +251,44 @@ func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantSta
 		Merchants: items,
 		Total:     int(res.Total),
 	}, nil
+}
+
+// MerchantAppeals is the resolver for the merchantAppeals field.
+func (r *queryResolver) MerchantAppeals(ctx context.Context, merchantID string) ([]*model.MerchantAppeal, error) {
+	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
+		return nil, appErrors.Internal(nil, "merchant client unavailable")
+	}
+	if strings.TrimSpace(merchantID) == "" {
+		return nil, appErrors.BadRequest("merchant id is required")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && (role != "MERCHANT" || !strings.EqualFold(userCtx.UserID, merchantID)) {
+		return nil, appErrors.Forbidden("you can only view appeals for your own merchant profile")
+	}
+
+	res, err := r.ClientMgr.MerchantClient.GetMerchantAppeals(ctx, &merchantpb.GetMerchantAppealsRequest{
+		MerchantId: merchantID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	items := make([]*model.MerchantAppeal, len(res.Appeals))
+	for i, a := range res.Appeals {
+		items[i] = toModelMerchantAppeal(a)
+	}
+
+	return items, nil
 }
