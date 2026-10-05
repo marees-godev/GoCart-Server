@@ -12,6 +12,14 @@ enum MerchantStatus {
   REJECTED = 2;
   SUSPENDED = 3;
 }
+enum MerchantLifecycleStatus {
+  MERCHANT_LIFECYCLE_UNSPECIFIED = 0;
+  MERCHANT_LIFECYCLE_ACTIVE = 1;
+  MERCHANT_LIFECYCLE_INACTIVE = 2;
+  MERCHANT_LIFECYCLE_PENDING_REVIEW = 3;
+  MERCHANT_LIFECYCLE_SUSPENDED = 4;
+  MERCHANT_LIFECYCLE_TERMINATED = 5;
+}
 
 service MerchantService {
   rpc GetMerchant (GetMerchantRequest) returns (GetMerchantResponse);
@@ -20,6 +28,11 @@ service MerchantService {
   rpc ListMerchants (ListMerchantsRequest) returns (ListMerchantsResponse);
   rpc UpdateMerchantStatus (UpdateMerchantStatusRequest) returns (UpdateMerchantStatusResponse);
   rpc DeleteMerchant (DeleteMerchantRequest) returns (DeleteMerchantResponse);
+  rpc ActivateMerchant (LifecycleMerchantRequest) returns (LifecycleMerchantResponse);
+  rpc SuspendMerchant (LifecycleMerchantRequest) returns (LifecycleMerchantResponse);
+  rpc ReactivateMerchant (LifecycleMerchantRequest) returns (LifecycleMerchantResponse);
+  rpc CreateMerchantAppeal (CreateMerchantAppealRequest) returns (CreateMerchantAppealResponse);
+  rpc GetMerchantAppeals (GetMerchantAppealsRequest) returns (GetMerchantAppealsResponse);
 }
 
 message MerchantResponseData {
@@ -38,7 +51,7 @@ message MerchantResponseData {
 }
 
 message GetMerchantRequest {
-  string id = 1; // Pure merchant UUID lookup
+  string id = 1;
 }
 
 message GetMerchantResponse {
@@ -73,6 +86,8 @@ message ListMerchantsRequest {
   int32 limit = 1;
   int32 offset = 2;
   optional MerchantStatus status = 3;
+  optional MerchantLifecycleStatus lifecycle_status = 4;
+  optional bool reactivated_only = 5;
 }
 
 message ListMerchantsResponse {
@@ -97,4 +112,44 @@ message DeleteMerchantRequest {
 
 message DeleteMerchantResponse {
   bool success = 1;
+}
+
+message LifecycleMerchantRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message LifecycleMerchantResponse {
+  MerchantResponseData merchant = 1;
+  MerchantLifecycleStatus previous_status = 2;
+  string message = 3;
+}
+
+
+message MerchantAppealData {
+  string id = 1;
+  string merchant_id = 2;
+  string reason = 3;
+  string status = 4;
+  string admin_comment = 5;
+  google.protobuf.Timestamp reviewed_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateMerchantAppealRequest {
+  string merchant_id = 1;
+  string reason = 2;
+}
+
+message CreateMerchantAppealResponse {
+  MerchantAppealData appeal = 1;
+}
+
+message GetMerchantAppealsRequest {
+  string merchant_id = 1;
+}
+
+message GetMerchantAppealsResponse {
+  repeated MerchantAppealData appeals = 1;
 }

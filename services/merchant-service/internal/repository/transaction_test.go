@@ -15,7 +15,7 @@ import (
 type MockTransactionalRepository struct {
 	mu           sync.Mutex
 	merchants    map[uuid.UUID]*model.Merchant
-	audits       []*model.MerchantStatusAudit
+	audits       []*model.MerchantLifecycleAudit
 	failAudit    bool
 	failCommit   bool
 	rollbackDone bool
@@ -24,7 +24,7 @@ type MockTransactionalRepository struct {
 func NewMockTransactionalRepository() *MockTransactionalRepository {
 	return &MockTransactionalRepository{
 		merchants: make(map[uuid.UUID]*model.Merchant),
-		audits:    make([]*model.MerchantStatusAudit, 0),
+		audits:    make([]*model.MerchantLifecycleAudit, 0),
 	}
 }
 
@@ -66,14 +66,16 @@ func (m *MockTransactionalRepository) UpdateStatusWithAudit(ctx context.Context,
 		return nil, currentStatus, errors.New("failed to record merchant status audit: database error")
 	}
 
-	audit := &model.MerchantStatusAudit{
-		ID:         uuid.New(),
-		MerchantID: id,
-		FromStatus: currentStatus,
-		ToStatus:   newStatus,
-		Reason:     reason,
-		UpdatedBy:  updatedBy,
-		CreatedAt:  time.Now().UTC(),
+	audit := &model.MerchantLifecycleAudit{
+		ID:             uuid.New(),
+		MerchantID:     id,
+		AdminID:        updatedBy,
+		Action:         model.LifecycleActionApprove,
+		PreviousStatus: string(currentStatus),
+		NewStatus:      string(newStatus),
+		Reason:         reason,
+		Status:         model.AuditStatusSuccess,
+		CreatedAt:      time.Now().UTC(),
 	}
 	m.audits = append(m.audits, audit)
 
@@ -151,8 +153,8 @@ func TestTransactionRollback_OnAuditFailure(t *testing.T) {
 	if len(repo.audits) != 1 {
 		t.Errorf("expected 1 audit record, got %d", len(repo.audits))
 	}
-	if repo.audits[0].FromStatus != model.MerchantStatusPending || repo.audits[0].ToStatus != model.MerchantStatusApproved {
-		t.Errorf("audit record mismatch: from %s to %s", repo.audits[0].FromStatus, repo.audits[0].ToStatus)
+	if repo.audits[0].PreviousStatus != string(model.MerchantStatusPending) || repo.audits[0].NewStatus != string(model.MerchantStatusApproved) {
+		t.Errorf("audit record mismatch: from %s to %s", repo.audits[0].PreviousStatus, repo.audits[0].NewStatus)
 	}
 }
 

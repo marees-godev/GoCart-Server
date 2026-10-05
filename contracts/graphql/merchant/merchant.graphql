@@ -5,6 +5,25 @@ enum MerchantStatus {
   SUSPENDED
 }
 
+enum MerchantLifecycleStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_REVIEW
+  SUSPENDED
+  TERMINATED
+}
+
+type MerchantAppeal {
+  id: ID!
+  merchantId: ID!
+  reason: String!
+  status: String!
+  adminComment: String
+  reviewedAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
 type Merchant {
   id: ID!
   businessName: String!
@@ -35,13 +54,16 @@ input UpdateMerchantInput {
 
 extend type Query {
   merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: MerchantStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchants(status: MerchantStatus, lifecycleStatus: MerchantLifecycleStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  activeMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  suspendedMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  reactivatedMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchantAppeals(merchantId: ID!): [MerchantAppeal!]! @auth(requires: [MERCHANT, ADMIN])
 }
 
 extend type Mutation {
   updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
   updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
   deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
+  merchantAppeal(merchantId: ID!, reason: String!): MerchantAppeal! @auth(requires: [MERCHANT])
 }
-
-

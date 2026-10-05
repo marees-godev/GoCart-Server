@@ -6,3 +6,4 @@ ALTER TABLE merchants ALTER COLUMN business_name SET DEFAULT '';
 ALTER TYPE merchant_status ADD VALUE IF NOT EXISTS 'SUSPENDED';
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_merchants_deleted_at ON merchants(deleted_at);
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pan_card_number VARCHAR(100) NOT NULL DEFAULT '';

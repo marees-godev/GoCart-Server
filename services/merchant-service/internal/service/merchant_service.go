@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -57,8 +58,14 @@ type MerchantService interface {
 	GetMerchantByID(ctx context.Context, id uuid.UUID) (*model.Merchant, error)
 	CreateMerchant(ctx context.Context, req dto.CreateMerchantRequest) (*model.Merchant, error)
 	ListMerchants(ctx context.Context, limit, offset int, status string) ([]*model.Merchant, int, error)
+	ListReactivatedMerchants(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error)
 	UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantRequest) (*model.Merchant, error)
 	UpdateMerchantStatus(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantStatusRequest) (*model.Merchant, string, error)
+	ActivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error)
+	SuspendMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error)
+	ReactivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error)
+	CreateAppeal(ctx context.Context, merchantID uuid.UUID, reason string) (*model.MerchantAppeal, error)
+	GetAppeals(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error)
 	DeleteMerchant(ctx context.Context, id uuid.UUID) error
 }
 
@@ -167,6 +174,27 @@ func (s *merchantService) ListMerchants(ctx context.Context, limit, offset int, 
 	}
 
 	s.logger.Info("Merchants listed successfully",
+		slog.Int("count", len(merchants)),
+		slog.Int("total", total),
+	)
+	return merchants, total, nil
+}
+
+func (s *merchantService) ListReactivatedMerchants(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error) {
+	s.logger.Info("Listing reactivated merchants",
+		slog.Int("limit", limit),
+		slog.Int("offset", offset),
+	)
+	merchants, total, err := s.repo.ListReactivated(ctx, limit, offset)
+	if err != nil {
+		s.logger.Error("Failed to list reactivated merchants from repository",
+			slog.Int("limit", limit),
+			slog.Int("offset", offset),
+			slog.Any("error", err),
+		)
+		return nil, 0, err
+	}
+	s.logger.Info("Reactivated merchants listed successfully",
 		slog.Int("count", len(merchants)),
 		slog.Int("total", total),
 	)
@@ -325,4 +353,81 @@ func (s *merchantService) DeleteMerchant(ctx context.Context, id uuid.UUID) erro
 
 	s.logger.Info("Merchant profile deleted successfully", slog.String("merchant_id", id.String()))
 	return nil
+}
+
+func (s *merchantService) ActivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	if id == uuid.Nil {
+		s.logger.Warn("ActivateMerchant failed: invalid nil UUID")
+		return nil, "", appErrors.BadRequest("valid merchant ID is required")
+	}
+	s.logger.Info("Executing ActivateMerchant", slog.String("merchant_id", id.String()), slog.String("admin_id", adminID))
+	return s.repo.ExecuteLifecycleTransition(ctx, id, model.LifecycleActionActivate, reason, adminID, reqID)
+}
+
+func (s *merchantService) SuspendMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	if id == uuid.Nil {
+		s.logger.Warn("SuspendMerchant failed: invalid nil UUID")
+		return nil, "", appErrors.BadRequest("valid merchant ID is required")
+	}
+	s.logger.Info("Executing SuspendMerchant", slog.String("merchant_id", id.String()), slog.String("admin_id", adminID))
+	return s.repo.ExecuteLifecycleTransition(ctx, id, model.LifecycleActionSuspend, reason, adminID, reqID)
+}
+
+func (s *merchantService) ReactivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	if id == uuid.Nil {
+		s.logger.Warn("ReactivateMerchant failed: invalid nil UUID")
+		return nil, "", appErrors.BadRequest("valid merchant ID is required")
+	}
+	s.logger.Info("Executing ReactivateMerchant", slog.String("merchant_id", id.String()), slog.String("admin_id", adminID))
+	return s.repo.ExecuteLifecycleTransition(ctx, id, model.LifecycleActionReactivate, reason, adminID, reqID)
+}
+
+func (s *merchantService) CreateAppeal(ctx context.Context, merchantID uuid.UUID, reason string) (*model.MerchantAppeal, error) {
+	if merchantID == uuid.Nil {
+		s.logger.Warn("CreateAppeal failed: invalid nil UUID")
+		return nil, appErrors.BadRequest("valid merchant ID is required")
+	}
+	trimmedReason := strings.TrimSpace(reason)
+	if trimmedReason == "" {
+		return nil, appErrors.BadRequest("appeal reason is required")
+	}
+
+	merchant, err := s.repo.GetByID(ctx, merchantID)
+	if err != nil {
+		return nil, err
+	}
+	if merchant == nil {
+		return nil, appErrors.NotFound("merchant not found")
+	}
+
+	// Must be SUSPENDED to submit an appeal
+	if strings.ToUpper(strings.TrimSpace(merchant.Status)) != string(model.MerchantStatusSuspended) {
+		return nil, appErrors.Conflict("appeal can only be submitted for a suspended merchant")
+	}
+
+	appeal := &model.MerchantAppeal{
+		ID:         uuid.New(),
+		MerchantID: merchantID,
+		Reason:     trimmedReason,
+		Status:     string(model.MerchantAppealStatusPending),
+	}
+
+	if err := s.repo.CreateAppeal(ctx, appeal); err != nil {
+		return nil, err
+	}
+
+	// Update merchant status to PENDING upon appeal submission
+	if _, _, err := s.repo.UpdateStatusWithAudit(ctx, merchantID, model.MerchantStatusPending, fmt.Sprintf("Re-appeal submitted: %s", trimmedReason), "MERCHANT"); err != nil {
+		s.logger.Warn("Failed to update merchant status to PENDING upon appeal submission", slog.Any("error", err))
+	}
+
+	return appeal, nil
+}
+
+func (s *merchantService) GetAppeals(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
+	if merchantID == uuid.Nil {
+		s.logger.Warn("GetAppeals failed: invalid nil UUID")
+		return nil, appErrors.BadRequest("valid merchant ID is required")
+	}
+	return s.repo.GetAppealsByMerchantID(ctx, merchantID)
 }
