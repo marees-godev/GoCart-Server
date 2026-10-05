@@ -4,7 +4,9 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
-	"github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -16,10 +18,12 @@ import (
 type Clients struct {
 	AuthClient      auth.AuthServiceClient
 	UserClient      userpb.UserServiceClient
+	ProductClient   productpb.ProductServiceClient
 	StoreClient     store.StoreServiceClient
 	CategoryClient  categorypb.CategoryServiceClient
 	CartClient      cartpb.CartServiceClient
-	InventoryClient inventory.InventoryServiceClient
+	InventoryClient inventorypb.InventoryServiceClient
+	OrderClient     orderpb.OrderServiceClient
 	conns           []*grpc.ClientConn
 }
 
@@ -147,10 +151,12 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 	return &Clients{
 		AuthClient:      auth.NewAuthServiceClient(authConn),
 		UserClient:      userpb.NewUserServiceClient(userConn),
+		ProductClient:   productpb.NewProductServiceClient(productConn),
 		StoreClient:     store.NewStoreServiceClient(storeConn),
 		CategoryClient:  categorypb.NewCategoryServiceClient(categoryConn),
 		CartClient:      cartpb.NewCartServiceClient(cartConn),
-		InventoryClient: inventory.NewInventoryServiceClient(invConn),
+		InventoryClient: inventorypb.NewInventoryServiceClient(invConn),
+		OrderClient:     orderpb.NewOrderServiceClient(orderConn),
 		conns: []*grpc.ClientConn{
 			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn,
 		},
@@ -174,8 +180,14 @@ func NewClientsWithServices(
 		if cat, ok := svc.(categorypb.CategoryServiceClient); ok {
 			c.CategoryClient = cat
 		}
-		if inv, ok := svc.(inventory.InventoryServiceClient); ok {
+		if p, ok := svc.(productpb.ProductServiceClient); ok {
+			c.ProductClient = p
+		}
+		if inv, ok := svc.(inventorypb.InventoryServiceClient); ok {
 			c.InventoryClient = inv
+		}
+		if ord, ok := svc.(orderpb.OrderServiceClient); ok {
+			c.OrderClient = ord
 		}
 	}
 	return c

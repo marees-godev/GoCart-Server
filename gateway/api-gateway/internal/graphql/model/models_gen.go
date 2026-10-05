@@ -152,12 +152,28 @@ type CreateOrderInput struct {
 }
 
 type CreateProductInput struct {
-	StoreID     string  `json:"storeId"`
-	CategoryID  string  `json:"categoryId"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Price       float64 `json:"price"`
-	Sku         string  `json:"sku"`
+	StoreID      string                       `json:"storeId"`
+	CategoryID   string                       `json:"categoryId"`
+	Sku          string                       `json:"sku"`
+	Name         string                       `json:"name"`
+	Description  *string                      `json:"description,omitempty"`
+	Price        float64                      `json:"price"`
+	Mrp          float64                      `json:"mrp"`
+	Tax          *float64                     `json:"tax,omitempty"`
+	Status       *ProductStatus               `json:"status,omitempty"`
+	ImageURL     *string                      `json:"imageUrl,omitempty"`
+	Images       []string                     `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload            `json:"imagesUpload,omitempty"`
+	Variants     []*CreateProductVariantInput `json:"variants,omitempty"`
+}
+
+type CreateProductVariantInput struct {
+	Sku            string  `json:"sku"`
+	Name           string  `json:"name"`
+	Price          float64 `json:"price"`
+	Mrp            float64 `json:"mrp"`
+	Stock          *int    `json:"stock,omitempty"`
+	AttributesJSON *string `json:"attributesJson,omitempty"`
 }
 
 type CreateStoreInput struct {
@@ -181,6 +197,11 @@ type DeleteAccountInput struct {
 }
 
 type DeleteCategoryResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type DeleteProductResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
@@ -313,16 +334,23 @@ type ProcessPaymentInput struct {
 }
 
 type Product struct {
-	ID          string   `json:"id"`
-	StoreID     string   `json:"storeId"`
-	CategoryID  string   `json:"categoryId"`
-	Name        string   `json:"name"`
-	Description *string  `json:"description,omitempty"`
-	Price       float64  `json:"price"`
-	Sku         string   `json:"sku"`
-	IsActive    bool     `json:"isActive"`
-	Images      []string `json:"images,omitempty"`
-	CreatedAt   *string  `json:"createdAt,omitempty"`
+	ID          string            `json:"id"`
+	StoreID     string            `json:"storeId"`
+	CategoryID  string            `json:"categoryId"`
+	Sku         string            `json:"sku"`
+	Name        string            `json:"name"`
+	Description *string           `json:"description,omitempty"`
+	Price       float64           `json:"price"`
+	Mrp         float64           `json:"mrp"`
+	Tax         float64           `json:"tax"`
+	Status      ProductStatus     `json:"status"`
+	ImageURL    *string           `json:"imageUrl,omitempty"`
+	Images      []string          `json:"images,omitempty"`
+	Variants    []*ProductVariant `json:"variants,omitempty"`
+	AvgRating   float64           `json:"avgRating"`
+	CreatedAt   *string           `json:"createdAt,omitempty"`
+	UpdatedAt   *string           `json:"updatedAt,omitempty"`
+	DeletedAt   *string           `json:"deletedAt,omitempty"`
 }
 
 type ProductList struct {
@@ -334,6 +362,21 @@ type ProductRatings struct {
 	Ratings       []*Rating `json:"ratings"`
 	AverageRating float64   `json:"averageRating"`
 	Total         int       `json:"total"`
+}
+
+type ProductVariant struct {
+	ID             string        `json:"id"`
+	ProductID      string        `json:"productId"`
+	Sku            string        `json:"sku"`
+	Name           string        `json:"name"`
+	Price          float64       `json:"price"`
+	Mrp            float64       `json:"mrp"`
+	Stock          int           `json:"stock"`
+	AttributesJSON *string       `json:"attributesJson,omitempty"`
+	Status         ProductStatus `json:"status"`
+	CreatedAt      *string       `json:"createdAt,omitempty"`
+	UpdatedAt      *string       `json:"updatedAt,omitempty"`
+	DeletedAt      *string       `json:"deletedAt,omitempty"`
 }
 
 type Query struct {
@@ -517,10 +560,28 @@ type UpdateMerchantInput struct {
 }
 
 type UpdateProductInput struct {
-	Name        *string  `json:"name,omitempty"`
-	Description *string  `json:"description,omitempty"`
-	Price       *float64 `json:"price,omitempty"`
-	IsActive    *bool    `json:"isActive,omitempty"`
+	Name         *string                      `json:"name,omitempty"`
+	Description  *string                      `json:"description,omitempty"`
+	Price        *float64                     `json:"price,omitempty"`
+	Mrp          *float64                     `json:"mrp,omitempty"`
+	Tax          *float64                     `json:"tax,omitempty"`
+	Status       *ProductStatus               `json:"status,omitempty"`
+	ImageURL     *string                      `json:"imageUrl,omitempty"`
+	CategoryID   *string                      `json:"categoryId,omitempty"`
+	Images       []string                     `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload            `json:"imagesUpload,omitempty"`
+	Variants     []*UpdateProductVariantInput `json:"variants,omitempty"`
+}
+
+type UpdateProductVariantInput struct {
+	ID             *string        `json:"id,omitempty"`
+	Sku            *string        `json:"sku,omitempty"`
+	Name           *string        `json:"name,omitempty"`
+	Price          *float64       `json:"price,omitempty"`
+	Mrp            *float64       `json:"mrp,omitempty"`
+	Stock          *int           `json:"stock,omitempty"`
+	AttributesJSON *string        `json:"attributesJson,omitempty"`
+	Status         *ProductStatus `json:"status,omitempty"`
 }
 
 type UpdateStoreInput struct {
@@ -659,6 +720,53 @@ func (e *MerchantStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e MerchantStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ProductStatus string
+
+const (
+	ProductStatusInStock      ProductStatus = "IN_STOCK"
+	ProductStatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
+	ProductStatusLowStock     ProductStatus = "LOW_STOCK"
+	ProductStatusReserved     ProductStatus = "RESERVED"
+	ProductStatusDiscontinued ProductStatus = "DISCONTINUED"
+)
+
+var AllProductStatus = []ProductStatus{
+	ProductStatusInStock,
+	ProductStatusOutOfStock,
+	ProductStatusLowStock,
+	ProductStatusReserved,
+	ProductStatusDiscontinued,
+}
+
+func (e ProductStatus) IsValid() bool {
+	switch e {
+	case ProductStatusInStock, ProductStatusOutOfStock, ProductStatusLowStock, ProductStatusReserved, ProductStatusDiscontinued:
+		return true
+	}
+	return false
+}
+
+func (e ProductStatus) String() string {
+	return string(e)
+}
+
+func (e *ProductStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProductStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProductStatus", str)
+	}
+	return nil
+}
+
+func (e ProductStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

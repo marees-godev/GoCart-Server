@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/utils"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/model"
@@ -41,23 +41,6 @@ func isValidUUID(u string) bool {
 	return err == nil
 }
 
-const skuCharset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func GenerateSKU() string {
-	bytes := make([]byte, 8)
-	if _, err := rand.Read(bytes); err != nil {
-		now := time.Now().UnixNano()
-		for i := range bytes {
-			bytes[i] = skuCharset[int(now+int64(i*31))%len(skuCharset)]
-		}
-	} else {
-		for i := range bytes {
-			bytes[i] = skuCharset[int(bytes[i])%len(skuCharset)]
-		}
-	}
-	return "SKU-" + string(bytes)
-}
-
 func (s *inventoryService) CreateInventory(ctx context.Context, input dto.CreateInventoryInput) (*model.Inventory, error) {
 	if !isValidUUID(input.ProductID) {
 		return nil, appErrors.BadRequest("invalid product id: must be a valid UUID")
@@ -71,7 +54,7 @@ func (s *inventoryService) CreateInventory(ctx context.Context, input dto.Create
 
 	sku := strings.TrimSpace(input.SKU)
 	if sku == "" {
-		sku = GenerateSKU()
+		sku = utils.GenerateSKU()
 	}
 
 	if input.InitialQuantity < 0 {

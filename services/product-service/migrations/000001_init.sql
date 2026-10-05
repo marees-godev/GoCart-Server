@@ -1,3 +1,9 @@
+DO $$ BEGIN
+    CREATE TYPE product_status AS ENUM ('IN_STOCK', 'OUT_OF_STOCK', 'LOW_STOCK', 'RESERVED', 'DISCONTINUED');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID NOT NULL,
@@ -7,11 +13,14 @@ CREATE TABLE IF NOT EXISTS products (
     description TEXT,
     price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
     mrp DECIMAL(12,2) NOT NULL CHECK (mrp >= price),
-    tax_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00 CHECK (tax_rate >= 0),
+    tax DECIMAL(5,2) NOT NULL DEFAULT 0.00 CHECK (tax >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    status product_status NOT NULL DEFAULT 'IN_STOCK',
+    image_url TEXT,
+    avg_rating DECIMAL(3,2) NOT NULL DEFAULT 0.00 CHECK (avg_rating >= 0 AND avg_rating <= 5.00),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
     UNIQUE(store_id, sku)
 );
 
@@ -23,6 +32,22 @@ CREATE TABLE IF NOT EXISTS product_images (
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_variants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    sku VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
+    mrp DECIMAL(12,2) NOT NULL CHECK (mrp >= price),
+    stock INT NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    attributes JSONB NOT NULL DEFAULT '{}',
+    status product_status NOT NULL DEFAULT 'IN_STOCK',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ,
+    UNIQUE(product_id, sku)
 );
 
 CREATE TABLE IF NOT EXISTS outbox_events (
@@ -37,7 +62,11 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     published_at TIMESTAMPTZ
 );
 
+CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_deleted_at ON products(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_product_images_product_id ON product_images(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_variants_product_id ON product_variants(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_variants_deleted_at ON product_variants(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_product_outbox_status_created ON outbox_events(status, created_at);
