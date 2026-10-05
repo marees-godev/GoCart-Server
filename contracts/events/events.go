@@ -145,3 +145,16 @@ type StoreAppealedEvent struct {
 	Reason     string    `json:"reason"`
 	AppealedAt time.Time `json:"appealed_at"`
 }
+
+// OrderCancelledEvent represents the payload for OrderCancelled domain event.
+type OrderCancelledEvent struct {
+	OrderID     string    `json:"order_id"`
+	Reason      string    `json:"reason,omitempty"`
+	CancelledAt time.Time `json:"cancelled_at"`
+}
+
+// OrderConfirmedEvent represents the payload for OrderConfirmed domain event.
+type OrderConfirmedEvent struct {
+	OrderID     string    `json:"order_id"`
+	ConfirmedAt time.Time `json:"confirmed_at"`
+}

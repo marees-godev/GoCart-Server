@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,8 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	contractsEvents "github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/events"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/model"
 )
 
@@ -25,6 +26,7 @@ type InventoryRepository interface {
 	UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error)
 	ReserveStock(ctx context.Context, orderID string, items []model.ReserveItem, expiresAt time.Time) (string, error)
 	ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error
+	CommitStock(ctx context.Context, input dto.CommitStockInput) error
 	ReleaseExpiredReservations(ctx context.Context) (int, error)
 	GetTransactionsByInventoryID(ctx context.Context, inventoryID string, limit, offset int) ([]*model.InventoryTransaction, error)
 }
@@ -136,26 +138,34 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 		}
 	}
 
-	payload, _ := json.Marshal(map[string]interface{}{
-		"inventory_id":        inv.ID,
-		"product_id":          inv.ProductID,
-		"variant_id":          inv.VariantID,
-		"sku":                 inv.SKU,
-		"available_quantity":  inv.AvailableQuantity,
-		"reserved_quantity":   inv.ReservedQuantity,
-		"low_stock_threshold": inv.LowStockThreshold,
-	})
-
-	outboxQuery := `
-		INSERT INTO outbox_events (
-			id, aggregate_type, aggregate_id, event_type, payload, status, retry_count, created_at
-		) VALUES (
-			$1, $2, $3, $4, $5, 'PENDING', 0, $6
-		);
-	`
-	_, err = tx.Exec(ctx, outboxQuery, uuid.NewString(), "INVENTORY", inv.ID, "INVENTORY_CREATED", payload, now)
-	if err != nil {
+	createdEvent := events.InventoryCreatedEvent{
+		EventType:         events.EventInventoryCreated,
+		InventoryID:       inv.ID,
+		ProductID:         inv.ProductID,
+		VariantID:         inv.VariantID,
+		SKU:               inv.SKU,
+		AvailableQuantity: inv.AvailableQuantity,
+		ReservedQuantity:  inv.ReservedQuantity,
+		LowStockThreshold: inv.LowStockThreshold,
+		Timestamp:         now,
+	}
+	if err := writeOutboxEvent(ctx, tx, "INVENTORY", inv.ID, events.EventInventoryCreated, contractsEvents.TopicInventoryCreated, createdEvent, now); err != nil {
 		return appErrors.Internal(err, "failed to write outbox event")
+	}
+
+	if inv.AvailableQuantity < inv.LowStockThreshold {
+		lowEvent := events.InventoryLowEvent{
+			EventType:         events.EventInventoryLow,
+			InventoryID:       inv.ID,
+			ProductID:         inv.ProductID,
+			VariantID:         inv.VariantID,
+			SKU:               inv.SKU,
+			AvailableQuantity: inv.AvailableQuantity,
+			ReservedQuantity:  inv.ReservedQuantity,
+			LowStockThreshold: inv.LowStockThreshold,
+			Timestamp:         now,
+		}
+		_ = writeOutboxEvent(ctx, tx, "INVENTORY", inv.ID, events.EventInventoryLow, contractsEvents.TopicInventoryLow, lowEvent, now)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -294,24 +304,17 @@ func (r *pgInventoryRepository) Restock(ctx context.Context, id string, quantity
 		return nil, appErrors.Internal(err, "failed to record restock inventory transaction")
 	}
 
-	payload, _ := json.Marshal(map[string]interface{}{
-		"inventory_id":       inv.ID,
-		"product_id":         inv.ProductID,
-		"variant_id":         inv.VariantID,
-		"restock_quantity":   quantity,
-		"available_quantity": inv.AvailableQuantity,
-		"reserved_quantity":  inv.ReservedQuantity,
-	})
-
-	outboxQuery := `
-		INSERT INTO outbox_events (
-			id, aggregate_type, aggregate_id, event_type, payload, status, retry_count, created_at
-		) VALUES (
-			$1, $2, $3, $4, $5, 'PENDING', 0, $6
-		);
-	`
-	_, err = tx.Exec(ctx, outboxQuery, uuid.NewString(), "INVENTORY", inv.ID, "INVENTORY_RESTOCKED", payload, now)
-	if err != nil {
+	restockedEvent := events.InventoryRestockedEvent{
+		EventType:         events.EventInventoryRestocked,
+		InventoryID:       inv.ID,
+		ProductID:         inv.ProductID,
+		VariantID:         inv.VariantID,
+		RestockQuantity:   quantity,
+		AvailableQuantity: inv.AvailableQuantity,
+		ReservedQuantity:  inv.ReservedQuantity,
+		Timestamp:         now,
+	}
+	if err := writeOutboxEvent(ctx, tx, "INVENTORY", inv.ID, events.EventInventoryRestocked, contractsEvents.TopicInventoryRestocked, restockedEvent, now); err != nil {
 		return nil, appErrors.Internal(err, "failed to record restock outbox event")
 	}
 
@@ -422,11 +425,46 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.Updat
 		return nil, appErrors.Internal(err, "failed to record stock adjustment transaction")
 	}
 
+	if inv.AvailableQuantity < inv.LowStockThreshold {
+		lowEvent := events.InventoryLowEvent{
+			EventType:         events.EventInventoryLow,
+			InventoryID:       inv.ID,
+			ProductID:         inv.ProductID,
+			VariantID:         inv.VariantID,
+			SKU:               inv.SKU,
+			AvailableQuantity: inv.AvailableQuantity,
+			ReservedQuantity:  inv.ReservedQuantity,
+			LowStockThreshold: inv.LowStockThreshold,
+			Timestamp:         now,
+		}
+		_ = writeOutboxEvent(ctx, tx, "INVENTORY", inv.ID, events.EventInventoryLow, contractsEvents.TopicInventoryLow, lowEvent, now)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, appErrors.Internal(err, "failed to commit stock update")
 	}
 
 	return &inv, nil
+}
+
+func writeOutboxEvent(ctx context.Context, tx pgx.Tx, aggregateType, aggregateID, eventType, topic string, payload interface{}, createdAt time.Time) error {
+	envelope, err := contractsEvents.NewEventEnvelope(eventType, "inventory-service", payload)
+	if err != nil {
+		return fmt.Errorf("failed to create event envelope: %w", err)
+	}
+	envelopeBytes, err := envelope.Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal event envelope: %w", err)
+	}
+	query := `
+		INSERT INTO outbox_events (
+			id, aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, 'PENDING', 0, $7
+		);
+	`
+	_, err = tx.Exec(ctx, query, uuid.NewString(), aggregateType, aggregateID, eventType, envelopeBytes, topic, createdAt)
+	return err
 }
 
 func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string, items []model.ReserveItem, expiresAt time.Time) (string, error) {
@@ -441,6 +479,19 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now().UTC()
+
+	var existingResID string
+	checkQuery := `
+		SELECT id FROM inventory_reservations
+		WHERE order_id = $1 AND status IN ('RESERVED', 'CONFIRMED')
+		LIMIT 1;
+	`
+	_ = tx.QueryRow(ctx, checkQuery, orderID).Scan(&existingResID)
+	if existingResID != "" {
+		_ = tx.Commit(ctx)
+		return existingResID, nil
+	}
+
 	reservationID := uuid.NewString()
 
 	for _, item := range items {
@@ -452,7 +503,7 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 		var args []interface{}
 		if item.VariantID == nil || *item.VariantID == "" {
 			selectQuery = `
-				SELECT id, available_quantity, reserved_quantity
+				SELECT id, sku, available_quantity, reserved_quantity, low_stock_threshold
 				FROM inventories
 				WHERE product_id = $1 AND variant_id IS NULL
 				FOR UPDATE;
@@ -460,7 +511,7 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 			args = []interface{}{item.ProductID}
 		} else {
 			selectQuery = `
-				SELECT id, available_quantity, reserved_quantity
+				SELECT id, sku, available_quantity, reserved_quantity, low_stock_threshold
 				FROM inventories
 				WHERE product_id = $1 AND variant_id = $2
 				FOR UPDATE;
@@ -468,9 +519,9 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 			args = []interface{}{item.ProductID, *item.VariantID}
 		}
 
-		var invID string
-		var available, reserved int
-		err := tx.QueryRow(ctx, selectQuery, args...).Scan(&invID, &available, &reserved)
+		var invID, sku string
+		var available, reserved, lowStockThreshold int
+		err := tx.QueryRow(ctx, selectQuery, args...).Scan(&invID, &sku, &available, &reserved, &lowStockThreshold)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return "", appErrors.NotFound(fmt.Sprintf("inventory not found for product %s", item.ProductID))
@@ -482,14 +533,17 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 			return "", appErrors.Conflict(fmt.Sprintf("insufficient stock for product %s: available %d, requested %d", item.ProductID, available, item.Quantity))
 		}
 
+		newAvailable := available - item.Quantity
+		newReserved := reserved + item.Quantity
+
 		updateQuery := `
 			UPDATE inventories
-			SET available_quantity = available_quantity - $1,
-			    reserved_quantity = reserved_quantity + $1,
-			    updated_at = $2
-			WHERE id = $3;
+			SET available_quantity = $1,
+			    reserved_quantity = $2,
+			    updated_at = $3
+			WHERE id = $4;
 		`
-		_, err = tx.Exec(ctx, updateQuery, item.Quantity, now, invID)
+		_, err = tx.Exec(ctx, updateQuery, newAvailable, newReserved, now, invID)
 		if err != nil {
 			return "", appErrors.Internal(err, "failed to update stock for reservation")
 		}
@@ -518,6 +572,41 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 		_, err = tx.Exec(ctx, txQuery, uuid.NewString(), invID, model.TransactionTypeReserve, item.Quantity, &ref, &notes, now)
 		if err != nil {
 			return "", appErrors.Internal(err, "failed to insert reservation transaction")
+		}
+
+		resEvent := events.InventoryReservedEvent{
+			EventType:         events.EventInventoryReserved,
+			InventoryID:       invID,
+			ProductID:         item.ProductID,
+			VariantID:         item.VariantID,
+			SKU:               sku,
+			OrderID:           orderID,
+			ReservationID:     reservationID,
+			Quantity:          item.Quantity,
+			AvailableQuantity: newAvailable,
+			ReservedQuantity:  newReserved,
+			LowStockThreshold: lowStockThreshold,
+			Timestamp:         now,
+		}
+		if err := writeOutboxEvent(ctx, tx, "INVENTORY", invID, events.EventInventoryReserved, contractsEvents.TopicInventoryReserved, resEvent, now); err != nil {
+			return "", appErrors.Internal(err, "failed to record InventoryReserved outbox event")
+		}
+
+		if newAvailable < lowStockThreshold {
+			lowEvent := events.InventoryLowEvent{
+				EventType:         events.EventInventoryLow,
+				InventoryID:       invID,
+				ProductID:         item.ProductID,
+				VariantID:         item.VariantID,
+				SKU:               sku,
+				AvailableQuantity: newAvailable,
+				ReservedQuantity:  newReserved,
+				LowStockThreshold: lowStockThreshold,
+				Timestamp:         now,
+			}
+			if err := writeOutboxEvent(ctx, tx, "INVENTORY", invID, events.EventInventoryLow, contractsEvents.TopicInventoryLow, lowEvent, now); err != nil {
+				return "", appErrors.Internal(err, "failed to record InventoryLow outbox event")
+			}
 		}
 	}
 
@@ -593,7 +682,6 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 		return appErrors.NotFound("reservation not found")
 	}
 
-	// Idempotency: if all matching reservations are already released or expired, return success without mutating inventory
 	if len(activeRows) == 0 {
 		return nil
 	}
@@ -618,7 +706,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 				    reserved_quantity = GREATEST(reserved_quantity - $1, 0),
 				    updated_at = $2
 				WHERE product_id = $3 AND variant_id IS NULL
-				RETURNING id;
+				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID}
 		} else {
@@ -628,13 +716,14 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 				    reserved_quantity = GREATEST(reserved_quantity - $1, 0),
 				    updated_at = $2
 				WHERE product_id = $3 AND variant_id = $4
-				RETURNING id;
+				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID, *row.variantID}
 		}
 
-		var invID string
-		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID)
+		var invID, sku string
+		var newAvail, newRes int
+		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID, &sku, &newAvail, &newRes)
 		if err != nil {
 			return appErrors.Internal(err, "failed to return stock to available inventory")
 		}
@@ -662,10 +751,193 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 		if err != nil {
 			return appErrors.Internal(err, "failed to update reservation status")
 		}
+
+		relEvent := events.InventoryReleasedEvent{
+			EventType:         events.EventInventoryReleased,
+			InventoryID:       invID,
+			ProductID:         row.productID,
+			VariantID:         row.variantID,
+			SKU:               sku,
+			OrderID:           row.orderID,
+			ReservationID:     row.id,
+			Quantity:          row.quantity,
+			Reason:            input.Reason,
+			AvailableQuantity: newAvail,
+			ReservedQuantity:  newRes,
+			Timestamp:         now,
+		}
+		if err := writeOutboxEvent(ctx, tx, "INVENTORY", invID, events.EventInventoryReleased, contractsEvents.TopicInventoryReleased, relEvent, now); err != nil {
+			return appErrors.Internal(err, "failed to record InventoryReleased outbox event")
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return appErrors.Internal(err, "failed to commit release transaction")
+	}
+
+	return nil
+}
+
+func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.CommitStockInput) error {
+	resID := strings.TrimSpace(input.ReservationID)
+	orderID := strings.TrimSpace(input.OrderID)
+
+	if resID == "" && orderID == "" {
+		return appErrors.BadRequest("either reservation_id or order_id is required for commit")
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to begin commit transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	now := time.Now().UTC()
+
+	var selectQuery string
+	var args []interface{}
+
+	if resID != "" {
+		selectQuery = `
+			SELECT id, order_id, product_id, variant_id, quantity, status
+			FROM inventory_reservations
+			WHERE id = $1
+			FOR UPDATE;
+		`
+		args = []interface{}{resID}
+	} else {
+		selectQuery = `
+			SELECT id, order_id, product_id, variant_id, quantity, status
+			FROM inventory_reservations
+			WHERE order_id = $1
+			FOR UPDATE;
+		`
+		args = []interface{}{orderID}
+	}
+
+	rows, err := tx.Query(ctx, selectQuery, args...)
+	if err != nil {
+		return appErrors.Internal(err, "failed to fetch reservations for commit")
+	}
+	defer rows.Close()
+
+	type resRow struct {
+		id, orderID, productID string
+		variantID              *string
+		quantity               int
+		status                 model.ReservationStatus
+	}
+	var allRows []resRow
+	var activeRows []resRow
+	var confirmedCount int
+	var releasedCount int
+
+	for rows.Next() {
+		var row resRow
+		if err := rows.Scan(&row.id, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
+			return appErrors.Internal(err, "failed to scan reservation row for commit")
+		}
+		allRows = append(allRows, row)
+		if row.status == model.ReservationStatusReserved {
+			activeRows = append(activeRows, row)
+		} else if row.status == model.ReservationStatusConfirmed {
+			confirmedCount++
+		} else if row.status == model.ReservationStatusReleased || row.status == model.ReservationStatusExpired {
+			releasedCount++
+		}
+	}
+	rows.Close()
+
+	if len(allRows) == 0 {
+		return appErrors.NotFound("reservation not found")
+	}
+
+	if len(activeRows) == 0 {
+		if confirmedCount > 0 {
+			// Already committed idempotently
+			return nil
+		}
+		if releasedCount > 0 {
+			return appErrors.Conflict("cannot commit released or expired reservation")
+		}
+		return appErrors.Conflict("reservation is not in a committable state")
+	}
+
+	for _, row := range activeRows {
+		var updateInvQuery string
+		var invArgs []interface{}
+
+		if row.variantID == nil || *row.variantID == "" {
+			updateInvQuery = `
+				UPDATE inventories
+				SET reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id IS NULL
+				RETURNING id, sku, available_quantity, reserved_quantity;
+			`
+			invArgs = []interface{}{row.quantity, now, row.productID}
+		} else {
+			updateInvQuery = `
+				UPDATE inventories
+				SET reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id = $4
+				RETURNING id, sku, available_quantity, reserved_quantity;
+			`
+			invArgs = []interface{}{row.quantity, now, row.productID, *row.variantID}
+		}
+
+		var invID, sku string
+		var avail, newRes int
+		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID, &sku, &avail, &newRes)
+		if err != nil {
+			return appErrors.Internal(err, "failed to deduct reserved stock for commit")
+		}
+
+		ref := row.orderID
+		notes := fmt.Sprintf("Stock committed for order %s", row.orderID)
+		txQuery := `
+			INSERT INTO inventory_transactions (
+				id, inventory_id, type, quantity, reference_id, notes, created_at
+			) VALUES (
+				$1, $2, $3, $4, $5, $6, $7
+			);
+		`
+		_, err = tx.Exec(ctx, txQuery, uuid.NewString(), invID, model.TransactionTypeCommit, row.quantity, &ref, &notes, now)
+		if err != nil {
+			return appErrors.Internal(err, "failed to record commit transaction")
+		}
+
+		resUpdateQuery := `
+			UPDATE inventory_reservations
+			SET status = 'CONFIRMED', updated_at = $1
+			WHERE id = $2 AND status = 'RESERVED';
+		`
+		_, err = tx.Exec(ctx, resUpdateQuery, now, row.id)
+		if err != nil {
+			return appErrors.Internal(err, "failed to update reservation status to CONFIRMED")
+		}
+
+		commitEvent := events.InventoryCommittedEvent{
+			EventType:         events.EventInventoryCommitted,
+			InventoryID:       invID,
+			ProductID:         row.productID,
+			VariantID:         row.variantID,
+			SKU:               sku,
+			OrderID:           row.orderID,
+			ReservationID:     row.id,
+			Quantity:          row.quantity,
+			AvailableQuantity: avail,
+			ReservedQuantity:  newRes,
+			Timestamp:         now,
+		}
+		if err := writeOutboxEvent(ctx, tx, "INVENTORY", invID, events.EventInventoryCommitted, contractsEvents.TopicInventoryCommitted, commitEvent, now); err != nil {
+			return appErrors.Internal(err, "failed to record InventoryCommitted outbox event")
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit transaction")
 	}
 
 	return nil

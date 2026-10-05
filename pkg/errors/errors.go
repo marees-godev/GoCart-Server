@@ -250,3 +250,13 @@ func ToGRPC(err error) error {
 func (e *AppError) ToGRPC() error {
 	return MapAppErrorToGRPC(e)
 }
+
+func IsConflict(err error) bool {
+	appErr := AsAppError(err)
+	return appErr != nil && appErr.Code == CodeConflict
+}
+
+func IsNotFound(err error) bool {
+	appErr := AsAppError(err)
+	return appErr != nil && appErr.Code == CodeNotFound
+}

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -14,8 +15,14 @@ type Config struct {
 	Services    ServicesConfig
 	Database    DatabaseConfig
 	Reservation ReservationConfig
+	Kafka       KafkaConfig
 	Logger      LoggerConfig
 	Tracing     TracingConfig
+}
+
+type KafkaConfig struct {
+	Brokers []string
+	Enabled bool
 }
 
 type ReservationConfig struct {
@@ -93,6 +100,10 @@ func LoadEnv() *Config {
 		Reservation: ReservationConfig{
 			ExpirationCleanupIntervalSeconds: GetEnvAsInt("RESERVATION_EXPIRATION_CLEANUP_INTERVAL_SECONDS", 30),
 			DefaultExpirationMinutes:         GetEnvAsInt("DEFAULT_RESERVATION_EXPIRATION_MINUTES", 15),
+		},
+		Kafka: KafkaConfig{
+			Brokers: strings.Split(GetEnv("KAFKA_BROKERS", "localhost:9092"), ","),
+			Enabled: GetEnvAsBool("KAFKA_ENABLED", true),
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),

@@ -23,6 +23,7 @@ type InventoryService interface {
 	UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error)
 	ReserveStock(ctx context.Context, input dto.ReserveStockInput) (string, time.Time, error)
 	ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error
+	CommitStock(ctx context.Context, input dto.CommitStockInput) error
 	ReleaseExpiredReservations(ctx context.Context) (int, error)
 	StartExpirationWorker(ctx context.Context, interval time.Duration)
 }
@@ -324,6 +325,16 @@ func (s *inventoryService) ReleaseStock(ctx context.Context, input dto.ReleaseSt
 		return appErrors.BadRequest("invalid order id: must be a valid UUID")
 	}
 	return s.repo.ReleaseStock(ctx, input)
+}
+
+func (s *inventoryService) CommitStock(ctx context.Context, input dto.CommitStockInput) error {
+	if strings.TrimSpace(input.ReservationID) != "" && !isValidUUID(input.ReservationID) {
+		return appErrors.BadRequest("invalid reservation id: must be a valid UUID")
+	}
+	if strings.TrimSpace(input.OrderID) != "" && !isValidUUID(input.OrderID) {
+		return appErrors.BadRequest("invalid order id: must be a valid UUID")
+	}
+	return s.repo.CommitStock(ctx, input)
 }
 
 func (s *inventoryService) ReleaseExpiredReservations(ctx context.Context) (int, error) {

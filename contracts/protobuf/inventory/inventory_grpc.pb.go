@@ -27,6 +27,7 @@ const (
 	InventoryService_ReleaseStock_FullMethodName               = "/gocart.inventory.v1.InventoryService/ReleaseStock"
 	InventoryService_ReleaseExpiredReservations_FullMethodName = "/gocart.inventory.v1.InventoryService/ReleaseExpiredReservations"
 	InventoryService_UpdateStock_FullMethodName                = "/gocart.inventory.v1.InventoryService/UpdateStock"
+	InventoryService_CommitStock_FullMethodName                = "/gocart.inventory.v1.InventoryService/CommitStock"
 )
 
 // InventoryServiceClient is the client API for InventoryService service.
@@ -41,6 +42,7 @@ type InventoryServiceClient interface {
 	ReleaseStock(ctx context.Context, in *ReleaseStockRequest, opts ...grpc.CallOption) (*ReleaseStockResponse, error)
 	ReleaseExpiredReservations(ctx context.Context, in *ReleaseExpiredReservationsRequest, opts ...grpc.CallOption) (*ReleaseExpiredReservationsResponse, error)
 	UpdateStock(ctx context.Context, in *UpdateStockRequest, opts ...grpc.CallOption) (*UpdateStockResponse, error)
+	CommitStock(ctx context.Context, in *CommitStockRequest, opts ...grpc.CallOption) (*CommitStockResponse, error)
 }
 
 type inventoryServiceClient struct {
@@ -131,6 +133,16 @@ func (c *inventoryServiceClient) UpdateStock(ctx context.Context, in *UpdateStoc
 	return out, nil
 }
 
+func (c *inventoryServiceClient) CommitStock(ctx context.Context, in *CommitStockRequest, opts ...grpc.CallOption) (*CommitStockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitStockResponse)
+	err := c.cc.Invoke(ctx, InventoryService_CommitStock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InventoryServiceServer is the server API for InventoryService service.
 // All implementations must embed UnimplementedInventoryServiceServer
 // for forward compatibility.
@@ -143,6 +155,7 @@ type InventoryServiceServer interface {
 	ReleaseStock(context.Context, *ReleaseStockRequest) (*ReleaseStockResponse, error)
 	ReleaseExpiredReservations(context.Context, *ReleaseExpiredReservationsRequest) (*ReleaseExpiredReservationsResponse, error)
 	UpdateStock(context.Context, *UpdateStockRequest) (*UpdateStockResponse, error)
+	CommitStock(context.Context, *CommitStockRequest) (*CommitStockResponse, error)
 	mustEmbedUnimplementedInventoryServiceServer()
 }
 
@@ -176,6 +189,9 @@ func (UnimplementedInventoryServiceServer) ReleaseExpiredReservations(context.Co
 }
 func (UnimplementedInventoryServiceServer) UpdateStock(context.Context, *UpdateStockRequest) (*UpdateStockResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateStock not implemented")
+}
+func (UnimplementedInventoryServiceServer) CommitStock(context.Context, *CommitStockRequest) (*CommitStockResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitStock not implemented")
 }
 func (UnimplementedInventoryServiceServer) mustEmbedUnimplementedInventoryServiceServer() {}
 func (UnimplementedInventoryServiceServer) testEmbeddedByValue()                          {}
@@ -342,6 +358,24 @@ func _InventoryService_UpdateStock_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InventoryService_CommitStock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitStockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).CommitStock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_CommitStock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).CommitStock(ctx, req.(*CommitStockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InventoryService_ServiceDesc is the grpc.ServiceDesc for InventoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var InventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateStock",
 			Handler:    _InventoryService_UpdateStock_Handler,
+		},
+		{
+			MethodName: "CommitStock",
+			Handler:    _InventoryService_CommitStock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

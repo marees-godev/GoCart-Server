@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -210,6 +211,18 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
+
+		ref := orderID
+		notes := fmt.Sprintf("Stock reserved for order %s", orderID)
+		r.transactions = append(r.transactions, &model.InventoryTransaction{
+			ID:          uuid.NewString(),
+			InventoryID: found.ID,
+			Type:        model.TransactionTypeReserve,
+			Quantity:    item.Quantity,
+			ReferenceID: &ref,
+			Notes:       &notes,
+			CreatedAt:   now,
+		})
 	}
 	return resID, nil
 }
@@ -235,6 +248,7 @@ func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, input dto.Releas
 		targetStatus = model.ReservationStatusExpired
 	}
 
+	now := time.Now().UTC()
 	for _, res := range matching {
 		if res.Status == model.ReservationStatusReserved {
 			for _, inv := range r.inventories {
@@ -246,14 +260,101 @@ func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, input dto.Releas
 						if inv.ReservedQuantity < 0 {
 							inv.ReservedQuantity = 0
 						}
-						inv.UpdatedAt = time.Now().UTC()
+						inv.UpdatedAt = now
+
+						ref := res.OrderID
+						notes := fmt.Sprintf("Stock released (%s)", input.Reason)
+						r.transactions = append(r.transactions, &model.InventoryTransaction{
+							ID:          uuid.NewString(),
+							InventoryID: inv.ID,
+							Type:        model.TransactionTypeRelease,
+							Quantity:    res.Quantity,
+							ReferenceID: &ref,
+							Notes:       &notes,
+							CreatedAt:   now,
+						})
 						break
 					}
 				}
 			}
 			res.Status = targetStatus
-			res.UpdatedAt = time.Now().UTC()
+			res.UpdatedAt = now
 		}
+	}
+
+	return nil
+}
+
+func (r *memoryInventoryRepo) CommitStock(ctx context.Context, input dto.CommitStockInput) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var matching []*model.InventoryReservation
+	var confirmedCount int
+	var releasedCount int
+
+	for _, res := range r.reservations {
+		if (input.ReservationID != "" && res.ID == input.ReservationID) ||
+			(input.OrderID != "" && res.OrderID == input.OrderID) {
+			matching = append(matching, res)
+			if res.Status == model.ReservationStatusConfirmed {
+				confirmedCount++
+			} else if res.Status == model.ReservationStatusReleased || res.Status == model.ReservationStatusExpired {
+				releasedCount++
+			}
+		}
+	}
+
+	if len(matching) == 0 {
+		return appErrors.NotFound("reservation not found")
+	}
+
+	var active []*model.InventoryReservation
+	for _, res := range matching {
+		if res.Status == model.ReservationStatusReserved {
+			active = append(active, res)
+		}
+	}
+
+	if len(active) == 0 {
+		if confirmedCount > 0 {
+			return appErrors.Conflict("reservation is already committed")
+		}
+		if releasedCount > 0 {
+			return appErrors.Conflict("cannot commit released or expired reservation")
+		}
+		return appErrors.Conflict("reservation is not in a committable state")
+	}
+
+	now := time.Now().UTC()
+	for _, res := range active {
+		for _, inv := range r.inventories {
+			if inv.ProductID == res.ProductID {
+				if (res.VariantID == nil && inv.VariantID == nil) ||
+					(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
+					inv.ReservedQuantity -= res.Quantity
+					if inv.ReservedQuantity < 0 {
+						inv.ReservedQuantity = 0
+					}
+					inv.UpdatedAt = now
+
+					ref := res.OrderID
+					notes := fmt.Sprintf("Stock committed for order %s", res.OrderID)
+					r.transactions = append(r.transactions, &model.InventoryTransaction{
+						ID:          uuid.NewString(),
+						InventoryID: inv.ID,
+						Type:        model.TransactionTypeCommit,
+						Quantity:    res.Quantity,
+						ReferenceID: &ref,
+						Notes:       &notes,
+						CreatedAt:   now,
+					})
+					break
+				}
+			}
+		}
+		res.Status = model.ReservationStatusConfirmed
+		res.UpdatedAt = now
 	}
 
 	return nil
@@ -898,5 +999,207 @@ func TestInventoryGRPCServer_ReleaseStock_ByOrderId(t *testing.T) {
 	}
 	if stockResp.Stock.AvailableQuantity != 25 {
 		t.Errorf("expected available quantity 25, got %d", stockResp.Stock.AvailableQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_CommitStock_Success(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-COMMIT", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-COMMIT",
+		InitialQuantity: 50,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	resResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 15},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock failed: %v", err)
+	}
+
+	// Commit reservation
+	commitResp, err := server.CommitStock(context.Background(), &inventorypb.CommitStockRequest{
+		ReservationId: resResp.ReservationId,
+	})
+	if err != nil {
+		t.Fatalf("CommitStock failed: %v", err)
+	}
+	if !commitResp.Success {
+		t.Errorf("expected commit stock success true")
+	}
+
+	// Stock check: Available=35, Reserved=0 (permanently deducted)
+	stockResp, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: prodID})
+	if err != nil {
+		t.Fatalf("GetStock failed: %v", err)
+	}
+	if stockResp.Stock.AvailableQuantity != 35 {
+		t.Errorf("expected available quantity 35, got %d", stockResp.Stock.AvailableQuantity)
+	}
+	if stockResp.Stock.ReservedQuantity != 0 {
+		t.Errorf("expected reserved quantity 0 after commit, got %d", stockResp.Stock.ReservedQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_CommitStock_CannotCommitTwice(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-COMMIT-TWICE", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-COMMIT-TWICE",
+		InitialQuantity: 20,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	resResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 5},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock failed: %v", err)
+	}
+
+	// 1st commit succeeds
+	_, err = server.CommitStock(context.Background(), &inventorypb.CommitStockRequest{
+		ReservationId: resResp.ReservationId,
+	})
+	if err != nil {
+		t.Fatalf("1st CommitStock failed: %v", err)
+	}
+
+	// 2nd commit must fail
+	_, err = server.CommitStock(context.Background(), &inventorypb.CommitStockRequest{
+		ReservationId: resResp.ReservationId,
+	})
+	if err == nil {
+		t.Fatalf("expected error when committing reservation twice, got nil")
+	}
+}
+
+func TestInventoryGRPCServer_CommitStock_CannotCommitReleased(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-COMMIT-RELEASED", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-COMMIT-RELEASED",
+		InitialQuantity: 30,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	resResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 10},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock failed: %v", err)
+	}
+
+	// Release stock
+	_, err = server.ReleaseStock(context.Background(), &inventorypb.ReleaseStockRequest{
+		ReservationId: resResp.ReservationId,
+	})
+	if err != nil {
+		t.Fatalf("ReleaseStock failed: %v", err)
+	}
+
+	// Attempting commit on released reservation must fail
+	_, err = server.CommitStock(context.Background(), &inventorypb.CommitStockRequest{
+		ReservationId: resResp.ReservationId,
+	})
+	if err == nil {
+		t.Fatalf("expected error committing released reservation, got nil")
+	}
+}
+
+func TestInventoryGRPCServer_ConcurrentReservation_PreventsOverselling(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-CONCURRENT", merchantID)
+
+	const totalStock = 20
+	const numGoroutines = 50
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-CONCURRENT",
+		InitialQuantity: totalStock,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	var successCount int32
+	var failCount int32
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			orderID := uuid.NewString()
+			_, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+				OrderId: orderID,
+				Items: []*inventorypb.ReservationItem{
+					{ProductId: prodID, Quantity: 1},
+				},
+			})
+			if err == nil {
+				atomic.AddInt32(&successCount, 1)
+			} else {
+				atomic.AddInt32(&failCount, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	if successCount != int32(totalStock) {
+		t.Errorf("expected exactly %d successful reservations, got %d", totalStock, successCount)
+	}
+	if failCount != int32(numGoroutines-totalStock) {
+		t.Errorf("expected %d failed reservations due to insufficient stock, got %d", numGoroutines-totalStock, failCount)
+	}
+
+	stockResp, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: prodID})
+	if err != nil {
+		t.Fatalf("GetStock failed: %v", err)
+	}
+	if stockResp.Stock.AvailableQuantity != 0 {
+		t.Errorf("expected available quantity 0, got %d", stockResp.Stock.AvailableQuantity)
+	}
+	if stockResp.Stock.ReservedQuantity != totalStock {
+		t.Errorf("expected reserved quantity %d, got %d", totalStock, stockResp.Stock.ReservedQuantity)
 	}
 }
