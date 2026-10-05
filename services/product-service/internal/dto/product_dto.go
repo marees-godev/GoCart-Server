@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/utils"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/model"
 )
 
@@ -53,7 +54,7 @@ func (r *CreateProductRequest) Validate() error {
 
 	r.SKU = strings.TrimSpace(r.SKU)
 	if r.SKU == "" {
-		return appErrors.InvalidArgument("sku is required")
+		r.SKU = utils.GenerateSKU()
 	}
 
 	r.Name = strings.TrimSpace(r.Name)
@@ -87,7 +88,7 @@ func (r *CreateProductRequest) Validate() error {
 		v.SKU = strings.TrimSpace(v.SKU)
 		v.Name = strings.TrimSpace(v.Name)
 		if v.SKU == "" {
-			return appErrors.InvalidArgument("variant sku is required")
+			v.SKU = utils.GenerateSKU()
 		}
 		if v.Price < 0 {
 			return appErrors.InvalidArgument("variant price cannot be negative")
