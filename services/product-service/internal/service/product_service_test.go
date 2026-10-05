@@ -101,6 +101,22 @@ func (m *mockRepo) DeleteProduct(ctx context.Context, id string) error {
 	return nil
 }
 
+func (m *mockRepo) DeleteProductVariant(ctx context.Context, productID, variantID string) error {
+	p, ok := m.products[productID]
+	if !ok {
+		return appErrors.NotFound("product not found")
+	}
+	for i, v := range p.Variants {
+		if v.ID == variantID {
+			now := time.Now()
+			p.Variants[i].Status = model.StatusDiscontinued
+			p.Variants[i].DeletedAt = &now
+			return nil
+		}
+	}
+	return appErrors.NotFound("product variant not found for this product")
+}
+
 type mockStoreClient struct {
 	stores map[string]*storepb.Store
 }
@@ -314,3 +330,134 @@ func TestProductService_UpdateAndDeleteProduct(t *testing.T) {
 		}
 	})
 }
+
+func TestProductService_ProductVariants(t *testing.T) {
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	merchantID := "merchant-123"
+
+	repo := newMockRepo()
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Apparel", IsActive: true},
+		},
+	}
+
+	svc := service.NewProductService(repo, storeClient, catClient, nil)
+
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: merchantID,
+		Role:   auth.RoleMerchant,
+	})
+
+	t.Run("create product with multiple size and color variants", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "TSHIRT-BASE",
+			Name:       "T-Shirt",
+			Price:      799.00,
+			MRP:        999.00,
+			Variants: []dto.CreateVariantRequest{
+				{
+					SKU:            "TS-RED-M",
+					Name:           "Red / M",
+					Price:          799.00,
+					MRP:            999.00,
+					Stock:          20,
+					AttributesJSON: `{"color":"Red","size":"M"}`,
+				},
+				{
+					SKU:            "TS-RED-L",
+					Name:           "Red / L",
+					Price:          799.00,
+					MRP:            999.00,
+					Stock:          15,
+					AttributesJSON: `{"color":"Red","size":"L"}`,
+				},
+				{
+					SKU:            "TS-BLU-M",
+					Name:           "Blue / M",
+					Price:          849.00,
+					MRP:            999.00,
+					Stock:          10,
+					AttributesJSON: `{"color":"Blue","size":"M"}`,
+				},
+			},
+		}
+
+		prod, err := svc.CreateProduct(merchantCtx, req)
+		if err != nil {
+			t.Fatalf("expected creation success, got error: %v", err)
+		}
+
+		if len(prod.Variants) != 3 {
+			t.Fatalf("expected 3 variants, got %d", len(prod.Variants))
+		}
+
+		if prod.Variants[0].SKU != "TS-RED-M" || prod.Variants[0].Price != 799.00 {
+			t.Errorf("variant 0 unexpected: %+v", prod.Variants[0])
+		}
+		if prod.Variants[2].SKU != "TS-BLU-M" || prod.Variants[2].Price != 849.00 {
+			t.Errorf("variant 2 unexpected: %+v", prod.Variants[2])
+		}
+	})
+
+	t.Run("create product with zero variants", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "CAP-SINGLE",
+			Name:       "Baseball Cap",
+			Price:      299.00,
+			MRP:        399.00,
+			Variants:   []dto.CreateVariantRequest{},
+		}
+
+		prod, err := svc.CreateProduct(merchantCtx, req)
+		if err != nil {
+			t.Fatalf("expected creation success, got error: %v", err)
+		}
+		if len(prod.Variants) != 0 {
+			t.Errorf("expected 0 variants, got %d", len(prod.Variants))
+		}
+	})
+
+	t.Run("delete product variant", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "PANTS-BASE",
+			Name:       "Jeans",
+			Price:      1499.00,
+			MRP:        1999.00,
+			Variants: []dto.CreateVariantRequest{
+				{
+					SKU:   "PANTS-30",
+					Name:  "Size 30",
+					Price: 1499.00,
+					MRP:   1999.00,
+				},
+			},
+		}
+
+		prod, err := svc.CreateProduct(merchantCtx, req)
+		if err != nil {
+			t.Fatalf("expected creation success, got error: %v", err)
+		}
+
+		// Manually assign ID for test
+		prod.Variants[0].ID = "var-1111-2222"
+
+		err = svc.DeleteProductVariant(merchantCtx, prod.ID, prod.Variants[0].ID)
+		if err != nil {
+			t.Fatalf("expected delete variant success, got %v", err)
+		}
+	})
+}
+

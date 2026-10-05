@@ -10,6 +10,7 @@ service ProductService {
   rpc CreateProduct (CreateProductRequest) returns (CreateProductResponse);
   rpc UpdateProduct (UpdateProductRequest) returns (UpdateProductResponse);
   rpc DeleteProduct (DeleteProductRequest) returns (DeleteProductResponse);
+  rpc DeleteProductVariant (DeleteProductVariantRequest) returns (DeleteProductVariantResponse);
 }
 
 message ProductVariant {
@@ -142,6 +143,16 @@ message DeleteProductRequest {
 }
 
 message DeleteProductResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteProductVariantRequest {
+  string product_id = 1;
+  string id = 2;
+}
+
+message DeleteProductVariantResponse {
   bool success = 1;
   string message = 2;
 }
