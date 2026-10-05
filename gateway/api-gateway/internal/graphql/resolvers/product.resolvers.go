@@ -249,6 +249,29 @@ func (r *mutationResolver) DeleteProduct(ctx context.Context, id string) (*model
 	}, nil
 }
 
+// DeleteProductVariant is the resolver for the deleteProductVariant field.
+func (r *mutationResolver) DeleteProductVariant(ctx context.Context, productID string, id string) (*model.DeleteProductVariantResponse, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &productpb.DeleteProductVariantRequest{
+		ProductId: productID,
+		Id:        id,
+	}
+
+	resp, err := client.DeleteProductVariant(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteProductVariantResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
+}
+
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id string) (*model.Product, error) {
 	client, err := r.getProductClient()

@@ -31,6 +31,7 @@ type ProductService interface {
 	ListProducts(ctx context.Context, req dto.ListProductsRequest) ([]*model.Product, int32, error)
 	UpdateProduct(ctx context.Context, req dto.UpdateProductRequest) (*model.Product, error)
 	DeleteProduct(ctx context.Context, id string) error
+	DeleteProductVariant(ctx context.Context, productID, variantID string) error
 }
 
 type productService struct {
@@ -335,4 +336,33 @@ func (s *productService) DeleteProduct(ctx context.Context, id string) error {
 	}
 
 	return s.repo.DeleteProduct(ctx, id)
+}
+
+func (s *productService) DeleteProductVariant(ctx context.Context, productID, variantID string) error {
+	if productID == "" {
+		return appErrors.InvalidArgument("product id is required")
+	}
+	if variantID == "" {
+		return appErrors.InvalidArgument("variant id is required")
+	}
+
+	existing, err := s.repo.GetProductByID(ctx, productID)
+	if err != nil {
+		return err
+	}
+
+	user, hasUser := auth.UserFromContext(ctx)
+	if hasUser && user.Role == auth.RoleMerchant {
+		if s.storeClient != nil {
+			stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: existing.StoreID})
+			if err != nil || stResp == nil || stResp.Store == nil {
+				return appErrors.Forbidden("merchant does not own this store")
+			}
+			if stResp.Store.MerchantId != user.UserID {
+				return appErrors.Forbidden("merchant does not own this product's store")
+			}
+		}
+	}
+
+	return s.repo.DeleteProductVariant(ctx, productID, variantID)
 }

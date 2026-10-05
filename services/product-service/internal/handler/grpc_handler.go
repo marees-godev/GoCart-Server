@@ -218,3 +218,25 @@ func (h *ProductGRPCHandler) DeleteProduct(ctx context.Context, req *productpb.D
 		Message: "Product deleted successfully",
 	}, nil
 }
+
+func (h *ProductGRPCHandler) DeleteProductVariant(ctx context.Context, req *productpb.DeleteProductVariantRequest) (*productpb.DeleteProductVariantResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	if err := h.productService.DeleteProductVariant(ctx, req.ProductId, req.Id); err != nil {
+		if h.logger != nil {
+			h.logger.Error("DeleteProductVariant failed", "error", err)
+		}
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	if h.logger != nil {
+		h.logger.Info("DeleteProductVariant RPC succeeded", "product_id", req.ProductId, "variant_id", req.Id)
+	}
+
+	return &productpb.DeleteProductVariantResponse{
+		Success: true,
+		Message: "Product variant deleted successfully",
+	}, nil
+}

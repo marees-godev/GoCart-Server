@@ -51,6 +51,11 @@ type DeleteProductResponse {
   message: String!
 }
 
+type DeleteProductVariantResponse {
+  success: Boolean!
+  message: String!
+}
+
 input CreateProductVariantInput {
   sku: String!
   name: String!
@@ -110,4 +115,5 @@ extend type Mutation {
   createProduct(input: CreateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
   updateProduct(id: ID!, input: UpdateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
   deleteProduct(id: ID!): DeleteProductResponse! @auth(requires: [ADMIN, MERCHANT])
+  deleteProductVariant(productId: ID!, id: ID!): DeleteProductVariantResponse! @auth(requires: [ADMIN, MERCHANT])
 }

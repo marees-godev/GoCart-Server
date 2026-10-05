@@ -23,6 +23,7 @@ type ProductRepository interface {
 	ListProducts(ctx context.Context, filter dto.ListProductsRequest) ([]*model.Product, int32, error)
 	UpdateProduct(ctx context.Context, p *model.Product) error
 	DeleteProduct(ctx context.Context, id string) error
+	DeleteProductVariant(ctx context.Context, productID, variantID string) error
 }
 
 type pgProductRepository struct {
@@ -90,6 +91,17 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 	// Insert Variants
 	for i, v := range p.Variants {
+		var existingVarID string
+		err = tx.QueryRow(ctx, `
+			SELECT pv.id
+			FROM product_variants pv
+			JOIN products p ON pv.product_id = p.id
+			WHERE p.store_id = $1 AND pv.sku = $2 AND pv.deleted_at IS NULL
+		`, p.StoreID, v.SKU).Scan(&existingVarID)
+		if err == nil {
+			return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists in this store", v.SKU))
+		}
+
 		vQuery := `
 			INSERT INTO product_variants (product_id, sku, name, price, mrp, stock, attributes, status)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -107,7 +119,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 		err = tx.QueryRow(ctx, vQuery, p.ID, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus).Scan(&v.ID, &v.CreatedAt, &v.UpdatedAt)
 		if err != nil {
-			if strings.Contains(err.Error(), "product_variants_product_id_sku_key") {
+			if strings.Contains(err.Error(), "product_variants_product_id_sku_key") || strings.Contains(err.Error(), "duplicate key") {
 				return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists for this product", v.SKU))
 			}
 			return appErrors.Internal(err, "failed to insert product variant")
@@ -374,6 +386,19 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 	if len(p.Variants) > 0 {
 		for i, v := range p.Variants {
 			if v.ID != "" {
+				if v.SKU != "" {
+					var existingVarID string
+					err = tx.QueryRow(ctx, `
+						SELECT pv.id
+						FROM product_variants pv
+						JOIN products p ON pv.product_id = p.id
+						WHERE p.store_id = $1 AND pv.sku = $2 AND pv.deleted_at IS NULL AND pv.id != $3
+					`, p.StoreID, v.SKU, v.ID).Scan(&existingVarID)
+					if err == nil {
+						return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists in this store", v.SKU))
+					}
+				}
+
 				vQuery := `
 					UPDATE product_variants
 					SET sku = $1, name = $2, price = $3, mrp = $4, stock = $5, attributes = $6, status = $7, updated_at = NOW()
@@ -387,11 +412,30 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 				if vStatus == "" {
 					vStatus = model.StatusInStock
 				}
-				_, err := tx.Exec(ctx, vQuery, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus, v.ID, p.ID)
+				res, err := tx.Exec(ctx, vQuery, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus, v.ID, p.ID)
 				if err != nil {
+					if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "product_variants_product_id_sku_key") {
+						return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists", v.SKU))
+					}
 					return appErrors.Internal(err, "failed to update variant")
 				}
+				if res.RowsAffected() == 0 {
+					return appErrors.InvalidArgument(fmt.Sprintf("variant %s does not belong to product %s or does not exist", v.ID, p.ID))
+				}
 			} else {
+				if v.SKU != "" {
+					var existingVarID string
+					err = tx.QueryRow(ctx, `
+						SELECT pv.id
+						FROM product_variants pv
+						JOIN products p ON pv.product_id = p.id
+						WHERE p.store_id = $1 AND pv.sku = $2 AND pv.deleted_at IS NULL
+					`, p.StoreID, v.SKU).Scan(&existingVarID)
+					if err == nil {
+						return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists in this store", v.SKU))
+					}
+				}
+
 				vQuery := `
 					INSERT INTO product_variants (product_id, sku, name, price, mrp, stock, attributes, status)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -405,7 +449,13 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 				if vStatus == "" {
 					vStatus = model.StatusInStock
 				}
-				_ = tx.QueryRow(ctx, vQuery, p.ID, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus).Scan(&v.ID, &v.CreatedAt, &v.UpdatedAt)
+				err = tx.QueryRow(ctx, vQuery, p.ID, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus).Scan(&v.ID, &v.CreatedAt, &v.UpdatedAt)
+				if err != nil {
+					if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "product_variants_product_id_sku_key") {
+						return appErrors.AlreadyExists(fmt.Sprintf("variant SKU %s already exists", v.SKU))
+					}
+					return appErrors.Internal(err, "failed to insert variant during update")
+				}
 				v.ProductID = p.ID
 				p.Variants[i] = v
 			}
@@ -472,6 +522,49 @@ func (r *pgProductRepository) DeleteProduct(ctx context.Context, id string) erro
 		VALUES ($1, $2, $3, $4, 'PENDING')
 	`
 	_, _ = tx.Exec(ctx, outboxQuery, "PRODUCT", id, "product.deleted", eventPayload)
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	return nil
+}
+
+func (r *pgProductRepository) DeleteProductVariant(ctx context.Context, productID, variantID string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to start database transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	now := time.Now()
+	query := `
+		UPDATE product_variants
+		SET status = 'discontinued', deleted_at = $3, updated_at = $3
+		WHERE id = $1 AND product_id = $2 AND deleted_at IS NULL
+		RETURNING sku
+	`
+	var sku string
+	err = tx.QueryRow(ctx, query, variantID, productID, now).Scan(&sku)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return appErrors.NotFound("product variant not found for this product")
+		}
+		return appErrors.Internal(err, "failed to delete product variant")
+	}
+
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"variant_id": variantID,
+		"product_id": productID,
+		"sku":        sku,
+		"status":     "discontinued",
+		"deleted_at": now.Format(time.RFC3339),
+	})
+	outboxQuery := `
+		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status)
+		VALUES ($1, $2, $3, $4, 'PENDING')
+	`
+	_, _ = tx.Exec(ctx, outboxQuery, "PRODUCT_VARIANT", variantID, "product_variant.deleted", eventPayload)
 
 	if err := tx.Commit(ctx); err != nil {
 		return appErrors.Internal(err, "failed to commit transaction")
