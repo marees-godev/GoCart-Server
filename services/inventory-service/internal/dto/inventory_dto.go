@@ -27,18 +27,26 @@ type GetInventoryInput struct {
 }
 
 type UpdateStockInput struct {
-	ProductID string
-	VariantID *string
-	Quantity  int
+	InventoryID *string
+	ProductID   *string
+	VariantID   *string
+	Quantity    int
 }
 
 type ReserveStockInput struct {
-	OrderID string
-	Items   []ReserveItemInput
+	OrderID           string
+	Items             []ReserveItemInput
+	ExpirationMinutes int
 }
 
 type ReserveItemInput struct {
 	ProductID string
 	VariantID *string
 	Quantity  int
+}
+
+type ReleaseStockInput struct {
+	ReservationID string
+	OrderID       string
+	Reason        string
 }

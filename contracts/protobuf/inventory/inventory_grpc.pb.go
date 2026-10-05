@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InventoryService_GetInventory_FullMethodName     = "/gocart.inventory.v1.InventoryService/GetInventory"
-	InventoryService_CreateInventory_FullMethodName  = "/gocart.inventory.v1.InventoryService/CreateInventory"
-	InventoryService_RestockInventory_FullMethodName = "/gocart.inventory.v1.InventoryService/RestockInventory"
-	InventoryService_GetStock_FullMethodName         = "/gocart.inventory.v1.InventoryService/GetStock"
-	InventoryService_ReserveStock_FullMethodName     = "/gocart.inventory.v1.InventoryService/ReserveStock"
-	InventoryService_ReleaseStock_FullMethodName     = "/gocart.inventory.v1.InventoryService/ReleaseStock"
-	InventoryService_UpdateStock_FullMethodName      = "/gocart.inventory.v1.InventoryService/UpdateStock"
+	InventoryService_GetInventory_FullMethodName               = "/gocart.inventory.v1.InventoryService/GetInventory"
+	InventoryService_CreateInventory_FullMethodName            = "/gocart.inventory.v1.InventoryService/CreateInventory"
+	InventoryService_RestockInventory_FullMethodName           = "/gocart.inventory.v1.InventoryService/RestockInventory"
+	InventoryService_GetStock_FullMethodName                   = "/gocart.inventory.v1.InventoryService/GetStock"
+	InventoryService_ReserveStock_FullMethodName               = "/gocart.inventory.v1.InventoryService/ReserveStock"
+	InventoryService_ReleaseStock_FullMethodName               = "/gocart.inventory.v1.InventoryService/ReleaseStock"
+	InventoryService_ReleaseExpiredReservations_FullMethodName = "/gocart.inventory.v1.InventoryService/ReleaseExpiredReservations"
+	InventoryService_UpdateStock_FullMethodName                = "/gocart.inventory.v1.InventoryService/UpdateStock"
 )
 
 // InventoryServiceClient is the client API for InventoryService service.
@@ -38,6 +39,7 @@ type InventoryServiceClient interface {
 	GetStock(ctx context.Context, in *GetStockRequest, opts ...grpc.CallOption) (*GetStockResponse, error)
 	ReserveStock(ctx context.Context, in *ReserveStockRequest, opts ...grpc.CallOption) (*ReserveStockResponse, error)
 	ReleaseStock(ctx context.Context, in *ReleaseStockRequest, opts ...grpc.CallOption) (*ReleaseStockResponse, error)
+	ReleaseExpiredReservations(ctx context.Context, in *ReleaseExpiredReservationsRequest, opts ...grpc.CallOption) (*ReleaseExpiredReservationsResponse, error)
 	UpdateStock(ctx context.Context, in *UpdateStockRequest, opts ...grpc.CallOption) (*UpdateStockResponse, error)
 }
 
@@ -109,6 +111,16 @@ func (c *inventoryServiceClient) ReleaseStock(ctx context.Context, in *ReleaseSt
 	return out, nil
 }
 
+func (c *inventoryServiceClient) ReleaseExpiredReservations(ctx context.Context, in *ReleaseExpiredReservationsRequest, opts ...grpc.CallOption) (*ReleaseExpiredReservationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReleaseExpiredReservationsResponse)
+	err := c.cc.Invoke(ctx, InventoryService_ReleaseExpiredReservations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *inventoryServiceClient) UpdateStock(ctx context.Context, in *UpdateStockRequest, opts ...grpc.CallOption) (*UpdateStockResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateStockResponse)
@@ -129,6 +141,7 @@ type InventoryServiceServer interface {
 	GetStock(context.Context, *GetStockRequest) (*GetStockResponse, error)
 	ReserveStock(context.Context, *ReserveStockRequest) (*ReserveStockResponse, error)
 	ReleaseStock(context.Context, *ReleaseStockRequest) (*ReleaseStockResponse, error)
+	ReleaseExpiredReservations(context.Context, *ReleaseExpiredReservationsRequest) (*ReleaseExpiredReservationsResponse, error)
 	UpdateStock(context.Context, *UpdateStockRequest) (*UpdateStockResponse, error)
 	mustEmbedUnimplementedInventoryServiceServer()
 }
@@ -157,6 +170,9 @@ func (UnimplementedInventoryServiceServer) ReserveStock(context.Context, *Reserv
 }
 func (UnimplementedInventoryServiceServer) ReleaseStock(context.Context, *ReleaseStockRequest) (*ReleaseStockResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReleaseStock not implemented")
+}
+func (UnimplementedInventoryServiceServer) ReleaseExpiredReservations(context.Context, *ReleaseExpiredReservationsRequest) (*ReleaseExpiredReservationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReleaseExpiredReservations not implemented")
 }
 func (UnimplementedInventoryServiceServer) UpdateStock(context.Context, *UpdateStockRequest) (*UpdateStockResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateStock not implemented")
@@ -290,6 +306,24 @@ func _InventoryService_ReleaseStock_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InventoryService_ReleaseExpiredReservations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReleaseExpiredReservationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).ReleaseExpiredReservations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_ReleaseExpiredReservations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).ReleaseExpiredReservations(ctx, req.(*ReleaseExpiredReservationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InventoryService_UpdateStock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateStockRequest)
 	if err := dec(in); err != nil {
@@ -338,6 +372,10 @@ var InventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReleaseStock",
 			Handler:    _InventoryService_ReleaseStock_Handler,
+		},
+		{
+			MethodName: "ReleaseExpiredReservations",
+			Handler:    _InventoryService_ReleaseExpiredReservations_Handler,
 		},
 		{
 			MethodName: "UpdateStock",

@@ -12,7 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
-	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -90,33 +89,32 @@ func main() {
 	}
 
 	// 5. Initialize Downstream Clients & Domain Layer
-	var productClient client.ProductClient
 	prodGRPCClient, prodConn, err := grpcclient.NewProductClient(cfg.Services.ProductServiceAddr, 5*time.Second)
 	if err != nil {
-		log.Warn("Product service gRPC client initialization failed, using stub client", "error", err)
-		productClient = client.NewStubProductClient()
-	} else {
-		defer func() {
-			if prodConn != nil {
-				_ = prodConn.Close()
-			}
-		}()
-		var storeGRPCClient storepb.StoreServiceClient
-		storeCli, storeConn, err := grpcclient.NewStoreClient(cfg.Services.StoreServiceAddr, 5*time.Second)
-		if err == nil && storeCli != nil {
-			storeGRPCClient = storeCli
-			defer func() {
-				if storeConn != nil {
-					_ = storeConn.Close()
-				}
-			}()
-		}
-		var pCli productpb.ProductServiceClient = prodGRPCClient
-		productClient = client.NewGRPCProductClient(pCli, storeGRPCClient)
+		log.Error("Failed to initialize product service gRPC client", "error", err)
+		os.Exit(1)
 	}
+	if prodConn != nil {
+		defer func() { _ = prodConn.Close() }()
+	}
+
+	var storeGRPCClient storepb.StoreServiceClient
+	storeCli, storeConn, err := grpcclient.NewStoreClient(cfg.Services.StoreServiceAddr, 5*time.Second)
+	if err != nil {
+		log.Warn("Failed to initialize store service gRPC client", "error", err)
+	} else if storeCli != nil {
+		storeGRPCClient = storeCli
+		if storeConn != nil {
+			defer func() { _ = storeConn.Close() }()
+		}
+	}
+
+	productClient := client.NewGRPCProductClient(prodGRPCClient, storeGRPCClient)
 
 	invRepo := repository.NewInventoryRepository(db.Pool)
 	invService := service.NewInventoryService(invRepo, productClient)
+	cleanupInterval := time.Duration(cfg.Reservation.ExpirationCleanupIntervalSeconds) * time.Second
+	invService.StartExpirationWorker(ctx, cleanupInterval)
 	invGRPCServer := inventoryGRPC.NewInventoryGRPCServer(invService)
 
 	// 6. Start gRPC Server
