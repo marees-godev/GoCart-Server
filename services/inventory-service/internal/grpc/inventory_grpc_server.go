@@ -181,15 +181,22 @@ func (s *InventoryGRPCServer) ReserveStock(ctx context.Context, req *inventorypb
 
 	var items []dto.ReserveItemInput
 	for _, it := range req.GetItems() {
+		var variantID *string
+		if it.GetVariantId() != "" {
+			v := it.GetVariantId()
+			variantID = &v
+		}
 		items = append(items, dto.ReserveItemInput{
 			ProductID: it.GetProductId(),
+			VariantID: variantID,
 			Quantity:  int(it.GetQuantity()),
 		})
 	}
 
-	resID, err := s.service.ReserveStock(ctx, dto.ReserveStockInput{
-		OrderID: req.GetOrderId(),
-		Items:   items,
+	resID, expiresAt, err := s.service.ReserveStock(ctx, dto.ReserveStockInput{
+		OrderID:           req.GetOrderId(),
+		Items:             items,
+		ExpirationMinutes: int(req.GetExpirationMinutes()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -198,15 +205,20 @@ func (s *InventoryGRPCServer) ReserveStock(ctx context.Context, req *inventorypb
 	return &inventorypb.ReserveStockResponse{
 		ReservationId: resID,
 		Success:       true,
+		ExpiresAt:     expiresAt.UTC().Format(time.RFC3339),
 	}, nil
 }
 
 func (s *InventoryGRPCServer) ReleaseStock(ctx context.Context, req *inventorypb.ReleaseStockRequest) (*inventorypb.ReleaseStockResponse, error) {
-	if req == nil || req.GetReservationId() == "" {
-		return nil, appErrors.BadRequest("reservation_id is required").ToGRPC()
+	if req == nil || (req.GetReservationId() == "" && req.GetOrderId() == "") {
+		return nil, appErrors.BadRequest("either reservation_id or order_id is required").ToGRPC()
 	}
 
-	err := s.service.ReleaseStock(ctx, req.GetReservationId())
+	err := s.service.ReleaseStock(ctx, dto.ReleaseStockInput{
+		ReservationID: req.GetReservationId(),
+		OrderID:       req.GetOrderId(),
+		Reason:        req.GetReason(),
+	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
@@ -216,14 +228,40 @@ func (s *InventoryGRPCServer) ReleaseStock(ctx context.Context, req *inventorypb
 	}, nil
 }
 
+func (s *InventoryGRPCServer) ReleaseExpiredReservations(ctx context.Context, req *inventorypb.ReleaseExpiredReservationsRequest) (*inventorypb.ReleaseExpiredReservationsResponse, error) {
+	count, err := s.service.ReleaseExpiredReservations(ctx)
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+	return &inventorypb.ReleaseExpiredReservationsResponse{
+		ReleasedCount: int32(count),
+	}, nil
+}
+
 func (s *InventoryGRPCServer) UpdateStock(ctx context.Context, req *inventorypb.UpdateStockRequest) (*inventorypb.UpdateStockResponse, error) {
-	if req == nil || req.GetProductId() == "" {
-		return nil, appErrors.BadRequest("product_id is required").ToGRPC()
+	if req == nil || (req.GetInventoryId() == "" && req.GetProductId() == "") {
+		return nil, appErrors.BadRequest("either inventory_id or product_id is required").ToGRPC()
+	}
+
+	var invID, prodID, varID *string
+	if req.GetInventoryId() != "" {
+		v := req.GetInventoryId()
+		invID = &v
+	}
+	if req.GetProductId() != "" {
+		v := req.GetProductId()
+		prodID = &v
+	}
+	if req.GetVariantId() != "" {
+		v := req.GetVariantId()
+		varID = &v
 	}
 
 	inv, err := s.service.UpdateStock(ctx, dto.UpdateStockInput{
-		ProductID: req.GetProductId(),
-		Quantity:  int(req.GetQuantity()),
+		InventoryID: invID,
+		ProductID:   prodID,
+		VariantID:   varID,
+		Quantity:    int(req.GetQuantity()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)

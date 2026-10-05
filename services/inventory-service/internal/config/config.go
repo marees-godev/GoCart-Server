@@ -8,13 +8,19 @@ import (
 )
 
 type Config struct {
-	App      AppConfig
-	HTTP     HTTPConfig
-	GRPC     GRPCConfig
-	Services ServicesConfig
-	Database DatabaseConfig
-	Logger   LoggerConfig
-	Tracing  TracingConfig
+	App         AppConfig
+	HTTP        HTTPConfig
+	GRPC        GRPCConfig
+	Services    ServicesConfig
+	Database    DatabaseConfig
+	Reservation ReservationConfig
+	Logger      LoggerConfig
+	Tracing     TracingConfig
+}
+
+type ReservationConfig struct {
+	ExpirationCleanupIntervalSeconds int
+	DefaultExpirationMinutes         int
 }
 
 type GRPCConfig struct {
@@ -83,6 +89,10 @@ func LoadEnv() *Config {
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
 			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+		},
+		Reservation: ReservationConfig{
+			ExpirationCleanupIntervalSeconds: GetEnvAsInt("RESERVATION_EXPIRATION_CLEANUP_INTERVAL_SECONDS", 30),
+			DefaultExpirationMinutes:         GetEnvAsInt("DEFAULT_RESERVATION_EXPIRATION_MINUTES", 15),
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/utils"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
@@ -20,8 +21,10 @@ type InventoryService interface {
 	RestockInventory(ctx context.Context, input dto.RestockInventoryInput) (*model.Inventory, error)
 	GetStock(ctx context.Context, productID string) (*model.Inventory, error)
 	UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error)
-	ReserveStock(ctx context.Context, input dto.ReserveStockInput) (string, error)
-	ReleaseStock(ctx context.Context, reservationID string) error
+	ReserveStock(ctx context.Context, input dto.ReserveStockInput) (string, time.Time, error)
+	ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error
+	ReleaseExpiredReservations(ctx context.Context) (int, error)
+	StartExpirationWorker(ctx context.Context, interval time.Duration)
 }
 
 type inventoryService struct {
@@ -52,21 +55,17 @@ func (s *inventoryService) CreateInventory(ctx context.Context, input dto.Create
 		}
 	}
 
-	sku := strings.TrimSpace(input.SKU)
-	if sku == "" {
-		sku = utils.GenerateSKU()
-	}
-
-	if input.InitialQuantity < 0 {
-		return nil, appErrors.BadRequest("initial quantity cannot be negative")
-	}
-
-	if input.LowStockThreshold < 0 {
-		return nil, appErrors.BadRequest("low stock threshold cannot be negative")
-	}
-
 	// Downstream verification: ensure product/variant reference exists
+	var prodSKU string
 	if s.productClient != nil {
+		prod, err := s.productClient.GetProduct(ctx, input.ProductID)
+		if err != nil {
+			return nil, err
+		}
+		if prod != nil {
+			prodSKU = strings.TrimSpace(prod.SKU)
+		}
+
 		if err := s.productClient.ValidateProductVariant(ctx, input.ProductID, input.VariantID); err != nil {
 			return nil, err
 		}
@@ -80,6 +79,14 @@ func (s *inventoryService) CreateInventory(ctx context.Context, input dto.Create
 				return nil, appErrors.Forbidden("merchant cannot create inventory for a product belonging to another merchant")
 			}
 		}
+	}
+
+	sku := strings.TrimSpace(input.SKU)
+	if sku == "" && prodSKU != "" {
+		sku = prodSKU
+	}
+	if sku == "" {
+		sku = utils.GenerateSKU()
 	}
 
 	var variantID *string
@@ -222,45 +229,68 @@ func (s *inventoryService) GetStock(ctx context.Context, productID string) (*mod
 }
 
 func (s *inventoryService) UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error) {
-	if !isValidUUID(input.ProductID) {
-		return nil, appErrors.BadRequest("invalid product id: must be a valid UUID")
-	}
 	if input.Quantity < 0 {
 		return nil, appErrors.BadRequest("quantity cannot be negative")
 	}
 
-	var variantID *string
+	var invID, prodID, varID *string
+
+	if input.InventoryID != nil && strings.TrimSpace(*input.InventoryID) != "" {
+		if !isValidUUID(*input.InventoryID) {
+			return nil, appErrors.BadRequest("invalid inventory id: must be a valid UUID")
+		}
+		cleaned := strings.TrimSpace(*input.InventoryID)
+		invID = &cleaned
+	}
+
+	if input.ProductID != nil && strings.TrimSpace(*input.ProductID) != "" {
+		if !isValidUUID(*input.ProductID) {
+			return nil, appErrors.BadRequest("invalid product id: must be a valid UUID")
+		}
+		cleaned := strings.TrimSpace(*input.ProductID)
+		prodID = &cleaned
+	}
+
 	if input.VariantID != nil && strings.TrimSpace(*input.VariantID) != "" {
 		if !isValidUUID(*input.VariantID) {
 			return nil, appErrors.BadRequest("invalid variant id: must be a valid UUID")
 		}
 		cleaned := strings.TrimSpace(*input.VariantID)
-		variantID = &cleaned
+		varID = &cleaned
 	}
 
-	return s.repo.UpdateStock(ctx, input.ProductID, variantID, input.Quantity)
+	if invID == nil && prodID == nil {
+		return nil, appErrors.BadRequest("either inventory_id or product_id must be provided")
+	}
+
+	return s.repo.UpdateStock(ctx, dto.UpdateStockInput{
+		InventoryID: invID,
+		ProductID:   prodID,
+		VariantID:   varID,
+		Quantity:    input.Quantity,
+	})
 }
 
-func (s *inventoryService) ReserveStock(ctx context.Context, input dto.ReserveStockInput) (string, error) {
+func (s *inventoryService) ReserveStock(ctx context.Context, input dto.ReserveStockInput) (string, time.Time, error) {
 	if !isValidUUID(input.OrderID) {
-		return "", appErrors.BadRequest("invalid order id: must be a valid UUID")
+		return "", time.Time{}, appErrors.BadRequest("invalid order id: must be a valid UUID")
 	}
 	if len(input.Items) == 0 {
-		return "", appErrors.BadRequest("no reservation items provided")
+		return "", time.Time{}, appErrors.BadRequest("no reservation items provided")
 	}
 
 	items := make([]model.ReserveItem, len(input.Items))
 	for i, it := range input.Items {
 		if !isValidUUID(it.ProductID) {
-			return "", appErrors.BadRequest("invalid product id in reservation items: must be a valid UUID")
+			return "", time.Time{}, appErrors.BadRequest("invalid product id in reservation items: must be a valid UUID")
 		}
 		if it.Quantity <= 0 {
-			return "", appErrors.BadRequest("reservation item quantity must be greater than zero")
+			return "", time.Time{}, appErrors.BadRequest("reservation item quantity must be greater than zero")
 		}
 		var varID *string
 		if it.VariantID != nil && strings.TrimSpace(*it.VariantID) != "" {
 			if !isValidUUID(*it.VariantID) {
-				return "", appErrors.BadRequest("invalid variant id in reservation items: must be a valid UUID")
+				return "", time.Time{}, appErrors.BadRequest("invalid variant id in reservation items: must be a valid UUID")
 			}
 			cleaned := strings.TrimSpace(*it.VariantID)
 			varID = &cleaned
@@ -272,13 +302,52 @@ func (s *inventoryService) ReserveStock(ctx context.Context, input dto.ReserveSt
 		}
 	}
 
-	expiresAt := time.Now().UTC().Add(30 * time.Minute)
-	return s.repo.ReserveStock(ctx, input.OrderID, items, expiresAt)
+	expirationMinutes := input.ExpirationMinutes
+	if expirationMinutes <= 0 {
+		expirationMinutes = 15
+	}
+	expiresAt := time.Now().UTC().Add(time.Duration(expirationMinutes) * time.Minute)
+
+	resID, err := s.repo.ReserveStock(ctx, input.OrderID, items, expiresAt)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return resID, expiresAt, nil
 }
 
-func (s *inventoryService) ReleaseStock(ctx context.Context, reservationID string) error {
-	if !isValidUUID(reservationID) {
+func (s *inventoryService) ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error {
+	if strings.TrimSpace(input.ReservationID) != "" && !isValidUUID(input.ReservationID) {
 		return appErrors.BadRequest("invalid reservation id: must be a valid UUID")
 	}
-	return s.repo.ReleaseStock(ctx, reservationID)
+	if strings.TrimSpace(input.OrderID) != "" && !isValidUUID(input.OrderID) {
+		return appErrors.BadRequest("invalid order id: must be a valid UUID")
+	}
+	return s.repo.ReleaseStock(ctx, input)
+}
+
+func (s *inventoryService) ReleaseExpiredReservations(ctx context.Context) (int, error) {
+	return s.repo.ReleaseExpiredReservations(ctx)
+}
+
+func (s *inventoryService) StartExpirationWorker(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if count, err := s.repo.ReleaseExpiredReservations(ctx); err != nil {
+					logger.FromContext(ctx).Error("failed to release expired inventory reservations", "error", err)
+				} else if count > 0 {
+					logger.FromContext(ctx).Info("released expired inventory reservations", "count", count)
+				}
+			}
+		}
+	}()
 }

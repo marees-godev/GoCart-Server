@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/model"
 )
 
@@ -21,9 +22,10 @@ type InventoryRepository interface {
 	GetByID(ctx context.Context, id string) (*model.Inventory, error)
 	GetByProductAndVariant(ctx context.Context, productID string, variantID *string) (*model.Inventory, error)
 	Restock(ctx context.Context, id string, quantity int, refID, notes *string) (*model.Inventory, error)
-	UpdateStock(ctx context.Context, productID string, variantID *string, quantity int) (*model.Inventory, error)
+	UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error)
 	ReserveStock(ctx context.Context, orderID string, items []model.ReserveItem, expiresAt time.Time) (string, error)
-	ReleaseStock(ctx context.Context, reservationID string) error
+	ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error
+	ReleaseExpiredReservations(ctx context.Context) (int, error)
 	GetTransactionsByInventoryID(ctx context.Context, inventoryID string, limit, offset int) ([]*model.InventoryTransaction, error)
 }
 
@@ -89,7 +91,15 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			if strings.Contains(pgErr.ConstraintName, "sku") {
+			constraintStr := strings.ToLower(pgErr.ConstraintName + " " + pgErr.Message + " " + pgErr.Detail)
+			if strings.Contains(constraintStr, "sku") {
+				return appErrors.Conflict("inventory with this SKU already exists")
+			}
+			return appErrors.Conflict("inventory already exists for this product/variant")
+		}
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "23505") || strings.Contains(errStr, "duplicate key") {
+			if strings.Contains(errStr, "sku") {
 				return appErrors.Conflict("inventory with this SKU already exists")
 			}
 			return appErrors.Conflict("inventory already exists for this product/variant")
@@ -312,8 +322,8 @@ func (r *pgInventoryRepository) Restock(ctx context.Context, id string, quantity
 	return &inv, nil
 }
 
-func (r *pgInventoryRepository) UpdateStock(ctx context.Context, productID string, variantID *string, quantity int) (*model.Inventory, error) {
-	if quantity < 0 {
+func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error) {
+	if input.Quantity < 0 {
 		return nil, appErrors.BadRequest("quantity cannot be negative")
 	}
 
@@ -327,24 +337,48 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, productID strin
 	var updateQuery string
 	var args []interface{}
 
-	if variantID == nil || *variantID == "" {
+	var invID, prodID, varID string
+	if input.InventoryID != nil {
+		invID = strings.TrimSpace(*input.InventoryID)
+	}
+	if input.ProductID != nil {
+		prodID = strings.TrimSpace(*input.ProductID)
+	}
+	if input.VariantID != nil {
+		varID = strings.TrimSpace(*input.VariantID)
+	}
+
+	if invID != "" {
 		updateQuery = `
 			UPDATE inventories
 			SET available_quantity = $1,
 			    updated_at = $2
-			WHERE product_id = $3 AND variant_id IS NULL
+			WHERE id = $3
 			RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 		`
-		args = []interface{}{quantity, now, productID}
+		args = []interface{}{input.Quantity, now, invID}
+	} else if prodID != "" {
+		if varID != "" {
+			updateQuery = `
+				UPDATE inventories
+				SET available_quantity = $1,
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id = $4
+				RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+			`
+			args = []interface{}{input.Quantity, now, prodID, varID}
+		} else {
+			updateQuery = `
+				UPDATE inventories
+				SET available_quantity = $1,
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id IS NULL
+				RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+			`
+			args = []interface{}{input.Quantity, now, prodID}
+		}
 	} else {
-		updateQuery = `
-			UPDATE inventories
-			SET available_quantity = $1,
-			    updated_at = $2
-			WHERE product_id = $3 AND variant_id = $4
-			RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
-		`
-		args = []interface{}{quantity, now, productID, *variantID}
+		return nil, appErrors.BadRequest("either inventory_id or product_id must be provided for stock update")
 	}
 
 	var inv model.Inventory
@@ -366,7 +400,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, productID strin
 		return nil, appErrors.Internal(err, "failed to update stock")
 	}
 
-	txNotes := fmt.Sprintf("Stock manually updated to %d", quantity)
+	txNotes := fmt.Sprintf("Stock manually updated to %d", input.Quantity)
 	txInsertQuery := `
 		INSERT INTO inventory_transactions (
 			id, inventory_id, type, quantity, reference_id, notes, created_at
@@ -380,7 +414,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, productID strin
 		uuid.NewString(),
 		inv.ID,
 		model.TransactionTypeAdjustment,
-		quantity,
+		input.Quantity,
 		&txNotes,
 		now,
 	)
@@ -494,7 +528,11 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 	return reservationID, nil
 }
 
-func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID string) error {
+func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error {
+	if strings.TrimSpace(input.ReservationID) == "" && strings.TrimSpace(input.OrderID) == "" {
+		return appErrors.BadRequest("either reservation_id or order_id is required for release")
+	}
+
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to begin release transaction")
@@ -502,12 +540,29 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now().UTC()
-	rows, err := tx.Query(ctx, `
-		SELECT id, order_id, product_id, variant_id, quantity
-		FROM inventory_reservations
-		WHERE id = $1 AND status = 'RESERVED'
-		FOR UPDATE;
-	`, reservationID)
+
+	var selectQuery string
+	var args []interface{}
+
+	if strings.TrimSpace(input.ReservationID) != "" {
+		selectQuery = `
+			SELECT id, order_id, product_id, variant_id, quantity, status
+			FROM inventory_reservations
+			WHERE id = $1
+			FOR UPDATE;
+		`
+		args = []interface{}{strings.TrimSpace(input.ReservationID)}
+	} else {
+		selectQuery = `
+			SELECT id, order_id, product_id, variant_id, quantity, status
+			FROM inventory_reservations
+			WHERE order_id = $1
+			FOR UPDATE;
+		`
+		args = []interface{}{strings.TrimSpace(input.OrderID)}
+	}
+
+	rows, err := tx.Query(ctx, selectQuery, args...)
 	if err != nil {
 		return appErrors.Internal(err, "failed to fetch reservations for release")
 	}
@@ -517,24 +572,45 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 		id, orderID, productID string
 		variantID              *string
 		quantity               int
+		status                 model.ReservationStatus
 	}
-	var resList []resRow
+	var allRows []resRow
+	var activeRows []resRow
+
 	for rows.Next() {
 		var row resRow
-		if err := rows.Scan(&row.id, &row.orderID, &row.productID, &row.variantID, &row.quantity); err != nil {
+		if err := rows.Scan(&row.id, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
 			return appErrors.Internal(err, "failed to scan reservation row")
 		}
-		resList = append(resList, row)
+		allRows = append(allRows, row)
+		if row.status == model.ReservationStatusReserved {
+			activeRows = append(activeRows, row)
+		}
 	}
 	rows.Close()
 
-	if len(resList) == 0 {
-		return appErrors.NotFound("reservation not found or already released/expired")
+	if len(allRows) == 0 {
+		return appErrors.NotFound("reservation not found")
 	}
 
-	for _, row := range resList {
+	// Idempotency: if all matching reservations are already released or expired, return success without mutating inventory
+	if len(activeRows) == 0 {
+		return nil
+	}
+
+	targetStatus := model.ReservationStatusReleased
+	if strings.EqualFold(input.Reason, "EXPIRED") {
+		targetStatus = model.ReservationStatusExpired
+	}
+
+	notes := "Stock released"
+	if strings.TrimSpace(input.Reason) != "" {
+		notes = fmt.Sprintf("Stock released (%s)", strings.TrimSpace(input.Reason))
+	}
+
+	for _, row := range activeRows {
 		var updateInvQuery string
-		var args []interface{}
+		var invArgs []interface{}
 		if row.variantID == nil || *row.variantID == "" {
 			updateInvQuery = `
 				UPDATE inventories
@@ -544,7 +620,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 				WHERE product_id = $3 AND variant_id IS NULL
 				RETURNING id;
 			`
-			args = []interface{}{row.quantity, now, row.productID}
+			invArgs = []interface{}{row.quantity, now, row.productID}
 		} else {
 			updateInvQuery = `
 				UPDATE inventories
@@ -554,17 +630,17 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 				WHERE product_id = $3 AND variant_id = $4
 				RETURNING id;
 			`
-			args = []interface{}{row.quantity, now, row.productID, *row.variantID}
+			invArgs = []interface{}{row.quantity, now, row.productID, *row.variantID}
 		}
 
 		var invID string
-		err := tx.QueryRow(ctx, updateInvQuery, args...).Scan(&invID)
+		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID)
 		if err != nil {
 			return appErrors.Internal(err, "failed to return stock to available inventory")
 		}
 
 		ref := row.orderID
-		notes := fmt.Sprintf("Stock released from reservation %s", reservationID)
+		notesVal := notes
 		txQuery := `
 			INSERT INTO inventory_transactions (
 				id, inventory_id, type, quantity, reference_id, notes, created_at
@@ -572,19 +648,20 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 				$1, $2, $3, $4, $5, $6, $7
 			);
 		`
-		_, err = tx.Exec(ctx, txQuery, uuid.NewString(), invID, model.TransactionTypeRelease, row.quantity, &ref, &notes, now)
+		_, err = tx.Exec(ctx, txQuery, uuid.NewString(), invID, model.TransactionTypeRelease, row.quantity, &ref, &notesVal, now)
 		if err != nil {
 			return appErrors.Internal(err, "failed to record release transaction")
 		}
-	}
 
-	_, err = tx.Exec(ctx, `
-		UPDATE inventory_reservations
-		SET status = 'RELEASED', updated_at = $1
-		WHERE id = $2;
-	`, now, reservationID)
-	if err != nil {
-		return appErrors.Internal(err, "failed to update reservation status to RELEASED")
+		resUpdateQuery := `
+			UPDATE inventory_reservations
+			SET status = $1, updated_at = $2
+			WHERE id = $3 AND status = 'RESERVED';
+		`
+		_, err = tx.Exec(ctx, resUpdateQuery, targetStatus, now, row.id)
+		if err != nil {
+			return appErrors.Internal(err, "failed to update reservation status")
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -592,6 +669,42 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, reservationID 
 	}
 
 	return nil
+}
+
+func (r *pgInventoryRepository) ReleaseExpiredReservations(ctx context.Context) (int, error) {
+	now := time.Now().UTC()
+	query := `
+		SELECT DISTINCT id
+		FROM inventory_reservations
+		WHERE status = 'RESERVED' AND expires_at <= $1;
+	`
+	rows, err := r.pool.Query(ctx, query, now)
+	if err != nil {
+		return 0, appErrors.Internal(err, "failed to query expired reservations")
+	}
+	defer rows.Close()
+
+	var expiredIDs []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			expiredIDs = append(expiredIDs, id)
+		}
+	}
+	rows.Close()
+
+	releasedCount := 0
+	for _, id := range expiredIDs {
+		err := r.ReleaseStock(ctx, dto.ReleaseStockInput{
+			ReservationID: id,
+			Reason:        "EXPIRED",
+		})
+		if err == nil {
+			releasedCount++
+		}
+	}
+
+	return releasedCount, nil
 }
 
 func (r *pgInventoryRepository) GetTransactionsByInventoryID(ctx context.Context, inventoryID string, limit, offset int) ([]*model.InventoryTransaction, error) {

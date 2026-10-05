@@ -23,8 +23,13 @@ func (r *mutationResolver) ReserveStock(ctx context.Context, orderID string, ite
 	var protoItems []*inventorypb.ReservationItem
 	for _, it := range items {
 		if it != nil {
+			var variantID string
+			if it.VariantID != nil {
+				variantID = *it.VariantID
+			}
 			protoItems = append(protoItems, &inventorypb.ReservationItem{
 				ProductId: it.ProductID,
+				VariantId: variantID,
 				Quantity:  int32(it.Quantity),
 			})
 		}
@@ -38,8 +43,15 @@ func (r *mutationResolver) ReserveStock(ctx context.Context, orderID string, ite
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
+	var expiresAt *string
+	if res.ExpiresAt != "" {
+		exp := res.ExpiresAt
+		expiresAt = &exp
+	}
+
 	return &model.ReserveStockPayload{
 		ReservationID: res.ReservationId,
+		ExpiresAt:     expiresAt,
 		Success:       res.Success,
 	}, nil
 }
@@ -61,14 +73,27 @@ func (r *mutationResolver) ReleaseStock(ctx context.Context, reservationID strin
 }
 
 // UpdateStock is the resolver for the updateStock field.
-func (r *mutationResolver) UpdateStock(ctx context.Context, productID string, quantity int) (*model.StockItem, error) {
+func (r *mutationResolver) UpdateStock(ctx context.Context, inventoryID *string, productID *string, variantID *string, quantity int) (*model.StockItem, error) {
 	if r.Clients == nil || r.Clients.InventoryClient == nil {
 		return nil, appErrors.Internal(nil, "inventory service client unavailable")
 	}
 
+	var iID, pID, vID string
+	if inventoryID != nil {
+		iID = *inventoryID
+	}
+	if productID != nil {
+		pID = *productID
+	}
+	if variantID != nil {
+		vID = *variantID
+	}
+
 	res, err := r.Clients.InventoryClient.UpdateStock(ctx, &inventorypb.UpdateStockRequest{
-		ProductId: productID,
-		Quantity:  int32(quantity),
+		InventoryId: iID,
+		ProductId:   pID,
+		VariantId:   vID,
+		Quantity:    int32(quantity),
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

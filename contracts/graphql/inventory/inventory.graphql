@@ -18,6 +18,7 @@ type InventoryItem {
 
 type ReserveStockPayload {
   reservationId: String!
+  expiresAt: String
   success: Boolean!
 }
 
@@ -28,6 +29,7 @@ type RestockInventoryPayload {
 
 input ReservationItemInput {
   productId: ID!
+  variantId: String
   quantity: Int!
 }
 
@@ -56,7 +58,7 @@ extend type Query {
 extend type Mutation {
   reserveStock(orderId: ID!, items: [ReservationItemInput!]!): ReserveStockPayload @auth
   releaseStock(reservationId: ID!): Boolean! @auth
-  updateStock(productId: ID!, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
+  updateStock(inventoryId: ID, productId: ID, variantId: String, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
   createInventory(input: CreateInventoryInput!): InventoryItem @auth(requires: [ADMIN, MERCHANT])
   restockInventory(input: RestockInventoryInput!): RestockInventoryPayload @auth(requires: [ADMIN, MERCHANT])
 }

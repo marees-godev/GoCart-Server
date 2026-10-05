@@ -249,7 +249,7 @@ type ComplexityRoot struct {
 		UpdateOrderStatus       func(childComplexity int, id string, status string) int
 		UpdateProduct           func(childComplexity int, id string, input model.UpdateProductInput) int
 		UpdateReturnStatus      func(childComplexity int, id string, status string) int
-		UpdateStock             func(childComplexity int, productID string, quantity int) int
+		UpdateStock             func(childComplexity int, inventoryID *string, productID *string, variantID *string, quantity int) int
 		UpdateStore             func(childComplexity int, input model.UpdateStoreInput) int
 		UpdateUser              func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress       func(childComplexity int, id string, input model.UpdateAddressInput) int
@@ -398,6 +398,7 @@ type ComplexityRoot struct {
 	}
 
 	ReserveStockPayload struct {
+		ExpiresAt     func(childComplexity int) int
 		ReservationID func(childComplexity int) int
 		Success       func(childComplexity int) int
 	}
@@ -520,7 +521,7 @@ type MutationResolver interface {
 	UpdateDeliveryStatus(ctx context.Context, id string, status string, location *string) (*model.Delivery, error)
 	ReserveStock(ctx context.Context, orderID string, items []*model.ReservationItemInput) (*model.ReserveStockPayload, error)
 	ReleaseStock(ctx context.Context, reservationID string) (bool, error)
-	UpdateStock(ctx context.Context, productID string, quantity int) (*model.StockItem, error)
+	UpdateStock(ctx context.Context, inventoryID *string, productID *string, variantID *string, quantity int) (*model.StockItem, error)
 	CreateInventory(ctx context.Context, input model.CreateInventoryInput) (*model.InventoryItem, error)
 	RestockInventory(ctx context.Context, input model.RestockInventoryInput) (*model.RestockInventoryPayload, error)
 	UpdateMerchant(ctx context.Context, id string, input model.UpdateMerchantInput) (*model.Merchant, error)
@@ -1905,7 +1906,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateStock(childComplexity, args["productId"].(string), args["quantity"].(int)), true
+		return e.complexity.Mutation.UpdateStock(childComplexity, args["inventoryId"].(*string), args["productId"].(*string), args["variantId"].(*string), args["quantity"].(int)), true
 
 	case "Mutation.updateStore":
 		if e.complexity.Mutation.UpdateStore == nil {
@@ -2794,6 +2795,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RefundPayload.Status(childComplexity), true
 
+	case "ReserveStockPayload.expiresAt":
+		if e.complexity.ReserveStockPayload.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.ReserveStockPayload.ExpiresAt(childComplexity), true
+
 	case "ReserveStockPayload.reservationId":
 		if e.complexity.ReserveStockPayload.ReservationID == nil {
 			break
@@ -3638,6 +3646,7 @@ type InventoryItem {
 
 type ReserveStockPayload {
   reservationId: String!
+  expiresAt: String
   success: Boolean!
 }
 
@@ -3648,6 +3657,7 @@ type RestockInventoryPayload {
 
 input ReservationItemInput {
   productId: ID!
+  variantId: String
   quantity: Int!
 }
 
@@ -3676,7 +3686,7 @@ extend type Query {
 extend type Mutation {
   reserveStock(orderId: ID!, items: [ReservationItemInput!]!): ReserveStockPayload @auth
   releaseStock(reservationId: ID!): Boolean! @auth
-  updateStock(productId: ID!, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
+  updateStock(inventoryId: ID, productId: ID, variantId: String, quantity: Int!): StockItem @auth(requires: [ADMIN, MERCHANT])
   createInventory(input: CreateInventoryInput!): InventoryItem @auth(requires: [ADMIN, MERCHANT])
   restockInventory(input: RestockInventoryInput!): RestockInventoryPayload @auth(requires: [ADMIN, MERCHANT])
 }
@@ -5228,24 +5238,42 @@ func (ec *executionContext) field_Mutation_updateReturnStatus_args(ctx context.C
 func (ec *executionContext) field_Mutation_updateStock_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 *string
+	if tmp, ok := rawArgs["inventoryId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("inventoryId"))
+		arg0, err = ec.unmarshalOID2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["inventoryId"] = arg0
+	var arg1 *string
 	if tmp, ok := rawArgs["productId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg1, err = ec.unmarshalOID2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["productId"] = arg0
-	var arg1 int
+	args["productId"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["variantId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("variantId"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["variantId"] = arg2
+	var arg3 int
 	if tmp, ok := rawArgs["quantity"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
-		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
+		arg3, err = ec.unmarshalNInt2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["quantity"] = arg1
+	args["quantity"] = arg3
 	return args, nil
 }
 
@@ -11406,6 +11434,8 @@ func (ec *executionContext) fieldContext_Mutation_reserveStock(ctx context.Conte
 			switch field.Name {
 			case "reservationId":
 				return ec.fieldContext_ReserveStockPayload_reservationId(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_ReserveStockPayload_expiresAt(ctx, field)
 			case "success":
 				return ec.fieldContext_ReserveStockPayload_success(ctx, field)
 			}
@@ -11516,7 +11546,7 @@ func (ec *executionContext) _Mutation_updateStock(ctx context.Context, field gra
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateStock(rctx, fc.Args["productId"].(string), fc.Args["quantity"].(int))
+			return ec.resolvers.Mutation().UpdateStock(rctx, fc.Args["inventoryId"].(*string), fc.Args["productId"].(*string), fc.Args["variantId"].(*string), fc.Args["quantity"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN", "MERCHANT"})
@@ -21175,6 +21205,47 @@ func (ec *executionContext) fieldContext_ReserveStockPayload_reservationId(_ con
 	return fc, nil
 }
 
+func (ec *executionContext) _ReserveStockPayload_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ReserveStockPayload) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReserveStockPayload_expiresAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpiresAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReserveStockPayload_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReserveStockPayload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ReserveStockPayload_success(ctx context.Context, field graphql.CollectedField, obj *model.ReserveStockPayload) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ReserveStockPayload_success(ctx, field)
 	if err != nil {
@@ -26977,7 +27048,7 @@ func (ec *executionContext) unmarshalInputReservationItemInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productId", "quantity"}
+	fieldsInOrder := [...]string{"productId", "variantId", "quantity"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -26991,6 +27062,13 @@ func (ec *executionContext) unmarshalInputReservationItemInput(ctx context.Conte
 				return it, err
 			}
 			it.ProductID = data
+		case "variantId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("variantId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VariantID = data
 		case "quantity":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
 			data, err := ec.unmarshalNInt2int(ctx, v)
@@ -30519,6 +30597,8 @@ func (ec *executionContext) _ReserveStockPayload(ctx context.Context, sel ast.Se
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "expiresAt":
+			out.Values[i] = ec._ReserveStockPayload_expiresAt(ctx, field, obj)
 		case "success":
 			out.Values[i] = ec._ReserveStockPayload_success(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

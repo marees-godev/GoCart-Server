@@ -10,5 +10,6 @@
 - **Enum Types**: Always create explicit PostgreSQL `ENUM` types for fixed categorical columns (e.g. statuses, types, roles, categories) instead of generic `VARCHAR` or `TEXT`.
 - **Database Normalization**: Every service must strictly adhere to relational database normalization (3NF). Maintain dedicated relational tables with foreign keys and cascade rules instead of dumping structured relational sub-entities into JSON/JSONB or denormalized text columns.
 - **Minimal Comments**: Keep code clean, concise, and avoid unnecessary comments.
+- **Protobuf Generation**: Only generate protobuf code for the specific proto file(s) being modified (e.g. `make gen-proto SERVICE=<service>`), never generate all proto files unnecessarily.
 - **Security**: Never leak credentials or sensitive values in logs.
 
