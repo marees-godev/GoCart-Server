@@ -1137,6 +1137,102 @@ func (x *UpdateStockResponse) GetStock() *StockItem {
 	return nil
 }
 
+type CommitStockRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReservationId string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
+	OrderId       string                 `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitStockRequest) Reset() {
+	*x = CommitStockRequest{}
+	mi := &file_contracts_protobuf_inventory_inventory_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitStockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitStockRequest) ProtoMessage() {}
+
+func (x *CommitStockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_inventory_inventory_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitStockRequest.ProtoReflect.Descriptor instead.
+func (*CommitStockRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_inventory_inventory_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *CommitStockRequest) GetReservationId() string {
+	if x != nil {
+		return x.ReservationId
+	}
+	return ""
+}
+
+func (x *CommitStockRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+type CommitStockResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitStockResponse) Reset() {
+	*x = CommitStockResponse{}
+	mi := &file_contracts_protobuf_inventory_inventory_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitStockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitStockResponse) ProtoMessage() {}
+
+func (x *CommitStockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_inventory_inventory_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitStockResponse.ProtoReflect.Descriptor instead.
+func (*CommitStockResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_inventory_inventory_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CommitStockResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_contracts_protobuf_inventory_inventory_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_inventory_inventory_proto_rawDesc = "" +
@@ -1234,7 +1330,12 @@ const file_contracts_protobuf_inventory_inventory_proto_rawDesc = "" +
 	"\n" +
 	"variant_id\x18\x04 \x01(\tR\tvariantId\"K\n" +
 	"\x13UpdateStockResponse\x124\n" +
-	"\x05stock\x18\x01 \x01(\v2\x1e.gocart.inventory.v1.StockItemR\x05stock2\xeb\x06\n" +
+	"\x05stock\x18\x01 \x01(\v2\x1e.gocart.inventory.v1.StockItemR\x05stock\"V\n" +
+	"\x12CommitStockRequest\x12%\n" +
+	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12\x19\n" +
+	"\border_id\x18\x02 \x01(\tR\aorderId\"/\n" +
+	"\x13CommitStockResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xcd\a\n" +
 	"\x10InventoryService\x12c\n" +
 	"\fGetInventory\x12(.gocart.inventory.v1.GetInventoryRequest\x1a).gocart.inventory.v1.GetInventoryResponse\x12l\n" +
 	"\x0fCreateInventory\x12+.gocart.inventory.v1.CreateInventoryRequest\x1a,.gocart.inventory.v1.CreateInventoryResponse\x12o\n" +
@@ -1243,7 +1344,8 @@ const file_contracts_protobuf_inventory_inventory_proto_rawDesc = "" +
 	"\fReserveStock\x12(.gocart.inventory.v1.ReserveStockRequest\x1a).gocart.inventory.v1.ReserveStockResponse\x12c\n" +
 	"\fReleaseStock\x12(.gocart.inventory.v1.ReleaseStockRequest\x1a).gocart.inventory.v1.ReleaseStockResponse\x12\x8d\x01\n" +
 	"\x1aReleaseExpiredReservations\x126.gocart.inventory.v1.ReleaseExpiredReservationsRequest\x1a7.gocart.inventory.v1.ReleaseExpiredReservationsResponse\x12`\n" +
-	"\vUpdateStock\x12'.gocart.inventory.v1.UpdateStockRequest\x1a(.gocart.inventory.v1.UpdateStockResponseBNZLgithub.com/marees-godev/GoCart-Server/contracts/protobuf/inventory;inventoryb\x06proto3"
+	"\vUpdateStock\x12'.gocart.inventory.v1.UpdateStockRequest\x1a(.gocart.inventory.v1.UpdateStockResponse\x12`\n" +
+	"\vCommitStock\x12'.gocart.inventory.v1.CommitStockRequest\x1a(.gocart.inventory.v1.CommitStockResponseBNZLgithub.com/marees-godev/GoCart-Server/contracts/protobuf/inventory;inventoryb\x06proto3"
 
 var (
 	file_contracts_protobuf_inventory_inventory_proto_rawDescOnce sync.Once
@@ -1257,7 +1359,7 @@ func file_contracts_protobuf_inventory_inventory_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_inventory_inventory_proto_rawDescData
 }
 
-var file_contracts_protobuf_inventory_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_contracts_protobuf_inventory_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_contracts_protobuf_inventory_inventory_proto_goTypes = []any{
 	(*InventoryItem)(nil),                      // 0: gocart.inventory.v1.InventoryItem
 	(*GetInventoryRequest)(nil),                // 1: gocart.inventory.v1.GetInventoryRequest
@@ -1278,6 +1380,8 @@ var file_contracts_protobuf_inventory_inventory_proto_goTypes = []any{
 	(*ReleaseExpiredReservationsResponse)(nil), // 16: gocart.inventory.v1.ReleaseExpiredReservationsResponse
 	(*UpdateStockRequest)(nil),                 // 17: gocart.inventory.v1.UpdateStockRequest
 	(*UpdateStockResponse)(nil),                // 18: gocart.inventory.v1.UpdateStockResponse
+	(*CommitStockRequest)(nil),                 // 19: gocart.inventory.v1.CommitStockRequest
+	(*CommitStockResponse)(nil),                // 20: gocart.inventory.v1.CommitStockResponse
 }
 var file_contracts_protobuf_inventory_inventory_proto_depIdxs = []int32{
 	0,  // 0: gocart.inventory.v1.GetInventoryResponse.inventory:type_name -> gocart.inventory.v1.InventoryItem
@@ -1294,16 +1398,18 @@ var file_contracts_protobuf_inventory_inventory_proto_depIdxs = []int32{
 	13, // 11: gocart.inventory.v1.InventoryService.ReleaseStock:input_type -> gocart.inventory.v1.ReleaseStockRequest
 	15, // 12: gocart.inventory.v1.InventoryService.ReleaseExpiredReservations:input_type -> gocart.inventory.v1.ReleaseExpiredReservationsRequest
 	17, // 13: gocart.inventory.v1.InventoryService.UpdateStock:input_type -> gocart.inventory.v1.UpdateStockRequest
-	2,  // 14: gocart.inventory.v1.InventoryService.GetInventory:output_type -> gocart.inventory.v1.GetInventoryResponse
-	4,  // 15: gocart.inventory.v1.InventoryService.CreateInventory:output_type -> gocart.inventory.v1.CreateInventoryResponse
-	6,  // 16: gocart.inventory.v1.InventoryService.RestockInventory:output_type -> gocart.inventory.v1.RestockInventoryResponse
-	9,  // 17: gocart.inventory.v1.InventoryService.GetStock:output_type -> gocart.inventory.v1.GetStockResponse
-	12, // 18: gocart.inventory.v1.InventoryService.ReserveStock:output_type -> gocart.inventory.v1.ReserveStockResponse
-	14, // 19: gocart.inventory.v1.InventoryService.ReleaseStock:output_type -> gocart.inventory.v1.ReleaseStockResponse
-	16, // 20: gocart.inventory.v1.InventoryService.ReleaseExpiredReservations:output_type -> gocart.inventory.v1.ReleaseExpiredReservationsResponse
-	18, // 21: gocart.inventory.v1.InventoryService.UpdateStock:output_type -> gocart.inventory.v1.UpdateStockResponse
-	14, // [14:22] is the sub-list for method output_type
-	6,  // [6:14] is the sub-list for method input_type
+	19, // 14: gocart.inventory.v1.InventoryService.CommitStock:input_type -> gocart.inventory.v1.CommitStockRequest
+	2,  // 15: gocart.inventory.v1.InventoryService.GetInventory:output_type -> gocart.inventory.v1.GetInventoryResponse
+	4,  // 16: gocart.inventory.v1.InventoryService.CreateInventory:output_type -> gocart.inventory.v1.CreateInventoryResponse
+	6,  // 17: gocart.inventory.v1.InventoryService.RestockInventory:output_type -> gocart.inventory.v1.RestockInventoryResponse
+	9,  // 18: gocart.inventory.v1.InventoryService.GetStock:output_type -> gocart.inventory.v1.GetStockResponse
+	12, // 19: gocart.inventory.v1.InventoryService.ReserveStock:output_type -> gocart.inventory.v1.ReserveStockResponse
+	14, // 20: gocart.inventory.v1.InventoryService.ReleaseStock:output_type -> gocart.inventory.v1.ReleaseStockResponse
+	16, // 21: gocart.inventory.v1.InventoryService.ReleaseExpiredReservations:output_type -> gocart.inventory.v1.ReleaseExpiredReservationsResponse
+	18, // 22: gocart.inventory.v1.InventoryService.UpdateStock:output_type -> gocart.inventory.v1.UpdateStockResponse
+	20, // 23: gocart.inventory.v1.InventoryService.CommitStock:output_type -> gocart.inventory.v1.CommitStockResponse
+	15, // [15:24] is the sub-list for method output_type
+	6,  // [6:15] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -1320,7 +1426,7 @@ func file_contracts_protobuf_inventory_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_inventory_inventory_proto_rawDesc), len(file_contracts_protobuf_inventory_inventory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

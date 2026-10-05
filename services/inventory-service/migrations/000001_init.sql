@@ -1,6 +1,6 @@
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'inventory_transaction_type') THEN
-        CREATE TYPE inventory_transaction_type AS ENUM ('RESTOCK', 'RESERVE', 'RELEASE', 'ADJUSTMENT', 'SALE', 'RETURN');
+        CREATE TYPE inventory_transaction_type AS ENUM ('RESTOCK', 'RESERVE', 'RELEASE', 'ADJUSTMENT', 'SALE', 'RETURN', 'COMMIT');
     END IF;
 END $$;
 
@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     aggregate_id VARCHAR(255) NOT NULL,
     event_type VARCHAR(100) NOT NULL,
     payload JSONB NOT NULL,
+    topic VARCHAR(255) NOT NULL DEFAULT '',
     status outbox_status NOT NULL DEFAULT 'PENDING',
     retry_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

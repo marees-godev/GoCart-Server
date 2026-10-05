@@ -275,3 +275,21 @@ func (s *InventoryGRPCServer) UpdateStock(ctx context.Context, req *inventorypb.
 		},
 	}, nil
 }
+
+func (s *InventoryGRPCServer) CommitStock(ctx context.Context, req *inventorypb.CommitStockRequest) (*inventorypb.CommitStockResponse, error) {
+	if req == nil || (req.GetReservationId() == "" && req.GetOrderId() == "") {
+		return nil, appErrors.BadRequest("either reservation_id or order_id is required").ToGRPC()
+	}
+
+	err := s.service.CommitStock(ctx, dto.CommitStockInput{
+		ReservationID: req.GetReservationId(),
+		OrderID:       req.GetOrderId(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &inventorypb.CommitStockResponse{
+		Success: true,
+	}, nil
+}

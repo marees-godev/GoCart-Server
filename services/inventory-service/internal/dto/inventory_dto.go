@@ -50,3 +50,8 @@ type ReleaseStockInput struct {
 	OrderID       string
 	Reason        string
 }
+
+type CommitStockInput struct {
+	ReservationID string
+	OrderID       string
+}
