@@ -13,6 +13,7 @@ service InventoryService {
   rpc ReleaseStock (ReleaseStockRequest) returns (ReleaseStockResponse);
   rpc ReleaseExpiredReservations (ReleaseExpiredReservationsRequest) returns (ReleaseExpiredReservationsResponse);
   rpc UpdateStock (UpdateStockRequest) returns (UpdateStockResponse);
+  rpc CommitStock (CommitStockRequest) returns (CommitStockResponse);
 }
 
 message InventoryItem {
@@ -124,4 +125,14 @@ message UpdateStockRequest {
 message UpdateStockResponse {
   StockItem stock = 1;
 }
+
+message CommitStockRequest {
+  string reservation_id = 1;
+  string order_id = 2;
+}
+
+message CommitStockResponse {
+  bool success = 1;
+}
+
 

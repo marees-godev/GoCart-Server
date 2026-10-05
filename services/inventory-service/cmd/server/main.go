@@ -9,19 +9,25 @@ import (
 	"syscall"
 	"time"
 
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/consumer"
 	inventoryGRPC "github.com/marees-godev/GoCart-Server/services/inventory-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/service"
@@ -116,6 +122,42 @@ func main() {
 	cleanupInterval := time.Duration(cfg.Reservation.ExpirationCleanupIntervalSeconds) * time.Second
 	invService.StartExpirationWorker(ctx, cleanupInterval)
 	invGRPCServer := inventoryGRPC.NewInventoryGRPCServer(invService)
+
+	// 6. Initialize Kafka Producer, Outbox Publisher & Event Consumer
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		kafkaCfg := kafka.Config{
+			Brokers:       cfg.Kafka.Brokers,
+			MaxRetries:    3,
+			RetryInterval: 1 * time.Second,
+		}
+		kp := kafka.NewProducer(kafkaCfg)
+		defer func() { _ = kp.Close() }()
+
+		// Start Outbox Publisher worker
+		outboxStore := outbox.NewStore()
+		outboxPublisher := outbox.NewPublisher(db.Pool, kp, outboxStore, outbox.DefaultConfig())
+		go outboxPublisher.Start(ctx)
+
+		// Start Kafka Event Consumer
+		consumerCfg := kafka.ConsumerConfig{
+			GroupID: "inventory-service-group",
+			Topics: []string{
+				events.TopicOrderCreated,
+				events.TopicPaymentFailed,
+				events.TopicOrderCancelled,
+				events.TopicOrderConfirmed,
+			},
+		}
+		kafkaConsumer := kafka.NewConsumer(kafkaCfg, consumerCfg, kp)
+		evtConsumer := consumer.NewInventoryEventConsumer(invService)
+		go func() {
+			log.Info("Starting Inventory Kafka Event Consumer...")
+			if err := kafkaConsumer.Start(ctx, evtConsumer.HandleEvent); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Kafka event consumer failed", "error", err)
+			}
+		}()
+		defer func() { _ = kafkaConsumer.Close() }()
+	}
 
 	// 6. Start gRPC Server
 	grpcServer := grpc.NewServer(

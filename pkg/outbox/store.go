@@ -101,16 +101,33 @@ func (s *Store) MarkPublished(ctx context.Context, tx pgx.Tx, id uuid.UUID) erro
 // PENDING so the next poll cycle can retry it. Must be called within the same
 // transaction that FetchAndLockPending was issued on.
 func (s *Store) MarkFailed(ctx context.Context, tx pgx.Tx, id uuid.UUID, maxRetries int) error {
-	_, err := tx.Exec(ctx, `
+	var newRetryCount int
+	err := tx.QueryRow(ctx, `
 		UPDATE outbox_events
-		SET retry_count = retry_count + 1,
-		    status = CASE WHEN retry_count + 1 >= $2 THEN 'FAILED' ELSE 'PENDING' END
-		WHERE id = $1`,
-		id, maxRetries,
-	)
+		SET retry_count = retry_count + 1
+		WHERE id = $1
+		RETURNING retry_count`,
+		id,
+	).Scan(&newRetryCount)
 	if err != nil {
 		return fmt.Errorf("outbox: mark failed %s: %w", id, err)
 	}
+
+	status := "PENDING"
+	if newRetryCount >= maxRetries {
+		status = "FAILED"
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE outbox_events
+		SET status = $2
+		WHERE id = $1`,
+		id, status,
+	)
+	if err != nil {
+		return fmt.Errorf("outbox: update status %s: %w", id, err)
+	}
+
 	return nil
 }
 

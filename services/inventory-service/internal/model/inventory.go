@@ -11,6 +11,7 @@ const (
 	TransactionTypeAdjustment TransactionType = "ADJUSTMENT"
 	TransactionTypeSale       TransactionType = "SALE"
 	TransactionTypeReturn     TransactionType = "RETURN"
+	TransactionTypeCommit     TransactionType = "COMMIT"
 )
 
 type ReservationStatus string

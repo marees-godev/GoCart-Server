@@ -11,9 +11,16 @@ import (
 // Standard Event Type Constants
 const (
 	EventTypeOrderCreated               = "OrderCreated"
+	EventTypeOrderCancelled             = "OrderCancelled"
+	EventTypeOrderConfirmed             = "OrderConfirmed"
 	EventTypePaymentSuccessful          = "PaymentSuccessful"
 	EventTypePaymentFailed              = "PaymentFailed"
 	EventTypeInventoryReserved          = "InventoryReserved"
+	EventTypeInventoryReleased          = "InventoryReleased"
+	EventTypeInventoryCommitted         = "InventoryCommitted"
+	EventTypeInventoryLow               = "InventoryLow"
+	EventTypeInventoryCreated           = "InventoryCreated"
+	EventTypeInventoryRestocked         = "InventoryRestocked"
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
@@ -30,7 +37,17 @@ const (
 
 // Standard Topic Constants
 const (
-	TopicUserRegistered = "gocart.auth.user-registered"
+	TopicUserRegistered     = "gocart.auth.user-registered"
+	TopicOrderCreated       = "gocart.order.order-created"
+	TopicOrderCancelled     = "gocart.order.order-cancelled"
+	TopicOrderConfirmed     = "gocart.order.order-confirmed"
+	TopicPaymentFailed      = "gocart.payment.payment-failed"
+	TopicInventoryReserved  = "gocart.inventory.inventory-reserved"
+	TopicInventoryReleased  = "gocart.inventory.inventory-released"
+	TopicInventoryCommitted = "gocart.inventory.inventory-committed"
+	TopicInventoryLow       = "gocart.inventory.inventory-low"
+	TopicInventoryCreated   = "gocart.inventory.inventory-created"
+	TopicInventoryRestocked = "gocart.inventory.inventory-restocked"
 
 	// Store Service Topics
 	TopicStoreCreated     = "gocart.store.store-created"
