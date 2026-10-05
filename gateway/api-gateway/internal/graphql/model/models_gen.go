@@ -428,13 +428,15 @@ type RequestReturnInput struct {
 }
 
 type ReservationItemInput struct {
-	ProductID string `json:"productId"`
-	Quantity  int    `json:"quantity"`
+	ProductID string  `json:"productId"`
+	VariantID *string `json:"variantId,omitempty"`
+	Quantity  int     `json:"quantity"`
 }
 
 type ReserveStockPayload struct {
-	ReservationID string `json:"reservationId"`
-	Success       bool   `json:"success"`
+	ReservationID string  `json:"reservationId"`
+	ExpiresAt     *string `json:"expiresAt,omitempty"`
+	Success       bool    `json:"success"`
 }
 
 type ResetPasswordPayload struct {

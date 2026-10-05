@@ -12,6 +12,7 @@ import (
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/client"
+	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
 	inventoryGRPC "github.com/marees-godev/GoCart-Server/services/inventory-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/repository"
@@ -130,20 +131,37 @@ func (r *memoryInventoryRepo) Restock(ctx context.Context, id string, quantity i
 	return &copyInv, nil
 }
 
-func (r *memoryInventoryRepo) UpdateStock(ctx context.Context, productID string, variantID *string, quantity int) (*model.Inventory, error) {
+func (r *memoryInventoryRepo) UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	var invID, prodID, varID string
+	if input.InventoryID != nil {
+		invID = *input.InventoryID
+	}
+	if input.ProductID != nil {
+		prodID = *input.ProductID
+	}
+	if input.VariantID != nil {
+		varID = *input.VariantID
+	}
+
 	for _, inv := range r.inventories {
-		if inv.ProductID == productID {
+		if invID != "" && inv.ID == invID {
+			inv.AvailableQuantity = input.Quantity
+			inv.UpdatedAt = time.Now().UTC()
+			copyInv := *inv
+			return &copyInv, nil
+		}
+		if prodID != "" && inv.ProductID == prodID {
 			matches := false
-			if (variantID == nil || *variantID == "") && inv.VariantID == nil {
+			if varID == "" && inv.VariantID == nil {
 				matches = true
-			} else if variantID != nil && inv.VariantID != nil && *variantID == *inv.VariantID {
+			} else if varID != "" && inv.VariantID != nil && varID == *inv.VariantID {
 				matches = true
 			}
 			if matches {
-				inv.AvailableQuantity = quantity
+				inv.AvailableQuantity = input.Quantity
 				inv.UpdatedAt = time.Now().UTC()
 				copyInv := *inv
 				return &copyInv, nil
@@ -196,32 +214,73 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 	return resID, nil
 }
 
-func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, reservationID string) error {
+func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, input dto.ReleaseStockInput) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	res, ok := r.reservations[reservationID]
-	if !ok || res.Status != model.ReservationStatusReserved {
-		return appErrors.NotFound("reservation not found or already released/expired")
-	}
-
-	for _, inv := range r.inventories {
-		if inv.ProductID == res.ProductID {
-			if (res.VariantID == nil && inv.VariantID == nil) ||
-				(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
-				inv.AvailableQuantity += res.Quantity
-				inv.ReservedQuantity -= res.Quantity
-				if inv.ReservedQuantity < 0 {
-					inv.ReservedQuantity = 0
-				}
-				inv.UpdatedAt = time.Now().UTC()
-				break
-			}
+	var matching []*model.InventoryReservation
+	for _, res := range r.reservations {
+		if (input.ReservationID != "" && res.ID == input.ReservationID) ||
+			(input.OrderID != "" && res.OrderID == input.OrderID) {
+			matching = append(matching, res)
 		}
 	}
-	res.Status = model.ReservationStatusReleased
-	res.UpdatedAt = time.Now().UTC()
+
+	if len(matching) == 0 {
+		return appErrors.NotFound("reservation not found")
+	}
+
+	targetStatus := model.ReservationStatusReleased
+	if strings.EqualFold(input.Reason, "EXPIRED") {
+		targetStatus = model.ReservationStatusExpired
+	}
+
+	for _, res := range matching {
+		if res.Status == model.ReservationStatusReserved {
+			for _, inv := range r.inventories {
+				if inv.ProductID == res.ProductID {
+					if (res.VariantID == nil && inv.VariantID == nil) ||
+						(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
+						inv.AvailableQuantity += res.Quantity
+						inv.ReservedQuantity -= res.Quantity
+						if inv.ReservedQuantity < 0 {
+							inv.ReservedQuantity = 0
+						}
+						inv.UpdatedAt = time.Now().UTC()
+						break
+					}
+				}
+			}
+			res.Status = targetStatus
+			res.UpdatedAt = time.Now().UTC()
+		}
+	}
+
 	return nil
+}
+
+func (r *memoryInventoryRepo) ReleaseExpiredReservations(ctx context.Context) (int, error) {
+	r.mu.Lock()
+	now := time.Now().UTC()
+	var expiredIDs []string
+	for _, res := range r.reservations {
+		if res.Status == model.ReservationStatusReserved && !res.ExpiresAt.After(now) {
+			expiredIDs = append(expiredIDs, res.ID)
+		}
+	}
+	r.mu.Unlock()
+
+	released := 0
+	for _, id := range expiredIDs {
+		err := r.ReleaseStock(ctx, dto.ReleaseStockInput{
+			ReservationID: id,
+			Reason:        "EXPIRED",
+		})
+		if err == nil {
+			released++
+		}
+	}
+	return released, nil
 }
 
 func (r *memoryInventoryRepo) GetTransactionsByInventoryID(ctx context.Context, inventoryID string, limit, offset int) ([]*model.InventoryTransaction, error) {
@@ -237,12 +296,77 @@ func (r *memoryInventoryRepo) GetTransactionsByInventoryID(ctx context.Context, 
 	return result, nil
 }
 
-func setupTestServer() (*inventoryGRPC.InventoryGRPCServer, *client.StubProductClient) {
-	stubCli := client.NewStubProductClient()
+type mockProductClient struct {
+	products          map[string]*client.ProductDetails
+	merchantOwnership map[string]string
+}
+
+func newMockProductClient() *mockProductClient {
+	return &mockProductClient{
+		products:          make(map[string]*client.ProductDetails),
+		merchantOwnership: make(map[string]string),
+	}
+}
+
+func (s *mockProductClient) AddProduct(id, storeID, sku, merchantID string) {
+	s.products[id] = &client.ProductDetails{
+		ID:       id,
+		StoreID:  storeID,
+		SKU:      sku,
+		Name:     "Product " + id,
+		IsActive: true,
+	}
+	if merchantID != "" {
+		s.merchantOwnership[id] = merchantID
+	}
+}
+
+func (s *mockProductClient) GetProduct(ctx context.Context, productID string) (*client.ProductDetails, error) {
+	if prod, ok := s.products[productID]; ok {
+		return prod, nil
+	}
+	if len(s.products) > 0 {
+		return nil, appErrors.NotFound("product not found")
+	}
+	return &client.ProductDetails{
+		ID:       productID,
+		StoreID:  "test-store-id",
+		SKU:      "SKU-DEFAULT",
+		Name:     "Default Test Product",
+		IsActive: true,
+	}, nil
+}
+
+func (s *mockProductClient) ValidateProductVariant(ctx context.Context, productID string, variantID *string) error {
+	prod, err := s.GetProduct(ctx, productID)
+	if err != nil {
+		return err
+	}
+	if prod == nil {
+		return appErrors.NotFound("invalid product reference")
+	}
+	if variantID != nil && *variantID == "invalid-variant-id" {
+		return appErrors.NotFound("invalid variant reference")
+	}
+	return nil
+}
+
+func (s *mockProductClient) VerifyProductMerchant(ctx context.Context, merchantID, productID string) (bool, error) {
+	if merchantID == "" {
+		return true, nil
+	}
+	if expectedMerchant, ok := s.merchantOwnership[productID]; ok {
+		return expectedMerchant == merchantID, nil
+	}
+	return true, nil
+}
+
+func setupTestServer() (*inventoryGRPC.InventoryGRPCServer, *mockProductClient) {
+	mockCli := newMockProductClient()
 	repo := newMemoryInventoryRepo()
-	svc := service.NewInventoryService(repo, stubCli)
+	svc := service.NewInventoryService(repo, mockCli)
 	server := inventoryGRPC.NewInventoryGRPCServer(svc)
-	return server, stubCli
+	return server, mockCli
 }
 
 func TestInventoryGRPCServer_CreateInventory_Success(t *testing.T) {
@@ -580,5 +704,199 @@ func TestInventoryGRPCServer_ReserveAndReleaseStock_SeparateTracking(t *testing.
 	}
 	if stockRespAfter.Stock.ReservedQuantity != 0 {
 		t.Errorf("expected reserved quantity 0 after release, got %d", stockRespAfter.Stock.ReservedQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_ReserveStock_InsufficientStock(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-LIMITED", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-LIMITED",
+		InitialQuantity: 10,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	_, err = server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{
+				ProductId: prodID,
+				Quantity:  20,
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error for insufficient stock reservation, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok || (st.Code() != codes.AlreadyExists && st.Code() != codes.InvalidArgument && st.Code() != codes.FailedPrecondition) {
+		t.Fatalf("expected Conflict or InvalidArgument status code, got %v", err)
+	}
+}
+
+func TestInventoryGRPCServer_ReserveAndRelease_VariantAndExpiration(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	varID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-VAR-RES", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		VariantId:       varID,
+		Sku:             "SKU-VAR-RES",
+		InitialQuantity: 30,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	reserveResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{
+				ProductId: prodID,
+				VariantId: varID,
+				Quantity:  10,
+			},
+		},
+		ExpirationMinutes: 15,
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock with variant failed: %v", err)
+	}
+
+	if reserveResp.ExpiresAt == "" {
+		t.Errorf("expected expires_at in reservation response")
+	}
+
+	// Verify stock
+	getInvResp, err := server.GetInventory(context.Background(), &inventorypb.GetInventoryRequest{
+		MerchantId: merchantID,
+		ProductId:  prodID,
+		VariantId:  varID,
+	})
+	if err != nil {
+		t.Fatalf("GetInventory failed: %v", err)
+	}
+	if getInvResp.Inventory.AvailableQuantity != 20 {
+		t.Errorf("expected available quantity 20, got %d", getInvResp.Inventory.AvailableQuantity)
+	}
+	if getInvResp.Inventory.ReservedQuantity != 10 {
+		t.Errorf("expected reserved quantity 10, got %d", getInvResp.Inventory.ReservedQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_ReleaseStock_DuplicateReleaseIdempotency(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-DUP", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-DUP",
+		InitialQuantity: 40,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	resResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 10},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock failed: %v", err)
+	}
+
+	// 1st release call
+	rel1, err := server.ReleaseStock(context.Background(), &inventorypb.ReleaseStockRequest{
+		ReservationId: resResp.ReservationId,
+		Reason:        "PAYMENT_FAILED",
+	})
+	if err != nil || !rel1.Success {
+		t.Fatalf("1st ReleaseStock failed: %v", err)
+	}
+
+	// 2nd release call (duplicate release - e.g. order cancellation following payment failure)
+	rel2, err := server.ReleaseStock(context.Background(), &inventorypb.ReleaseStockRequest{
+		ReservationId: resResp.ReservationId,
+		Reason:        "ORDER_CANCELLED",
+	})
+	if err != nil || !rel2.Success {
+		t.Fatalf("2nd duplicate ReleaseStock failed: %v", err)
+	}
+
+	// Verify inventory quantity is restored once to 40, not double-restored to 50
+	stockResp, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: prodID})
+	if err != nil {
+		t.Fatalf("GetStock failed: %v", err)
+	}
+	if stockResp.Stock.AvailableQuantity != 40 {
+		t.Errorf("expected available quantity 40 after duplicate release, got %d", stockResp.Stock.AvailableQuantity)
+	}
+	if stockResp.Stock.ReservedQuantity != 0 {
+		t.Errorf("expected reserved quantity 0 after duplicate release, got %d", stockResp.Stock.ReservedQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_ReleaseStock_ByOrderId(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	merchantID := "merch-123"
+	stubCli.AddProduct(prodID, "store-1", "SKU-ORDER-REL", merchantID)
+
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		MerchantId:      merchantID,
+		ProductId:       prodID,
+		Sku:             "SKU-ORDER-REL",
+		InitialQuantity: 25,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	orderID := uuid.NewString()
+	_, err = server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: orderID,
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 5},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ReserveStock failed: %v", err)
+	}
+
+	// Release by order ID (e.g. order cancelled event listener)
+	relResp, err := server.ReleaseStock(context.Background(), &inventorypb.ReleaseStockRequest{
+		OrderId: orderID,
+		Reason:  "ORDER_CANCELLED",
+	})
+	if err != nil || !relResp.Success {
+		t.Fatalf("ReleaseStock by order ID failed: %v", err)
+	}
+
+	stockResp, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: prodID})
+	if err != nil {
+		t.Fatalf("GetStock failed: %v", err)
+	}
+	if stockResp.Stock.AvailableQuantity != 25 {
+		t.Errorf("expected available quantity 25, got %d", stockResp.Stock.AvailableQuantity)
 	}
 }
