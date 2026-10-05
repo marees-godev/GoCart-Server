@@ -738,8 +738,8 @@ func TestInventoryGRPCServer_ReserveStock_InsufficientStock(t *testing.T) {
 	}
 
 	st, ok := status.FromError(err)
-	if !ok || st.Code() != codes.AlreadyExists && st.Code() != codes.FailedPrecondition {
-		// appErrors.Conflict maps to AlreadyExists or Aborted in gRPC mapper
+	if !ok || (st.Code() != codes.AlreadyExists && st.Code() != codes.InvalidArgument && st.Code() != codes.FailedPrecondition) {
+		t.Fatalf("expected Conflict or InvalidArgument status code, got %v", err)
 	}
 }
 
