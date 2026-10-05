@@ -77,6 +77,10 @@ func (m *mockProductService) DeleteProduct(ctx context.Context, id string) error
 	return nil
 }
 
+func (m *mockProductService) DeleteProductVariant(ctx context.Context, productID, variantID string) error {
+	return nil
+}
+
 func TestProductGRPCHandler(t *testing.T) {
 	svc := newMockProductService()
 	h := handler.NewProductGRPCHandler(svc)
@@ -116,6 +120,16 @@ func TestProductGRPCHandler(t *testing.T) {
 
 	t.Run("DeleteProduct RPC", func(t *testing.T) {
 		resp, err := h.DeleteProduct(ctx, &productpb.DeleteProductRequest{Id: "33333333-3333-3333-3333-333333333333"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !resp.Success {
+			t.Errorf("expected success true")
+		}
+	})
+
+	t.Run("DeleteProductVariant RPC", func(t *testing.T) {
+		resp, err := h.DeleteProductVariant(ctx, &productpb.DeleteProductVariantRequest{ProductId: "prod-111", Id: "var-111"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

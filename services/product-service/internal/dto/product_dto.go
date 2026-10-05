@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -84,12 +85,23 @@ func (r *CreateProductRequest) Validate() error {
 		r.Status = string(model.StatusInStock)
 	}
 
+	seenSKUs := make(map[string]bool)
+	seenSKUs[r.SKU] = true
+
 	for i, v := range r.Variants {
 		v.SKU = strings.TrimSpace(v.SKU)
 		v.Name = strings.TrimSpace(v.Name)
 		if v.SKU == "" {
 			v.SKU = utils.GenerateSKU()
 		}
+		if v.Name == "" {
+			return appErrors.InvalidArgument("variant name is required")
+		}
+		if seenSKUs[v.SKU] {
+			return appErrors.InvalidArgument("duplicate variant SKU in request: " + v.SKU)
+		}
+		seenSKUs[v.SKU] = true
+
 		if v.Price < 0 {
 			return appErrors.InvalidArgument("variant price cannot be negative")
 		}
@@ -98,6 +110,9 @@ func (r *CreateProductRequest) Validate() error {
 		}
 		if v.Stock < 0 {
 			return appErrors.InvalidArgument("variant stock cannot be negative")
+		}
+		if v.AttributesJSON != "" && !json.Valid([]byte(v.AttributesJSON)) {
+			return appErrors.InvalidArgument("invalid variant attributes json")
 		}
 		r.Variants[i] = v
 	}
@@ -177,6 +192,44 @@ func (r *UpdateProductRequest) Validate() error {
 		}
 		sStr := string(st)
 		r.Status = &sStr
+	}
+
+	seenSKUs := make(map[string]bool)
+	for i, v := range r.Variants {
+		v.ID = strings.TrimSpace(v.ID)
+		if v.ID != "" {
+			if _, err := uuid.Parse(v.ID); err != nil {
+				return appErrors.InvalidArgument("variant id must be a valid UUID")
+			}
+		}
+		v.SKU = strings.TrimSpace(v.SKU)
+		v.Name = strings.TrimSpace(v.Name)
+		if v.SKU != "" {
+			if seenSKUs[v.SKU] {
+				return appErrors.InvalidArgument("duplicate variant SKU in request: " + v.SKU)
+			}
+			seenSKUs[v.SKU] = true
+		}
+		if v.Price < 0 {
+			return appErrors.InvalidArgument("variant price cannot be negative")
+		}
+		if v.MRP < v.Price {
+			return appErrors.InvalidArgument("variant MRP must be greater than or equal to price")
+		}
+		if v.Stock < 0 {
+			return appErrors.InvalidArgument("variant stock cannot be negative")
+		}
+		if v.AttributesJSON != "" && !json.Valid([]byte(v.AttributesJSON)) {
+			return appErrors.InvalidArgument("invalid variant attributes json")
+		}
+		if v.Status != "" {
+			st := model.ProductStatus(strings.ToUpper(strings.TrimSpace(v.Status)))
+			if !st.IsValid() {
+				return appErrors.InvalidArgument("invalid variant status")
+			}
+			v.Status = string(st)
+		}
+		r.Variants[i] = v
 	}
 
 	return nil
