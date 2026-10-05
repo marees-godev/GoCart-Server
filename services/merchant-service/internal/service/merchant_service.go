@@ -312,6 +312,14 @@ func (s *merchantService) UpdateMerchantStatus(ctx context.Context, id uuid.UUID
 
 	newStatus := model.MerchantStatus(trimmedStatus)
 	reason := strings.TrimSpace(req.RejectionReason)
+	if (newStatus == model.MerchantStatusRejected || newStatus == model.MerchantStatusSuspended) && reason == "" {
+		s.logger.Warn("UpdateMerchantStatus failed: rejection reason is required for REJECTED and SUSPENDED status",
+			slog.String("merchant_id", id.String()),
+			slog.String("status", string(newStatus)),
+		)
+		return nil, "", appErrors.BadRequest("rejection reason is required when rejecting or suspending a merchant")
+	}
+
 	s.logger.Info("Updating merchant status",
 		slog.String("merchant_id", id.String()),
 		slog.String("new_status", string(newStatus)),

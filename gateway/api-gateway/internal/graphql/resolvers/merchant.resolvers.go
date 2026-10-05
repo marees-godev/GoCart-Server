@@ -76,6 +76,12 @@ func (r *mutationResolver) UpdateMerchantStatus(ctx context.Context, id string, 
 		return nil, appErrors.BadRequest("id and status are required")
 	}
 
+	if status == model.MerchantStatusRejected || status == model.MerchantStatusSuspended {
+		if rejectionReason == nil || strings.TrimSpace(*rejectionReason) == "" {
+			return nil, appErrors.BadRequest("rejection reason is required when rejecting or suspending a merchant")
+		}
+	}
+
 	statusVal, ok := merchantpb.MerchantStatus_value[string(status)]
 	if !ok {
 		return nil, appErrors.BadRequest("invalid merchant status")
@@ -190,7 +196,7 @@ func (r *queryResolver) Merchant(ctx context.Context, id string) (*model.Merchan
 }
 
 // Merchants is the resolver for the merchants field.
-func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantStatus, lifecycleStatus *model.MerchantLifecycleStatus, limit *int, offset *int) (*model.MerchantList, error) {
+func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantStatus, lifecycleStatus *model.MerchantLifecycleStatus, reactivatedOnly *bool, limit *int, offset *int) (*model.MerchantList, error) {
 	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
 		return nil, appErrors.Internal(nil, "merchant client unavailable")
 	}
@@ -221,99 +227,8 @@ func (r *queryResolver) Merchants(ctx context.Context, status *model.MerchantSta
 			req.LifecycleStatus = &ls
 		}
 	}
-	if limit != nil {
-		req.Limit = int32(*limit)
-	}
-	if offset != nil {
-		req.Offset = int32(*offset)
-	}
-
-	res, err := r.ClientMgr.MerchantClient.ListMerchants(ctx, req)
-	if err != nil {
-		return nil, grpcclient.TranslateGRPCError(err)
-	}
-
-	items := make([]*model.Merchant, len(res.Merchants))
-	for i, m := range res.Merchants {
-		items[i] = toModelMerchant(m)
-	}
-
-	return &model.MerchantList{
-		Merchants: items,
-		Total:     int(res.Total),
-	}, nil
-}
-
-// ActiveMerchants is the resolver for the activeMerchants field.
-func (r *queryResolver) ActiveMerchants(ctx context.Context, limit *int, offset *int) (*model.MerchantList, error) {
-	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
-		return nil, appErrors.Internal(nil, "merchant client unavailable")
-	}
-	req := &merchantpb.ListMerchantsRequest{}
-	status := merchantpb.MerchantStatus_APPROVED
-	req.Status = &status
-	if limit != nil {
-		req.Limit = int32(*limit)
-	}
-	if offset != nil {
-		req.Offset = int32(*offset)
-	}
-
-	res, err := r.ClientMgr.MerchantClient.ListMerchants(ctx, req)
-	if err != nil {
-		return nil, grpcclient.TranslateGRPCError(err)
-	}
-
-	items := make([]*model.Merchant, len(res.Merchants))
-	for i, m := range res.Merchants {
-		items[i] = toModelMerchant(m)
-	}
-
-	return &model.MerchantList{
-		Merchants: items,
-		Total:     int(res.Total),
-	}, nil
-}
-
-// SuspendedMerchants is the resolver for the suspendedMerchants field.
-func (r *queryResolver) SuspendedMerchants(ctx context.Context, limit *int, offset *int) (*model.MerchantList, error) {
-	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
-		return nil, appErrors.Internal(nil, "merchant client unavailable")
-	}
-	req := &merchantpb.ListMerchantsRequest{}
-	status := merchantpb.MerchantStatus_SUSPENDED
-	req.Status = &status
-	if limit != nil {
-		req.Limit = int32(*limit)
-	}
-	if offset != nil {
-		req.Offset = int32(*offset)
-	}
-
-	res, err := r.ClientMgr.MerchantClient.ListMerchants(ctx, req)
-	if err != nil {
-		return nil, grpcclient.TranslateGRPCError(err)
-	}
-
-	items := make([]*model.Merchant, len(res.Merchants))
-	for i, m := range res.Merchants {
-		items[i] = toModelMerchant(m)
-	}
-
-	return &model.MerchantList{
-		Merchants: items,
-		Total:     int(res.Total),
-	}, nil
-}
-
-// ReactivatedMerchants is the resolver for the reactivatedMerchants field.
-func (r *queryResolver) ReactivatedMerchants(ctx context.Context, limit *int, offset *int) (*model.MerchantList, error) {
-	if r.ClientMgr == nil || r.ClientMgr.MerchantClient == nil {
-		return nil, appErrors.Internal(nil, "merchant client unavailable")
-	}
-	reactivated := true
-	req := &merchantpb.ListMerchantsRequest{
-		ReactivatedOnly: &reactivated,
+	if reactivatedOnly != nil {
+		req.ReactivatedOnly = reactivatedOnly
 	}
 	if limit != nil {
 		req.Limit = int32(*limit)

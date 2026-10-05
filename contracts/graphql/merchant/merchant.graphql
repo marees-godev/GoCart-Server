@@ -54,10 +54,7 @@ input UpdateMerchantInput {
 
 extend type Query {
   merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: MerchantStatus, lifecycleStatus: MerchantLifecycleStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
-  activeMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
-  suspendedMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
-  reactivatedMerchants(limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchants(status: MerchantStatus, lifecycleStatus: MerchantLifecycleStatus, reactivatedOnly: Boolean, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
   merchantAppeals(merchantId: ID!): [MerchantAppeal!]! @auth(requires: [MERCHANT, ADMIN])
 }
 

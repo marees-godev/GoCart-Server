@@ -813,6 +813,24 @@ func TestUpdateMerchantStatus(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for invalid status")
 	}
+
+	// 6. REJECTED without rejectionReason must fail
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch2.ID, dto.UpdateMerchantStatusRequest{
+		Status:          "REJECTED",
+		RejectionReason: "",
+	})
+	if err == nil {
+		t.Error("expected error when rejecting without rejectionReason")
+	}
+
+	// 7. SUSPENDED without rejectionReason must fail
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+		Status:          "SUSPENDED",
+		RejectionReason: "",
+	})
+	if err == nil {
+		t.Error("expected error when suspending without rejectionReason")
+	}
 }
 
 func TestDeleteMerchant(t *testing.T) {

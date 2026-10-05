@@ -281,6 +281,13 @@ func (s *MerchantGRPCServer) UpdateMerchantStatus(ctx context.Context, req *merc
 		return nil, status.Error(codes.InvalidArgument, "invalid merchant id format")
 	}
 
+	if req.Status == merchantpb.MerchantStatus_REJECTED || req.Status == merchantpb.MerchantStatus_SUSPENDED {
+		if strings.TrimSpace(req.RejectionReason) == "" {
+			s.logger.Warn("gRPC UpdateMerchantStatus: missing rejection reason for REJECTED or SUSPENDED status", slog.String("status", req.Status.String()))
+			return nil, status.Error(codes.InvalidArgument, "rejection reason is required when rejecting or suspending a merchant")
+		}
+	}
+
 	s.logger.Info("gRPC UpdateMerchantStatus: updating status",
 		slog.String("merchant_id", id.String()),
 		slog.String("status", req.Status.String()),

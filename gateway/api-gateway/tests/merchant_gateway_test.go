@@ -884,31 +884,31 @@ func TestE2E_GraphQLMerchant_Lifecycle(t *testing.T) {
 		t.Fatalf("expected status APPROVED after admin approval, got: %s", string(body))
 	}
 
-	// 4. Query activeMerchants -> returns the approved merchant
-	activeQuery := `{"query":"query { activeMerchants { merchants { id businessName status } total } }"}`
+	// 4. Query active merchants via single endpoint merchants(status: APPROVED) -> returns the approved merchant
+	activeQuery := `{"query":"query { merchants(status: APPROVED) { merchants { id businessName status } total } }"}`
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader([]byte(activeQuery)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	resp, err = app.Test(req, -1)
 	if err != nil {
-		t.Fatalf("query activeMerchants failed: %v", err)
+		t.Fatalf("query active merchants failed: %v", err)
 	}
 	body, _ = io.ReadAll(resp.Body)
 	var activeResp struct {
 		Data struct {
-			ActiveMerchants struct {
+			Merchants struct {
 				Merchants []struct {
 					ID     string `json:"id"`
 					Status string `json:"status"`
 				} `json:"merchants"`
 				Total int `json:"total"`
-			} `json:"activeMerchants"`
+			} `json:"merchants"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
 	}
 	_ = json.Unmarshal(body, &activeResp)
-	if len(activeResp.Errors) > 0 || activeResp.Data.ActiveMerchants.Total == 0 {
-		t.Fatalf("expected activeMerchants to return approved merchant, got: %s", string(body))
+	if len(activeResp.Errors) > 0 || activeResp.Data.Merchants.Total == 0 {
+		t.Fatalf("expected merchants(status: APPROVED) to return approved merchant, got: %s", string(body))
 	}
 
 	// 5. Authorized ADMIN suspending merchant -> SUCCESS (status SUSPENDED)
@@ -935,31 +935,31 @@ func TestE2E_GraphQLMerchant_Lifecycle(t *testing.T) {
 		t.Fatalf("expected status SUSPENDED after admin suspension, got: %s", string(body))
 	}
 
-	// 6. Query suspendedMerchants -> returns the suspended merchant
-	suspendedQuery := `{"query":"query { suspendedMerchants { merchants { id businessName status } total } }"}`
+	// 6. Query suspended merchants via single endpoint merchants(status: SUSPENDED) -> returns the suspended merchant
+	suspendedQuery := `{"query":"query { merchants(status: SUSPENDED) { merchants { id businessName status } total } }"}`
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader([]byte(suspendedQuery)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	resp, err = app.Test(req, -1)
 	if err != nil {
-		t.Fatalf("query suspendedMerchants failed: %v", err)
+		t.Fatalf("query suspended merchants failed: %v", err)
 	}
 	body, _ = io.ReadAll(resp.Body)
 	var suspendedResp struct {
 		Data struct {
-			SuspendedMerchants struct {
+			Merchants struct {
 				Merchants []struct {
 					ID     string `json:"id"`
 					Status string `json:"status"`
 				} `json:"merchants"`
 				Total int `json:"total"`
-			} `json:"suspendedMerchants"`
+			} `json:"merchants"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
 	}
 	_ = json.Unmarshal(body, &suspendedResp)
-	if len(suspendedResp.Errors) > 0 || suspendedResp.Data.SuspendedMerchants.Total == 0 {
-		t.Fatalf("expected suspendedMerchants to return suspended merchant, got: %s", string(body))
+	if len(suspendedResp.Errors) > 0 || suspendedResp.Data.Merchants.Total == 0 {
+		t.Fatalf("expected merchants(status: SUSPENDED) to return suspended merchant, got: %s", string(body))
 	}
 
 	// 7. Standard merchant submits appeal for SUSPENDED account -> SUCCESS (appeal status PENDING)
@@ -1060,33 +1060,70 @@ func TestE2E_GraphQLMerchant_Lifecycle(t *testing.T) {
 		t.Fatalf("expected status APPROVED after reactivation, got: %s", string(body))
 	}
 
-	// 11. Query reactivatedMerchants -> returns the reactivated merchant
-	reactivatedQuery := `{"query":"query { reactivatedMerchants { merchants { id businessName status } total } }"}`
+	// 11. Query reactivated merchants via single endpoint merchants(reactivatedOnly: true)
+	reactivatedQuery := `{"query":"query { merchants(reactivatedOnly: true) { merchants { id businessName status } total } }"}`
 	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader([]byte(reactivatedQuery)))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+adminToken)
 	resp, err = app.Test(req, -1)
 	if err != nil {
-		t.Fatalf("query reactivatedMerchants failed: %v", err)
+		t.Fatalf("query reactivated merchants failed: %v", err)
 	}
 	body, _ = io.ReadAll(resp.Body)
 	var reactivatedResp struct {
 		Data struct {
-			ReactivatedMerchants struct {
+			Merchants struct {
 				Merchants []struct {
 					ID     string `json:"id"`
 					Status string `json:"status"`
 				} `json:"merchants"`
 				Total int `json:"total"`
-			} `json:"reactivatedMerchants"`
+			} `json:"merchants"`
 		} `json:"data"`
 		Errors []any `json:"errors"`
 	}
 	_ = json.Unmarshal(body, &reactivatedResp)
-	if len(reactivatedResp.Errors) > 0 || reactivatedResp.Data.ReactivatedMerchants.Total == 0 {
-		t.Fatalf("expected reactivatedMerchants list, got: %s", string(body))
+	if len(reactivatedResp.Errors) > 0 || reactivatedResp.Data.Merchants.Total == 0 {
+		t.Fatalf("expected merchants(reactivatedOnly: true) list, got: %s", string(body))
 	}
 
+	// 12. Verify rejectionReason is required when status is SUSPENDED or REJECTED
+	suspendWithoutReason := fmt.Sprintf(`{"query":"mutation { updateMerchantStatus(id: \"%s\", status: SUSPENDED) { id status } }"}`, testMerchantID)
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader([]byte(suspendWithoutReason)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("suspend without reason request failed: %v", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	var suspendNoReasonResp struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(body, &suspendNoReasonResp)
+	if len(suspendNoReasonResp.Errors) == 0 {
+		t.Fatalf("expected error when suspending without rejectionReason, got: %s", string(body))
+	}
 
+	rejectWithoutReason := fmt.Sprintf(`{"query":"mutation { updateMerchantStatus(id: \"%s\", status: REJECTED) { id status } }"}`, testMerchantID)
+	req = httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewReader([]byte(rejectWithoutReason)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	resp, err = app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("reject without reason request failed: %v", err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	var rejectNoReasonResp struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(body, &rejectNoReasonResp)
+	if len(rejectNoReasonResp.Errors) == 0 {
+		t.Fatalf("expected error when rejecting without rejectionReason, got: %s", string(body))
+	}
 }
 
