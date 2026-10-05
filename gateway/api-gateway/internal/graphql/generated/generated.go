@@ -3737,11 +3737,11 @@ extend type Mutation {
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/product/product.graphql", Input: `enum ProductStatus {
-  stock_in
-  stock_out
-  low_stock
-  reserved
-  discontinued
+  IN_STOCK
+  OUT_OF_STOCK
+  LOW_STOCK
+  RESERVED
+  DISCONTINUED
 }
 
 type ProductVariant {
