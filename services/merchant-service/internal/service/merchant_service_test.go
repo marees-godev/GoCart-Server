@@ -19,12 +19,16 @@ import (
 type mockMerchantRepository struct {
 	mu            sync.Mutex
 	merchantsByID map[uuid.UUID]*model.Merchant
+	auditLogs     []*model.MerchantLifecycleAudit
+	appeals       []*model.MerchantAppeal
 	createErr     error
 }
 
 func newMockRepo() *mockMerchantRepository {
 	return &mockMerchantRepository{
 		merchantsByID: make(map[uuid.UUID]*model.Merchant),
+		auditLogs:     make([]*model.MerchantLifecycleAudit, 0),
+		appeals:       make([]*model.MerchantAppeal, 0),
 	}
 }
 
@@ -76,6 +80,28 @@ func (m *mockMerchantRepository) List(ctx context.Context, limit, offset int, st
 		if status == "" || merch.Status == status {
 			c := *merch
 			list = append(list, &c)
+		}
+	}
+	return list, len(list), nil
+}
+
+func (m *mockMerchantRepository) ListReactivated(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var list []*model.Merchant
+	for _, merch := range m.merchantsByID {
+		if merch.DeletedAt != nil {
+			continue
+		}
+		if merch.Status == string(model.MerchantStatusApproved) || merch.Status == string(model.MerchantStatusActive) {
+			for _, a := range m.auditLogs {
+				if a.MerchantID == merch.ID {
+					c := *merch
+					list = append(list, &c)
+					break
+				}
+			}
 		}
 	}
 	return list, len(list), nil
@@ -142,6 +168,110 @@ func (m *mockMerchantRepository) Delete(ctx context.Context, id uuid.UUID) error
 	merch.DeletedAt = &now
 	return nil
 }
+
+func (m *mockMerchantRepository) ExecuteLifecycleTransition(
+	ctx context.Context,
+	merchantID uuid.UUID,
+	action model.LifecycleAction,
+	reason string,
+	adminID string,
+	reqID string,
+) (*model.Merchant, model.MerchantStatus, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	merch, exists := m.merchantsByID[merchantID]
+	if !exists || merch.DeletedAt != nil {
+		return nil, "", appErrors.NotFound("merchant not found")
+	}
+
+	currentStatus := model.MerchantStatus(merch.Status)
+	targetStatus, err := model.ValidateLifecycleTransition(action, currentStatus)
+	if err != nil {
+		audit := &model.MerchantLifecycleAudit{
+			ID:             uuid.New(),
+			MerchantID:     merchantID,
+			AdminID:        adminID,
+			Action:         action,
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(currentStatus),
+			Reason:         reason,
+			Status:         model.AuditStatusFailed,
+			ErrorMessage:   err.Error(),
+			RequestID:      reqID,
+			CreatedAt:      time.Now().UTC(),
+		}
+		m.auditLogs = append(m.auditLogs, audit)
+		return nil, currentStatus, err
+	}
+
+	merch.Status = string(targetStatus)
+	merch.Version++
+	merch.UpdatedAt = time.Now().UTC()
+	c := *merch
+	m.merchantsByID[merchantID] = &c
+
+	audit := &model.MerchantLifecycleAudit{
+		ID:             uuid.New(),
+		MerchantID:     merchantID,
+		AdminID:        adminID,
+		Action:         action,
+		PreviousStatus: string(currentStatus),
+		NewStatus:      string(targetStatus),
+		Reason:         reason,
+		Status:         model.AuditStatusSuccess,
+		RequestID:      reqID,
+		CreatedAt:      time.Now().UTC(),
+	}
+	m.auditLogs = append(m.auditLogs, audit)
+
+	return &c, currentStatus, nil
+}
+
+func (m *mockMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *model.MerchantLifecycleAudit) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.auditLogs = append(m.auditLogs, audit)
+	return nil
+}
+
+func (m *mockMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if appeal.ID == uuid.Nil {
+		appeal.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	if appeal.CreatedAt.IsZero() {
+		appeal.CreatedAt = now
+	}
+	if appeal.UpdatedAt.IsZero() {
+		appeal.UpdatedAt = now
+	}
+	if appeal.Status == "" {
+		appeal.Status = string(model.MerchantAppealStatusPending)
+	}
+
+	copied := *appeal
+	m.appeals = append(m.appeals, &copied)
+	return nil
+}
+
+func (m *mockMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var list []*model.MerchantAppeal
+	for _, a := range m.appeals {
+		if a.MerchantID == merchantID {
+			copied := *a
+			list = append(list, &copied)
+		}
+	}
+	return list, nil
+}
+
 
 func TestCreateMerchant_Success(t *testing.T) {
 	repo := newMockRepo()
@@ -683,6 +813,24 @@ func TestUpdateMerchantStatus(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for invalid status")
 	}
+
+	// 6. REJECTED without rejectionReason must fail
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch2.ID, dto.UpdateMerchantStatusRequest{
+		Status:          "REJECTED",
+		RejectionReason: "",
+	})
+	if err == nil {
+		t.Error("expected error when rejecting without rejectionReason")
+	}
+
+	// 7. SUSPENDED without rejectionReason must fail
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), merch.ID, dto.UpdateMerchantStatusRequest{
+		Status:          "SUSPENDED",
+		RejectionReason: "",
+	})
+	if err == nil {
+		t.Error("expected error when suspending without rejectionReason")
+	}
 }
 
 func TestDeleteMerchant(t *testing.T) {
@@ -816,3 +964,238 @@ func TestDeleteMerchant_SoftDelete(t *testing.T) {
 		t.Fatalf("expected not found error when deleting already soft-deleted merchant, got nil")
 	}
 }
+
+func TestMerchantLifecycle_ServiceSuccessAndTransitions(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	created, err := svc.CreateMerchant(context.Background(), dto.CreateMerchantRequest{
+		ID:            uuid.New().String(),
+		BusinessEmail: "lifecycle@merchant.com",
+		FirstName:     "Life",
+		LastName:      "Cycle",
+	})
+	if err != nil {
+		t.Fatalf("failed to create merchant: %v", err)
+	}
+
+	adminID := "admin-user-1"
+	reqID := "req-trace-1"
+
+	// 1. Activate from PENDING -> ACTIVE
+	activated, prev, err := svc.ActivateMerchant(context.Background(), created.ID, "Approved KYC", adminID, reqID)
+	if err != nil {
+		t.Fatalf("ActivateMerchant failed: %v", err)
+	}
+	if prev != model.MerchantStatusPending {
+		t.Errorf("expected previous status PENDING, got %s", prev)
+	}
+	if activated.Status != string(model.MerchantStatusActive) {
+		t.Errorf("expected new status ACTIVE, got %s", activated.Status)
+	}
+
+	// 2. Suspend from ACTIVE -> SUSPENDED
+	suspended, prev, err := svc.SuspendMerchant(context.Background(), created.ID, "Policy violation", adminID, reqID)
+	if err != nil {
+		t.Fatalf("SuspendMerchant failed: %v", err)
+	}
+	if prev != model.MerchantStatusActive {
+		t.Errorf("expected previous status ACTIVE, got %s", prev)
+	}
+	if suspended.Status != string(model.MerchantStatusSuspended) {
+		t.Errorf("expected new status SUSPENDED, got %s", suspended.Status)
+	}
+
+	// 3. Reactivate from SUSPENDED -> ACTIVE
+	reactivated, prev, err := svc.ReactivateMerchant(context.Background(), created.ID, "Resolved", adminID, reqID)
+	if err != nil {
+		t.Fatalf("ReactivateMerchant failed: %v", err)
+	}
+	if prev != model.MerchantStatusSuspended {
+		t.Errorf("expected previous status SUSPENDED, got %s", prev)
+	}
+	if reactivated.Status != string(model.MerchantStatusActive) {
+		t.Errorf("expected new status ACTIVE, got %s", reactivated.Status)
+	}
+}
+
+func TestMerchantLifecycle_ServiceInvalidTransitionsAndConflicts(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	created, _ := svc.CreateMerchant(context.Background(), dto.CreateMerchantRequest{
+		ID:            uuid.New().String(),
+		BusinessEmail: "conflict@merchant.com",
+		FirstName:     "Conflict",
+		LastName:      "User",
+	})
+
+	// Reactivating a PENDING merchant should fail with 409 Conflict
+	_, _, err := svc.ReactivateMerchant(context.Background(), created.ID, "Try reactivate", "admin-1", "trace-1")
+	if err == nil {
+		t.Fatalf("expected error reactivating PENDING merchant, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeConflict {
+		t.Fatalf("expected CONFLICT code, got %v", err)
+	}
+
+	// Activating an already ACTIVE merchant should fail with 409 Conflict
+	_, _, err = svc.ActivateMerchant(context.Background(), created.ID, "Activate 1", "admin-1", "trace-1")
+	if err != nil {
+		t.Fatalf("first activate failed: %v", err)
+	}
+	_, _, err = svc.ActivateMerchant(context.Background(), created.ID, "Activate 2", "admin-1", "trace-1")
+	if err == nil {
+		t.Fatalf("expected conflict on second activate, got nil")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeConflict {
+		t.Fatalf("expected CONFLICT code, got %v", err)
+	}
+}
+
+func TestMerchantLifecycle_ValidationErrors(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	_, _, err := svc.ActivateMerchant(context.Background(), uuid.Nil, "reason", "admin-1", "req-1")
+	if err == nil {
+		t.Fatalf("expected error on nil uuid")
+	}
+
+	_, _, err = svc.SuspendMerchant(context.Background(), uuid.Nil, "reason", "admin-1", "req-1")
+	if err == nil {
+		t.Fatalf("expected error on nil uuid")
+	}
+
+	_, _, err = svc.ReactivateMerchant(context.Background(), uuid.Nil, "reason", "admin-1", "req-1")
+	if err == nil {
+		t.Fatalf("expected error on nil uuid")
+	}
+}
+
+func TestMerchantAppeals(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	created, err := svc.CreateMerchant(context.Background(), dto.CreateMerchantRequest{
+		ID:            uuid.New().String(),
+		BusinessEmail: "appeal@merchant.com",
+		FirstName:     "Appeal",
+		LastName:      "Merchant",
+	})
+	if err != nil {
+		t.Fatalf("failed to create merchant: %v", err)
+	}
+
+	// 1. Appeal on PENDING merchant fails with Conflict (must be SUSPENDED)
+	_, err = svc.CreateAppeal(context.Background(), created.ID, "Unfair suspension")
+	if err == nil {
+		t.Fatalf("expected conflict error when appealing non-suspended merchant, got nil")
+	}
+
+	// 2. Activate then Suspend merchant
+	_, _, err = svc.ActivateMerchant(context.Background(), created.ID, "Activating", "admin-1", "req-1")
+	if err != nil {
+		t.Fatalf("activate failed: %v", err)
+	}
+	_, _, err = svc.SuspendMerchant(context.Background(), created.ID, "Violated policy", "admin-1", "req-2")
+	if err != nil {
+		t.Fatalf("suspend failed: %v", err)
+	}
+
+	// 3. Appeal with empty reason fails with BadRequest
+	_, err = svc.CreateAppeal(context.Background(), created.ID, "   ")
+	if err == nil {
+		t.Fatalf("expected error for empty reason, got nil")
+	}
+
+	// 4. Appeal with nil UUID fails
+	_, err = svc.CreateAppeal(context.Background(), uuid.Nil, "Valid reason")
+	if err == nil {
+		t.Fatalf("expected error for nil merchantID, got nil")
+	}
+
+	// 5. Successful appeal
+	appeal, err := svc.CreateAppeal(context.Background(), created.ID, "Policy issue resolved")
+	if err != nil {
+		t.Fatalf("create appeal failed: %v", err)
+	}
+	if appeal.ID == uuid.Nil {
+		t.Errorf("expected generated appeal ID, got nil")
+	}
+	if appeal.Status != string(model.MerchantAppealStatusPending) {
+		t.Errorf("expected pending status, got %s", appeal.Status)
+	}
+
+	// Verify merchant status changed to PENDING
+	reloaded, err := svc.GetMerchantByID(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get merchant failed: %v", err)
+	}
+	if reloaded.Status != string(model.MerchantStatusPending) {
+		t.Errorf("expected merchant status PENDING after appeal, got %s", reloaded.Status)
+	}
+
+	// 6. Get appeals
+	appeals, err := svc.GetAppeals(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get appeals failed: %v", err)
+	}
+	if len(appeals) != 1 {
+		t.Fatalf("expected 1 appeal, got %d", len(appeals))
+	}
+	if appeals[0].Reason != "Policy issue resolved" {
+		t.Errorf("expected reason 'Policy issue resolved', got %s", appeals[0].Reason)
+	}
+
+	// 7. Get appeals for nil UUID
+	_, err = svc.GetAppeals(context.Background(), uuid.Nil)
+	if err == nil {
+		t.Fatalf("expected error for nil merchantID in GetAppeals")
+	}
+}
+
+func TestListReactivatedMerchants(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewMerchantService(repo, nil)
+
+	created, err := svc.CreateMerchant(context.Background(), dto.CreateMerchantRequest{
+		ID:            uuid.New().String(),
+		BusinessEmail: "reactivated@merchant.com",
+		FirstName:     "Reactivated",
+		LastName:      "User",
+	})
+	if err != nil {
+		t.Fatalf("failed to create merchant: %v", err)
+	}
+
+	// Activate -> Suspend -> Reactivate
+	_, _, err = svc.ActivateMerchant(context.Background(), created.ID, "Initial activation", "admin-1", "req-1")
+	if err != nil {
+		t.Fatalf("activate failed: %v", err)
+	}
+	_, _, err = svc.SuspendMerchant(context.Background(), created.ID, "Suspended for review", "admin-1", "req-2")
+	if err != nil {
+		t.Fatalf("suspend failed: %v", err)
+	}
+	_, _, err = svc.ReactivateMerchant(context.Background(), created.ID, "Reactivated after appeal", "admin-1", "req-3")
+	if err != nil {
+		t.Fatalf("reactivate failed: %v", err)
+	}
+
+	// Query reactivated merchants
+	list, total, err := svc.ListReactivatedMerchants(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("list reactivated failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("expected 1 reactivated merchant, got total=%d len=%d", total, len(list))
+	}
+	if list[0].ID != created.ID {
+		t.Errorf("expected merchant ID %v, got %v", created.ID, list[0].ID)
+	}
+}
+
+

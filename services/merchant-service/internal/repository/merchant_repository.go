@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,9 +17,14 @@ type MerchantRepository interface {
 	Create(ctx context.Context, merchant *model.Merchant) error
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Merchant, error)
 	List(ctx context.Context, limit, offset int, status string) ([]*model.Merchant, int, error)
+	ListReactivated(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error)
 	Update(ctx context.Context, merchant *model.Merchant) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, rejectionReason string) (*model.Merchant, error)
 	UpdateStatusWithAudit(ctx context.Context, id uuid.UUID, newStatus model.MerchantStatus, reason string, updatedBy string) (*model.Merchant, model.MerchantStatus, error)
+	ExecuteLifecycleTransition(ctx context.Context, merchantID uuid.UUID, action model.LifecycleAction, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error)
+	RecordLifecycleAudit(ctx context.Context, audit *model.MerchantLifecycleAudit) error
+	CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error
+	GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -123,12 +129,12 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 	var countArgs []interface{}
 
 	if status != "" {
-		countQuery = `SELECT COUNT(*) FROM merchants WHERE status = $1 AND deleted_at IS NULL`
+		countQuery = `SELECT COUNT(*) FROM merchants WHERE (status::text = $1 OR (lifecycle_status IS NOT NULL AND lifecycle_status::text = $1)) AND deleted_at IS NULL`
 		countArgs = append(countArgs, status)
 		listQuery = `
 			SELECT id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, created_at, updated_at, deleted_at
 			FROM merchants
-			WHERE status = $1 AND deleted_at IS NULL
+			WHERE (status::text = $1 OR (lifecycle_status IS NOT NULL AND lifecycle_status::text = $1)) AND deleted_at IS NULL
 			ORDER BY created_at DESC
 			LIMIT $2 OFFSET $3
 		`
@@ -185,6 +191,93 @@ func (r *pgMerchantRepository) List(ctx context.Context, limit, offset int, stat
 	if err := rows.Err(); err != nil {
 		r.logger.Error("Repository: error iterating merchant rows", slog.Any("error", err))
 		return nil, 0, appErrors.Internal(err, "error iterating merchant rows")
+	}
+
+	return merchants, total, nil
+}
+
+func (r *pgMerchantRepository) ListReactivated(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	countQuery := `
+		SELECT COUNT(DISTINCT m.id)
+		FROM merchants m
+		WHERE (m.status = 'APPROVED' OR m.status = 'ACTIVE')
+		  AND m.deleted_at IS NULL
+		  AND (
+		    EXISTS (
+		      SELECT 1 FROM merchant_lifecycle_audit a
+		      WHERE a.merchant_id = m.id AND (a.action = 'REACTIVATE' OR (a.previous_status = 'SUSPENDED' AND a.new_status IN ('APPROVED', 'ACTIVE', 'PENDING')))
+		    )
+		    OR EXISTS (
+		      SELECT 1 FROM merchant_appeals ap
+		      WHERE ap.merchant_id = m.id
+		    )
+		  )
+	`
+	var total int
+	err := r.db.Pool.QueryRow(ctx, countQuery).Scan(&total)
+	if err != nil {
+		r.logger.Error("Repository: failed to count reactivated merchants", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to count reactivated merchants")
+	}
+
+	listQuery := `
+		SELECT DISTINCT m.id, m.business_name, m.first_name, m.last_name, m.business_email, m.business_phone, m.pan_card_number, m.status, m.rejection_reason, m.created_at, m.updated_at, m.deleted_at
+		FROM merchants m
+		WHERE (m.status = 'APPROVED' OR m.status = 'ACTIVE')
+		  AND m.deleted_at IS NULL
+		  AND (
+		    EXISTS (
+		      SELECT 1 FROM merchant_lifecycle_audit a
+		      WHERE a.merchant_id = m.id AND (a.action = 'REACTIVATE' OR (a.previous_status = 'SUSPENDED' AND a.new_status IN ('APPROVED', 'ACTIVE', 'PENDING')))
+		    )
+		    OR EXISTS (
+		      SELECT 1 FROM merchant_appeals ap
+		      WHERE ap.merchant_id = m.id
+		    )
+		  )
+		ORDER BY m.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := r.db.Pool.Query(ctx, listQuery, limit, offset)
+	if err != nil {
+		r.logger.Error("Repository: failed to list reactivated merchants", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to list reactivated merchants")
+	}
+	defer rows.Close()
+
+	merchants := make([]*model.Merchant, 0)
+	for rows.Next() {
+		var m model.Merchant
+		if err := rows.Scan(
+			&m.ID,
+			&m.BusinessName,
+			&m.FirstName,
+			&m.LastName,
+			&m.BusinessEmail,
+			&m.BusinessPhone,
+			&m.PanCardNumber,
+			&m.Status,
+			&m.RejectionReason,
+			&m.CreatedAt,
+			&m.UpdatedAt,
+			&m.DeletedAt,
+		); err != nil {
+			r.logger.Error("Repository: failed to scan reactivated merchant row", slog.Any("error", err))
+			return nil, 0, appErrors.Internal(err, "failed to scan reactivated merchant row")
+		}
+		merchants = append(merchants, &m)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.Error("Repository: error iterating reactivated merchant rows", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "error iterating reactivated merchant rows")
 	}
 
 	return merchants, total, nil
@@ -285,14 +378,32 @@ func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uui
 		return nil, currentStatus, appErrors.Internal(err, "failed to update merchant status")
 	}
 
+	var action model.LifecycleAction
+	switch newStatus {
+	case model.MerchantStatusApproved:
+		action = model.LifecycleActionApprove
+	case model.MerchantStatusRejected:
+		action = model.LifecycleActionReject
+	case model.MerchantStatusSuspended:
+		action = model.LifecycleActionSuspend
+	case model.MerchantStatusActive:
+		if currentStatus == model.MerchantStatusSuspended {
+			action = model.LifecycleActionReactivate
+		} else {
+			action = model.LifecycleActionActivate
+		}
+	default:
+		action = model.LifecycleActionUpdateStatus
+	}
+
 	auditQuery := `
-		INSERT INTO merchant_status_audit (merchant_id, from_status, to_status, reason, updated_by, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
+		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', '', '', NOW())
 	`
-	_, err = tx.Exec(ctx, auditQuery, id, string(currentStatus), string(newStatus), reason, updatedBy)
+	_, err = tx.Exec(ctx, auditQuery, id, updatedBy, string(action), string(currentStatus), string(newStatus), reason)
 	if err != nil {
-		r.logger.Error("Repository: failed to write to merchant_status_audit in tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
-		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant status audit")
+		r.logger.Error("Repository: failed to write to merchant_lifecycle_audit in tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -330,4 +441,235 @@ func (r *pgMerchantRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	r.logger.Debug("Repository: merchant soft deleted successfully", slog.String("merchant_id", id.String()))
 	return nil
+}
+
+func (r *pgMerchantRepository) ExecuteLifecycleTransition(
+	ctx context.Context,
+	merchantID uuid.UUID,
+	action model.LifecycleAction,
+	reason string,
+	adminID string,
+	reqID string,
+) (*model.Merchant, model.MerchantStatus, error) {
+	if adminID == "" {
+		adminID = "ADMIN"
+	}
+
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		r.logger.Error("Repository: failed to begin tx for lifecycle transition", slog.Any("error", err))
+		return nil, "", appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Lock the merchant row with FOR UPDATE to serialize concurrent requests and eliminate race conditions
+	var m model.Merchant
+	queryCurrent := `
+		SELECT id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, version, created_at, updated_at, deleted_at
+		FROM merchants
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`
+	err = tx.QueryRow(ctx, queryCurrent, merchantID).Scan(
+		&m.ID,
+		&m.BusinessName,
+		&m.FirstName,
+		&m.LastName,
+		&m.BusinessEmail,
+		&m.BusinessPhone,
+		&m.PanCardNumber,
+		&m.Status,
+		&m.RejectionReason,
+		&m.Version,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Warn("Repository: merchant not found for lifecycle transition", slog.String("merchant_id", merchantID.String()))
+			return nil, "", appErrors.NotFound("merchant not found")
+		}
+		r.logger.Error("Repository: failed to query merchant for lifecycle transition", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+		return nil, "", appErrors.Internal(err, "failed to query merchant")
+	}
+
+	currentStatus := model.MerchantStatus(m.Status)
+
+	// Enforce strict state machine transition rules
+	targetStatus, transErr := model.ValidateLifecycleTransition(action, currentStatus)
+	if transErr != nil {
+		r.logger.Warn("Repository: invalid lifecycle transition attempt",
+			slog.String("merchant_id", merchantID.String()),
+			slog.String("action", string(action)),
+			slog.String("current_status", string(currentStatus)),
+			slog.Any("error", transErr),
+		)
+
+		// Emit immutable FAILED audit record
+		failedAudit := &model.MerchantLifecycleAudit{
+			ID:             uuid.New(),
+			MerchantID:     merchantID,
+			AdminID:        adminID,
+			Action:         action,
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(currentStatus),
+			Reason:         reason,
+			Status:         model.AuditStatusFailed,
+			ErrorMessage:   transErr.Error(),
+			RequestID:      reqID,
+		}
+		_ = r.RecordLifecycleAudit(ctx, failedAudit)
+
+		return nil, currentStatus, transErr
+	}
+
+	// Apply atomic update with optimistic version bump
+	queryUpdate := `
+		UPDATE merchants
+		SET status = $1, version = version + 1, updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+		RETURNING id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, rejection_reason, version, created_at, updated_at, deleted_at
+	`
+	err = tx.QueryRow(ctx, queryUpdate, string(targetStatus), merchantID).Scan(
+		&m.ID,
+		&m.BusinessName,
+		&m.FirstName,
+		&m.LastName,
+		&m.BusinessEmail,
+		&m.BusinessPhone,
+		&m.PanCardNumber,
+		&m.Status,
+		&m.RejectionReason,
+		&m.Version,
+		&m.CreatedAt,
+		&m.UpdatedAt,
+		&m.DeletedAt,
+	)
+	if err != nil {
+		r.logger.Error("Repository: failed to update merchant status during lifecycle transition", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to update merchant status")
+	}
+
+	// Write immutable SUCCESS audit record into merchant_lifecycle_audit table
+	queryAudit := `
+		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+	`
+	_, err = tx.Exec(ctx, queryAudit, merchantID, adminID, string(action), string(currentStatus), string(targetStatus), reason, string(model.AuditStatusSuccess), "", reqID)
+	if err != nil {
+		r.logger.Error("Repository: failed to insert into merchant_lifecycle_audit", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Repository: failed to commit lifecycle transition transaction", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+		return nil, currentStatus, appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	r.logger.Info("Repository: merchant lifecycle transition committed successfully",
+		slog.String("merchant_id", merchantID.String()),
+		slog.String("action", string(action)),
+		slog.String("previous_status", string(currentStatus)),
+		slog.String("new_status", string(targetStatus)),
+		slog.String("admin_id", adminID),
+	)
+
+	return &m, currentStatus, nil
+}
+
+func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *model.MerchantLifecycleAudit) error {
+	query := `
+		INSERT INTO merchant_lifecycle_audit (id, merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+	`
+	id := audit.ID
+	if id == uuid.Nil {
+		id = uuid.New()
+	}
+	_, err := r.db.Pool.Exec(ctx, query,
+		id,
+		audit.MerchantID,
+		audit.AdminID,
+		string(audit.Action),
+		audit.PreviousStatus,
+		audit.NewStatus,
+		audit.Reason,
+		string(audit.Status),
+		audit.ErrorMessage,
+		audit.RequestID,
+	)
+	if err != nil {
+		r.logger.Error("Repository: failed to record standalone lifecycle audit", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to record lifecycle audit")
+	}
+	return nil
+}
+
+func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
+	query := `
+		INSERT INTO merchant_appeals (id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, created_at, updated_at
+	`
+	if appeal.ID == uuid.Nil {
+		appeal.ID = uuid.New()
+	}
+	now := time.Now()
+	if appeal.CreatedAt.IsZero() {
+		appeal.CreatedAt = now
+	}
+	if appeal.UpdatedAt.IsZero() {
+		appeal.UpdatedAt = now
+	}
+	if appeal.Status == "" {
+		appeal.Status = string(model.MerchantAppealStatusPending)
+	}
+
+	return r.db.Pool.QueryRow(ctx, query,
+		appeal.ID,
+		appeal.MerchantID,
+		appeal.Reason,
+		appeal.Status,
+		appeal.AdminComment,
+		appeal.ReviewedAt,
+		appeal.CreatedAt,
+		appeal.UpdatedAt,
+	).Scan(&appeal.ID, &appeal.CreatedAt, &appeal.UpdatedAt)
+}
+
+func (r *pgMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
+	query := `
+		SELECT id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at
+		FROM merchant_appeals
+		WHERE merchant_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Pool.Query(ctx, query, merchantID)
+	if err != nil {
+		r.logger.Error("Repository: failed to query merchant appeals", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+		return nil, appErrors.Internal(err, "failed to query merchant appeals")
+	}
+	defer rows.Close()
+
+	var appeals []*model.MerchantAppeal
+	for rows.Next() {
+		var a model.MerchantAppeal
+		if err := rows.Scan(
+			&a.ID,
+			&a.MerchantID,
+			&a.Reason,
+			&a.Status,
+			&a.AdminComment,
+			&a.ReviewedAt,
+			&a.CreatedAt,
+			&a.UpdatedAt,
+		); err != nil {
+			r.logger.Error("Repository: failed to scan merchant appeal", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
+			return nil, appErrors.Internal(err, "failed to scan merchant appeal")
+		}
+		appeals = append(appeals, &a)
+	}
+
+	return appeals, nil
 }

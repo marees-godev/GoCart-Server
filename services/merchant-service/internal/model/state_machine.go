@@ -3,16 +3,20 @@ package model
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
+
 var allowedTransitions = map[MerchantStatus][]MerchantStatus{
-	MerchantStatusPending:   {MerchantStatusApproved, MerchantStatusRejected},
-	MerchantStatusApproved:  {MerchantStatusSuspended},
-	MerchantStatusRejected:  {},
-	MerchantStatusSuspended: {},
+	MerchantStatusPending:       {MerchantStatusApproved, MerchantStatusRejected, MerchantStatusActive},
+	MerchantStatusPendingReview: {MerchantStatusActive, MerchantStatusRejected},
+	MerchantStatusInactive:      {MerchantStatusActive},
+	MerchantStatusApproved:      {MerchantStatusSuspended, MerchantStatusActive},
+	MerchantStatusActive:        {MerchantStatusSuspended, MerchantStatusInactive, MerchantStatusTerminated},
+	MerchantStatusSuspended:     {MerchantStatusActive, MerchantStatusPending, MerchantStatusTerminated},
+	MerchantStatusRejected:      {},
+	MerchantStatusTerminated:    {},
 }
 
 type InvalidStateTransitionError struct {
@@ -74,19 +78,61 @@ func (v *StateTransitionValidator) AllowedTargets(from MerchantStatus) []Merchan
 
 func IsValidStatus(status string) bool {
 	switch MerchantStatus(strings.ToUpper(strings.TrimSpace(status))) {
-	case MerchantStatusPending, MerchantStatusApproved, MerchantStatusRejected, MerchantStatusSuspended:
+	case MerchantStatusPending, MerchantStatusApproved, MerchantStatusRejected, MerchantStatusSuspended,
+		MerchantStatusActive, MerchantStatusInactive, MerchantStatusPendingReview, MerchantStatusTerminated:
 		return true
 	default:
 		return false
 	}
 }
 
-type MerchantStatusAudit struct {
-	ID         uuid.UUID      `json:"id" db:"id"`
-	MerchantID uuid.UUID      `json:"merchant_id" db:"merchant_id"`
-	FromStatus MerchantStatus `json:"from_status" db:"from_status"`
-	ToStatus   MerchantStatus `json:"to_status" db:"to_status"`
-	Reason     string         `json:"reason" db:"reason"`
-	UpdatedBy  string         `json:"updated_by" db:"updated_by"`
-	CreatedAt  time.Time      `json:"created_at" db:"created_at"`
+// ValidateLifecycleTransition enforces state machine rules for administrative lifecycle operations:
+// ActivateMerchant, SuspendMerchant, and ReactivateMerchant.
+// It returns the target status on success, or a 409 Conflict AppError on conflict/disallowed transition.
+func ValidateLifecycleTransition(action LifecycleAction, currentStatus MerchantStatus) (MerchantStatus, error) {
+	curr := MerchantStatus(strings.ToUpper(strings.TrimSpace(string(currentStatus))))
+
+	switch action {
+	case LifecycleActionActivate:
+		if curr == MerchantStatusActive {
+			return "", appErrors.Conflict("merchant is already active")
+		}
+		if curr == MerchantStatusTerminated {
+			return "", appErrors.Conflict("cannot activate a terminated merchant")
+		}
+		if curr == MerchantStatusSuspended {
+			return "", appErrors.Conflict("suspended merchant must be reactivated, not activated")
+		}
+		if curr == MerchantStatusPending || curr == MerchantStatusPendingReview || curr == MerchantStatusInactive || curr == MerchantStatusApproved {
+			return MerchantStatusActive, nil
+		}
+		return "", appErrors.Conflict(fmt.Sprintf("cannot activate merchant from status '%s'", curr))
+
+	case LifecycleActionSuspend:
+		if curr == MerchantStatusSuspended {
+			return "", appErrors.Conflict("merchant is already suspended")
+		}
+		if curr == MerchantStatusTerminated {
+			return "", appErrors.Conflict("cannot suspend a terminated merchant")
+		}
+		if curr == MerchantStatusActive || curr == MerchantStatusApproved {
+			return MerchantStatusSuspended, nil
+		}
+		return "", appErrors.Conflict(fmt.Sprintf("cannot suspend merchant from status '%s'; only active merchants can be suspended", curr))
+
+	case LifecycleActionReactivate:
+		if curr == MerchantStatusActive {
+			return "", appErrors.Conflict("merchant is already active")
+		}
+		if curr == MerchantStatusTerminated {
+			return "", appErrors.Conflict("cannot reactivate a terminated merchant")
+		}
+		if curr == MerchantStatusSuspended {
+			return MerchantStatusActive, nil
+		}
+		return "", appErrors.Conflict(fmt.Sprintf("merchant is not suspended (current status: '%s')", curr))
+
+	default:
+		return "", appErrors.BadRequest(fmt.Sprintf("unsupported lifecycle action: %s", action))
+	}
 }

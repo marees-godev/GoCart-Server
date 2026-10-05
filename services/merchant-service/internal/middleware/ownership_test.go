@@ -40,6 +40,13 @@ func (m *mockMerchantRepo) List(ctx context.Context, limit, offset int, status s
 	}
 	return list, len(list), nil
 }
+func (m *mockMerchantRepo) ListReactivated(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error) {
+	var list []*model.Merchant
+	for _, merch := range m.merchants {
+		list = append(list, merch)
+	}
+	return list, len(list), nil
+}
 func (m *mockMerchantRepo) Update(ctx context.Context, merchant *model.Merchant) error {
 	m.merchants[merchant.ID] = merchant
 	return nil
@@ -66,6 +73,23 @@ func (m *mockMerchantRepo) UpdateStatusWithAudit(ctx context.Context, id uuid.UU
 func (m *mockMerchantRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	delete(m.merchants, id)
 	return nil
+}
+func (m *mockMerchantRepo) ExecuteLifecycleTransition(ctx context.Context, id uuid.UUID, action model.LifecycleAction, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	merch, ok := m.merchants[id]
+	if !ok {
+		return nil, "", status.Error(codes.NotFound, "not found")
+	}
+	prev := model.MerchantStatus(merch.Status)
+	return merch, prev, nil
+}
+func (m *mockMerchantRepo) RecordLifecycleAudit(ctx context.Context, audit *model.MerchantLifecycleAudit) error {
+	return nil
+}
+func (m *mockMerchantRepo) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
+	return nil
+}
+func (m *mockMerchantRepo) GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
+	return nil, nil
 }
 
 func TestUnaryOwnershipInterceptor(t *testing.T) {

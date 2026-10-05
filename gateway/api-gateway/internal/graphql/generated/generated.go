@@ -178,6 +178,17 @@ type ComplexityRoot struct {
 		UpdatedAt       func(childComplexity int) int
 	}
 
+	MerchantAppeal struct {
+		AdminComment func(childComplexity int) int
+		CreatedAt    func(childComplexity int) int
+		ID           func(childComplexity int) int
+		MerchantID   func(childComplexity int) int
+		Reason       func(childComplexity int) int
+		ReviewedAt   func(childComplexity int) int
+		Status       func(childComplexity int) int
+		UpdatedAt    func(childComplexity int) int
+	}
+
 	MerchantList struct {
 		Merchants func(childComplexity int) int
 		Total     func(childComplexity int) int
@@ -210,6 +221,7 @@ type ComplexityRoot struct {
 		GenerateStoreUploadURL  func(childComplexity int, input model.GenerateStoreUploadURLInput) int
 		Login                   func(childComplexity int, input model.LoginInput) int
 		Logout                  func(childComplexity int) int
+		MerchantAppeal          func(childComplexity int, merchantID string, reason string) int
 		ProcessPayment          func(childComplexity int, input model.ProcessPaymentInput) int
 		PublishStore            func(childComplexity int, id string) int
 		ReactivateAccount       func(childComplexity int) int
@@ -348,7 +360,8 @@ type ComplexityRoot struct {
 		Inventory                     func(childComplexity int, productID *string, variantID *string, inventoryID *string) int
 		Me                            func(childComplexity int) int
 		Merchant                      func(childComplexity int, id string) int
-		Merchants                     func(childComplexity int, status *model.MerchantStatus, limit *int, offset *int) int
+		MerchantAppeals               func(childComplexity int, merchantID string) int
+		Merchants                     func(childComplexity int, status *model.MerchantStatus, lifecycleStatus *model.MerchantLifecycleStatus, reactivatedOnly *bool, limit *int, offset *int) int
 		MyStore                       func(childComplexity int) int
 		Notifications                 func(childComplexity int, userID string, limit *int, offset *int) int
 		Order                         func(childComplexity int, id string) int
@@ -513,6 +526,7 @@ type MutationResolver interface {
 	UpdateMerchant(ctx context.Context, id string, input model.UpdateMerchantInput) (*model.Merchant, error)
 	UpdateMerchantStatus(ctx context.Context, id string, status model.MerchantStatus, rejectionReason *string) (*model.Merchant, error)
 	DeleteMerchant(ctx context.Context, id string) (bool, error)
+	MerchantAppeal(ctx context.Context, merchantID string, reason string) (*model.MerchantAppeal, error)
 	SendNotification(ctx context.Context, input model.SendNotificationInput) (bool, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
 	UpdateOrderStatus(ctx context.Context, id string, status string) (*model.Order, error)
@@ -558,7 +572,8 @@ type QueryResolver interface {
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
 	Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string) (*model.InventoryItem, error)
 	Merchant(ctx context.Context, id string) (*model.Merchant, error)
-	Merchants(ctx context.Context, status *model.MerchantStatus, limit *int, offset *int) (*model.MerchantList, error)
+	Merchants(ctx context.Context, status *model.MerchantStatus, lifecycleStatus *model.MerchantLifecycleStatus, reactivatedOnly *bool, limit *int, offset *int) (*model.MerchantList, error)
+	MerchantAppeals(ctx context.Context, merchantID string) ([]*model.MerchantAppeal, error)
 	Notifications(ctx context.Context, userID string, limit *int, offset *int) (*model.NotificationList, error)
 	Order(ctx context.Context, id string) (*model.Order, error)
 	Orders(ctx context.Context, userID string, limit *int, offset *int) (*model.OrderList, error)
@@ -1177,6 +1192,62 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Merchant.UpdatedAt(childComplexity), true
 
+	case "MerchantAppeal.adminComment":
+		if e.complexity.MerchantAppeal.AdminComment == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.AdminComment(childComplexity), true
+
+	case "MerchantAppeal.createdAt":
+		if e.complexity.MerchantAppeal.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.CreatedAt(childComplexity), true
+
+	case "MerchantAppeal.id":
+		if e.complexity.MerchantAppeal.ID == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.ID(childComplexity), true
+
+	case "MerchantAppeal.merchantId":
+		if e.complexity.MerchantAppeal.MerchantID == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.MerchantID(childComplexity), true
+
+	case "MerchantAppeal.reason":
+		if e.complexity.MerchantAppeal.Reason == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.Reason(childComplexity), true
+
+	case "MerchantAppeal.reviewedAt":
+		if e.complexity.MerchantAppeal.ReviewedAt == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.ReviewedAt(childComplexity), true
+
+	case "MerchantAppeal.status":
+		if e.complexity.MerchantAppeal.Status == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.Status(childComplexity), true
+
+	case "MerchantAppeal.updatedAt":
+		if e.complexity.MerchantAppeal.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.MerchantAppeal.UpdatedAt(childComplexity), true
+
 	case "MerchantList.merchants":
 		if e.complexity.MerchantList.Merchants == nil {
 			break
@@ -1492,6 +1563,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Logout(childComplexity), true
+
+	case "Mutation.merchantAppeal":
+		if e.complexity.Mutation.MerchantAppeal == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_merchantAppeal_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.MerchantAppeal(childComplexity, args["merchantId"].(string), args["reason"].(string)), true
 
 	case "Mutation.processPayment":
 		if e.complexity.Mutation.ProcessPayment == nil {
@@ -2418,6 +2501,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Merchant(childComplexity, args["id"].(string)), true
 
+	case "Query.merchantAppeals":
+		if e.complexity.Query.MerchantAppeals == nil {
+			break
+		}
+
+		args, err := ec.field_Query_merchantAppeals_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MerchantAppeals(childComplexity, args["merchantId"].(string)), true
+
 	case "Query.merchants":
 		if e.complexity.Query.Merchants == nil {
 			break
@@ -2428,7 +2523,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Merchants(childComplexity, args["status"].(*model.MerchantStatus), args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.Merchants(childComplexity, args["status"].(*model.MerchantStatus), args["lifecycleStatus"].(*model.MerchantLifecycleStatus), args["reactivatedOnly"].(*bool), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.myStore":
 		if e.complexity.Query.MyStore == nil {
@@ -3593,6 +3688,25 @@ extend type Mutation {
   SUSPENDED
 }
 
+enum MerchantLifecycleStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_REVIEW
+  SUSPENDED
+  TERMINATED
+}
+
+type MerchantAppeal {
+  id: ID!
+  merchantId: ID!
+  reason: String!
+  status: String!
+  adminComment: String
+  reviewedAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
 type Merchant {
   id: ID!
   businessName: String!
@@ -3623,17 +3737,16 @@ input UpdateMerchantInput {
 
 extend type Query {
   merchant(id: ID!): Merchant @auth(requires: [ADMIN, MERCHANT])
-  merchants(status: MerchantStatus, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchants(status: MerchantStatus, lifecycleStatus: MerchantLifecycleStatus, reactivatedOnly: Boolean, limit: Int, offset: Int): MerchantList! @auth(requires: [ADMIN])
+  merchantAppeals(merchantId: ID!): [MerchantAppeal!]! @auth(requires: [MERCHANT, ADMIN])
 }
 
 extend type Mutation {
   updateMerchant(id: ID!, input: UpdateMerchantInput!): Merchant @auth(requires: [MERCHANT])
   updateMerchantStatus(id: ID!, status: MerchantStatus!, rejectionReason: String): Merchant @auth(requires: [ADMIN])
   deleteMerchant(id: ID!): Boolean! @auth(requires: [MERCHANT])
-}
-
-
-`, BuiltIn: false},
+  merchantAppeal(merchantId: ID!, reason: String!): MerchantAppeal! @auth(requires: [MERCHANT])
+}`, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/notification/notification.graphql", Input: `type Notification {
   id: ID!
   userId: String!
@@ -4572,6 +4685,30 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_merchantAppeal_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["merchantId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("merchantId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["merchantId"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_processPayment_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -5367,6 +5504,21 @@ func (ec *executionContext) field_Query_inventory_args(ctx context.Context, rawA
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_merchantAppeals_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["merchantId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("merchantId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["merchantId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_merchant_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -5394,24 +5546,42 @@ func (ec *executionContext) field_Query_merchants_args(ctx context.Context, rawA
 		}
 	}
 	args["status"] = arg0
-	var arg1 *int
+	var arg1 *model.MerchantLifecycleStatus
+	if tmp, ok := rawArgs["lifecycleStatus"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lifecycleStatus"))
+		arg1, err = ec.unmarshalOMerchantLifecycleStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantLifecycleStatus(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["lifecycleStatus"] = arg1
+	var arg2 *bool
+	if tmp, ok := rawArgs["reactivatedOnly"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reactivatedOnly"))
+		arg2, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reactivatedOnly"] = arg2
+	var arg3 *int
 	if tmp, ok := rawArgs["limit"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
-		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		arg3, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["limit"] = arg1
-	var arg2 *int
+	args["limit"] = arg3
+	var arg4 *int
 	if tmp, ok := rawArgs["offset"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
-		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		arg4, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["offset"] = arg2
+	args["offset"] = arg4
 	return args, nil
 }
 
@@ -9435,6 +9605,352 @@ func (ec *executionContext) fieldContext_Merchant_deletedAt(_ context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _MerchantAppeal_id(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_merchantId(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_merchantId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MerchantID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_merchantId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_reason(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_status(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_adminComment(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AdminComment, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_adminComment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_reviewedAt(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ReviewedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_reviewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MerchantAppeal_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MerchantAppeal_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MerchantAppeal_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MerchantAppeal",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _MerchantList_merchants(ctx context.Context, field graphql.CollectedField, obj *model.MerchantList) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_MerchantList_merchants(ctx, field)
 	if err != nil {
@@ -11524,6 +12040,103 @@ func (ec *executionContext) fieldContext_Mutation_deleteMerchant(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteMerchant_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_merchantAppeal(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_merchantAppeal(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().MerchantAppeal(rctx, fc.Args["merchantId"].(string), fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.MerchantAppeal); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.MerchantAppeal`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.MerchantAppeal)
+	fc.Result = res
+	return ec.marshalNMerchantAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppeal(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_merchantAppeal(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_MerchantAppeal_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_MerchantAppeal_merchantId(ctx, field)
+			case "reason":
+				return ec.fieldContext_MerchantAppeal_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_MerchantAppeal_status(ctx, field)
+			case "adminComment":
+				return ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
+			case "reviewedAt":
+				return ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_MerchantAppeal_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MerchantAppeal", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_merchantAppeal_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -18427,7 +19040,7 @@ func (ec *executionContext) _Query_merchants(ctx context.Context, field graphql.
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().Merchants(rctx, fc.Args["status"].(*model.MerchantStatus), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+			return ec.resolvers.Query().Merchants(rctx, fc.Args["status"].(*model.MerchantStatus), fc.Args["lifecycleStatus"].(*model.MerchantLifecycleStatus), fc.Args["reactivatedOnly"].(*bool), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
@@ -18491,6 +19104,103 @@ func (ec *executionContext) fieldContext_Query_merchants(ctx context.Context, fi
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_merchants_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_merchantAppeals(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_merchantAppeals(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().MerchantAppeals(rctx, fc.Args["merchantId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"MERCHANT", "ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.([]*model.MerchantAppeal); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be []*github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.MerchantAppeal`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.MerchantAppeal)
+	fc.Result = res
+	return ec.marshalNMerchantAppeal2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppealᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_merchantAppeals(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_MerchantAppeal_id(ctx, field)
+			case "merchantId":
+				return ec.fieldContext_MerchantAppeal_merchantId(ctx, field)
+			case "reason":
+				return ec.fieldContext_MerchantAppeal_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_MerchantAppeal_status(ctx, field)
+			case "adminComment":
+				return ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
+			case "reviewedAt":
+				return ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_MerchantAppeal_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MerchantAppeal", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_merchantAppeals_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -27939,6 +28649,74 @@ func (ec *executionContext) _Merchant(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var merchantAppealImplementors = []string{"MerchantAppeal"}
+
+func (ec *executionContext) _MerchantAppeal(ctx context.Context, sel ast.SelectionSet, obj *model.MerchantAppeal) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, merchantAppealImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MerchantAppeal")
+		case "id":
+			out.Values[i] = ec._MerchantAppeal_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "merchantId":
+			out.Values[i] = ec._MerchantAppeal_merchantId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._MerchantAppeal_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._MerchantAppeal_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "adminComment":
+			out.Values[i] = ec._MerchantAppeal_adminComment(ctx, field, obj)
+		case "reviewedAt":
+			out.Values[i] = ec._MerchantAppeal_reviewedAt(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._MerchantAppeal_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._MerchantAppeal_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var merchantListImplementors = []string{"MerchantList"}
 
 func (ec *executionContext) _MerchantList(ctx context.Context, sel ast.SelectionSet, obj *model.MerchantList) graphql.Marshaler {
@@ -28141,6 +28919,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "deleteMerchant":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteMerchant(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "merchantAppeal":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_merchantAppeal(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -29221,6 +30006,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_merchants(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "merchantAppeals":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_merchantAppeals(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -31126,6 +31933,64 @@ func (ec *executionContext) marshalNMerchant2ᚖgithubᚗcomᚋmareesᚑgodevᚋ
 	return ec._Merchant(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNMerchantAppeal2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppeal(ctx context.Context, sel ast.SelectionSet, v model.MerchantAppeal) graphql.Marshaler {
+	return ec._MerchantAppeal(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMerchantAppeal2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppealᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MerchantAppeal) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMerchantAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppeal(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMerchantAppeal2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantAppeal(ctx context.Context, sel ast.SelectionSet, v *model.MerchantAppeal) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MerchantAppeal(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNMerchantList2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantList(ctx context.Context, sel ast.SelectionSet, v model.MerchantList) graphql.Marshaler {
 	return ec._MerchantList(ctx, sel, &v)
 }
@@ -32287,6 +33152,22 @@ func (ec *executionContext) marshalOMerchant2ᚖgithubᚗcomᚋmareesᚑgodevᚋ
 		return graphql.Null
 	}
 	return ec._Merchant(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOMerchantLifecycleStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantLifecycleStatus(ctx context.Context, v interface{}) (*model.MerchantLifecycleStatus, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.MerchantLifecycleStatus)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOMerchantLifecycleStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantLifecycleStatus(ctx context.Context, sel ast.SelectionSet, v *model.MerchantLifecycleStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOMerchantStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchantStatus(ctx context.Context, v interface{}) (*model.MerchantStatus, error) {

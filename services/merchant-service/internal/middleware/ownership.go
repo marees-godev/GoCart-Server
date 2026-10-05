@@ -30,7 +30,7 @@ func ExtractIdentity(ctx context.Context) (userID, role string) {
 			}
 		}
 		if role == "" {
-			for _, key := range []string{"x-user-role", "user-role", "user_role", "role"} {
+			for _, key := range []string{"x-user-roles", "user-roles", "user_roles", "x-user-role", "user-role", "user_role", "role"} {
 				if vals := md.Get(key); len(vals) > 0 && strings.TrimSpace(vals[0]) != "" {
 					role = strings.ToUpper(strings.TrimSpace(vals[0]))
 					break
@@ -39,6 +39,20 @@ func ExtractIdentity(ctx context.Context) (userID, role string) {
 		}
 	}
 	return userID, role
+}
+
+func isAdminRole(role string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(role))
+	if upper == "ADMIN" || upper == "ROLE_ADMIN" {
+		return true
+	}
+	for _, part := range strings.Split(upper, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "ADMIN" || trimmed == "ROLE_ADMIN" {
+			return true
+		}
+	}
+	return false
 }
 
 // UnaryOwnershipInterceptor enforces that only the logged-in merchant (owner),
@@ -81,20 +95,32 @@ func UnaryOwnershipInterceptor(repo repository.MerchantRepository, log ...*slog.
 				}
 			}
 
+		case strings.HasSuffix(info.FullMethod, "/ActivateMerchant"),
+			strings.HasSuffix(info.FullMethod, "/SuspendMerchant"),
+			strings.HasSuffix(info.FullMethod, "/ReactivateMerchant"):
+			if userID == "" || role == "" {
+				l.Warn("Ownership: missing credentials for lifecycle management", slog.String("role", role), slog.String("user_id", userID))
+				return nil, status.Error(codes.Unauthenticated, "unauthorized: missing or invalid gateway authentication headers")
+			}
+			if !isAdminRole(role) {
+				l.Warn("Ownership: non-admin attempted lifecycle management", slog.String("role", role), slog.String("user_id", userID))
+				return nil, status.Error(codes.PermissionDenied, "forbidden: administrator privileges required")
+			}
+
 		case strings.HasSuffix(info.FullMethod, "/UpdateMerchantStatus"):
-			if role != "ADMIN" {
+			if !isAdminRole(role) {
 				l.Warn("Ownership: non-admin attempted to update merchant status", slog.String("role", role), slog.String("user_id", userID))
 				return nil, status.Error(codes.PermissionDenied, "forbidden: only admins can update merchant status")
 			}
 
 		case strings.HasSuffix(info.FullMethod, "/ListMerchants"):
-			if role != "ADMIN" {
+			if !isAdminRole(role) {
 				l.Warn("Ownership: non-admin attempted to list merchants", slog.String("role", role), slog.String("user_id", userID))
 				return nil, status.Error(codes.PermissionDenied, "forbidden: only admins can list all merchants")
 			}
 
 		case strings.HasSuffix(info.FullMethod, "/CreateMerchant"):
-			if role != "" && role != "MERCHANT" && role != "ADMIN" {
+			if role != "" && !isAdminRole(role) && role != "MERCHANT" && role != "ROLE_MERCHANT" {
 				l.Warn("Ownership: invalid caller role to create merchant", slog.String("role", role), slog.String("user_id", userID))
 				return nil, status.Error(codes.PermissionDenied, "forbidden: insufficient permissions to create merchant")
 			}
@@ -105,10 +131,10 @@ func UnaryOwnershipInterceptor(repo repository.MerchantRepository, log ...*slog.
 }
 
 func verifyMerchantOwnership(ctx context.Context, repo repository.MerchantRepository, merchantIDStr, callerUserID, callerRole string, l *slog.Logger) error {
-	if callerRole == "ADMIN" || (callerRole == "" && callerUserID == "") {
+	if isAdminRole(callerRole) || (callerRole == "" && callerUserID == "") {
 		return nil
 	}
-	if callerRole != "MERCHANT" || callerUserID == "" {
+	if (callerRole != "MERCHANT" && callerRole != "ROLE_MERCHANT") || callerUserID == "" {
 		l.Warn("Ownership check failed: not a merchant or missing caller ID", slog.String("caller_role", callerRole), slog.String("caller_user_id", callerUserID))
 		return status.Error(codes.PermissionDenied, "forbidden: you can only access/modify your own merchant profile")
 	}

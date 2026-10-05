@@ -270,6 +270,17 @@ type Merchant struct {
 	DeletedAt       *string        `json:"deletedAt,omitempty"`
 }
 
+type MerchantAppeal struct {
+	ID           string  `json:"id"`
+	MerchantID   string  `json:"merchantId"`
+	Reason       string  `json:"reason"`
+	Status       string  `json:"status"`
+	AdminComment *string `json:"adminComment,omitempty"`
+	ReviewedAt   *string `json:"reviewedAt,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
+}
+
 type MerchantList struct {
 	Merchants []*Merchant `json:"merchants"`
 	Total     int         `json:"total"`
@@ -675,6 +686,53 @@ func (e *Gender) UnmarshalGQL(v interface{}) error {
 }
 
 func (e Gender) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type MerchantLifecycleStatus string
+
+const (
+	MerchantLifecycleStatusActive        MerchantLifecycleStatus = "ACTIVE"
+	MerchantLifecycleStatusInactive      MerchantLifecycleStatus = "INACTIVE"
+	MerchantLifecycleStatusPendingReview MerchantLifecycleStatus = "PENDING_REVIEW"
+	MerchantLifecycleStatusSuspended     MerchantLifecycleStatus = "SUSPENDED"
+	MerchantLifecycleStatusTerminated    MerchantLifecycleStatus = "TERMINATED"
+)
+
+var AllMerchantLifecycleStatus = []MerchantLifecycleStatus{
+	MerchantLifecycleStatusActive,
+	MerchantLifecycleStatusInactive,
+	MerchantLifecycleStatusPendingReview,
+	MerchantLifecycleStatusSuspended,
+	MerchantLifecycleStatusTerminated,
+}
+
+func (e MerchantLifecycleStatus) IsValid() bool {
+	switch e {
+	case MerchantLifecycleStatusActive, MerchantLifecycleStatusInactive, MerchantLifecycleStatusPendingReview, MerchantLifecycleStatusSuspended, MerchantLifecycleStatusTerminated:
+		return true
+	}
+	return false
+}
+
+func (e MerchantLifecycleStatus) String() string {
+	return string(e)
+}
+
+func (e *MerchantLifecycleStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MerchantLifecycleStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MerchantLifecycleStatus", str)
+	}
+	return nil
+}
+
+func (e MerchantLifecycleStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

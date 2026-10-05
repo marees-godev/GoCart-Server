@@ -25,6 +25,11 @@ const (
 	MerchantService_ListMerchants_FullMethodName        = "/merchant.v1.MerchantService/ListMerchants"
 	MerchantService_UpdateMerchantStatus_FullMethodName = "/merchant.v1.MerchantService/UpdateMerchantStatus"
 	MerchantService_DeleteMerchant_FullMethodName       = "/merchant.v1.MerchantService/DeleteMerchant"
+	MerchantService_ActivateMerchant_FullMethodName     = "/merchant.v1.MerchantService/ActivateMerchant"
+	MerchantService_SuspendMerchant_FullMethodName      = "/merchant.v1.MerchantService/SuspendMerchant"
+	MerchantService_ReactivateMerchant_FullMethodName   = "/merchant.v1.MerchantService/ReactivateMerchant"
+	MerchantService_CreateMerchantAppeal_FullMethodName = "/merchant.v1.MerchantService/CreateMerchantAppeal"
+	MerchantService_GetMerchantAppeals_FullMethodName   = "/merchant.v1.MerchantService/GetMerchantAppeals"
 )
 
 // MerchantServiceClient is the client API for MerchantService service.
@@ -37,6 +42,11 @@ type MerchantServiceClient interface {
 	ListMerchants(ctx context.Context, in *ListMerchantsRequest, opts ...grpc.CallOption) (*ListMerchantsResponse, error)
 	UpdateMerchantStatus(ctx context.Context, in *UpdateMerchantStatusRequest, opts ...grpc.CallOption) (*UpdateMerchantStatusResponse, error)
 	DeleteMerchant(ctx context.Context, in *DeleteMerchantRequest, opts ...grpc.CallOption) (*DeleteMerchantResponse, error)
+	ActivateMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error)
+	SuspendMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error)
+	ReactivateMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error)
+	CreateMerchantAppeal(ctx context.Context, in *CreateMerchantAppealRequest, opts ...grpc.CallOption) (*CreateMerchantAppealResponse, error)
+	GetMerchantAppeals(ctx context.Context, in *GetMerchantAppealsRequest, opts ...grpc.CallOption) (*GetMerchantAppealsResponse, error)
 }
 
 type merchantServiceClient struct {
@@ -107,6 +117,56 @@ func (c *merchantServiceClient) DeleteMerchant(ctx context.Context, in *DeleteMe
 	return out, nil
 }
 
+func (c *merchantServiceClient) ActivateMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LifecycleMerchantResponse)
+	err := c.cc.Invoke(ctx, MerchantService_ActivateMerchant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *merchantServiceClient) SuspendMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LifecycleMerchantResponse)
+	err := c.cc.Invoke(ctx, MerchantService_SuspendMerchant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *merchantServiceClient) ReactivateMerchant(ctx context.Context, in *LifecycleMerchantRequest, opts ...grpc.CallOption) (*LifecycleMerchantResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LifecycleMerchantResponse)
+	err := c.cc.Invoke(ctx, MerchantService_ReactivateMerchant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *merchantServiceClient) CreateMerchantAppeal(ctx context.Context, in *CreateMerchantAppealRequest, opts ...grpc.CallOption) (*CreateMerchantAppealResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateMerchantAppealResponse)
+	err := c.cc.Invoke(ctx, MerchantService_CreateMerchantAppeal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *merchantServiceClient) GetMerchantAppeals(ctx context.Context, in *GetMerchantAppealsRequest, opts ...grpc.CallOption) (*GetMerchantAppealsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMerchantAppealsResponse)
+	err := c.cc.Invoke(ctx, MerchantService_GetMerchantAppeals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MerchantServiceServer is the server API for MerchantService service.
 // All implementations must embed UnimplementedMerchantServiceServer
 // for forward compatibility.
@@ -117,6 +177,11 @@ type MerchantServiceServer interface {
 	ListMerchants(context.Context, *ListMerchantsRequest) (*ListMerchantsResponse, error)
 	UpdateMerchantStatus(context.Context, *UpdateMerchantStatusRequest) (*UpdateMerchantStatusResponse, error)
 	DeleteMerchant(context.Context, *DeleteMerchantRequest) (*DeleteMerchantResponse, error)
+	ActivateMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error)
+	SuspendMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error)
+	ReactivateMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error)
+	CreateMerchantAppeal(context.Context, *CreateMerchantAppealRequest) (*CreateMerchantAppealResponse, error)
+	GetMerchantAppeals(context.Context, *GetMerchantAppealsRequest) (*GetMerchantAppealsResponse, error)
 	mustEmbedUnimplementedMerchantServiceServer()
 }
 
@@ -144,6 +209,21 @@ func (UnimplementedMerchantServiceServer) UpdateMerchantStatus(context.Context, 
 }
 func (UnimplementedMerchantServiceServer) DeleteMerchant(context.Context, *DeleteMerchantRequest) (*DeleteMerchantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteMerchant not implemented")
+}
+func (UnimplementedMerchantServiceServer) ActivateMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ActivateMerchant not implemented")
+}
+func (UnimplementedMerchantServiceServer) SuspendMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuspendMerchant not implemented")
+}
+func (UnimplementedMerchantServiceServer) ReactivateMerchant(context.Context, *LifecycleMerchantRequest) (*LifecycleMerchantResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReactivateMerchant not implemented")
+}
+func (UnimplementedMerchantServiceServer) CreateMerchantAppeal(context.Context, *CreateMerchantAppealRequest) (*CreateMerchantAppealResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateMerchantAppeal not implemented")
+}
+func (UnimplementedMerchantServiceServer) GetMerchantAppeals(context.Context, *GetMerchantAppealsRequest) (*GetMerchantAppealsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMerchantAppeals not implemented")
 }
 func (UnimplementedMerchantServiceServer) mustEmbedUnimplementedMerchantServiceServer() {}
 func (UnimplementedMerchantServiceServer) testEmbeddedByValue()                         {}
@@ -274,6 +354,96 @@ func _MerchantService_DeleteMerchant_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MerchantService_ActivateMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LifecycleMerchantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerchantServiceServer).ActivateMerchant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MerchantService_ActivateMerchant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerchantServiceServer).ActivateMerchant(ctx, req.(*LifecycleMerchantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MerchantService_SuspendMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LifecycleMerchantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerchantServiceServer).SuspendMerchant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MerchantService_SuspendMerchant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerchantServiceServer).SuspendMerchant(ctx, req.(*LifecycleMerchantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MerchantService_ReactivateMerchant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LifecycleMerchantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerchantServiceServer).ReactivateMerchant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MerchantService_ReactivateMerchant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerchantServiceServer).ReactivateMerchant(ctx, req.(*LifecycleMerchantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MerchantService_CreateMerchantAppeal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateMerchantAppealRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerchantServiceServer).CreateMerchantAppeal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MerchantService_CreateMerchantAppeal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerchantServiceServer).CreateMerchantAppeal(ctx, req.(*CreateMerchantAppealRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MerchantService_GetMerchantAppeals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMerchantAppealsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerchantServiceServer).GetMerchantAppeals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MerchantService_GetMerchantAppeals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerchantServiceServer).GetMerchantAppeals(ctx, req.(*GetMerchantAppealsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MerchantService_ServiceDesc is the grpc.ServiceDesc for MerchantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +474,26 @@ var MerchantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteMerchant",
 			Handler:    _MerchantService_DeleteMerchant_Handler,
+		},
+		{
+			MethodName: "ActivateMerchant",
+			Handler:    _MerchantService_ActivateMerchant_Handler,
+		},
+		{
+			MethodName: "SuspendMerchant",
+			Handler:    _MerchantService_SuspendMerchant_Handler,
+		},
+		{
+			MethodName: "ReactivateMerchant",
+			Handler:    _MerchantService_ReactivateMerchant_Handler,
+		},
+		{
+			MethodName: "CreateMerchantAppeal",
+			Handler:    _MerchantService_CreateMerchantAppeal_Handler,
+		},
+		{
+			MethodName: "GetMerchantAppeals",
+			Handler:    _MerchantService_GetMerchantAppeals_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

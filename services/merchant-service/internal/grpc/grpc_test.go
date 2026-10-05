@@ -66,6 +66,14 @@ func (m *mockService) ListMerchants(ctx context.Context, limit, offset int, stat
 	return list, len(list), nil
 }
 
+func (m *mockService) ListReactivatedMerchants(ctx context.Context, limit, offset int) ([]*model.Merchant, int, error) {
+	list := make([]*model.Merchant, 0)
+	for _, merch := range m.merchants {
+		list = append(list, merch)
+	}
+	return list, len(list), nil
+}
+
 func (m *mockService) UpdateMerchant(ctx context.Context, id uuid.UUID, req dto.UpdateMerchantRequest) (*model.Merchant, error) {
 	merch, exists := m.merchants[id]
 	if !exists {
@@ -110,6 +118,72 @@ func (m *mockService) DeleteMerchant(ctx context.Context, id uuid.UUID) error {
 	}
 	delete(m.merchants, id)
 	return nil
+}
+
+func (m *mockService) ActivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	merch, exists := m.merchants[id]
+	if !exists {
+		return nil, "", appErrors.NotFound("merchant not found")
+	}
+	curr := model.MerchantStatus(merch.Status)
+	target, err := model.ValidateLifecycleTransition(model.LifecycleActionActivate, curr)
+	if err != nil {
+		return nil, curr, err
+	}
+	merch.Status = string(target)
+	return merch, curr, nil
+}
+
+func (m *mockService) SuspendMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	merch, exists := m.merchants[id]
+	if !exists {
+		return nil, "", appErrors.NotFound("merchant not found")
+	}
+	curr := model.MerchantStatus(merch.Status)
+	target, err := model.ValidateLifecycleTransition(model.LifecycleActionSuspend, curr)
+	if err != nil {
+		return nil, curr, err
+	}
+	merch.Status = string(target)
+	return merch, curr, nil
+}
+
+func (m *mockService) ReactivateMerchant(ctx context.Context, id uuid.UUID, reason string, adminID string, reqID string) (*model.Merchant, model.MerchantStatus, error) {
+	merch, exists := m.merchants[id]
+	if !exists {
+		return nil, "", appErrors.NotFound("merchant not found")
+	}
+	curr := model.MerchantStatus(merch.Status)
+	target, err := model.ValidateLifecycleTransition(model.LifecycleActionReactivate, curr)
+	if err != nil {
+		return nil, curr, err
+	}
+	merch.Status = string(target)
+	return merch, curr, nil
+}
+
+func (m *mockService) CreateAppeal(ctx context.Context, merchantID uuid.UUID, reason string) (*model.MerchantAppeal, error) {
+	return &model.MerchantAppeal{
+		ID:         uuid.New(),
+		MerchantID: merchantID,
+		Reason:     reason,
+		Status:     string(model.MerchantAppealStatusPending),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}, nil
+}
+
+func (m *mockService) GetAppeals(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
+	return []*model.MerchantAppeal{
+		{
+			ID:         uuid.New(),
+			MerchantID: merchantID,
+			Reason:     "test appeal",
+			Status:     string(model.MerchantAppealStatusPending),
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+	}, nil
 }
 
 func TestMerchantGRPC_CRUD(t *testing.T) {
@@ -292,5 +366,128 @@ func TestMerchantGRPC_CRUD(t *testing.T) {
 	}
 	if !delRes.Success {
 		t.Errorf("expected success true, got false")
+	}
+}
+
+func TestMerchantGRPC_LifecycleOperations(t *testing.T) {
+	svc := newMockService()
+	server := merchantGRPC.NewMerchantGRPCServer(svc)
+
+	lis := bufconn.Listen(1024 * 1024)
+	grpcServer := grpc.NewServer()
+	merchantpb.RegisterMerchantServiceServer(grpcServer, server)
+
+	go func() {
+		_ = grpcServer.Serve(lis)
+	}()
+	defer func() {
+		grpcServer.Stop()
+		_ = lis.Close()
+	}()
+
+	conn, err := grpc.NewClient("passthrough://bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		t.Fatalf("failed to dial bufnet: %v", err)
+	}
+	defer conn.Close()
+
+	client := merchantpb.NewMerchantServiceClient(conn)
+
+	// Create a test merchant in PENDING state
+	mID := uuid.New()
+	svc.merchants[mID] = &model.Merchant{
+		ID:            mID,
+		BusinessName:  "Lifecycle Shop",
+		BusinessEmail: "shop@lifecycle.com",
+		Status:        string(model.MerchantStatusPending),
+	}
+
+	adminCtx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs(
+		"x-user-id", "admin-123",
+		"x-user-roles", "ROLE_ADMIN",
+		"x-request-id", "req-test-1",
+	))
+
+	merchantCtx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs(
+		"x-user-id", "merchant-999",
+		"x-user-roles", "ROLE_MERCHANT",
+	))
+
+	unauthCtx := context.Background()
+
+	// 1. RBAC Test: Calling Activate with ROLE_MERCHANT -> 403 PermissionDenied
+	_, err = client.ActivateMerchant(merchantCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Activate try",
+	})
+	if err == nil || status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied for ROLE_MERCHANT, got: %v", err)
+	}
+
+	// 2. Auth Test: Calling Activate without auth headers -> 401 Unauthenticated
+	_, err = client.ActivateMerchant(unauthCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Activate try",
+	})
+	if err == nil || status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected Unauthenticated for missing auth, got: %v", err)
+	}
+
+	// 3. Validation: Missing ID -> 400 InvalidArgument
+	_, err = client.ActivateMerchant(adminCtx, &merchantpb.LifecycleMerchantRequest{
+		Id: "",
+	})
+	if err == nil || status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for empty id, got: %v", err)
+	}
+
+	// 4. Success: Admin activates merchant (PENDING -> ACTIVE)
+	actRes, err := client.ActivateMerchant(adminCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Approved documentation",
+	})
+	if err != nil {
+		t.Fatalf("ActivateMerchant failed: %v", err)
+	}
+	if actRes.Merchant == nil || actRes.Merchant.Id != mID.String() {
+		t.Errorf("expected merchant ID %s, got: %v", mID.String(), actRes.Merchant)
+	}
+
+	// 5. Conflict Test: Activating already ACTIVE merchant -> 409 Conflict (codes.AlreadyExists)
+	_, err = client.ActivateMerchant(adminCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Activate again",
+	})
+	if err == nil || status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("expected AlreadyExists (409 Conflict) for duplicate activation, got: %v", err)
+	}
+
+	// 6. Success: Admin suspends ACTIVE merchant (ACTIVE -> SUSPENDED)
+	susRes, err := client.SuspendMerchant(adminCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Policy investigation",
+	})
+	if err != nil {
+		t.Fatalf("SuspendMerchant failed: %v", err)
+	}
+	if susRes.PreviousStatus != merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_ACTIVE {
+		t.Errorf("expected previous status ACTIVE, got: %s", susRes.PreviousStatus)
+	}
+
+	// 7. Success: Admin reactivates SUSPENDED merchant (SUSPENDED -> ACTIVE)
+	reactRes, err := client.ReactivateMerchant(adminCtx, &merchantpb.LifecycleMerchantRequest{
+		Id:     mID.String(),
+		Reason: "Cleared investigation",
+	})
+	if err != nil {
+		t.Fatalf("ReactivateMerchant failed: %v", err)
+	}
+	if reactRes.PreviousStatus != merchantpb.MerchantLifecycleStatus_MERCHANT_LIFECYCLE_SUSPENDED {
+		t.Errorf("expected previous status SUSPENDED, got: %s", reactRes.PreviousStatus)
 	}
 }
