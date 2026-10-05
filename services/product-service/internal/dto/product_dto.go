@@ -74,13 +74,13 @@ func (r *CreateProductRequest) Validate() error {
 	}
 
 	if r.Status != "" {
-		st := model.ProductStatus(strings.ToLower(strings.TrimSpace(r.Status)))
+		st := model.ProductStatus(strings.ToUpper(strings.TrimSpace(r.Status)))
 		if !st.IsValid() {
 			return appErrors.InvalidArgument("invalid product status")
 		}
 		r.Status = string(st)
 	} else {
-		r.Status = string(model.StatusStockIn)
+		r.Status = string(model.StatusInStock)
 	}
 
 	for i, v := range r.Variants {
@@ -170,7 +170,7 @@ func (r *UpdateProductRequest) Validate() error {
 	}
 
 	if r.Status != nil {
-		st := model.ProductStatus(strings.ToLower(strings.TrimSpace(*r.Status)))
+		st := model.ProductStatus(strings.ToUpper(strings.TrimSpace(*r.Status)))
 		if !st.IsValid() {
 			return appErrors.InvalidArgument("invalid product status")
 		}

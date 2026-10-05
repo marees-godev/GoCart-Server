@@ -73,7 +73,7 @@ func TestProductResolvers_CreateProduct_Success(t *testing.T) {
 				Productname: "iPhone 15",
 				Price:       999.0,
 				Mrp:         1099.0,
-				Status:      "stock_in",
+				Status:      "IN_STOCK",
 			},
 		},
 	}

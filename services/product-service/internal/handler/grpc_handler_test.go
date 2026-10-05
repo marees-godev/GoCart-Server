@@ -35,7 +35,7 @@ func (m *mockProductService) CreateProduct(ctx context.Context, req dto.CreatePr
 		Description: req.Description,
 		Price:       req.Price,
 		MRP:         req.MRP,
-		Status:      model.StatusStockIn,
+		Status:      model.StatusInStock,
 	}
 	m.products[p.ID] = p
 	return p, nil

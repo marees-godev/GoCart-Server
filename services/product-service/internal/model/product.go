@@ -7,16 +7,16 @@ import (
 type ProductStatus string
 
 const (
-	StatusStockIn      ProductStatus = "stock_in"
-	StatusStockOut     ProductStatus = "stock_out"
-	StatusLowStock     ProductStatus = "low_stock"
-	StatusReserved     ProductStatus = "reserved"
-	StatusDiscontinued ProductStatus = "discontinued"
+	StatusInStock      ProductStatus = "IN_STOCK"
+	StatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
+	StatusLowStock     ProductStatus = "LOW_STOCK"
+	StatusReserved     ProductStatus = "RESERVED"
+	StatusDiscontinued ProductStatus = "DISCONTINUED"
 )
 
 func (s ProductStatus) IsValid() bool {
 	switch s {
-	case StatusStockIn, StatusStockOut, StatusLowStock, StatusReserved, StatusDiscontinued:
+	case StatusInStock, StatusOutOfStock, StatusLowStock, StatusReserved, StatusDiscontinued:
 		return true
 	default:
 		return false

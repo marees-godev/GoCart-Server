@@ -102,7 +102,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 		vStatus := v.Status
 		if vStatus == "" {
-			vStatus = model.StatusStockIn
+			vStatus = model.StatusInStock
 		}
 
 		err = tx.QueryRow(ctx, vQuery, p.ID, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus).Scan(&v.ID, &v.CreatedAt, &v.UpdatedAt)
@@ -385,7 +385,7 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 				}
 				vStatus := v.Status
 				if vStatus == "" {
-					vStatus = model.StatusStockIn
+					vStatus = model.StatusInStock
 				}
 				_, err := tx.Exec(ctx, vQuery, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus, v.ID, p.ID)
 				if err != nil {
@@ -403,7 +403,7 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 				}
 				vStatus := v.Status
 				if vStatus == "" {
-					vStatus = model.StatusStockIn
+					vStatus = model.StatusInStock
 				}
 				_ = tx.QueryRow(ctx, vQuery, p.ID, v.SKU, v.Name, v.Price, v.MRP, v.Stock, attr, vStatus).Scan(&v.ID, &v.CreatedAt, &v.UpdatedAt)
 				v.ProductID = p.ID

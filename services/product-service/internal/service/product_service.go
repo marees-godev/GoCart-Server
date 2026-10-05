@@ -81,13 +81,16 @@ func (s *productService) processImageDataURL(ctx context.Context, input string, 
 		contentType = "image/svg+xml"
 	}
 
-	ext := ".png"
-	if contentType == "image/jpeg" {
+	var ext string
+	switch contentType {
+	case "image/jpeg":
 		ext = ".jpg"
-	} else if contentType == "image/webp" {
+	case "image/webp":
 		ext = ".webp"
-	} else if contentType == "image/svg+xml" {
+	case "image/svg+xml":
 		ext = ".svg"
+	default:
+		ext = ".png"
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(b64Data)
@@ -160,7 +163,7 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 			MRP:            v.MRP,
 			Stock:          v.Stock,
 			AttributesJSON: v.AttributesJSON,
-			Status:         model.StatusStockIn,
+			Status:         model.StatusInStock,
 		})
 	}
 
@@ -283,7 +286,7 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 		for _, v := range req.Variants {
 			vStatus := model.ProductStatus(v.Status)
 			if vStatus == "" {
-				vStatus = model.StatusStockIn
+				vStatus = model.StatusInStock
 			}
 			newVariants = append(newVariants, model.ProductVariant{
 				ID:             v.ID,

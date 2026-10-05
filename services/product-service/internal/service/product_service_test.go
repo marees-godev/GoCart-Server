@@ -159,7 +159,7 @@ func TestProductService_CreateProduct(t *testing.T) {
 			Price:       999.00,
 			MRP:         1099.00,
 			Tax:         5.00,
-			Status:      "stock_in",
+			Status:      "IN_STOCK",
 			Images:      []string{"https://img.com/iphone15.jpg"},
 		}
 
