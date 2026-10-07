@@ -9,6 +9,7 @@ import (
 	"time"
 
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -149,7 +150,7 @@ func TestProductService_CreateProduct(t *testing.T) {
 	repo := newMockRepo()
 	storeClient := &mockStoreClient{
 		stores: map[string]*storepb.Store{
-			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store"},
+			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store", ApprovalStatus: "APPROVED"},
 		},
 	}
 	catClient := &mockCategoryClient{
@@ -257,7 +258,7 @@ func TestProductService_UpdateAndDeleteProduct(t *testing.T) {
 	repo := newMockRepo()
 	storeClient := &mockStoreClient{
 		stores: map[string]*storepb.Store{
-			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store"},
+			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store", ApprovalStatus: "APPROVED"},
 		},
 	}
 	catClient := &mockCategoryClient{
@@ -339,7 +340,7 @@ func TestProductService_ProductVariants(t *testing.T) {
 	repo := newMockRepo()
 	storeClient := &mockStoreClient{
 		stores: map[string]*storepb.Store{
-			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store"},
+			validStoreID: {Id: validStoreID, MerchantId: merchantID, Name: "Test Store", ApprovalStatus: "APPROVED"},
 		},
 	}
 	catClient := &mockCategoryClient{
@@ -457,6 +458,157 @@ func TestProductService_ProductVariants(t *testing.T) {
 		err = svc.DeleteProductVariant(merchantCtx, prod.ID, prod.Variants[0].ID)
 		if err != nil {
 			t.Fatalf("expected delete variant success, got %v", err)
+		}
+	})
+}
+
+type mockMerchantClient struct {
+	merchants map[string]*merchantpb.MerchantResponseData
+}
+
+func (m *mockMerchantClient) GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error) {
+	merch, ok := m.merchants[in.Id]
+	if !ok {
+		return nil, errors.New("merchant not found")
+	}
+	return &merchantpb.GetMerchantResponse{Merchant: merch}, nil
+}
+
+func TestProductService_PublishingRulesAndPrerequisites(t *testing.T) {
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	unapprovedStoreID := "22222222-2222-2222-2222-222222222222"
+	activeMerchantID := "33333333-3333-3333-3333-333333333333"
+	suspendedMerchantID := "44444444-4444-4444-4444-444444444444"
+	validCatID := "55555555-5555-5555-5555-555555555555"
+
+	repo := newMockRepo()
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID:      {Id: validStoreID, MerchantId: activeMerchantID, Name: "Approved Store", ApprovalStatus: "APPROVED"},
+			unapprovedStoreID: {Id: unapprovedStoreID, MerchantId: activeMerchantID, Name: "Pending Store", ApprovalStatus: "PENDING_APPROVAL"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	merchClient := &mockMerchantClient{
+		merchants: map[string]*merchantpb.MerchantResponseData{
+			activeMerchantID:    {Id: activeMerchantID, Status: merchantpb.MerchantStatus_APPROVED},
+			suspendedMerchantID: {Id: suspendedMerchantID, Status: merchantpb.MerchantStatus_SUSPENDED},
+		},
+	}
+
+	svc := service.NewProductServiceWithClients(repo, storeClient, catClient, merchClient, nil)
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: activeMerchantID,
+		Role:   auth.RoleMerchant,
+	})
+
+	t.Run("cannot publish product with missing required fields (no image)", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "NO-IMG",
+			Name:       "No Image Product",
+			Price:      100.0,
+			MRP:        120.0,
+			Status:     "PUBLISHED",
+		}
+		_, err := svc.CreateProduct(merchantCtx, req)
+		if err == nil {
+			t.Fatal("expected error publishing product with no images")
+		}
+	})
+
+	t.Run("cannot publish product if store is not APPROVED", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    unapprovedStoreID,
+			CategoryID: validCatID,
+			SKU:        "UNAPP-STORE",
+			Name:       "Unapproved Store Product",
+			Price:      100.0,
+			MRP:        120.0,
+			Status:     "PUBLISHED",
+			Images:     []string{"https://img.com/p.jpg"},
+		}
+		_, err := svc.CreateProduct(merchantCtx, req)
+		if err == nil {
+			t.Fatal("expected error publishing product for unapproved store")
+		}
+	})
+
+	t.Run("successful publication when prerequisites met", func(t *testing.T) {
+		req := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "VALID-PUB",
+			Name:       "Valid Product",
+			Price:      100.0,
+			MRP:        120.0,
+			Status:     "PUBLISHED",
+			Images:     []string{"https://img.com/p.jpg"},
+		}
+		p, err := svc.CreateProduct(merchantCtx, req)
+		if err != nil {
+			t.Fatalf("expected successful publication, got %v", err)
+		}
+		if p.Status != model.StatusPublished {
+			t.Errorf("expected status PUBLISHED, got %s", p.Status)
+		}
+	})
+
+	t.Run("reject invalid state transition DRAFT -> PUBLISHED directly on update without pending review", func(t *testing.T) {
+		// Create DRAFT
+		draftReq := dto.CreateProductRequest{
+			StoreID:    validStoreID,
+			CategoryID: validCatID,
+			SKU:        "DRAFT-PROD",
+			Name:       "Draft Product",
+			Price:      100.0,
+			MRP:        120.0,
+			Status:     "DRAFT",
+			Images:     []string{"https://img.com/p.jpg"},
+		}
+		prod, err := svc.CreateProduct(merchantCtx, draftReq)
+		if err != nil {
+			t.Fatalf("failed to create draft product: %v", err)
+		}
+
+		// Try transitioning DRAFT -> PUBLISHED directly
+		pubStatus := "PUBLISHED"
+		_, err = svc.UpdateProduct(merchantCtx, dto.UpdateProductRequest{
+			ID:     prod.ID,
+			Status: &pubStatus,
+		})
+		if err == nil {
+			t.Fatal("expected conflict error transitioning DRAFT directly to PUBLISHED")
+		}
+
+		// Transition DRAFT -> PENDING_REVIEW -> PUBLISHED
+		pendingStatus := "PENDING_REVIEW"
+		updated, err := svc.UpdateProduct(merchantCtx, dto.UpdateProductRequest{
+			ID:     prod.ID,
+			Status: &pendingStatus,
+		})
+		if err != nil {
+			t.Fatalf("expected DRAFT -> PENDING_REVIEW to succeed, got %v", err)
+		}
+		if updated.Status != model.StatusPendingReview {
+			t.Errorf("expected status PENDING_REVIEW, got %s", updated.Status)
+		}
+
+		// Transition PENDING_REVIEW -> PUBLISHED
+		pub, err := svc.UpdateProduct(merchantCtx, dto.UpdateProductRequest{
+			ID:     prod.ID,
+			Status: &pubStatus,
+		})
+		if err != nil {
+			t.Fatalf("expected PENDING_REVIEW -> PUBLISHED to succeed, got %v", err)
+		}
+		if pub.Status != model.StatusPublished {
+			t.Errorf("expected status PUBLISHED, got %s", pub.Status)
 		}
 	})
 }

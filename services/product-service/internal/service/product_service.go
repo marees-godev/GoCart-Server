@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"log/slog"
 	"strings"
 
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -25,6 +27,10 @@ type CategoryClient interface {
 	GetCategory(ctx context.Context, in *categorypb.GetCategoryRequest, opts ...grpc.CallOption) (*categorypb.GetCategoryResponse, error)
 }
 
+type MerchantClient interface {
+	GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error)
+}
+
 type ProductService interface {
 	CreateProduct(ctx context.Context, req dto.CreateProductRequest) (*model.Product, error)
 	GetProduct(ctx context.Context, id string) (*model.Product, error)
@@ -38,7 +44,9 @@ type productService struct {
 	repo           repository.ProductRepository
 	storeClient    StoreClient
 	categoryClient CategoryClient
+	merchantClient MerchantClient
 	uploader       storage.Uploader
+	stateValidator *model.StateTransitionValidator
 	logger         *slog.Logger
 }
 
@@ -46,6 +54,17 @@ func NewProductService(
 	repo repository.ProductRepository,
 	storeClient StoreClient,
 	categoryClient CategoryClient,
+	uploader storage.Uploader,
+	log ...*slog.Logger,
+) ProductService {
+	return NewProductServiceWithClients(repo, storeClient, categoryClient, nil, uploader, log...)
+}
+
+func NewProductServiceWithClients(
+	repo repository.ProductRepository,
+	storeClient StoreClient,
+	categoryClient CategoryClient,
+	merchantClient MerchantClient,
 	uploader storage.Uploader,
 	log ...*slog.Logger,
 ) ProductService {
@@ -57,9 +76,43 @@ func NewProductService(
 		repo:           repo,
 		storeClient:    storeClient,
 		categoryClient: categoryClient,
+		merchantClient: merchantClient,
 		uploader:       uploader,
+		stateValidator: model.NewStateTransitionValidator(),
 		logger:         l,
 	}
+}
+
+func (s *productService) checkPublishPrerequisites(ctx context.Context, storeID string, p *model.Product) error {
+	if err := p.ValidateForPublishing(); err != nil {
+		return err
+	}
+
+	var merchantID string
+	if s.storeClient != nil {
+		stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: storeID})
+		if err != nil || stResp == nil || stResp.Store == nil {
+			return appErrors.InvalidArgument("invalid or non-existent store_id")
+		}
+		appStatus := strings.ToUpper(strings.TrimSpace(stResp.Store.ApprovalStatus))
+		if appStatus != "APPROVED" {
+			return appErrors.Conflict(fmt.Sprintf("cannot publish product: store approval status must be APPROVED (current: '%s')", stResp.Store.ApprovalStatus))
+		}
+		merchantID = stResp.Store.MerchantId
+	}
+
+	if s.merchantClient != nil && merchantID != "" {
+		mResp, err := s.merchantClient.GetMerchant(ctx, &merchantpb.GetMerchantRequest{Id: merchantID})
+		if err != nil || mResp == nil || mResp.Merchant == nil {
+			return appErrors.InvalidArgument("invalid or non-existent merchant for store")
+		}
+		mStatus := strings.ToUpper(strings.TrimSpace(mResp.Merchant.Status.String()))
+		if mStatus != "ACTIVE" && mStatus != "APPROVED" {
+			return appErrors.Conflict(fmt.Sprintf("cannot publish product: merchant status must be ACTIVE (current: '%s')", mResp.Merchant.Status.String()))
+		}
+	}
+
+	return nil
 }
 
 func (s *productService) processImageDataURL(ctx context.Context, input string, folder string) string {
@@ -172,6 +225,14 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 		imgURL = images[0].URL
 	}
 
+	prodStatus := model.ProductStatus(req.Status)
+	if prodStatus == "" {
+		prodStatus = model.StatusDraft
+	}
+	if !prodStatus.IsValid() {
+		return nil, appErrors.BadRequest("invalid product status")
+	}
+
 	product := &model.Product{
 		StoreID:     req.StoreID,
 		CategoryID:  req.CategoryID,
@@ -182,11 +243,17 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 		MRP:         req.MRP,
 		Tax:         req.Tax,
 		Currency:    "USD",
-		Status:      model.ProductStatus(req.Status),
+		Status:      prodStatus,
 		ImageURL:    imgURL,
 		AvgRating:   0.00,
 		Images:      images,
 		Variants:    variants,
+	}
+
+	if prodStatus == model.StatusPublished {
+		if err := s.checkPublishPrerequisites(ctx, req.StoreID, product); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.repo.CreateProduct(ctx, product); err != nil {
@@ -258,9 +325,18 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 	if req.Tax != nil {
 		existing.Tax = *req.Tax
 	}
+
 	if req.Status != nil {
-		existing.Status = model.ProductStatus(*req.Status)
+		targetStatus := model.ProductStatus(*req.Status)
+		if !targetStatus.IsValid() {
+			return nil, appErrors.BadRequest("invalid product status")
+		}
+		if err := s.stateValidator.Validate(existing.Status, targetStatus); err != nil {
+			return nil, err
+		}
+		existing.Status = targetStatus
 	}
+
 	if req.ImageURL != nil {
 		existing.ImageURL = s.processImageDataURL(ctx, *req.ImageURL, "products")
 	}
@@ -302,6 +378,12 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 			})
 		}
 		existing.Variants = newVariants
+	}
+
+	if existing.Status == model.StatusPublished {
+		if err := s.checkPublishPrerequisites(ctx, existing.StoreID, existing); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := s.repo.UpdateProduct(ctx, existing); err != nil {
