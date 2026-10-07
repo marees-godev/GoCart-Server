@@ -2,11 +2,21 @@ package model
 
 import (
 	"time"
+
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
 type ProductStatus string
 
 const (
+	StatusDraft         ProductStatus = "DRAFT"
+	StatusPendingReview ProductStatus = "PENDING_REVIEW"
+	StatusPublished     ProductStatus = "PUBLISHED"
+	StatusUnpublished   ProductStatus = "UNPUBLISHED"
+	StatusSuspended     ProductStatus = "SUSPENDED"
+	StatusDeleted       ProductStatus = "DELETED"
+
+	// Legacy / Inventory compatibility statuses
 	StatusInStock      ProductStatus = "IN_STOCK"
 	StatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
 	StatusLowStock     ProductStatus = "LOW_STOCK"
@@ -16,7 +26,8 @@ const (
 
 func (s ProductStatus) IsValid() bool {
 	switch s {
-	case StatusInStock, StatusOutOfStock, StatusLowStock, StatusReserved, StatusDiscontinued:
+	case StatusDraft, StatusPendingReview, StatusPublished, StatusUnpublished, StatusSuspended, StatusDeleted,
+		StatusInStock, StatusOutOfStock, StatusLowStock, StatusReserved, StatusDiscontinued:
 		return true
 	default:
 		return false
@@ -42,6 +53,25 @@ type Product struct {
 	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
 	DeletedAt   *time.Time       `json:"deleted_at,omitempty" db:"deleted_at"`
+}
+
+func (p *Product) ValidateForPublishing() error {
+	if p == nil {
+		return appErrors.BadRequest("product is nil")
+	}
+	if p.Name == "" {
+		return appErrors.BadRequest("product name is required for publishing")
+	}
+	if p.Price <= 0 {
+		return appErrors.BadRequest("product price must be greater than zero for publishing")
+	}
+	if p.CategoryID == "" {
+		return appErrors.BadRequest("product category is required for publishing")
+	}
+	if p.ImageURL == "" && len(p.Images) == 0 {
+		return appErrors.BadRequest("at least one product image is required for publishing")
+	}
+	return nil
 }
 
 type ProductImage struct {
