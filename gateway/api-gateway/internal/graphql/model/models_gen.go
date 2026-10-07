@@ -797,11 +797,11 @@ const (
 	ProductStatusUnpublished   ProductStatus = "UNPUBLISHED"
 	ProductStatusSuspended     ProductStatus = "SUSPENDED"
 	ProductStatusDeleted       ProductStatus = "DELETED"
-	ProductStatusInStock      ProductStatus = "IN_STOCK"
-	ProductStatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
-	ProductStatusLowStock     ProductStatus = "LOW_STOCK"
-	ProductStatusReserved     ProductStatus = "RESERVED"
-	ProductStatusDiscontinued ProductStatus = "DISCONTINUED"
+	ProductStatusInStock       ProductStatus = "IN_STOCK"
+	ProductStatusOutOfStock    ProductStatus = "OUT_OF_STOCK"
+	ProductStatusLowStock      ProductStatus = "LOW_STOCK"
+	ProductStatusReserved      ProductStatus = "RESERVED"
+	ProductStatusDiscontinued  ProductStatus = "DISCONTINUED"
 )
 
 var AllProductStatus = []ProductStatus{

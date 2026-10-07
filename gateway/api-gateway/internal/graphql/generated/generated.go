@@ -3893,6 +3893,12 @@ extend type Mutation {
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/product/product.graphql", Input: `enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  UNPUBLISHED
+  SUSPENDED
+  DELETED
   IN_STOCK
   OUT_OF_STOCK
   LOW_STOCK
