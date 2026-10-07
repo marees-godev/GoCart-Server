@@ -1038,10 +1038,8 @@ type MerchantAppealData struct {
 	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	AdminComment  string                 `protobuf:"bytes,5,opt,name=admin_comment,json=adminComment,proto3" json:"admin_comment,omitempty"`
-	ReviewedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=reviewed_at,json=reviewedAt,proto3" json:"reviewed_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1102,20 +1100,6 @@ func (x *MerchantAppealData) GetStatus() string {
 		return x.Status
 	}
 	return ""
-}
-
-func (x *MerchantAppealData) GetAdminComment() string {
-	if x != nil {
-		return x.AdminComment
-	}
-	return ""
-}
-
-func (x *MerchantAppealData) GetReviewedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ReviewedAt
-	}
-	return nil
 }
 
 func (x *MerchantAppealData) GetCreatedAt() *timestamppb.Timestamp {
@@ -1390,20 +1374,17 @@ const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\x19LifecycleMerchantResponse\x12=\n" +
 	"\bmerchant\x18\x01 \x01(\v2!.merchant.v1.MerchantResponseDataR\bmerchant\x12M\n" +
 	"\x0fprevious_status\x18\x02 \x01(\x0e2$.merchant.v1.MerchantLifecycleStatusR\x0epreviousStatus\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\xcd\x02\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xeb\x01\n" +
 	"\x12MerchantAppealData\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
 	"merchantId\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\x12#\n" +
-	"\radmin_comment\x18\x05 \x01(\tR\fadminComment\x12;\n" +
-	"\vreviewed_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"reviewedAt\x129\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"V\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"V\n" +
 	"\x1bCreateMerchantAppealRequest\x12\x1f\n" +
 	"\vmerchant_id\x18\x01 \x01(\tR\n" +
 	"merchantId\x12\x16\n" +
@@ -1495,38 +1476,37 @@ var file_contracts_protobuf_merchant_merchant_proto_depIdxs = []int32{
 	0,  // 12: merchant.v1.UpdateMerchantStatusResponse.previous_status:type_name -> merchant.v1.MerchantStatus
 	2,  // 13: merchant.v1.LifecycleMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
 	1,  // 14: merchant.v1.LifecycleMerchantResponse.previous_status:type_name -> merchant.v1.MerchantLifecycleStatus
-	22, // 15: merchant.v1.MerchantAppealData.reviewed_at:type_name -> google.protobuf.Timestamp
-	22, // 16: merchant.v1.MerchantAppealData.created_at:type_name -> google.protobuf.Timestamp
-	22, // 17: merchant.v1.MerchantAppealData.updated_at:type_name -> google.protobuf.Timestamp
-	17, // 18: merchant.v1.CreateMerchantAppealResponse.appeal:type_name -> merchant.v1.MerchantAppealData
-	17, // 19: merchant.v1.GetMerchantAppealsResponse.appeals:type_name -> merchant.v1.MerchantAppealData
-	3,  // 20: merchant.v1.MerchantService.GetMerchant:input_type -> merchant.v1.GetMerchantRequest
-	5,  // 21: merchant.v1.MerchantService.UpdateMerchant:input_type -> merchant.v1.UpdateMerchantRequest
-	7,  // 22: merchant.v1.MerchantService.CreateMerchant:input_type -> merchant.v1.CreateMerchantRequest
-	9,  // 23: merchant.v1.MerchantService.ListMerchants:input_type -> merchant.v1.ListMerchantsRequest
-	11, // 24: merchant.v1.MerchantService.UpdateMerchantStatus:input_type -> merchant.v1.UpdateMerchantStatusRequest
-	13, // 25: merchant.v1.MerchantService.DeleteMerchant:input_type -> merchant.v1.DeleteMerchantRequest
-	15, // 26: merchant.v1.MerchantService.ActivateMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
-	15, // 27: merchant.v1.MerchantService.SuspendMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
-	15, // 28: merchant.v1.MerchantService.ReactivateMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
-	18, // 29: merchant.v1.MerchantService.CreateMerchantAppeal:input_type -> merchant.v1.CreateMerchantAppealRequest
-	20, // 30: merchant.v1.MerchantService.GetMerchantAppeals:input_type -> merchant.v1.GetMerchantAppealsRequest
-	4,  // 31: merchant.v1.MerchantService.GetMerchant:output_type -> merchant.v1.GetMerchantResponse
-	6,  // 32: merchant.v1.MerchantService.UpdateMerchant:output_type -> merchant.v1.UpdateMerchantResponse
-	8,  // 33: merchant.v1.MerchantService.CreateMerchant:output_type -> merchant.v1.CreateMerchantResponse
-	10, // 34: merchant.v1.MerchantService.ListMerchants:output_type -> merchant.v1.ListMerchantsResponse
-	12, // 35: merchant.v1.MerchantService.UpdateMerchantStatus:output_type -> merchant.v1.UpdateMerchantStatusResponse
-	14, // 36: merchant.v1.MerchantService.DeleteMerchant:output_type -> merchant.v1.DeleteMerchantResponse
-	16, // 37: merchant.v1.MerchantService.ActivateMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
-	16, // 38: merchant.v1.MerchantService.SuspendMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
-	16, // 39: merchant.v1.MerchantService.ReactivateMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
-	19, // 40: merchant.v1.MerchantService.CreateMerchantAppeal:output_type -> merchant.v1.CreateMerchantAppealResponse
-	21, // 41: merchant.v1.MerchantService.GetMerchantAppeals:output_type -> merchant.v1.GetMerchantAppealsResponse
-	31, // [31:42] is the sub-list for method output_type
-	20, // [20:31] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	22, // 15: merchant.v1.MerchantAppealData.created_at:type_name -> google.protobuf.Timestamp
+	22, // 16: merchant.v1.MerchantAppealData.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 17: merchant.v1.CreateMerchantAppealResponse.appeal:type_name -> merchant.v1.MerchantAppealData
+	17, // 18: merchant.v1.GetMerchantAppealsResponse.appeals:type_name -> merchant.v1.MerchantAppealData
+	3,  // 19: merchant.v1.MerchantService.GetMerchant:input_type -> merchant.v1.GetMerchantRequest
+	5,  // 20: merchant.v1.MerchantService.UpdateMerchant:input_type -> merchant.v1.UpdateMerchantRequest
+	7,  // 21: merchant.v1.MerchantService.CreateMerchant:input_type -> merchant.v1.CreateMerchantRequest
+	9,  // 22: merchant.v1.MerchantService.ListMerchants:input_type -> merchant.v1.ListMerchantsRequest
+	11, // 23: merchant.v1.MerchantService.UpdateMerchantStatus:input_type -> merchant.v1.UpdateMerchantStatusRequest
+	13, // 24: merchant.v1.MerchantService.DeleteMerchant:input_type -> merchant.v1.DeleteMerchantRequest
+	15, // 25: merchant.v1.MerchantService.ActivateMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
+	15, // 26: merchant.v1.MerchantService.SuspendMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
+	15, // 27: merchant.v1.MerchantService.ReactivateMerchant:input_type -> merchant.v1.LifecycleMerchantRequest
+	18, // 28: merchant.v1.MerchantService.CreateMerchantAppeal:input_type -> merchant.v1.CreateMerchantAppealRequest
+	20, // 29: merchant.v1.MerchantService.GetMerchantAppeals:input_type -> merchant.v1.GetMerchantAppealsRequest
+	4,  // 30: merchant.v1.MerchantService.GetMerchant:output_type -> merchant.v1.GetMerchantResponse
+	6,  // 31: merchant.v1.MerchantService.UpdateMerchant:output_type -> merchant.v1.UpdateMerchantResponse
+	8,  // 32: merchant.v1.MerchantService.CreateMerchant:output_type -> merchant.v1.CreateMerchantResponse
+	10, // 33: merchant.v1.MerchantService.ListMerchants:output_type -> merchant.v1.ListMerchantsResponse
+	12, // 34: merchant.v1.MerchantService.UpdateMerchantStatus:output_type -> merchant.v1.UpdateMerchantStatusResponse
+	14, // 35: merchant.v1.MerchantService.DeleteMerchant:output_type -> merchant.v1.DeleteMerchantResponse
+	16, // 36: merchant.v1.MerchantService.ActivateMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
+	16, // 37: merchant.v1.MerchantService.SuspendMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
+	16, // 38: merchant.v1.MerchantService.ReactivateMerchant:output_type -> merchant.v1.LifecycleMerchantResponse
+	19, // 39: merchant.v1.MerchantService.CreateMerchantAppeal:output_type -> merchant.v1.CreateMerchantAppealResponse
+	21, // 40: merchant.v1.MerchantService.GetMerchantAppeals:output_type -> merchant.v1.GetMerchantAppealsResponse
+	30, // [30:41] is the sub-list for method output_type
+	19, // [19:30] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_merchant_merchant_proto_init() }

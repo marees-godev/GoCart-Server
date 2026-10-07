@@ -146,7 +146,6 @@ func TestMerchantLifecycleMigration(t *testing.T) {
 		"previous_status VARCHAR(50) NOT NULL",
 		"new_status VARCHAR(50) NOT NULL",
 		"status merchant_audit_status NOT NULL DEFAULT 'SUCCESS'",
-		"request_id VARCHAR(100) NOT NULL DEFAULT ''",
 		"idx_merchant_lifecycle_audit_merchant_id",
 		"idx_merchant_lifecycle_audit_created_at",
 		"idx_merchant_lifecycle_audit_admin_id",
@@ -163,6 +162,13 @@ func TestMerchantLifecycleAuditModelFields(t *testing.T) {
 	a := model.MerchantLifecycleAudit{}
 	v := reflect.TypeOf(a)
 
+	if _, ok := v.FieldByName("ErrorMessage"); ok {
+		t.Errorf("MerchantLifecycleAudit model should NOT contain ErrorMessage field")
+	}
+	if _, ok := v.FieldByName("RequestID"); ok {
+		t.Errorf("MerchantLifecycleAudit model should NOT contain RequestID field")
+	}
+
 	expectedFields := map[string]reflect.Type{
 		"ID":             reflect.TypeOf(uuid.UUID{}),
 		"MerchantID":     reflect.TypeOf(uuid.UUID{}),
@@ -172,8 +178,6 @@ func TestMerchantLifecycleAuditModelFields(t *testing.T) {
 		"NewStatus":      reflect.TypeOf(""),
 		"Reason":         reflect.TypeOf(""),
 		"Status":         reflect.TypeOf(model.AuditStatus("")),
-		"ErrorMessage":   reflect.TypeOf(""),
-		"RequestID":      reflect.TypeOf(""),
 		"CreatedAt":      reflect.TypeOf(time.Time{}),
 	}
 
@@ -188,3 +192,69 @@ func TestMerchantLifecycleAuditModelFields(t *testing.T) {
 		}
 	}
 }
+
+func TestMerchantAppealModelFields(t *testing.T) {
+	app := model.MerchantAppeal{}
+	v := reflect.TypeOf(app)
+
+	if _, ok := v.FieldByName("AdminComment"); ok {
+		t.Errorf("MerchantAppeal model should NOT contain AdminComment field")
+	}
+	if _, ok := v.FieldByName("ReviewedAt"); ok {
+		t.Errorf("MerchantAppeal model should NOT contain ReviewedAt field")
+	}
+}
+
+func TestMerchantOutboxMigration(t *testing.T) {
+	outboxPath := filepath.Join("..", "migrations", "000008_create_outbox_events.sql")
+	content, err := os.ReadFile(outboxPath)
+	if err != nil {
+		t.Fatalf("failed to read 000008_create_outbox_events.sql: %v", err)
+	}
+
+	sqlText := string(content)
+	expectedTokens := []string{
+		"outbox_status AS ENUM ('PENDING', 'PUBLISHED', 'FAILED')",
+		"CREATE TABLE IF NOT EXISTS outbox_events",
+		"id UUID PRIMARY KEY",
+		"aggregate_id VARCHAR(255) NOT NULL",
+		"event_type VARCHAR(100) NOT NULL",
+		"payload JSONB NOT NULL",
+		"headers JSONB NOT NULL",
+		"status outbox_status NOT NULL DEFAULT 'PENDING'",
+		"retry_count INT NOT NULL DEFAULT 0",
+		"created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+		"idx_merchant_outbox_status_created",
+		"idx_merchant_outbox_pending_created",
+	}
+
+	for _, token := range expectedTokens {
+		if !strings.Contains(sqlText, token) {
+			t.Errorf("000008_create_outbox_events.sql missing expected token: %s", token)
+		}
+	}
+}
+
+func TestRemoveLifecycleAndAppealColumnsMigration(t *testing.T) {
+	migrationPath := filepath.Join("..", "migrations", "000009_remove_lifecycle_and_appeal_columns.sql")
+	content, err := os.ReadFile(migrationPath)
+	if err != nil {
+		t.Fatalf("failed to read 000009_remove_lifecycle_and_appeal_columns.sql: %v", err)
+	}
+
+	sqlText := string(content)
+	expectedTokens := []string{
+		"ALTER TABLE merchant_lifecycle_audit DROP COLUMN IF EXISTS error_message",
+		"ALTER TABLE merchant_lifecycle_audit DROP COLUMN IF EXISTS request_id",
+		"ALTER TABLE merchant_appeals DROP COLUMN IF EXISTS admin_comment",
+		"ALTER TABLE merchant_appeals DROP COLUMN IF EXISTS reviewed_at",
+	}
+
+	for _, token := range expectedTokens {
+		if !strings.Contains(sqlText, token) {
+			t.Errorf("000009_remove_lifecycle_and_appeal_columns.sql missing expected token: %s", token)
+		}
+	}
+}
+

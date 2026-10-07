@@ -1,0 +1,42 @@
+groups:
+  - name: gocart_transactional_outbox_alerts
+    rules:
+      - alert: OutboxQueueBuildup
+        expr: gocart_outbox_pending_count > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: transactional_outbox
+        annotations:
+          summary: "Transactional outbox queue buildup on service {{ $labels.service }}"
+          description: "Outbox pending event count on {{ $labels.service }} has exceeded 100 for over 5 minutes (current: {{ $value }}). Check Kafka connectivity and outbox worker health."
+
+      - alert: OutboxLagHigh
+        expr: histogram_quantile(0.95, sum by (le, service) (rate(gocart_outbox_lag_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: transactional_outbox
+        annotations:
+          summary: "Transactional outbox publication lag high on service {{ $labels.service }}"
+          description: "95th percentile publication lag on {{ $labels.service }} is above 30 seconds (current: {{ $value }}s)."
+
+      - alert: OutboxPublishingErrors
+        expr: sum by (service, topic) (rate(gocart_outbox_publishing_errors_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: transactional_outbox
+        annotations:
+          summary: "High outbox publishing error rate on {{ $labels.service }} topic {{ $labels.topic }}"
+          description: "Service {{ $labels.service }} is experiencing sustained errors publishing to Kafka topic {{ $labels.topic }}."
+
+      - alert: OutboxDLQInsertDetected
+        expr: increase(gocart_outbox_publishing_errors_total{error_type="max_retries_exceeded"}[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: dead_letter_queue
+        annotations:
+          summary: "Outbox events routed to DLQ on {{ $labels.service }}"
+          description: "Events on service {{ $labels.service }} exceeded max retry attempts and were forwarded to the Dead Letter Queue. Immediate administrative investigation required."

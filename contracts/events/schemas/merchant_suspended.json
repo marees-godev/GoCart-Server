@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.gocart.internal/events/merchant_suspended.json",
+  "title": "MerchantSuspendedEvent",
+  "description": "Payload schema emitted when a merchant is suspended.",
+  "type": "object",
+  "properties": {
+    "merchant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the suspended merchant."
+    },
+    "previous_status": {
+      "type": "string",
+      "description": "State prior to suspension (e.g. ACTIVE, APPROVED)."
+    },
+    "new_status": {
+      "type": "string",
+      "enum": ["SUSPENDED"],
+      "description": "New target state."
+    },
+    "suspended_by": {
+      "type": "string",
+      "description": "Identifier of the administrator or system process suspending the merchant."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Mandatory reason for suspension."
+    },
+    "suspended_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when suspension took effect."
+    }
+  },
+  "required": ["merchant_id", "previous_status", "new_status", "suspended_by", "reason", "suspended_at"]
+}

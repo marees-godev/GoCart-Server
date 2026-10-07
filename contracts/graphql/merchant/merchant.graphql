@@ -18,8 +18,6 @@ type MerchantAppeal {
   merchantId: ID!
   reason: String!
   status: String!
-  adminComment: String
-  reviewedAt: String
   createdAt: String!
   updatedAt: String!
 }

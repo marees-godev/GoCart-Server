@@ -8,8 +8,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/merchant-service/internal/model"
 )
 
@@ -29,20 +31,29 @@ type MerchantRepository interface {
 }
 
 type pgMerchantRepository struct {
-	db     *database.DB
-	logger *slog.Logger
+	db          *database.DB
+	outboxStore *outbox.Store
+	logger      *slog.Logger
 }
 
 func NewMerchantRepository(db *database.DB, log ...*slog.Logger) MerchantRepository {
+	return NewMerchantRepositoryWithOutbox(db, outbox.NewStore(), log...)
+}
+
+func NewMerchantRepositoryWithOutbox(db *database.DB, outboxStore *outbox.Store, log ...*slog.Logger) MerchantRepository {
 	var l *slog.Logger
 	if len(log) > 0 && log[0] != nil {
 		l = log[0]
 	} else {
 		l = slog.Default()
 	}
+	if outboxStore == nil {
+		outboxStore = outbox.NewStore()
+	}
 	return &pgMerchantRepository{
-		db:     db,
-		logger: l,
+		db:          db,
+		outboxStore: outboxStore,
+		logger:      l,
 	}
 }
 
@@ -50,13 +61,21 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 	if merchant.ID == uuid.Nil {
 		merchant.ID = uuid.New()
 	}
+
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		r.logger.Error("Repository: failed to begin transaction for merchant creation", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		INSERT INTO merchants (id, business_name, first_name, last_name, business_email, business_phone, pan_card_number, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 		ON CONFLICT (id) DO NOTHING
 		RETURNING id, created_at, updated_at
 	`
-	err := r.db.Pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		merchant.ID,
 		merchant.BusinessName,
 		merchant.FirstName,
@@ -79,7 +98,47 @@ func (r *pgMerchantRepository) Create(ctx context.Context, merchant *model.Merch
 		r.logger.Error("Repository: failed to insert merchant", slog.String("merchant_id", merchant.ID.String()), slog.Any("error", err))
 		return appErrors.Internal(err, "failed to create merchant")
 	}
-	r.logger.Debug("Repository: merchant inserted successfully", slog.String("merchant_id", merchant.ID.String()))
+
+	// Transactional Outbox: Persist MerchantRegistered event in outbox inside same DB transaction
+	regEvt := events.MerchantRegisteredEvent{
+		MerchantID:   merchant.ID.String(),
+		BusinessName: merchant.BusinessName,
+		FirstName:    merchant.FirstName,
+		LastName:     merchant.LastName,
+		Email:        merchant.BusinessEmail,
+		Phone:        merchant.BusinessPhone,
+		CreatedAt:    merchant.CreatedAt,
+		RegisteredAt: merchant.CreatedAt,
+	}
+	envelope, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantRegistered, "merchant-service", merchant.ID.String(), regEvt)
+	if err != nil {
+		r.logger.Error("Repository: failed to construct MerchantRegistered envelope", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to construct event envelope")
+	}
+	payloadBytes, err := envelope.Marshal()
+	if err != nil {
+		r.logger.Error("Repository: failed to marshal MerchantRegistered payload", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to marshal event payload")
+	}
+
+	outboxEvt := &outbox.Event{
+		AggregateType: "merchant",
+		AggregateID:   merchant.ID.String(),
+		EventType:     events.EventTypeMerchantRegistered,
+		Payload:       payloadBytes,
+		Topic:         events.TopicMerchantRegistered,
+	}
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		r.logger.Error("Repository: failed to write MerchantRegistered event to outbox", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to record outbox event")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Repository: failed to commit create merchant transaction", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	r.logger.Debug("Repository: merchant and outbox event inserted successfully", slog.String("merchant_id", merchant.ID.String()))
 	return nil
 }
 
@@ -397,13 +456,59 @@ func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uui
 	}
 
 	auditQuery := `
-		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', '', '', NOW())
+		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'SUCCESS', NOW())
 	`
 	_, err = tx.Exec(ctx, auditQuery, id, updatedBy, string(action), string(currentStatus), string(newStatus), reason)
 	if err != nil {
 		r.logger.Error("Repository: failed to write to merchant_lifecycle_audit in tx", slog.String("merchant_id", id.String()), slog.Any("error", err))
 		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
+	}
+
+	// Transactional Outbox integration: write state transition domain event
+	switch newStatus {
+	case model.MerchantStatusActive, model.MerchantStatusApproved:
+		actPayload := events.MerchantActivatedEvent{
+			MerchantID:     id.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(newStatus),
+			ActivatedBy:    updatedBy,
+			Reason:         reason,
+			ActivatedAt:    time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantActivated, "merchant-service", id.String(), actPayload)
+		if err == nil {
+			if pBytes, err := env.Marshal(); err == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "merchant",
+					AggregateID:   id.String(),
+					EventType:     events.EventTypeMerchantActivated,
+					Payload:       pBytes,
+					Topic:         events.TopicMerchantActivated,
+				})
+			}
+		}
+	case model.MerchantStatusSuspended:
+		suspPayload := events.MerchantSuspendedEvent{
+			MerchantID:     id.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(newStatus),
+			SuspendedBy:    updatedBy,
+			Reason:         reason,
+			SuspendedAt:    time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantSuspended, "merchant-service", id.String(), suspPayload)
+		if err == nil {
+			if pBytes, err := env.Marshal(); err == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "merchant",
+					AggregateID:   id.String(),
+					EventType:     events.EventTypeMerchantSuspended,
+					Payload:       pBytes,
+					Topic:         events.TopicMerchantSuspended,
+				})
+			}
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -516,8 +621,6 @@ func (r *pgMerchantRepository) ExecuteLifecycleTransition(
 			NewStatus:      string(currentStatus),
 			Reason:         reason,
 			Status:         model.AuditStatusFailed,
-			ErrorMessage:   transErr.Error(),
-			RequestID:      reqID,
 		}
 		_ = r.RecordLifecycleAudit(ctx, failedAudit)
 
@@ -553,13 +656,77 @@ func (r *pgMerchantRepository) ExecuteLifecycleTransition(
 
 	// Write immutable SUCCESS audit record into merchant_lifecycle_audit table
 	queryAudit := `
-		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		INSERT INTO merchant_lifecycle_audit (merchant_id, admin_id, action, previous_status, new_status, reason, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 	`
-	_, err = tx.Exec(ctx, queryAudit, merchantID, adminID, string(action), string(currentStatus), string(targetStatus), reason, string(model.AuditStatusSuccess), "", reqID)
+	_, err = tx.Exec(ctx, queryAudit, merchantID, adminID, string(action), string(currentStatus), string(targetStatus), reason, string(model.AuditStatusSuccess))
 	if err != nil {
 		r.logger.Error("Repository: failed to insert into merchant_lifecycle_audit", slog.String("merchant_id", merchantID.String()), slog.Any("error", err))
 		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
+	}
+
+	// Transactional Outbox: Write domain event to outbox inside same DB transaction
+	switch targetStatus {
+	case model.MerchantStatusActive:
+		actPayload := events.MerchantActivatedEvent{
+			MerchantID:     merchantID.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(targetStatus),
+			ActivatedBy:    adminID,
+			Reason:         reason,
+			ActivatedAt:    time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantActivated, "merchant-service", merchantID.String(), actPayload)
+		if err != nil {
+			r.logger.Error("Repository: failed to construct MerchantActivated envelope", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to construct event envelope")
+		}
+		payloadBytes, err := env.Marshal()
+		if err != nil {
+			r.logger.Error("Repository: failed to marshal MerchantActivated payload", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to marshal event payload")
+		}
+		outboxEvt := &outbox.Event{
+			AggregateType: "merchant",
+			AggregateID:   merchantID.String(),
+			EventType:     events.EventTypeMerchantActivated,
+			Payload:       payloadBytes,
+			Topic:         events.TopicMerchantActivated,
+		}
+		if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+			r.logger.Error("Repository: failed to write MerchantActivated event to outbox", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to record outbox event")
+		}
+	case model.MerchantStatusSuspended:
+		suspPayload := events.MerchantSuspendedEvent{
+			MerchantID:     merchantID.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(targetStatus),
+			SuspendedBy:    adminID,
+			Reason:         reason,
+			SuspendedAt:    time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantSuspended, "merchant-service", merchantID.String(), suspPayload)
+		if err != nil {
+			r.logger.Error("Repository: failed to construct MerchantSuspended envelope", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to construct event envelope")
+		}
+		payloadBytes, err := env.Marshal()
+		if err != nil {
+			r.logger.Error("Repository: failed to marshal MerchantSuspended payload", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to marshal event payload")
+		}
+		outboxEvt := &outbox.Event{
+			AggregateType: "merchant",
+			AggregateID:   merchantID.String(),
+			EventType:     events.EventTypeMerchantSuspended,
+			Payload:       payloadBytes,
+			Topic:         events.TopicMerchantSuspended,
+		}
+		if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+			r.logger.Error("Repository: failed to write MerchantSuspended event to outbox", slog.Any("error", err))
+			return nil, currentStatus, appErrors.Internal(err, "failed to record outbox event")
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -580,8 +747,8 @@ func (r *pgMerchantRepository) ExecuteLifecycleTransition(
 
 func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *model.MerchantLifecycleAudit) error {
 	query := `
-		INSERT INTO merchant_lifecycle_audit (id, merchant_id, admin_id, action, previous_status, new_status, reason, status, error_message, request_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+		INSERT INTO merchant_lifecycle_audit (id, merchant_id, admin_id, action, previous_status, new_status, reason, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
 	`
 	id := audit.ID
 	if id == uuid.Nil {
@@ -596,8 +763,6 @@ func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *
 		audit.NewStatus,
 		audit.Reason,
 		string(audit.Status),
-		audit.ErrorMessage,
-		audit.RequestID,
 	)
 	if err != nil {
 		r.logger.Error("Repository: failed to record standalone lifecycle audit", slog.Any("error", err))
@@ -608,8 +773,8 @@ func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *
 
 func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
 	query := `
-		INSERT INTO merchant_appeals (id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO merchant_appeals (id, merchant_id, reason, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
 	if appeal.ID == uuid.Nil {
@@ -631,8 +796,6 @@ func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.M
 		appeal.MerchantID,
 		appeal.Reason,
 		appeal.Status,
-		appeal.AdminComment,
-		appeal.ReviewedAt,
 		appeal.CreatedAt,
 		appeal.UpdatedAt,
 	).Scan(&appeal.ID, &appeal.CreatedAt, &appeal.UpdatedAt)
@@ -640,7 +803,7 @@ func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.M
 
 func (r *pgMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
 	query := `
-		SELECT id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at
+		SELECT id, merchant_id, reason, status, created_at, updated_at
 		FROM merchant_appeals
 		WHERE merchant_id = $1
 		ORDER BY created_at DESC
@@ -660,8 +823,6 @@ func (r *pgMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merch
 			&a.MerchantID,
 			&a.Reason,
 			&a.Status,
-			&a.AdminComment,
-			&a.ReviewedAt,
 			&a.CreatedAt,
 			&a.UpdatedAt,
 		); err != nil {

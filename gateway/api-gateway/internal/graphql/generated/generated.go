@@ -184,14 +184,12 @@ type ComplexityRoot struct {
 	}
 
 	MerchantAppeal struct {
-		AdminComment func(childComplexity int) int
-		CreatedAt    func(childComplexity int) int
-		ID           func(childComplexity int) int
-		MerchantID   func(childComplexity int) int
-		Reason       func(childComplexity int) int
-		ReviewedAt   func(childComplexity int) int
-		Status       func(childComplexity int) int
-		UpdatedAt    func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		ID         func(childComplexity int) int
+		MerchantID func(childComplexity int) int
+		Reason     func(childComplexity int) int
+		Status     func(childComplexity int) int
+		UpdatedAt  func(childComplexity int) int
 	}
 
 	MerchantList struct {
@@ -1214,13 +1212,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Merchant.UpdatedAt(childComplexity), true
 
-	case "MerchantAppeal.adminComment":
-		if e.complexity.MerchantAppeal.AdminComment == nil {
-			break
-		}
-
-		return e.complexity.MerchantAppeal.AdminComment(childComplexity), true
-
 	case "MerchantAppeal.createdAt":
 		if e.complexity.MerchantAppeal.CreatedAt == nil {
 			break
@@ -1248,13 +1239,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MerchantAppeal.Reason(childComplexity), true
-
-	case "MerchantAppeal.reviewedAt":
-		if e.complexity.MerchantAppeal.ReviewedAt == nil {
-			break
-		}
-
-		return e.complexity.MerchantAppeal.ReviewedAt(childComplexity), true
 
 	case "MerchantAppeal.status":
 		if e.complexity.MerchantAppeal.Status == nil {
@@ -3744,8 +3728,6 @@ type MerchantAppeal {
   merchantId: ID!
   reason: String!
   status: String!
-  adminComment: String
-  reviewedAt: String
   createdAt: String!
   updatedAt: String!
 }
@@ -9960,88 +9942,6 @@ func (ec *executionContext) fieldContext_MerchantAppeal_status(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _MerchantAppeal_adminComment(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.AdminComment, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_MerchantAppeal_adminComment(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "MerchantAppeal",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _MerchantAppeal_reviewedAt(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ReviewedAt, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_MerchantAppeal_reviewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "MerchantAppeal",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _MerchantAppeal_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.MerchantAppeal) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
 	if err != nil {
@@ -12298,10 +12198,6 @@ func (ec *executionContext) fieldContext_Mutation_merchantAppeal(ctx context.Con
 				return ec.fieldContext_MerchantAppeal_reason(ctx, field)
 			case "status":
 				return ec.fieldContext_MerchantAppeal_status(ctx, field)
-			case "adminComment":
-				return ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
-			case "reviewedAt":
-				return ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
 			case "updatedAt":
@@ -19447,10 +19343,6 @@ func (ec *executionContext) fieldContext_Query_merchantAppeals(ctx context.Conte
 				return ec.fieldContext_MerchantAppeal_reason(ctx, field)
 			case "status":
 				return ec.fieldContext_MerchantAppeal_status(ctx, field)
-			case "adminComment":
-				return ec.fieldContext_MerchantAppeal_adminComment(ctx, field)
-			case "reviewedAt":
-				return ec.fieldContext_MerchantAppeal_reviewedAt(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_MerchantAppeal_createdAt(ctx, field)
 			case "updatedAt":
@@ -29038,10 +28930,6 @@ func (ec *executionContext) _MerchantAppeal(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "adminComment":
-			out.Values[i] = ec._MerchantAppeal_adminComment(ctx, field, obj)
-		case "reviewedAt":
-			out.Values[i] = ec._MerchantAppeal_reviewedAt(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._MerchantAppeal_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

@@ -256,4 +256,100 @@ func TestStoreEventsSerialization(t *testing.T) {
 			t.Errorf("restored payload mismatch: %+v", restored)
 		}
 	})
+
+	t.Run("MerchantRegisteredEvent", func(t *testing.T) {
+		payload := events.MerchantRegisteredEvent{
+			MerchantID:   "merch-123",
+			Email:        "merchant@example.com",
+			BusinessName: "Acme Corp",
+			FirstName:    "John",
+			LastName:     "Doe",
+			Phone:        "+1234567890",
+			CreatedAt:    now,
+			RegisteredAt: now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantRegistered, "merchant-service", payload.MerchantID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		if env.AggregateID != "merch-123" {
+			t.Errorf("expected aggregate_id merch-123, got %s", env.AggregateID)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.MerchantRegisteredEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.MerchantID != "merch-123" || restored.BusinessName != "Acme Corp" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("MerchantActivatedEvent", func(t *testing.T) {
+		payload := events.MerchantActivatedEvent{
+			MerchantID:     "merch-123",
+			PreviousStatus: "PENDING",
+			NewStatus:      "ACTIVE",
+			ActivatedBy:    "admin-uuid-1",
+			Reason:         "KYC verified",
+			ActivatedAt:    now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantActivated, "merchant-service", payload.MerchantID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.MerchantActivatedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.MerchantID != "merch-123" || restored.NewStatus != "ACTIVE" || restored.ActivatedBy != "admin-uuid-1" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("MerchantSuspendedEvent", func(t *testing.T) {
+		payload := events.MerchantSuspendedEvent{
+			MerchantID:     "merch-123",
+			PreviousStatus: "ACTIVE",
+			NewStatus:      "SUSPENDED",
+			SuspendedBy:    "admin-uuid-1",
+			Reason:         "Terms violation",
+			SuspendedAt:    now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantSuspended, "merchant-service", payload.MerchantID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.MerchantSuspendedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.MerchantID != "merch-123" || restored.NewStatus != "SUSPENDED" || restored.Reason != "Terms violation" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
 }
+

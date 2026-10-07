@@ -4,10 +4,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
-
 
 type Config struct {
 	App      AppConfig
@@ -16,10 +16,27 @@ type Config struct {
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Kafka    KafkaConfig
+	Outbox   OutboxConfig
 }
 
 type GRPCConfig struct {
 	Port string
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 
@@ -85,6 +102,19 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "merchant-service"),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   time.Duration(GetEnvAsInt("OUTBOX_POLL_INTERVAL_MS", 2000)) * time.Millisecond,
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 1000)) * time.Millisecond,
+			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.merchant.dlq"),
 		},
 	}
 }

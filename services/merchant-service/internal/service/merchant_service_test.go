@@ -197,8 +197,6 @@ func (m *mockMerchantRepository) ExecuteLifecycleTransition(
 			NewStatus:      string(currentStatus),
 			Reason:         reason,
 			Status:         model.AuditStatusFailed,
-			ErrorMessage:   err.Error(),
-			RequestID:      reqID,
 			CreatedAt:      time.Now().UTC(),
 		}
 		m.auditLogs = append(m.auditLogs, audit)
@@ -220,7 +218,6 @@ func (m *mockMerchantRepository) ExecuteLifecycleTransition(
 		NewStatus:      string(targetStatus),
 		Reason:         reason,
 		Status:         model.AuditStatusSuccess,
-		RequestID:      reqID,
 		CreatedAt:      time.Now().UTC(),
 	}
 	m.auditLogs = append(m.auditLogs, audit)

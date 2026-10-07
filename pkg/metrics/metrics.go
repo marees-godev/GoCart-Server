@@ -82,6 +82,47 @@ var (
 		},
 		[]string{"service", "operation", "table"},
 	)
+
+	outboxEventsPublishedTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "gocart",
+			Subsystem: "outbox",
+			Name:      "events_published_total",
+			Help:      "Total number of transactional outbox events successfully published to message broker.",
+		},
+		[]string{"service", "topic"},
+	)
+
+	outboxPublishingErrorsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "gocart",
+			Subsystem: "outbox",
+			Name:      "publishing_errors_total",
+			Help:      "Total number of errors encountered while publishing outbox events.",
+		},
+		[]string{"service", "topic", "error_type"},
+	)
+
+	outboxLagSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "gocart",
+			Subsystem: "outbox",
+			Name:      "outbox_lag_seconds",
+			Help:      "Histogram of time elapsed between outbox event insertion and successful broker publication.",
+			Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+		},
+		[]string{"service"},
+	)
+
+	outboxPendingCount = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "gocart",
+			Subsystem: "outbox",
+			Name:      "pending_count",
+			Help:      "Current count of pending outbox events awaiting publication.",
+		},
+		[]string{"service"},
+	)
 )
 
 func init() {
@@ -93,6 +134,10 @@ func init() {
 		messageProcessingDuration,
 		messagePublishedTotal,
 		dbQueryDuration,
+		outboxEventsPublishedTotal,
+		outboxPublishingErrorsTotal,
+		outboxLagSeconds,
+		outboxPendingCount,
 	)
 }
 
@@ -121,6 +166,22 @@ func RecordMessagePublished(service, topic, status string) {
 
 func RecordDBQuery(service, operation, table string, duration time.Duration) {
 	dbQueryDuration.WithLabelValues(service, operation, table).Observe(duration.Seconds())
+}
+
+func RecordOutboxPublished(service, topic string) {
+	outboxEventsPublishedTotal.WithLabelValues(service, topic).Inc()
+}
+
+func RecordOutboxError(service, topic, errorType string) {
+	outboxPublishingErrorsTotal.WithLabelValues(service, topic, errorType).Inc()
+}
+
+func RecordOutboxLag(service string, duration time.Duration) {
+	outboxLagSeconds.WithLabelValues(service).Observe(duration.Seconds())
+}
+
+func SetOutboxPendingCount(service string, count float64) {
+	outboxPendingCount.WithLabelValues(service).Set(count)
 }
 
 func Handler() http.Handler {

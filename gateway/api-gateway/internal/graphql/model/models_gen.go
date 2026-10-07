@@ -276,14 +276,12 @@ type Merchant struct {
 }
 
 type MerchantAppeal struct {
-	ID           string  `json:"id"`
-	MerchantID   string  `json:"merchantId"`
-	Reason       string  `json:"reason"`
-	Status       string  `json:"status"`
-	AdminComment *string `json:"adminComment,omitempty"`
-	ReviewedAt   *string `json:"reviewedAt,omitempty"`
-	CreatedAt    string  `json:"createdAt"`
-	UpdatedAt    string  `json:"updatedAt"`
+	ID         string `json:"id"`
+	MerchantID string `json:"merchantId"`
+	Reason     string `json:"reason"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
 type MerchantList struct {

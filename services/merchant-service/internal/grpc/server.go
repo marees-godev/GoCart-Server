@@ -504,7 +504,7 @@ func toProtoAppeal(a *model.MerchantAppeal) *merchantpb.MerchantAppealData {
 	if a == nil {
 		return nil
 	}
-	res := &merchantpb.MerchantAppealData{
+	return &merchantpb.MerchantAppealData{
 		Id:         a.ID.String(),
 		MerchantId: a.MerchantID.String(),
 		Reason:     a.Reason,
@@ -512,11 +512,4 @@ func toProtoAppeal(a *model.MerchantAppeal) *merchantpb.MerchantAppealData {
 		CreatedAt:  timestamppb.New(a.CreatedAt),
 		UpdatedAt:  timestamppb.New(a.UpdatedAt),
 	}
-	if a.AdminComment != nil {
-		res.AdminComment = *a.AdminComment
-	}
-	if a.ReviewedAt != nil {
-		res.ReviewedAt = timestamppb.New(*a.ReviewedAt)
-	}
-	return res
 }

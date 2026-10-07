@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package merchant.v1;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant;merchant";
+
+import "google/protobuf/timestamp.proto";
+
+message MerchantRegisteredEvent {
+  string merchant_id = 1;
+  string email = 2;
+  string role = 3;
+  string business_name = 4;
+  string first_name = 5;
+  string last_name = 6;
+  string phone = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp registered_at = 9;
+}
+
+message MerchantActivatedEvent {
+  string merchant_id = 1;
+  string previous_status = 2;
+  string new_status = 3;
+  string activated_by = 4;
+  string reason = 5;
+  google.protobuf.Timestamp activated_at = 6;
+}
+
+message MerchantSuspendedEvent {
+  string merchant_id = 1;
+  string previous_status = 2;
+  string new_status = 3;
+  string suspended_by = 4;
+  string reason = 5;
+  google.protobuf.Timestamp suspended_at = 6;
+}
