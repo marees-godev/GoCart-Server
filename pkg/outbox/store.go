@@ -190,10 +190,9 @@ func (s *Store) MarkFailedWithBackoff(ctx context.Context, tx pgx.Tx, id uuid.UU
 		RETURNING retry_count`,
 		id,
 	).Scan(&newRetryCount)
-	if err != nil {
+  	if err != nil {          
 		return fmt.Errorf("outbox: mark failed %s: %w", id, err)
 	}
-
 	status := StatusPending
 	if newRetryCount >= maxRetries {
 		status = StatusFailed
