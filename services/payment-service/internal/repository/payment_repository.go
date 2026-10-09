@@ -21,7 +21,7 @@ type PaymentRepository interface {
 	GetPaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error)
 	GetPaymentByGatewayTransactionID(ctx context.Context, gatewayTxID string) (*model.Payment, error)
 	GetPaymentByIdempotencyKey(ctx context.Context, idempotencyKey string) (*model.Payment, error)
-	UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string) (*model.Payment, error)
+	UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string, paymentMethod ...string) (*model.Payment, error)
 	CreateRefund(ctx context.Context, refund *model.Refund) error
 	GetRefundByID(ctx context.Context, id string) (*model.Refund, error)
 	GetRefundByGatewayRefundID(ctx context.Context, gatewayRefundID string) (*model.Refund, error)
@@ -370,12 +370,32 @@ func (r *pgPaymentRepository) GetPaymentByIdempotencyKey(ctx context.Context, ke
 	return &p, nil
 }
 
-func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string) (*model.Payment, error) {
+func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string, paymentMethod ...string) (*model.Payment, error) {
+	pm := ""
+	if len(paymentMethod) > 0 && paymentMethod[0] != "" {
+		pm = model.NormalizePaymentMethod(paymentMethod[0])
+	}
+
+	targetID := id
+	if _, err := uuid.Parse(targetID); err != nil {
+		if existing, errLookup := r.GetPaymentByID(ctx, targetID); errLookup == nil && existing != nil {
+			targetID = existing.ID
+		} else if existingByGateway, errGateway := r.GetPaymentByGatewayTransactionID(ctx, targetID); errGateway == nil && existingByGateway != nil {
+			targetID = existingByGateway.ID
+		}
+	}
+
 	query := `
 		UPDATE payments
 		SET status = $2,
 		    gateway_transaction_id = COALESCE(NULLIF($3, ''), gateway_transaction_id),
 		    failure_reason = COALESCE(NULLIF($4, ''), failure_reason),
+		    payment_method = COALESCE(NULLIF($5, ''), payment_method),
+		    payment_method_id = COALESCE(
+		        (SELECT id FROM payment_methods WHERE code = $5::text LIMIT 1),
+		        (SELECT id FROM payment_methods WHERE code = UPPER($5::text) LIMIT 1),
+		        payment_method_id
+		    ),
 		    updated_at = NOW()
 		WHERE id = $1::uuid
 		RETURNING
@@ -397,7 +417,7 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 
 	var p model.Payment
 	var pmID *string
-	err := r.pool.QueryRow(ctx, query, id, status, gatewayTxID, failureReason).Scan(
+	err := r.pool.QueryRow(ctx, query, targetID, status, gatewayTxID, failureReason, pm).Scan(
 		&p.ID,
 		&p.OrderID,
 		&p.UserID,
@@ -460,6 +480,24 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 				VALUES ('payment', $1, $2, $3, $4, 'PENDING', 0, NOW())
 			`
 			_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentFailed, payloadBytes, events.TopicPaymentFailed)
+		}
+	} else if status == model.PaymentStatusPending {
+		env, envErr := events.NewEventEnvelope(events.EventTypePaymentPending, "payment-service", events.PaymentPendingEvent{
+			PaymentID:            p.ID,
+			OrderID:              p.OrderID,
+			UserID:               p.UserID,
+			Amount:               p.Amount,
+			Currency:             p.Currency,
+			GatewayTransactionID: p.GatewayTransactionID,
+			PendingAt:            p.UpdatedAt,
+		})
+		if envErr == nil {
+			payloadBytes, _ := env.Marshal()
+			outboxQuery := `
+				INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+				VALUES ('payment', $1, $2, $3, $4, 'PENDING', 0, NOW())
+			`
+			_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentPending, payloadBytes, events.TopicPaymentPending)
 		}
 	}
 

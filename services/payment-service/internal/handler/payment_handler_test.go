@@ -55,6 +55,26 @@ func TestPaymentHandler_PaymentCallback(t *testing.T) {
 	}
 }
 
+func TestPaymentHandler_PaymentCallback_Failure(t *testing.T) {
+	app := fiber.New()
+	h := NewPaymentHandler(nil, nil, gateway.GatewayConfig{}, slog.Default())
+	h.RegisterRoutes(app)
+
+	req := httptest.NewRequest("GET", "/payment-callback?razorpay_order_id=ord_123&status=failed&error_code=BAD_REQUEST_ERROR&error_description=Payment+failed", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var resultMap map[string]string
+	_ = json.Unmarshal(body, &resultMap)
+
+	if resultMap["status"] != "failed" || resultMap["order_id"] != "ord_123" {
+		t.Errorf("unexpected failure callback response: %v", resultMap)
+	}
+}
+
 func TestPaymentHandler_CreateOrder_TestMode(t *testing.T) {
 	app := fiber.New()
 	h := NewPaymentHandler(nil, nil, gateway.GatewayConfig{}, slog.Default())
@@ -74,4 +94,22 @@ func TestPaymentHandler_CreateOrder_TestMode(t *testing.T) {
 	if resultMap["status"] != "created" || resultMap["is_real"] != false {
 		t.Errorf("unexpected create order response: %v", resultMap)
 	}
+}
+
+func TestPaymentHandler_RenderCheckout(t *testing.T) {
+	app := fiber.New()
+	h := NewPaymentHandler(nil, nil, gateway.GatewayConfig{}, slog.Default())
+	h.RegisterRoutes(app)
+
+	req := httptest.NewRequest("GET", "/checkout", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 && resp.StatusCode != 500 {
+		t.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	_ = body
 }

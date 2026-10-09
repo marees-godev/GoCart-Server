@@ -15,7 +15,6 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 )
 
-
 type ProcessPaymentDTO struct {
 	OrderID        string
 	UserID         string
@@ -113,7 +112,7 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 	authoritativeAmount := authOrder.TotalAmount
 	currency := authOrder.Currency
 	if currency == "" {
-		currency = "USD"
+		currency = "INR"
 	}
 
 	userID := dto.UserID
@@ -183,6 +182,17 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 			return nil, err
 		}
 		slog.InfoContext(ctx, "payment successfully processed in service", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
+		return updated, nil
+	}
+
+	if gwResp != nil && (gwResp.Status == "PENDING" || gwResp.Status == "CREATED" || gwResp.Status == "INITIATED") {
+		// Persist PENDING state with stored Gateway Transaction ID
+		updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusPending, gwResp.GatewayTransactionID, "")
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to update payment to PENDING status in service", "payment_id", payment.ID, "error", err)
+			return nil, err
+		}
+		slog.InfoContext(ctx, "payment pending at gateway in service", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
 		return updated, nil
 	}
 
@@ -466,6 +476,12 @@ func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *model
 		}
 
 		pmMethod := model.NormalizePaymentMethod(p.Method)
+		initStatus := model.PaymentStatusPending
+		if event.Event == "payment.failed" || event.Event == "payment.disputed" || event.Event == "payment.dispute.created" || p.Status == "failed" {
+			initStatus = model.PaymentStatusFailed
+		} else if event.Event == "payment.captured" || event.Event == "order.paid" || p.Status == "captured" || p.Status == "paid" {
+			initStatus = model.PaymentStatusSuccess
+		}
 
 		fallbackPmt := &model.Payment{
 			ID:                   uuid.New().String(),
@@ -474,7 +490,7 @@ func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *model
 			PaymentMethod:        pmMethod,
 			Amount:               amt,
 			Currency:             curr,
-			Status:               model.PaymentStatusPending,
+			Status:               initStatus,
 			TransactionID:        fmt.Sprintf("tx_%s", uuid.New().String()),
 			GatewayTransactionID: gatewayTxID,
 			IdempotencyKey:       fmt.Sprintf("auto_wh_%s", gatewayTxID),
@@ -515,7 +531,13 @@ func (s *paymentService) handlePaymentPendingWebhook(ctx context.Context, event 
 		gatewayTxID = event.Payload.Order.Entity.ID
 	}
 
-	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusPending, gatewayTxID, "")
+	pEntity := event.Payload.Payment.Entity
+	paymentMethod := ""
+	if pEntity.Method != "" {
+		paymentMethod = model.NormalizePaymentMethod(pEntity.Method)
+	}
+
+	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusPending, gatewayTxID, "", paymentMethod)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update payment status to PENDING via webhook", "payment_id", payment.ID, "error", err)
 		return err
@@ -531,23 +553,32 @@ func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event 
 		return err
 	}
 
-	if payment.Status == model.PaymentStatusSuccess {
-		slog.InfoContext(ctx, "payment is already marked SUCCESS, skipping webhook update", "payment_id", payment.ID)
-		return nil
-	}
-
 	gatewayTxID := event.Payload.Payment.Entity.ID
 	if gatewayTxID == "" {
 		gatewayTxID = event.Payload.Order.Entity.ID
 	}
 
-	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusSuccess, gatewayTxID, "")
+	pEntity := event.Payload.Payment.Entity
+	paymentMethod := ""
+	if pEntity.Method != "" {
+		paymentMethod = model.NormalizePaymentMethod(pEntity.Method)
+	}
+
+	if payment.Status == model.PaymentStatusSuccess {
+		if paymentMethod != "" && payment.PaymentMethod != paymentMethod {
+			_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusSuccess, gatewayTxID, "", paymentMethod)
+		}
+		slog.InfoContext(ctx, "payment is already marked SUCCESS, skipping webhook update", "payment_id", payment.ID)
+		return nil
+	}
+
+	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusSuccess, gatewayTxID, "", paymentMethod)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update payment status to SUCCESS via webhook", "payment_id", payment.ID, "error", err)
 		return err
 	}
 
-	slog.InfoContext(ctx, "payment status updated to SUCCESS via razorpay webhook", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
+	slog.InfoContext(ctx, "payment status updated to SUCCESS via razorpay webhook", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID, "payment_method", updated.PaymentMethod)
 	return nil
 }
 
@@ -557,17 +588,29 @@ func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *
 		return err
 	}
 
+	pEntity := event.Payload.Payment.Entity
+	paymentMethod := ""
+	if pEntity.Method != "" {
+		paymentMethod = model.NormalizePaymentMethod(pEntity.Method)
+	}
+
 	if payment.Status == model.PaymentStatusFailed {
+		if paymentMethod != "" && payment.PaymentMethod != paymentMethod {
+			gatewayTxID := pEntity.ID
+			if gatewayTxID == "" {
+				gatewayTxID = event.Payload.Order.Entity.ID
+			}
+			_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusFailed, gatewayTxID, "", paymentMethod)
+		}
 		slog.InfoContext(ctx, "payment is already marked FAILED, skipping webhook update", "payment_id", payment.ID)
 		return nil
 	}
 
-	gatewayTxID := event.Payload.Payment.Entity.ID
+	gatewayTxID := pEntity.ID
 	if gatewayTxID == "" {
 		gatewayTxID = event.Payload.Order.Entity.ID
 	}
 
-	pEntity := event.Payload.Payment.Entity
 	failureReason := pEntity.ErrorDescription
 	if failureReason == "" {
 		failureReason = pEntity.ErrorReason
@@ -576,7 +619,7 @@ func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *
 		failureReason = "Payment failed at Razorpay gateway"
 	}
 
-	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusFailed, gatewayTxID, failureReason)
+	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusFailed, gatewayTxID, failureReason, paymentMethod)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update payment status to FAILED via webhook", "payment_id", payment.ID, "error", err)
 		return err

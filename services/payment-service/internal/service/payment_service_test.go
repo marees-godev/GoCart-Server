@@ -106,7 +106,7 @@ func (m *mockPaymentRepo) GetPaymentByIdempotencyKey(ctx context.Context, key st
 	return &pCopy, nil
 }
 
-func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string) (*model.Payment, error) {
+func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string, paymentMethod ...string) (*model.Payment, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -121,6 +121,9 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 	}
 	if failureReason != "" {
 		p.FailureReason = failureReason
+	}
+	if len(paymentMethod) > 0 && paymentMethod[0] != "" {
+		p.PaymentMethod = model.NormalizePaymentMethod(paymentMethod[0])
 	}
 	p.UpdatedAt = time.Now()
 

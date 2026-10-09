@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -33,9 +34,23 @@ func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gatew
 }
 
 func (h *PaymentHandler) RegisterRoutes(app *fiber.App) {
+	app.Get("/", h.RenderCheckout)
+	app.Get("/checkout", h.RenderCheckout)
 	app.Get("/get-key", h.GetKey)
 	app.Post("/create-order", h.CreateOrder)
 	app.All("/payment-callback", h.PaymentCallback)
+}
+
+func (h *PaymentHandler) RenderCheckout(c *fiber.Ctx) error {
+	c.Type("html")
+	content, err := os.ReadFile("./templates/checkout.html")
+	if err != nil {
+		content, err = os.ReadFile("../templates/checkout.html")
+	}
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).SendString("Checkout template not found")
+	}
+	return c.Send(content)
 }
 
 func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
@@ -48,8 +63,10 @@ func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
 
 func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	type orderReq struct {
-		Amount   float64 `json:"amount"`
-		Currency string  `json:"currency"`
+		Amount           float64 `json:"amount"`
+		Currency         string  `json:"currency"`
+		PaymentMethod    string  `json:"payment_method"`
+		PaymentMethodAlt string  `json:"paymentMethod"`
 	}
 	var req orderReq
 	_ = c.BodyParser(&req)
@@ -59,6 +76,14 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	if req.Currency == "" {
 		req.Currency = "INR"
 	}
+	method := req.PaymentMethod
+	if method == "" {
+		method = req.PaymentMethodAlt
+	}
+	if method == "" {
+		method = "NET_BANKING"
+	}
+	paymentMethod := model.NormalizePaymentMethod(method)
 
 	// If real Razorpay key & secret are provided, create genuine Razorpay Order ID via API
 	if h.gwConfig.RazorpayKeyID != "" && h.gwConfig.RazorpayKeySecret != "" && !strings.Contains(h.gwConfig.RazorpayKeyID, "xxxx") {
@@ -72,6 +97,7 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 			OrderID:        orderID,
 			Amount:         req.Amount,
 			Currency:       req.Currency,
+			PaymentMethod:  paymentMethod,
 			IdempotencyKey: idempKey,
 		})
 
@@ -80,7 +106,7 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 				ID:                   paymentID,
 				OrderID:              orderID,
 				UserID:               userID,
-				PaymentMethod:        "CREDIT_CARD",
+				PaymentMethod:        paymentMethod,
 				Amount:               req.Amount,
 				Currency:             req.Currency,
 				Status:               model.PaymentStatusPending,
@@ -88,10 +114,12 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 				GatewayTransactionID: rzpResp.GatewayTransactionID,
 				IdempotencyKey:       idempKey,
 			}
-			if createErr := h.paymentRepo.CreatePayment(c.UserContext(), pmt); createErr != nil {
-				h.log.Error("failed to persist payment record for razorpay order", "error", createErr)
-			} else {
-				h.log.Info("persisted pending razorpay payment in database", "payment_id", pmt.ID, "razorpay_order_id", rzpResp.GatewayTransactionID)
+			if h.paymentRepo != nil {
+				if createErr := h.paymentRepo.CreatePayment(c.UserContext(), pmt); createErr != nil {
+					h.log.Error("failed to persist payment record for razorpay order", "error", createErr)
+				} else {
+					h.log.Info("persisted pending razorpay payment in database", "payment_id", pmt.ID, "razorpay_order_id", rzpResp.GatewayTransactionID)
+				}
 			}
 
 			return c.JSON(fiber.Map{
@@ -119,9 +147,48 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 	orderID := c.FormValue("razorpay_order_id", c.Query("razorpay_order_id", c.Query("orderId", "")))
 	paymentID := c.FormValue("razorpay_payment_id", c.Query("razorpay_payment_id", c.Query("paymentId", "")))
 	signature := c.FormValue("razorpay_signature", c.Query("razorpay_signature", c.Query("signature", "")))
+	statusParam := strings.ToLower(c.FormValue("status", c.Query("status", "")))
+	errorCode := c.FormValue("error_code", c.Query("error_code", c.Query("error[code]", "")))
+	errorDesc := c.FormValue("error_description", c.Query("error_description", c.Query("error[description]", c.Query("error_reason", c.Query("error", "")))))
+
+	isFailed := statusParam == "failed" || statusParam == "failure" || statusParam == "error" || errorCode != ""
+
+	if (orderID != "" || paymentID != "") && h.paymentRepo != nil {
+		lookupID := orderID
+		if lookupID == "" {
+			lookupID = paymentID
+		}
+		pmt, err := h.paymentRepo.GetPaymentByID(c.UserContext(), lookupID)
+		if err == nil && pmt != nil {
+			if isFailed {
+				reason := errorDesc
+				if reason == "" {
+					reason = "Payment failed at gateway callback"
+				}
+				_, updateErr := h.paymentRepo.UpdatePaymentStatus(c.UserContext(), pmt.ID, model.PaymentStatusFailed, paymentID, reason)
+				if updateErr != nil {
+					h.log.Error("failed to update payment status to FAILED on callback", "payment_id", pmt.ID, "error", updateErr)
+				} else {
+					h.log.Info("updated payment status to FAILED on callback", "payment_id", pmt.ID, "reason", reason)
+				}
+			} else {
+				_, updateErr := h.paymentRepo.UpdatePaymentStatus(c.UserContext(), pmt.ID, model.PaymentStatusSuccess, paymentID, "")
+				if updateErr != nil {
+					h.log.Error("failed to update payment status to SUCCESS on callback", "payment_id", pmt.ID, "error", updateErr)
+				} else {
+					h.log.Info("updated payment status to SUCCESS on callback", "payment_id", pmt.ID, "razorpay_payment_id", paymentID)
+				}
+			}
+		}
+	}
+
+	responseStatus := "success"
+	if isFailed {
+		responseStatus = "failed"
+	}
 
 	return c.JSON(fiber.Map{
-		"status":     "success",
+		"status":     responseStatus,
 		"order_id":   orderID,
 		"payment_id": paymentID,
 		"signature":  signature,

@@ -57,11 +57,14 @@ func (m *mockRepo) GetPaymentByGatewayTransactionID(ctx context.Context, gateway
 func (m *mockRepo) GetPaymentByIdempotencyKey(ctx context.Context, key string) (*model.Payment, error) {
 	return nil, fiber.ErrNotFound
 }
-func (m *mockRepo) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string) (*model.Payment, error) {
+func (m *mockRepo) UpdatePaymentStatus(ctx context.Context, id string, status model.PaymentStatus, gatewayTxID string, failureReason string, paymentMethod ...string) (*model.Payment, error) {
 	if p, ok := m.payments[id]; ok {
 		p.Status = status
 		p.GatewayTransactionID = gatewayTxID
 		p.FailureReason = failureReason
+		if len(paymentMethod) > 0 && paymentMethod[0] != "" {
+			p.PaymentMethod = model.NormalizePaymentMethod(paymentMethod[0])
+		}
 		return p, nil
 	}
 	return nil, fiber.ErrNotFound
