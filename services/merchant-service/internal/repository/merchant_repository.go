@@ -811,8 +811,8 @@ func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *
 
 func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
 	query := `
-		INSERT INTO merchant_appeals (id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO merchant_appeals (id, merchant_id, reason, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
 	if appeal.ID == uuid.Nil {
@@ -834,8 +834,6 @@ func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.M
 		appeal.MerchantID,
 		appeal.Reason,
 		appeal.Status,
-		appeal.AdminComment,
-		appeal.ReviewedAt,
 		appeal.CreatedAt,
 		appeal.UpdatedAt,
 	).Scan(&appeal.ID, &appeal.CreatedAt, &appeal.UpdatedAt)

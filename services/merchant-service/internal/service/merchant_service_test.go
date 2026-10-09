@@ -157,12 +157,13 @@ func (m *mockMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id u
 	now := time.Now().UTC()
 	for _, app := range m.appeals {
 		if app.MerchantID == id && app.Status == string(model.MerchantAppealStatusPending) {
-			if newStatus == model.MerchantStatusRejected || newStatus == model.MerchantStatusSuspended {
+			switch newStatus {
+			case model.MerchantStatusRejected, model.MerchantStatusSuspended:
 				app.Status = string(model.MerchantAppealStatusRejected)
 				app.AdminComment = &reason
 				app.ReviewedAt = &now
 				app.UpdatedAt = now
-			} else if newStatus == model.MerchantStatusApproved || newStatus == model.MerchantStatusActive {
+			case model.MerchantStatusApproved, model.MerchantStatusActive:
 				app.Status = string(model.MerchantAppealStatusApproved)
 				app.AdminComment = &reason
 				app.ReviewedAt = &now
@@ -242,12 +243,13 @@ func (m *mockMerchantRepository) ExecuteLifecycleTransition(
 	now := time.Now().UTC()
 	for _, app := range m.appeals {
 		if app.MerchantID == merchantID && app.Status == string(model.MerchantAppealStatusPending) {
-			if action == model.LifecycleActionSuspend {
+			switch action {
+			case model.LifecycleActionSuspend:
 				app.Status = string(model.MerchantAppealStatusRejected)
 				app.AdminComment = &reason
 				app.ReviewedAt = &now
 				app.UpdatedAt = now
-			} else if action == model.LifecycleActionActivate || action == model.LifecycleActionReactivate {
+			case model.LifecycleActionActivate, model.LifecycleActionReactivate:
 				app.Status = string(model.MerchantAppealStatusApproved)
 				app.AdminComment = &reason
 				app.ReviewedAt = &now
@@ -283,6 +285,8 @@ func (m *mockMerchantRepository) CreateAppeal(ctx context.Context, appeal *model
 	if appeal.Status == "" {
 		appeal.Status = string(model.MerchantAppealStatusPending)
 	}
+	appeal.AdminComment = nil
+	appeal.ReviewedAt = nil
 
 	copied := *appeal
 	m.appeals = append(m.appeals, &copied)
