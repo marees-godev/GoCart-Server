@@ -51,7 +51,9 @@ func (p *Producer) Publish(ctx context.Context, topic, key string, envelope *eve
 		Value: payloadBytes,
 		Headers: []segmentio.Header{
 			{Key: "event_id", Value: []byte(envelope.EventID)},
+			{Key: "idempotency_key", Value: []byte(envelope.EventID)},
 			{Key: "event_type", Value: []byte(envelope.EventType)},
+			{Key: "aggregate_id", Value: []byte(key)},
 			{Key: "source", Value: []byte(envelope.Source)},
 			{Key: "timestamp", Value: []byte(envelope.Timestamp.Format(time.RFC3339))},
 		},

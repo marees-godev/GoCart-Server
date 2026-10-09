@@ -187,3 +187,32 @@ func TestTransactionRollback_OnInvalidStateTransition(t *testing.T) {
 		t.Errorf("expected 0 audit records, got %d", len(repo.audits))
 	}
 }
+
+func TestTransactionRollback_OutboxOnFailure(t *testing.T) {
+	repo := NewMockTransactionalRepository()
+
+	merchID := uuid.New()
+	initialMerchant := &model.Merchant{
+		ID:           merchID,
+		BusinessName: "Rollback Outbox Merchant",
+		Status:       string(model.MerchantStatusPending),
+	}
+	repo.merchants[merchID] = initialMerchant
+
+	// Force failure during transaction commit
+	repo.failCommit = true
+	_, _, err := repo.UpdateStatusWithAudit(context.Background(), merchID, model.MerchantStatusActive, "Activate should fail commit", "ADMIN")
+	if err == nil {
+		t.Fatal("expected error on failed commit, got nil")
+	}
+
+	if !repo.rollbackDone {
+		t.Error("expected rollback to be performed")
+	}
+
+	// Status must stay unchanged
+	if repo.merchants[merchID].Status != string(model.MerchantStatusPending) {
+		t.Errorf("expected status to remain PENDING after rollback, got %s", repo.merchants[merchID].Status)
+	}
+}
+

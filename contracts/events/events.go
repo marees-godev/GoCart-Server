@@ -73,15 +73,37 @@ type UserRegisteredEvent struct {
 	RegisteredAt time.Time `json:"registered_at,omitempty"`
 }
 
-// MerchantRegisteredEvent represents the payload for auth.merchant.registered domain event.
+// MerchantRegisteredEvent represents the payload for merchant registration domain events.
 type MerchantRegisteredEvent struct {
-	UserID       string    `json:"user_id"`
+	MerchantID   string    `json:"merchant_id,omitempty"`
 	Email        string    `json:"email"`
-	Role         string    `json:"role"`
+	Role         string    `json:"role,omitempty"`
 	BusinessName string    `json:"business_name,omitempty"`
+	FirstName    string    `json:"first_name,omitempty"`
+	LastName     string    `json:"last_name,omitempty"`
 	Phone        string    `json:"phone,omitempty"`
 	CreatedAt    time.Time `json:"created_at,omitempty"`
 	RegisteredAt time.Time `json:"registered_at,omitempty"`
+}
+
+// MerchantActivatedEvent represents the payload for MerchantActivated domain event.
+type MerchantActivatedEvent struct {
+	MerchantID     string    `json:"merchant_id"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	ActivatedBy    string    `json:"activated_by"`
+	Reason         string    `json:"reason,omitempty"`
+	ActivatedAt    time.Time `json:"activated_at"`
+}
+
+// MerchantSuspendedEvent represents the payload for MerchantSuspended domain event.
+type MerchantSuspendedEvent struct {
+	MerchantID     string    `json:"merchant_id"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	SuspendedBy    string    `json:"suspended_by"`
+	Reason         string    `json:"reason"`
+	SuspendedAt    time.Time `json:"suspended_at"`
 }
 
 // StoreCreatedEvent represents the payload for StoreCreated domain event.

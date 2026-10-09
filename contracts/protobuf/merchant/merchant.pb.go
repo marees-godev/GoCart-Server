@@ -1038,10 +1038,10 @@ type MerchantAppealData struct {
 	MerchantId    string                 `protobuf:"bytes,2,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	AdminComment  string                 `protobuf:"bytes,5,opt,name=admin_comment,json=adminComment,proto3" json:"admin_comment,omitempty"`
-	ReviewedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=reviewed_at,json=reviewedAt,proto3" json:"reviewed_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	AdminComment  string                 `protobuf:"bytes,7,opt,name=admin_comment,json=adminComment,proto3" json:"admin_comment,omitempty"`
+	ReviewedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=reviewed_at,json=reviewedAt,proto3" json:"reviewed_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1104,20 +1104,6 @@ func (x *MerchantAppealData) GetStatus() string {
 	return ""
 }
 
-func (x *MerchantAppealData) GetAdminComment() string {
-	if x != nil {
-		return x.AdminComment
-	}
-	return ""
-}
-
-func (x *MerchantAppealData) GetReviewedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.ReviewedAt
-	}
-	return nil
-}
-
 func (x *MerchantAppealData) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -1128,6 +1114,20 @@ func (x *MerchantAppealData) GetCreatedAt() *timestamppb.Timestamp {
 func (x *MerchantAppealData) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *MerchantAppealData) GetAdminComment() string {
+	if x != nil {
+		return x.AdminComment
+	}
+	return ""
+}
+
+func (x *MerchantAppealData) GetReviewedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ReviewedAt
 	}
 	return nil
 }
@@ -1396,14 +1396,14 @@ const file_contracts_protobuf_merchant_merchant_proto_rawDesc = "" +
 	"\vmerchant_id\x18\x02 \x01(\tR\n" +
 	"merchantId\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x16\n" +
-	"\x06status\x18\x04 \x01(\tR\x06status\x12#\n" +
-	"\radmin_comment\x18\x05 \x01(\tR\fadminComment\x12;\n" +
-	"\vreviewed_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"reviewedAt\x129\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"V\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\radmin_comment\x18\a \x01(\tR\fadminComment\x12;\n" +
+	"\vreviewed_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"reviewedAt\"V\n" +
 	"\x1bCreateMerchantAppealRequest\x12\x1f\n" +
 	"\vmerchant_id\x18\x01 \x01(\tR\n" +
 	"merchantId\x12\x16\n" +
@@ -1495,9 +1495,9 @@ var file_contracts_protobuf_merchant_merchant_proto_depIdxs = []int32{
 	0,  // 12: merchant.v1.UpdateMerchantStatusResponse.previous_status:type_name -> merchant.v1.MerchantStatus
 	2,  // 13: merchant.v1.LifecycleMerchantResponse.merchant:type_name -> merchant.v1.MerchantResponseData
 	1,  // 14: merchant.v1.LifecycleMerchantResponse.previous_status:type_name -> merchant.v1.MerchantLifecycleStatus
-	22, // 15: merchant.v1.MerchantAppealData.reviewed_at:type_name -> google.protobuf.Timestamp
-	22, // 16: merchant.v1.MerchantAppealData.created_at:type_name -> google.protobuf.Timestamp
-	22, // 17: merchant.v1.MerchantAppealData.updated_at:type_name -> google.protobuf.Timestamp
+	22, // 15: merchant.v1.MerchantAppealData.created_at:type_name -> google.protobuf.Timestamp
+	22, // 16: merchant.v1.MerchantAppealData.updated_at:type_name -> google.protobuf.Timestamp
+	22, // 17: merchant.v1.MerchantAppealData.reviewed_at:type_name -> google.protobuf.Timestamp
 	17, // 18: merchant.v1.CreateMerchantAppealResponse.appeal:type_name -> merchant.v1.MerchantAppealData
 	17, // 19: merchant.v1.GetMerchantAppealsResponse.appeals:type_name -> merchant.v1.MerchantAppealData
 	3,  // 20: merchant.v1.MerchantService.GetMerchant:input_type -> merchant.v1.GetMerchantRequest
