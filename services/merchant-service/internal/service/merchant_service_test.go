@@ -153,6 +153,24 @@ func (m *mockMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id u
 	merch.UpdatedAt = time.Now().UTC()
 	c := *merch
 	m.merchantsByID[id] = &c
+
+	now := time.Now().UTC()
+	for _, app := range m.appeals {
+		if app.MerchantID == id && app.Status == string(model.MerchantAppealStatusPending) {
+			switch newStatus {
+			case model.MerchantStatusRejected, model.MerchantStatusSuspended:
+				app.Status = string(model.MerchantAppealStatusRejected)
+				app.AdminComment = &reason
+				app.ReviewedAt = &now
+				app.UpdatedAt = now
+			case model.MerchantStatusApproved, model.MerchantStatusActive:
+				app.Status = string(model.MerchantAppealStatusApproved)
+				app.AdminComment = &reason
+				app.ReviewedAt = &now
+				app.UpdatedAt = now
+			}
+		}
+	}
 	return &c, currentStatus, nil
 }
 
@@ -197,8 +215,6 @@ func (m *mockMerchantRepository) ExecuteLifecycleTransition(
 			NewStatus:      string(currentStatus),
 			Reason:         reason,
 			Status:         model.AuditStatusFailed,
-			ErrorMessage:   err.Error(),
-			RequestID:      reqID,
 			CreatedAt:      time.Now().UTC(),
 		}
 		m.auditLogs = append(m.auditLogs, audit)
@@ -220,10 +236,27 @@ func (m *mockMerchantRepository) ExecuteLifecycleTransition(
 		NewStatus:      string(targetStatus),
 		Reason:         reason,
 		Status:         model.AuditStatusSuccess,
-		RequestID:      reqID,
 		CreatedAt:      time.Now().UTC(),
 	}
 	m.auditLogs = append(m.auditLogs, audit)
+
+	now := time.Now().UTC()
+	for _, app := range m.appeals {
+		if app.MerchantID == merchantID && app.Status == string(model.MerchantAppealStatusPending) {
+			switch action {
+			case model.LifecycleActionSuspend:
+				app.Status = string(model.MerchantAppealStatusRejected)
+				app.AdminComment = &reason
+				app.ReviewedAt = &now
+				app.UpdatedAt = now
+			case model.LifecycleActionActivate, model.LifecycleActionReactivate:
+				app.Status = string(model.MerchantAppealStatusApproved)
+				app.AdminComment = &reason
+				app.ReviewedAt = &now
+				app.UpdatedAt = now
+			}
+		}
+	}
 
 	return &c, currentStatus, nil
 }
@@ -252,6 +285,8 @@ func (m *mockMerchantRepository) CreateAppeal(ctx context.Context, appeal *model
 	if appeal.Status == "" {
 		appeal.Status = string(model.MerchantAppealStatusPending)
 	}
+	appeal.AdminComment = nil
+	appeal.ReviewedAt = nil
 
 	copied := *appeal
 	m.appeals = append(m.appeals, &copied)
@@ -1154,6 +1189,33 @@ func TestMerchantAppeals(t *testing.T) {
 	_, err = svc.GetAppeals(context.Background(), uuid.Nil)
 	if err == nil {
 		t.Fatalf("expected error for nil merchantID in GetAppeals")
+	}
+
+	// 8. Admin reviews appeal by rejecting merchant
+	_, _, err = svc.UpdateMerchantStatus(context.Background(), created.ID, dto.UpdateMerchantStatusRequest{
+		Status:          string(model.MerchantStatusRejected),
+		RejectionReason: "Appeal rejected: inadequate proof",
+	})
+	if err != nil {
+		t.Fatalf("update status to suspended failed: %v", err)
+	}
+
+	appealsAfterReview, err := svc.GetAppeals(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get appeals after review failed: %v", err)
+	}
+	if len(appealsAfterReview) != 1 {
+		t.Fatalf("expected 1 appeal, got %d", len(appealsAfterReview))
+	}
+	rev := appealsAfterReview[0]
+	if rev.Status != string(model.MerchantAppealStatusRejected) {
+		t.Errorf("expected appeal status REJECTED, got %s", rev.Status)
+	}
+	if rev.AdminComment == nil || *rev.AdminComment != "Appeal rejected: inadequate proof" {
+		t.Errorf("expected AdminComment 'Appeal rejected: inadequate proof', got %v", rev.AdminComment)
+	}
+	if rev.ReviewedAt == nil || rev.ReviewedAt.IsZero() {
+		t.Errorf("expected non-zero ReviewedAt timestamp, got nil")
 	}
 }
 

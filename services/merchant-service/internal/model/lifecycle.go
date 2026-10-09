@@ -33,7 +33,5 @@ type MerchantLifecycleAudit struct {
 	NewStatus      string          `json:"new_status" db:"new_status"`
 	Reason         string          `json:"reason" db:"reason"`
 	Status         AuditStatus     `json:"status" db:"status"`
-	ErrorMessage   string          `json:"error_message" db:"error_message"`
-	RequestID      string          `json:"request_id" db:"request_id"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 }

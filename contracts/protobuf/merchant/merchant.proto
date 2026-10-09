@@ -13,7 +13,7 @@ enum MerchantStatus {
   SUSPENDED = 3;
 }
 enum MerchantLifecycleStatus {
-  MERCHANT_LIFECYCLE_UNSPECIFIED = 0;
+  MERCHANT_LIFECYCLE_UNSPECIFIED = 0;  
   MERCHANT_LIFECYCLE_ACTIVE = 1;
   MERCHANT_LIFECYCLE_INACTIVE = 2;
   MERCHANT_LIFECYCLE_PENDING_REVIEW = 3;
@@ -131,10 +131,10 @@ message MerchantAppealData {
   string merchant_id = 2;
   string reason = 3;
   string status = 4;
-  string admin_comment = 5;
-  google.protobuf.Timestamp reviewed_at = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string admin_comment = 7;
+  google.protobuf.Timestamp reviewed_at = 8;
 }
 
 message CreateMerchantAppealRequest {
