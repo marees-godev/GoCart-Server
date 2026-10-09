@@ -42,10 +42,12 @@ const (
 type MerchantAppeal struct {
 	ID           uuid.UUID  `json:"id" db:"id"`
 	MerchantID   uuid.UUID  `json:"merchant_id" db:"merchant_id"`
-	Reason     string    `json:"reason" db:"reason"`
-	Status     string    `json:"status" db:"status"`
-	CreatedAt  time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+	Reason       string     `json:"reason" db:"reason"`
+	Status       string     `json:"status" db:"status"`
+	AdminComment *string    `json:"admin_comment,omitempty" db:"admin_comment"`
+	ReviewedAt   *time.Time `json:"reviewed_at,omitempty" db:"reviewed_at"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Merchant struct {

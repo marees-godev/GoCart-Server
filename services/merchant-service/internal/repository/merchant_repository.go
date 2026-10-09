@@ -465,6 +465,26 @@ func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uui
 		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
 	}
 
+	// Update pending appeals with admin comment and reviewed_at timestamp
+	nowUtc := time.Now().UTC()
+	switch newStatus {
+	case model.MerchantStatusRejected, model.MerchantStatusSuspended:
+		queryAppeal := `
+			UPDATE merchant_appeals
+			SET status = 'REJECTED', admin_comment = $1, reviewed_at = $2, updated_at = $2
+			WHERE merchant_id = $3 AND status = 'PENDING'
+		`
+		_, _ = tx.Exec(ctx, queryAppeal, reason, nowUtc, id)
+	case model.MerchantStatusApproved, model.MerchantStatusActive:
+		queryAppeal := `
+			UPDATE merchant_appeals
+			SET status = 'APPROVED', admin_comment = $1, reviewed_at = $2, updated_at = $2
+			WHERE merchant_id = $3 AND status = 'PENDING'
+		`
+		_, _ = tx.Exec(ctx, queryAppeal, reason, nowUtc, id)
+	}
+
+
 	// Transactional Outbox integration: write state transition domain event
 	switch newStatus {
 	case model.MerchantStatusActive, model.MerchantStatusApproved:
@@ -665,6 +685,24 @@ func (r *pgMerchantRepository) ExecuteLifecycleTransition(
 		return nil, currentStatus, appErrors.Internal(err, "failed to record merchant lifecycle audit")
 	}
 
+	// Update pending appeals with admin comment and reviewed_at timestamp
+	switch action {
+	case model.LifecycleActionSuspend:
+		queryAppeal := `
+			UPDATE merchant_appeals
+			SET status = 'REJECTED', admin_comment = $1, reviewed_at = $2, updated_at = $2
+			WHERE merchant_id = $3 AND status = 'PENDING'
+		`
+		_, _ = tx.Exec(ctx, queryAppeal, reason, time.Now().UTC(), merchantID)
+	case model.LifecycleActionActivate, model.LifecycleActionReactivate:
+		queryAppeal := `
+			UPDATE merchant_appeals
+			SET status = 'APPROVED', admin_comment = $1, reviewed_at = $2, updated_at = $2
+			WHERE merchant_id = $3 AND status = 'PENDING'
+		`
+		_, _ = tx.Exec(ctx, queryAppeal, reason, time.Now().UTC(), merchantID)
+	}
+
 	// Transactional Outbox: Write domain event to outbox inside same DB transaction
 	switch targetStatus {
 	case model.MerchantStatusActive:
@@ -773,8 +811,8 @@ func (r *pgMerchantRepository) RecordLifecycleAudit(ctx context.Context, audit *
 
 func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.MerchantAppeal) error {
 	query := `
-		INSERT INTO merchant_appeals (id, merchant_id, reason, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO merchant_appeals (id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 	if appeal.ID == uuid.Nil {
@@ -796,6 +834,8 @@ func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.M
 		appeal.MerchantID,
 		appeal.Reason,
 		appeal.Status,
+		appeal.AdminComment,
+		appeal.ReviewedAt,
 		appeal.CreatedAt,
 		appeal.UpdatedAt,
 	).Scan(&appeal.ID, &appeal.CreatedAt, &appeal.UpdatedAt)
@@ -803,7 +843,7 @@ func (r *pgMerchantRepository) CreateAppeal(ctx context.Context, appeal *model.M
 
 func (r *pgMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merchantID uuid.UUID) ([]*model.MerchantAppeal, error) {
 	query := `
-		SELECT id, merchant_id, reason, status, created_at, updated_at
+		SELECT id, merchant_id, reason, status, admin_comment, reviewed_at, created_at, updated_at
 		FROM merchant_appeals
 		WHERE merchant_id = $1
 		ORDER BY created_at DESC
@@ -823,6 +863,8 @@ func (r *pgMerchantRepository) GetAppealsByMerchantID(ctx context.Context, merch
 			&a.MerchantID,
 			&a.Reason,
 			&a.Status,
+			&a.AdminComment,
+			&a.ReviewedAt,
 			&a.CreatedAt,
 			&a.UpdatedAt,
 		); err != nil {

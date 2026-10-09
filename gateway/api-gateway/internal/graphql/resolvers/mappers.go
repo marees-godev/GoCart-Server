@@ -105,6 +105,14 @@ func toModelMerchantAppeal(a *merchantpb.MerchantAppealData) *model.MerchantAppe
 		Reason:     a.Reason,
 		Status:     a.Status,
 	}
+	if a.AdminComment != "" {
+		comment := a.AdminComment
+		res.AdminComment = &comment
+	}
+	if a.ReviewedAt != nil {
+		reviewedAt := a.ReviewedAt.AsTime().Format(time.RFC3339)
+		res.ReviewedAt = &reviewedAt
+	}
 	if a.CreatedAt != nil {
 		res.CreatedAt = a.CreatedAt.AsTime().Format(time.RFC3339)
 	}

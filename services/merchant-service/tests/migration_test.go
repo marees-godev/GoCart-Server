@@ -197,11 +197,11 @@ func TestMerchantAppealModelFields(t *testing.T) {
 	app := model.MerchantAppeal{}
 	v := reflect.TypeOf(app)
 
-	if _, ok := v.FieldByName("AdminComment"); ok {
-		t.Errorf("MerchantAppeal model should NOT contain AdminComment field")
+	if _, ok := v.FieldByName("AdminComment"); !ok {
+		t.Errorf("MerchantAppeal model SHOULD contain AdminComment field")
 	}
-	if _, ok := v.FieldByName("ReviewedAt"); ok {
-		t.Errorf("MerchantAppeal model should NOT contain ReviewedAt field")
+	if _, ok := v.FieldByName("ReviewedAt"); !ok {
+		t.Errorf("MerchantAppeal model SHOULD contain ReviewedAt field")
 	}
 }
 
@@ -247,8 +247,8 @@ func TestRemoveLifecycleAndAppealColumnsMigration(t *testing.T) {
 	expectedTokens := []string{
 		"ALTER TABLE merchant_lifecycle_audit DROP COLUMN IF EXISTS error_message",
 		"ALTER TABLE merchant_lifecycle_audit DROP COLUMN IF EXISTS request_id",
-		"ALTER TABLE merchant_appeals DROP COLUMN IF EXISTS admin_comment",
-		"ALTER TABLE merchant_appeals DROP COLUMN IF EXISTS reviewed_at",
+		"ALTER TABLE merchant_appeals ADD COLUMN IF NOT EXISTS admin_comment TEXT",
+		"ALTER TABLE merchant_appeals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ",
 	}
 
 	for _, token := range expectedTokens {
