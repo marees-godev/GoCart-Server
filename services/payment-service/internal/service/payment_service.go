@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,32 +15,6 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 )
 
-func normalizePaymentMethod(rawMethod string) string {
-	cleaned := strings.ToUpper(strings.TrimSpace(rawMethod))
-	switch cleaned {
-	case "NETBANKING", "NET_BANKING", "NETBANK", "BANK_TRANSFER", "NB":
-		return "NET_BANKING"
-	case "CARD", "CREDIT_CARD", "CREDITCARD":
-		return "CREDIT_CARD"
-	case "DEBIT_CARD", "DEBITCARD":
-		return "DEBIT_CARD"
-	case "UPI":
-		return "UPI"
-	case "PAYPAL":
-		return "PAYPAL"
-	case "MOCK":
-		return "MOCK"
-	case "WALLET":
-		return "WALLET"
-	case "EMI":
-		return "EMI"
-	default:
-		if cleaned != "" {
-			return cleaned
-		}
-		return "CREDIT_CARD"
-	}
-}
 
 type ProcessPaymentDTO struct {
 	OrderID        string
@@ -148,7 +121,7 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 		userID = authOrder.UserID
 	}
 
-	paymentMethod := normalizePaymentMethod(dto.PaymentMethod)
+	paymentMethod := model.NormalizePaymentMethod(dto.PaymentMethod)
 
 	// 3. Persist initial payment state (OrderCreated -> PaymentInitiated)
 	txRef := fmt.Sprintf("tx_%s", uuid.New().String())
@@ -350,7 +323,7 @@ func (s *paymentService) HandleRazorpayWebhook(ctx context.Context, body []byte)
 		return appErrors.BadRequest("webhook body cannot be empty")
 	}
 
-	var event gateway.RazorpayWebhookEvent
+	var event model.RazorpayWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		slog.ErrorContext(ctx, "failed to unmarshal razorpay webhook payload", "error", err)
 		return appErrors.BadRequest(fmt.Sprintf("invalid webhook json payload: %v", err))
@@ -407,7 +380,7 @@ func (s *paymentService) HandleRazorpayWebhook(ctx context.Context, body []byte)
 	return procErr
 }
 
-func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) (*model.Payment, error) {
+func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) (*model.Payment, error) {
 	p := event.Payload.Payment.Entity
 	ord := event.Payload.Order.Entity
 
@@ -492,7 +465,7 @@ func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *gatew
 			curr = "INR"
 		}
 
-		pmMethod := normalizePaymentMethod(p.Method)
+		pmMethod := model.NormalizePaymentMethod(p.Method)
 
 		fallbackPmt := &model.Payment{
 			ID:                   uuid.New().String(),
@@ -526,7 +499,7 @@ func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *gatew
 	return nil, appErrors.NotFound("payment record not found for webhook event")
 }
 
-func (s *paymentService) handlePaymentPendingWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) error {
+func (s *paymentService) handlePaymentPendingWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
 	payment, err := s.findPaymentForWebhook(ctx, event)
 	if err != nil {
 		return err
@@ -552,7 +525,7 @@ func (s *paymentService) handlePaymentPendingWebhook(ctx context.Context, event 
 	return nil
 }
 
-func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) error {
+func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
 	payment, err := s.findPaymentForWebhook(ctx, event)
 	if err != nil {
 		return err
@@ -578,7 +551,7 @@ func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event 
 	return nil
 }
 
-func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) error {
+func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
 	payment, err := s.findPaymentForWebhook(ctx, event)
 	if err != nil {
 		return err
@@ -613,7 +586,7 @@ func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *
 	return nil
 }
 
-func (s *paymentService) handleRefundSuccessWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) error {
+func (s *paymentService) handleRefundSuccessWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
 	refEntity := event.Payload.Refund.Entity
 	if refEntity.ID == "" {
 		slog.WarnContext(ctx, "refund entity ID is empty in refund webhook")
@@ -643,7 +616,8 @@ func (s *paymentService) handleRefundSuccessWebhook(ctx context.Context, event *
 	return nil
 }
 
-func (s *paymentService) handleRefundFailedWebhook(ctx context.Context, event *gateway.RazorpayWebhookEvent) error {
+func (s *paymentService) handleRefundFailedWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
+
 	refEntity := event.Payload.Refund.Entity
 	if refEntity.ID == "" {
 		return nil

@@ -6,13 +6,11 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/google/uuid"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -28,7 +26,6 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	paymentGRPC "github.com/marees-godev/GoCart-Server/services/payment-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/handler"
-	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 	"google.golang.org/grpc"
@@ -158,95 +155,8 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	app.Get("/get-key", func(c *fiber.Ctx) error {
-		key := gwConfig.RazorpayKeyID
-		if key == "" {
-			key = "rzp_test_xxxx"
-		}
-		return c.JSON(fiber.Map{"key": key})
-	})
-
-	app.Post("/create-order", func(c *fiber.Ctx) error {
-		type orderReq struct {
-			Amount   float64 `json:"amount"`
-			Currency string  `json:"currency"`
-		}
-		var req orderReq
-		_ = c.BodyParser(&req)
-		if req.Amount <= 0 {
-			req.Amount = 1499
-		}
-		if req.Currency == "" {
-			req.Currency = "INR"
-		}
-
-		// If real Razorpay key & secret are provided, create genuine Razorpay Order ID via API
-		if gwConfig.RazorpayKeyID != "" && gwConfig.RazorpayKeySecret != "" && !strings.Contains(gwConfig.RazorpayKeyID, "xxxx") {
-			paymentID := uuid.New().String()
-			orderID := uuid.New().String()
-			userID := uuid.New().String()
-			idempKey := fmt.Sprintf("idemp_%d", time.Now().UnixNano())
-
-			rzpResp, err := paymentGW.ProcessPayment(c.UserContext(), &gateway.ProcessGatewayRequest{
-				PaymentID:      paymentID,
-				OrderID:        orderID,
-				Amount:         req.Amount,
-				Currency:       req.Currency,
-				IdempotencyKey: idempKey,
-			})
-
-			if err == nil && rzpResp != nil && rzpResp.GatewayTransactionID != "" {
-				pmt := &model.Payment{
-					ID:                   paymentID,
-					OrderID:              orderID,
-					UserID:               userID,
-					PaymentMethod:        "CREDIT_CARD",
-					Amount:               req.Amount,
-					Currency:             req.Currency,
-					Status:               model.PaymentStatusPending,
-					TransactionID:        fmt.Sprintf("tx_%s", uuid.New().String()),
-					GatewayTransactionID: rzpResp.GatewayTransactionID,
-					IdempotencyKey:       idempKey,
-				}
-				if createErr := paymentRepo.CreatePayment(c.UserContext(), pmt); createErr != nil {
-					log.Error("failed to persist payment record for razorpay order", "error", createErr)
-				} else {
-					log.Info("persisted pending razorpay payment in database", "payment_id", pmt.ID, "razorpay_order_id", rzpResp.GatewayTransactionID)
-				}
-
-				return c.JSON(fiber.Map{
-					"id":         rzpResp.GatewayTransactionID,
-					"payment_id": paymentID,
-					"amount":     int64(req.Amount * 100),
-					"currency":   req.Currency,
-					"status":     "created",
-					"is_real":    true,
-				})
-			}
-		}
-
-		// If test / placeholder mode, leave order ID empty so Razorpay SDK allows standard client-side checkout
-		return c.JSON(fiber.Map{
-			"id":       "",
-			"amount":   int64(req.Amount * 100),
-			"currency": req.Currency,
-			"status":   "created",
-			"is_real":  false,
-		})
-	})
-
-	app.All("/payment-callback", func(c *fiber.Ctx) error {
-		orderID := c.FormValue("razorpay_order_id", c.Query("razorpay_order_id", c.Query("orderId", "")))
-		paymentID := c.FormValue("razorpay_payment_id", c.Query("razorpay_payment_id", c.Query("paymentId", "")))
-		signature := c.FormValue("razorpay_signature", c.Query("razorpay_signature", c.Query("signature", "")))
-
-		return c.JSON(fiber.Map{
-			"status":     "success",
-			"order_id":   orderID,
-			"payment_id": paymentID,
-			"signature":  signature,
-		})
-	})
+	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log)
+	paymentHandler.RegisterRoutes(app)
 
 	// Webhook endpoints
 	webhookHandler := handler.NewWebhookHandler(paymentService, gwConfig.RazorpayWebhookSecret)

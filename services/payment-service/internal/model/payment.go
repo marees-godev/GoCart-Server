@@ -1,8 +1,36 @@
 package model
 
 import (
+	"strings"
 	"time"
 )
+
+func NormalizePaymentMethod(rawMethod string) string {
+	cleaned := strings.ToUpper(strings.TrimSpace(rawMethod))
+	switch cleaned {
+	case "NETBANKING", "NET_BANKING", "NETBANK", "BANK_TRANSFER", "NB":
+		return "NET_BANKING"
+	case "CARD", "CREDIT_CARD", "CREDITCARD":
+		return "CREDIT_CARD"
+	case "DEBIT_CARD", "DEBITCARD":
+		return "DEBIT_CARD"
+	case "UPI":
+		return "UPI"
+	case "PAYPAL":
+		return "PAYPAL"
+	case "MOCK":
+		return "MOCK"
+	case "WALLET":
+		return "WALLET"
+	case "EMI":
+		return "EMI"
+	default:
+		if cleaned != "" {
+			return cleaned
+		}
+		return "CREDIT_CARD"
+	}
+}
 
 type PaymentStatus string
 

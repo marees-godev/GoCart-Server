@@ -98,7 +98,7 @@ func TestWebhookHandler_HandleRazorpayWebhook_InvalidSignature(t *testing.T) {
 	h.RegisterRoutes(app)
 
 	body := []byte(`{"entity":"event","event":"payment.captured"}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/razorpay", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/webhooks", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Razorpay-Signature", "invalid_signature")
 
@@ -147,7 +147,7 @@ func TestWebhookHandler_HandleRazorpayWebhook_Success(t *testing.T) {
 	mac.Write(body)
 	sig := hex.EncodeToString(mac.Sum(nil))
 
-	req := httptest.NewRequest(http.MethodPost, "/webhooks/razorpay", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/webhooks", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Razorpay-Signature", sig)
 

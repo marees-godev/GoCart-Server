@@ -54,7 +54,7 @@ func (c *grpcOrderClient) GetOrder(ctx context.Context, orderID string) (*Author
 		return nil, appErrors.NotFound(fmt.Sprintf("authoritative order %s is empty", orderID))
 	}
 
-	currency := "USD" // Default currency if not present in proto
+	currency := "INR" // Default currency if not present in proto
 	return &AuthoritativeOrder{
 		ID:          resp.Order.Id,
 		UserID:      resp.Order.UserId,
