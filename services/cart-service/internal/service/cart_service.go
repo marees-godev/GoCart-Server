@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -277,11 +278,11 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 					Message:   "product not found",
 					Code:      dto.ErrCodeProductNotFound,
 				})
-			} else if product.GetStatus() == "inactive" || product.GetStatus() == "discontinued" {
+			} else if prodStatus := strings.ToUpper(strings.TrimSpace(product.GetStatus())); prodStatus != "PUBLISHED" && prodStatus != "IN_STOCK" {
 				isValid = false
 				validationErrors = append(validationErrors, dto.ValidationError{
 					ProductID: item.ProductID,
-					Message:   "product is inactive",
+					Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
 					Code:      dto.ErrCodeProductInactive,
 				})
 			} else {

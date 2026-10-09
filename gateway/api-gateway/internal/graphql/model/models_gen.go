@@ -791,14 +791,26 @@ func (e MerchantStatus) MarshalGQL(w io.Writer) {
 type ProductStatus string
 
 const (
-	ProductStatusInStock      ProductStatus = "IN_STOCK"
-	ProductStatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
-	ProductStatusLowStock     ProductStatus = "LOW_STOCK"
-	ProductStatusReserved     ProductStatus = "RESERVED"
-	ProductStatusDiscontinued ProductStatus = "DISCONTINUED"
+	ProductStatusDraft         ProductStatus = "DRAFT"
+	ProductStatusPendingReview ProductStatus = "PENDING_REVIEW"
+	ProductStatusPublished     ProductStatus = "PUBLISHED"
+	ProductStatusUnpublished   ProductStatus = "UNPUBLISHED"
+	ProductStatusSuspended     ProductStatus = "SUSPENDED"
+	ProductStatusDeleted       ProductStatus = "DELETED"
+	ProductStatusInStock       ProductStatus = "IN_STOCK"
+	ProductStatusOutOfStock    ProductStatus = "OUT_OF_STOCK"
+	ProductStatusLowStock      ProductStatus = "LOW_STOCK"
+	ProductStatusReserved      ProductStatus = "RESERVED"
+	ProductStatusDiscontinued  ProductStatus = "DISCONTINUED"
 )
 
 var AllProductStatus = []ProductStatus{
+	ProductStatusDraft,
+	ProductStatusPendingReview,
+	ProductStatusPublished,
+	ProductStatusUnpublished,
+	ProductStatusSuspended,
+	ProductStatusDeleted,
 	ProductStatusInStock,
 	ProductStatusOutOfStock,
 	ProductStatusLowStock,
@@ -808,7 +820,7 @@ var AllProductStatus = []ProductStatus{
 
 func (e ProductStatus) IsValid() bool {
 	switch e {
-	case ProductStatusInStock, ProductStatusOutOfStock, ProductStatusLowStock, ProductStatusReserved, ProductStatusDiscontinued:
+	case ProductStatusDraft, ProductStatusPendingReview, ProductStatusPublished, ProductStatusUnpublished, ProductStatusSuspended, ProductStatusDeleted, ProductStatusInStock, ProductStatusOutOfStock, ProductStatusLowStock, ProductStatusReserved, ProductStatusDiscontinued:
 		return true
 	}
 	return false
