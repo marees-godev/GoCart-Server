@@ -1,14 +1,44 @@
+enum ProductStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+  LOW_STOCK
+  RESERVED
+  DISCONTINUED
+}
+
+type ProductVariant {
+  id: ID!
+  productId: String!
+  sku: String!
+  name: String!
+  price: Float!
+  mrp: Float!
+  stock: Int!
+  attributesJson: String
+  status: ProductStatus!
+  createdAt: String
+  updatedAt: String
+  deletedAt: String
+}
+
 type Product {
   id: ID!
   storeId: String!
   categoryId: String!
+  sku: String!
   name: String!
   description: String
   price: Float!
-  sku: String!
-  isActive: Boolean!
+  mrp: Float!
+  tax: Float!
+  status: ProductStatus!
+  imageUrl: String
   images: [String!]
+  variants: [ProductVariant!]
+  avgRating: Float!
   createdAt: String
+  updatedAt: String
+  deletedAt: String
 }
 
 type ProductList {
@@ -16,29 +46,74 @@ type ProductList {
   total: Int!
 }
 
+type DeleteProductResponse {
+  success: Boolean!
+  message: String!
+}
+
+type DeleteProductVariantResponse {
+  success: Boolean!
+  message: String!
+}
+
+input CreateProductVariantInput {
+  sku: String!
+  name: String!
+  price: Float!
+  mrp: Float!
+  stock: Int
+  attributesJson: String
+}
+
 input CreateProductInput {
   storeId: String!
   categoryId: String!
+  sku: String!
   name: String!
   description: String
   price: Float!
-  sku: String!
+  mrp: Float!
+  tax: Float
+  status: ProductStatus
+  imageUrl: String
+  images: [String!]
+  imagesUpload: [Upload!]
+  variants: [CreateProductVariantInput!]
+}
+
+input UpdateProductVariantInput {
+  id: String
+  sku: String
+  name: String
+  price: Float
+  mrp: Float
+  stock: Int
+  attributesJson: String
+  status: ProductStatus
 }
 
 input UpdateProductInput {
   name: String
   description: String
   price: Float
-  isActive: Boolean
+  mrp: Float
+  tax: Float
+  status: ProductStatus
+  imageUrl: String
+  categoryId: String
+  images: [String!]
+  imagesUpload: [Upload!]
+  variants: [UpdateProductVariantInput!]
 }
 
 extend type Query {
   product(id: ID!): Product
-  products(limit: Int, offset: Int, categoryId: String, storeId: String): ProductList!
+  products(limit: Int, offset: Int, categoryId: String, storeId: String, status: ProductStatus): ProductList!
 }
 
 extend type Mutation {
   createProduct(input: CreateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
   updateProduct(id: ID!, input: UpdateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
-  deleteProduct(id: ID!): Boolean! @auth(requires: [ADMIN, MERCHANT])
+  deleteProduct(id: ID!): DeleteProductResponse! @auth(requires: [ADMIN, MERCHANT])
+  deleteProductVariant(productId: ID!, id: ID!): DeleteProductVariantResponse! @auth(requires: [ADMIN, MERCHANT])
 }

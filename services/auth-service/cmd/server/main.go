@@ -134,7 +134,7 @@ func main() {
 	}
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, otpStore)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, otpStore, redisClient)
 
 	// 7. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))

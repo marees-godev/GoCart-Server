@@ -33,7 +33,6 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 		IsMerchant: req.GetIsMerchant(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -60,7 +59,6 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 		IsMerchant: req.GetIsMerchant(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -83,7 +81,6 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 		Token: req.GetToken(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -98,9 +95,9 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.RefreshToken(ctx, &dto.RefreshTokenRequest{
 		RefreshToken: req.GetRefreshToken(),
+		AccessToken:  req.GetAccessToken(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to bind request", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -113,6 +110,20 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 	}, nil
 }
 
+func (h *AuthGRPCHandler) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	resp, err := h.authService.Logout(ctx, &dto.LogoutRequest{
+		AccessToken: req.GetAccessToken(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.LogoutResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
 func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
 	resp, err := h.authService.VerifyEmail(ctx, &dto.VerifyEmailRequest{
 		Email: req.GetEmail(),
@@ -120,7 +131,6 @@ func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRe
 		Token: req.GetToken(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to verify email", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
@@ -135,11 +145,60 @@ func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.R
 		Email: req.GetEmail(),
 	})
 	if err != nil {
-		h.logger.Error("Failed to resend verification email", slog.Any("error", err))
 		return nil, appErrors.MapAppErrorToGRPC(err)
 	}
 
 	return &pb.ResendVerificationEmailResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
+	resp, err := h.authService.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
+		Email:    req.GetEmail(),
+		ClientIP:   req.GetClientIp(),
+		IsMerchant: req.GetIsMerchant(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ForgotPasswordResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ResetPasswordWithOtp(ctx context.Context, req *pb.ResetPasswordWithOtpRequest) (*pb.ResetPasswordResponse, error) {
+	resp, err := h.authService.ResetPasswordWithOtp(ctx, &dto.ResetPasswordWithOtpRequest{
+		Email:       req.GetEmail(),
+		OTP:         req.GetOtp(),
+		NewPassword: req.GetNewPassword(),
+		IsMerchant:  req.GetIsMerchant(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ResetPasswordResponse{
+		Success: resp.Success,
+		Message: resp.Message,
+	}, nil
+}
+
+func (h *AuthGRPCHandler) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+	userID := req.GetUserId()
+	resp, err := h.authService.ChangePassword(ctx, &dto.ChangePasswordRequest{
+		UserID:      userID,
+		OldPassword: req.GetOldPassword(),
+		NewPassword: req.GetNewPassword(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &pb.ChangePasswordResponse{
 		Success: resp.Success,
 		Message: resp.Message,
 	}, nil

@@ -1,11 +1,9 @@
 type AuthPayload {
   token: String!
+  refreshToken: String
+  tokenType: String
+  expiresIn: Int
   user: User!
-  merchantId: ID
-  businessEmail: String
-  firstName: String
-  lastName: String
-  role: String
   merchant: Merchant
 }
 
@@ -23,10 +21,59 @@ input RegisterInput {
   isMerchant: Boolean!
 }
 
+input RefreshTokenInput {
+  refreshToken: String!
+}
+
+type LogoutPayload {
+  success: Boolean!
+  message: String
+}
+
+# --- Forgot & Reset Password Flow ---
+input ForgotPasswordInput {
+  email: String!
+  isMerchant: Boolean!
+}
+
+type ForgotPasswordPayload {
+  success: Boolean!
+  message: String!
+}
+
+input ResetPasswordWithOtpInput {
+  email: String!
+  otp: String!
+  newPassword: String!
+  isMerchant: Boolean!
+}
+
+type ResetPasswordPayload {
+  success: Boolean!
+  message: String!
+}
+
+# --- Change Password Flow ---
+input ChangePasswordInput {
+  oldPassword: String!
+  newPassword: String!
+}
+
+type ChangePasswordPayload {
+  success: Boolean!
+  message: String!
+}
+
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  refreshToken(input: RefreshTokenInput!): AuthPayload!
+  logout: LogoutPayload!
   verifyEmail(email: String!, otp: String!): Boolean!
   resendVerificationEmail(email: String!): Boolean!
+  forgotPassword(input: ForgotPasswordInput!): ForgotPasswordPayload!
+  resetPasswordWithOtp(input: ResetPasswordWithOtpInput!): ResetPasswordPayload!
+  changePassword(input: ChangePasswordInput!): ChangePasswordPayload!
 }
+
 

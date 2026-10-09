@@ -18,6 +18,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/config"
 	userGRPC "github.com/marees-godev/GoCart-Server/services/user-service/internal/grpc"
@@ -88,8 +89,23 @@ func main() {
 	}
 
 	// 5. Initialize domain layers and gRPC Server
+	var s3Client storage.Uploader
+	s3Client, err = storage.NewS3Client(ctx, storage.Config{
+		Endpoint:        cfg.Storage.Endpoint,
+		Region:          cfg.Storage.Region,
+		AccessKeyID:     cfg.Storage.AccessKeyID,
+		SecretAccessKey: cfg.Storage.SecretAccessKey,
+		Bucket:          cfg.Storage.Bucket,
+		PublicURLPrefix: cfg.Storage.PublicURLPrefix,
+	})
+	if err != nil {
+		log.Warn("Failed to initialize S3 storage client for user service", "error", err)
+		s3Client = nil
+	}
+
+	imageProcessor := service.NewImageProcessor(s3Client)
 	userRepo := repository.NewUserRepository(db.Pool, cfg.Retention.Period)
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, imageProcessor)
 	addressRepo := repository.NewAddressRepository(db.Pool)
 	addressService := service.NewAddressService(addressRepo, userRepo)
 
@@ -98,7 +114,11 @@ func main() {
 
 	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService)
 
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),
+		grpc.MaxRecvMsgSize(10*1024*1024),
+		grpc.MaxSendMsgSize(10*1024*1024),
+	)
 	userpb.RegisterUserServiceServer(grpcServer, userGRPCServer)
 	reflection.Register(grpcServer)
 

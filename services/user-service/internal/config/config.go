@@ -16,6 +16,16 @@ type Config struct {
 	Logger   LoggerConfig
 	Tracing   TracingConfig
 	Retention RetentionConfig
+	Storage   StorageConfig
+}
+
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Bucket          string
+	PublicURLPrefix string
 }
 
 type RetentionConfig struct {
@@ -93,6 +103,14 @@ func LoadEnv() *Config {
 		Retention: RetentionConfig{
 			Interval: GetEnvAsDuration("RETENTION_WORKER_INTERVAL", 1*time.Hour),
 			Period:   GetEnvAsDuration("ACCOUNT_RETENTION_PERIOD", 30*24*time.Hour),
+		},
+		Storage: StorageConfig{
+			Endpoint:        GetEnv("USER_S3_ENDPOINT", GetEnv("S3_ENDPOINT", "https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3")),
+			Region:          GetEnv("USER_S3_REGION", GetEnv("S3_REGION", "ap-south-1")),
+			AccessKeyID:     GetEnv("USER_S3_ACCESS_KEY_ID", GetEnv("S3_ACCESS_KEY_ID", "")),
+			SecretAccessKey: GetEnv("USER_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
+			Bucket:          GetEnv("USER_S3_BUCKET", GetEnv("S3_BUCKET", "avatars")),
+			PublicURLPrefix: GetEnv("USER_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
 		},
 	}
 }

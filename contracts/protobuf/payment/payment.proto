@@ -7,6 +7,7 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/pa
 service PaymentService {
   rpc ProcessPayment (ProcessPaymentRequest) returns (ProcessPaymentResponse);
   rpc GetPayment (GetPaymentRequest) returns (GetPaymentResponse);
+  rpc GetPaymentByOrderID (GetPaymentByOrderIDRequest) returns (GetPaymentResponse);
   rpc CreateRefund (CreateRefundRequest) returns (CreateRefundResponse);
 }
 
@@ -18,7 +19,12 @@ message Payment {
   string payment_method = 5;
   string status = 6;
   string transaction_reference = 7;
-  string created_at = 8;
+  string gateway_transaction_id = 8;
+  string created_at = 9;
+  string user_id = 10;
+  string idempotency_key = 11;
+  string failure_reason = 12;
+  string updated_at = 13;
 }
 
 message ProcessPaymentRequest {
@@ -26,6 +32,8 @@ message ProcessPaymentRequest {
   double amount = 2;
   string currency = 3;
   string payment_method = 4;
+  string idempotency_key = 5;
+  string user_id = 6;
 }
 
 message ProcessPaymentResponse {
@@ -36,6 +44,10 @@ message GetPaymentRequest {
   string id = 1;
 }
 
+message GetPaymentByOrderIDRequest {
+  string order_id = 1;
+}
+
 message GetPaymentResponse {
   Payment payment = 1;
 }
@@ -44,10 +56,14 @@ message CreateRefundRequest {
   string payment_id = 1;
   double amount = 2;
   string reason = 3;
+  string idempotency_key = 4;
 }
 
 message CreateRefundResponse {
   string refund_id = 1;
   string status = 2;
   double amount = 3;
+  string gateway_refund_id = 4;
+  string created_at = 5;
 }
+

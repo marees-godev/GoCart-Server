@@ -19,14 +19,19 @@ var ErrNotFound = errors.New("record not found")
 type AuthRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.AuthCredential, error)
 	GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error)
 	UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error
 	ResetFailedLogin(ctx context.Context, id uuid.UUID) error
 	CreateLoginSession(ctx context.Context, refreshToken *model.RefreshToken, evt *outbox.Event) error
 	CreateCredential(ctx context.Context, cred *model.AuthCredential) error
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
-	GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error)
+	GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID) error
+	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
+	RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error
+	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
 	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error
 }
 
 type postgresAuthRepository struct {
@@ -158,7 +163,17 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 		return fmt.Errorf("repository: reset counters in tx failed: %w", err)
 	}
 
-	// 2. Insert refresh token
+	// 2. Delete existing refresh tokens for this user so only the newest token exists
+	_, err = tx.Exec(ctx, `
+		DELETE FROM refresh_tokens
+		WHERE user_id = $1
+	`, refreshToken.UserID)
+	if err != nil {
+		r.logger.Error("Failed to delete existing refresh tokens in tx", "user_id", refreshToken.UserID, "error", err)
+		return fmt.Errorf("repository: delete existing refresh tokens failed: %w", err)
+	}
+
+	// 3. Insert new refresh token
 	if refreshToken.ID == uuid.Nil {
 		refreshToken.ID = uuid.Must(uuid.NewV7())
 	}
@@ -215,16 +230,17 @@ func (r *postgresAuthRepository) DeleteCredential(ctx context.Context, id uuid.U
 	return nil
 }
 
-
-func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string) (*model.RefreshToken, error) {
+func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	query := `
-		SELECT id, user_id, token_hash, expires_at, revoked, created_at
-		FROM refresh_tokens
-		WHERE token_hash = $1
+		SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at
+		FROM refresh_tokens rt
+		LEFT JOIN auth_credentials ac ON ac.user_id = rt.user_id
+		WHERE rt.token_hash = $1
+		  AND ($2 = '' OR rt.user_id::text = $2 OR LOWER(ac.email) = LOWER($2))
 		LIMIT 1
 	`
 	var tok model.RefreshToken
-	err := r.pool.QueryRow(ctx, query, tokenHash).Scan(
+	err := r.pool.QueryRow(ctx, query, tokenHash, userIDOrEmail).Scan(
 		&tok.ID,
 		&tok.UserID,
 		&tok.TokenHash,
@@ -234,10 +250,10 @@ func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash 
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			r.logger.Warn("Refresh token not found", "token_hash", tokenHash)
+			r.logger.Warn("Refresh token not found", "token_hash", tokenHash, "identity", userIDOrEmail)
 			return nil, ErrNotFound
 		}
-		r.logger.Error("Failed to get refresh token", "token_hash", tokenHash, "error", err)
+		r.logger.Error("Failed to get refresh token", "token_hash", tokenHash, "identity", userIDOrEmail, "error", err)
 		return nil, fmt.Errorf("repository: get refresh token failed: %w", err)
 	}
 	return &tok, nil
@@ -246,13 +262,112 @@ func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash 
 func (r *postgresAuthRepository) RevokeRefreshToken(ctx context.Context, id uuid.UUID) error {
 	query := `
 		UPDATE refresh_tokens
-		SET revoked = true
+		SET revoked = true, revoked_at = NOW()
 		WHERE id = $1
 	`
 	_, err := r.pool.Exec(ctx, query, id)
 	if err != nil {
 		r.logger.Error("Failed to revoke refresh token", "id", id, "error", err)
 		return fmt.Errorf("repository: revoke refresh token failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE token_hash = $1
+	`
+	_, err := r.pool.Exec(ctx, query, tokenHash)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh token by hash", "error", err)
+		return fmt.Errorf("repository: revoke refresh token by hash failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE user_id = $1 AND revoked = false
+	`
+	_, err := r.pool.Exec(ctx, query, userID)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh tokens by user id", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: revoke refresh tokens by user id failed: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error) {
+	query := `
+		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
+		FROM auth_credentials
+		WHERE user_id = $1
+		LIMIT 1
+	`
+	var cred model.AuthCredential
+	err := r.pool.QueryRow(ctx, query, userID).Scan(
+		&cred.ID,
+		&cred.UserID,
+		&cred.Email,
+		&cred.Phone,
+		&cred.PasswordHash,
+		&cred.Role,
+		&cred.EmailVerified,
+		&cred.IsActive,
+		&cred.FailedLoginCount,
+		&cred.LockedUntil,
+		&cred.CreatedAt,
+		&cred.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Warn("User by user_id not found", "user_id", userID)
+			return nil, ErrNotFound
+		}
+		r.logger.Error("Failed to get user by user_id", "user_id", userID, "error", err)
+		return nil, fmt.Errorf("repository: get by user_id failed: %w", err)
+	}
+	return &cred, nil
+}
+
+func (r *postgresAuthRepository) RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// 1. Revoke old refresh token
+	_, err = tx.Exec(ctx, `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE id = $1
+	`, oldTokenID)
+	if err != nil {
+		r.logger.Error("Failed to revoke old refresh token in tx", "id", oldTokenID, "error", err)
+		return fmt.Errorf("repository: revoke old refresh token failed: %w", err)
+	}
+
+	// 2. Insert new refresh token
+	if newToken.ID == uuid.Nil {
+		newToken.ID = uuid.Must(uuid.NewV7())
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+	`, newToken.ID, newToken.UserID, newToken.TokenHash, newToken.ExpiresAt, newToken.Revoked)
+	if err != nil {
+		r.logger.Error("Failed to insert new refresh token in tx", "user_id", newToken.UserID, "error", err)
+		return fmt.Errorf("repository: insert new refresh token failed: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit rotation tx", "error", err)
+		return fmt.Errorf("repository: commit rotation tx failed: %w", err)
 	}
 	return nil
 }
@@ -271,3 +386,51 @@ func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID u
 	return nil
 }
 
+func (r *postgresAuthRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	query := `
+		UPDATE auth_credentials
+		SET password_hash = $1,
+		    failed_login_count = 0,
+		    locked_until = NULL,
+		    updated_at = NOW()
+		WHERE user_id = $2
+	`
+	cmdTag, err := tx.Exec(ctx, query, passwordHash, userID)
+	if err != nil {
+		r.logger.Error("Failed to update password", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: update password failed: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE refresh_tokens
+		SET revoked = true, revoked_at = NOW()
+		WHERE user_id = $1 AND revoked = false
+	`, userID)
+	if err != nil {
+		r.logger.Error("Failed to revoke refresh tokens on password change", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: revoke refresh tokens failed: %w", err)
+	}
+
+	if evt != nil {
+		if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+			r.logger.Error("Failed to insert outbox event on password change", "user_id", userID, "error", err)
+			return fmt.Errorf("repository: insert outbox event failed: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit password change tx", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: commit tx failed: %w", err)
+	}
+
+	return nil
+}

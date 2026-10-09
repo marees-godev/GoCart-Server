@@ -9,6 +9,7 @@ type User {
   email: String!
   firstName: String
   lastName: String
+  role: String
   phone: String
   username: String
   alternatePhone: String
@@ -48,6 +49,7 @@ input UpdateUserInput {
   gender: Gender
   bio: String
   avatarUrl: String
+  avatar: Upload
 }
 
 type AccountActionResponse {

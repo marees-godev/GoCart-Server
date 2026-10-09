@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoCart Payment Service - Checkout & Test Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-card: rgba(22, 30, 49, 0.75);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-primary: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.35);
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% -20%, #1e1b4b, var(--bg-primary) 70%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a5b4fc, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .method-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .method-btn {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .method-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.85rem 1.25rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: #ffffff;
+            box-shadow: 0 4px 14px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px var(--accent-glow);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #ffffff;
+        }
+
+        .console-card {
+            margin-top: 1.5rem;
+        }
+
+        .console-log {
+            background: #090d16;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            max-height: 240px;
+            overflow-y: auto;
+            color: #38bdf8;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-entry {
+            margin-bottom: 0.4rem;
+            word-break: break-all;
+        }
+
+        .log-time {
+            color: #64748b;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .badge-failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GoCart Payment Checkout</h1>
+            <p>Interactive Payment Simulation & Real-time Integration Console</p>
+        </div>
+
+        <div class="grid-layout">
+            <!-- Checkout Form Card -->
+            <div class="card">
+                <div class="card-title">
+                    💳 Order Checkout
+                </div>
+
+                <div class="form-group">
+                    <label>Order Amount (INR ₹)</label>
+                    <input type="number" id="amount" class="form-input" min="1" step="10">
+                </div>
+
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <div class="method-selector">
+                        <div class="method-btn active" onclick="selectMethod(this, 'CREDIT_CARD')">Card</div>
+                        <div class="method-btn" onclick="selectMethod(this, 'UPI')">UPI</div>
+                        <div class="method-btn" onclick="selectMethod(this, 'NET_BANKING')">NetBanking</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="initiateCheckout()">
+                    Proceed to Pay with Razorpay
+                </button>
+            </div>
+
+            <!-- Simulation Controls Card -->
+            <div class="card">
+                <div class="card-title">
+                    ⚡ Webhook & Event Testing
+                </div>
+
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Simulate gateway callbacks and webhook events to test Kafka event publishing:
+                </p>
+
+                <button class="btn btn-success" onclick="simulatePaymentStatus('SUCCESS')">
+                    Simulate Payment Success
+                </button>
+
+                <button class="btn btn-danger" onclick="simulatePaymentStatus('FAILED')">
+                    Simulate Payment Failure
+                </button>
+            </div>
+        </div>
+
+        <!-- Console Log Section -->
+        <div class="card console-card">
+            <div class="card-title" style="justify-content: space-between;">
+                <span>🖥️ Real-time Event Console</span>
+                <span id="status-badge" class="status-badge badge-pending">Ready</span>
+            </div>
+            <div id="console-log" class="console-log">
+                <div class="log-entry"><span class="log-time">[Init]</span> Payment service interactive checkout console
+                    loaded.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedPaymentMethod = 'CREDIT_CARD';
+
+        function selectMethod(el, method) {
+            document.querySelectorAll('.method-btn').forEach(btn => btn.classList.remove('active'));
+            el.classList.add('active');
+            selectedPaymentMethod = method;
+            log(`Selected payment method: ${method}`);
+        }
+
+        function log(msg) {
+            const consoleEl = document.getElementById('console-log');
+            const timeStr = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${timeStr}]</span> ${msg}`;
+            consoleEl.appendChild(entry);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function setStatus(status, text) {
+            const badge = document.getElementById('status-badge');
+            badge.className = `status-badge badge-${status.toLowerCase()}`;
+            badge.innerText = text;
+        }
+
+        async function initiateCheckout() {
+            const amount = parseFloat(document.getElementById('amount').value) || 1499;
+            log(`Initiating checkout order for ₹${amount}...`);
+            setStatus('pending', 'Processing');
+
+            try {
+                // Fetch Key
+                const keyResp = await fetch('/get-key');
+                const keyData = await keyResp.json();
+                const razorpayKey = keyData.key;
+
+                // Create Order
+                const orderResp = await fetch('/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: amount, currency: 'INR', payment_method: selectedPaymentMethod })
+                });
+
+                const orderData = await orderResp.json();
+                log(`Created Order Response: ${JSON.stringify(orderData)}`);
+
+                if (orderData.id && window.Razorpay) {
+                    const options = {
+                        "key": razorpayKey,
+                        "amount": orderData.amount,
+                        "currency": orderData.currency,
+                        "payment_method": selectedPaymentMethod,
+                        "name": "GoCart E-Commerce",
+                        "description": "Test Order Checkout",
+                        "order_id": orderData.id,
+                        "handler": function (response) {
+                            log(`Razorpay success payment_id: ${response.razorpay_payment_id}`);
+                            setStatus('success', 'Paid');
+                            window.location.href = `/payment-callback?razorpay_order_id=${response.razorpay_order_id}&razorpay_payment_id=${response.razorpay_payment_id}&razorpay_signature=${response.razorpay_signature}`;
+                        },
+                        "theme": { "color": "#6366f1" }
+                    };
+                    const rzp = new Razorpay(options);
+                    rzp.on('payment.failed', function (response) {
+                        const errReason = response.error ? (response.error.description || response.error.reason || response.error.code) : 'Payment failed';
+                        log(`Razorpay payment failed: ${errReason}`);
+                        setStatus('failed', 'Failed');
+                        fetch(`/payment-callback?razorpay_order_id=${orderData.id}&status=failed&error_code=${response.error ? response.error.code : ''}&error_description=${encodeURIComponent(errReason)}`);
+                    });
+                    rzp.open();
+                } else {
+                    log(`Razorpay order created in test mode. Simulating instant callback.`);
+                    setStatus('success', 'Simulated');
+                }
+            } catch (err) {
+                log(`Error: ${err.message}`);
+                setStatus('failed', 'Error');
+            }
+        }
+
+        async function simulatePaymentStatus(status) {
+            log(`Sending simulated ${status} webhook event to /webhooks...`);
+            try {
+                const resp = await fetch('/webhooks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        entity: "event",
+                        event: status === 'SUCCESS' ? "payment.captured" : "payment.failed",
+                        payload: {
+                            payment: {
+                                entity: {
+                                    id: "pay_sim_" + Date.now(),
+                                    amount: (parseFloat(document.getElementById('amount').value) || 1499) * 100,
+                                    currency: "INR",
+                                    status: status.toLowerCase(),
+                                    method: selectedPaymentMethod
+                                }
+                            }
+                        }
+                    })
+                });
+                const resData = await resp.json();
+                log(`Webhook response: ${JSON.stringify(resData)}`);
+                setStatus(status === 'SUCCESS' ? 'success' : 'failed', status);
+            } catch (err) {
+                log(`Webhook error: ${err.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -5,10 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -150,13 +147,18 @@ func NewHandler(es graphql.ExecutableSchema, cfg *config.Config) *Handler {
 			role = userCtx.Role
 		}
 
+		errLogMsg := e.Error()
+		if appErr != nil {
+			errLogMsg = appErr.Error()
+		}
+
 		logger.FromContext(ctx).Warn("GraphQL operation error",
 			"operation_name", opName,
 			"error_code", errorCode,
 			"request_id", middleware.GetRequestID(ctx),
 			"user_id", userID,
 			"role", role,
-			"error", e.Error(),
+			"error", errLogMsg,
 		)
 
 		return err
@@ -324,7 +326,7 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		}
 	}
 
-	if h.cfg != nil && !h.cfg.GraphQLIntrospectionEnabled {
+	if h.cfg != nil && !h.cfg.GraphQLIntrospectionEnabled && !strings.HasPrefix(c.Get("Content-Type"), "multipart/form-data") {
 		body := string(c.Body())
 		if strings.Contains(body, "__schema") || strings.Contains(body, "__type") {
 			appErr := appErrors.Forbidden("GraphQL introspection is disabled")
@@ -335,26 +337,11 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		}
 	}
 
+	rawBody := c.Body()
 	return adaptor.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(ctx)
-		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-			bodyBytes, _ := io.ReadAll(r.Body)
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-			_, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-			if err != nil {
-				fmt.Printf("DIAGNOSTIC: error parsing Content-Type: %v (raw: %q)\n", err, r.Header.Get("Content-Type"))
-			} else {
-				mr := multipart.NewReader(bytes.NewReader(bodyBytes), params["boundary"])
-				p, pErr := mr.NextPart()
-				if pErr != nil {
-					fmt.Printf("DIAGNOSTIC: mr.NextPart error: %v, bodyLen=%d, bodyPrefix=%q\n", pErr, len(bodyBytes), string(bodyBytes[:min(len(bodyBytes), 100)]))
-				} else {
-					if p.FormName() != "operations" {
-						fmt.Printf("DIAGNOSTIC: first formName is %q, expected 'operations'. Full body:\n%s\n", p.FormName(), string(bodyBytes))
-					}
-				}
-			}
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") && len(rawBody) > 0 {
+			r.Body = io.NopCloser(bytes.NewReader(rawBody))
 		}
 		h.server.ServeHTTP(w, r)
 	}))(c)

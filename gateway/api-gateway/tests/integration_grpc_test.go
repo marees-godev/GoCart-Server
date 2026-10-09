@@ -24,6 +24,7 @@ import (
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -65,7 +66,7 @@ func (m *mockCartBackend) GetCart(ctx context.Context, req *cartpb.GetCartReques
 	return &cartpb.GetCartResponse{Cart: cart}, nil
 }
 
-func (m *mockCartBackend) AddToCart(ctx context.Context, req *cartpb.AddToCartRequest) (*cartpb.AddToCartResponse, error) {
+func (m *mockCartBackend) AddCartItem(ctx context.Context, req *cartpb.AddCartItemRequest) (*cartpb.AddCartItemResponse, error) {
 	if req.Quantity <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "quantity must be greater than 0")
 	}
@@ -90,7 +91,7 @@ func (m *mockCartBackend) AddToCart(ctx context.Context, req *cartpb.AddToCartRe
 	cart.Items = append(cart.Items, newItem)
 	cart.TotalAmount += float64(req.Quantity) * req.UnitPrice
 
-	return &cartpb.AddToCartResponse{Cart: cart}, nil
+	return &cartpb.AddCartItemResponse{Cart: cart}, nil
 }
 
 func extractField(src, pattern string) string {
@@ -103,7 +104,7 @@ func extractField(src, pattern string) string {
 }
 
 func writeGraphQLError(c *fiber.Ctx, err error) error {
-	translated := client.TranslateGRPCError(err)
+	translated := grpcclient.TranslateGRPCError(err)
 	var appErr *appErrors.AppError
 	code := appErrors.CodeInternalError
 	msg := err.Error()
@@ -180,7 +181,7 @@ func setupIntegrationApp(t *testing.T, backend *mockCartBackend) (*fiber.App, fu
 			qty, _ := strconv.Atoi(quantityStr)
 			price, _ := strconv.ParseFloat(unitPriceStr, 64)
 
-			res, err := clientMgr.CartClient.AddToCart(c.Context(), &cartpb.AddToCartRequest{
+			res, err := clientMgr.CartClient.AddCartItem(c.Context(), &cartpb.AddCartItemRequest{
 				UserId:    userId,
 				ProductId: productId,
 				Quantity:  int32(qty),
@@ -454,13 +455,6 @@ func TestE2E_GatewayRateLimiting(t *testing.T) {
 	}()
 
 	cfg := &config.Config{
-		App: config.AppConfig{
-			Name: "api-gateway",
-		},
-		GRPC: config.GRPCConfig{
-			CartServiceAddr: "passthrough://bufnet",
-			DefaultTimeout:  2 * time.Second,
-		},
 		RateLimit: config.RateLimitConfig{
 			Enabled: true,
 			Max:     2,

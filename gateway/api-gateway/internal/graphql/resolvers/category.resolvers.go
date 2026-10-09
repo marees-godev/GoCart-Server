@@ -6,22 +6,239 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // CreateCategory is the resolver for the createCategory field.
 func (r *mutationResolver) CreateCategory(ctx context.Context, input model.CreateCategoryInput) (*model.Category, error) {
-	panic(fmt.Errorf("not implemented: CreateCategory - createCategory"))
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	parentID := ""
+	if input.ParentCategoryID != nil && *input.ParentCategoryID != "" {
+		parentID = *input.ParentCategoryID
+	}
+
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+
+	req := &categorypb.CreateCategoryRequest{
+		Name:             input.Name,
+		ParentCategoryId: parentID,
+		Description:      desc,
+		IsActive:         input.IsActive,
+	}
+
+	resp, err := client.CreateCategory(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapCategory(resp.GetCategory()), nil
+}
+
+// UpdateCategory is the resolver for the updateCategory field.
+func (r *mutationResolver) UpdateCategory(ctx context.Context, id string, input model.UpdateCategoryInput) (*model.Category, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	name := ""
+	if input.Name != nil {
+		name = *input.Name
+	}
+
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+
+	parentID := ""
+	if input.ParentCategoryID != nil && *input.ParentCategoryID != "" {
+		parentID = *input.ParentCategoryID
+	}
+
+	req := &categorypb.UpdateCategoryRequest{
+		Id:               id,
+		Name:             name,
+		Description:      desc,
+		ParentCategoryId: parentID,
+		IsActive:         input.IsActive,
+	}
+
+	resp, err := client.UpdateCategory(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapCategory(resp.GetCategory()), nil
+}
+
+// DeleteCategory is the resolver for the deleteCategory field.
+func (r *mutationResolver) DeleteCategory(ctx context.Context, id string) (*model.DeleteCategoryResponse, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &categorypb.DeleteCategoryRequest{
+		Id: id,
+	}
+
+	resp, err := client.DeleteCategory(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteCategoryResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
 }
 
 // Category is the resolver for the category field.
 func (r *queryResolver) Category(ctx context.Context, id string) (*model.Category, error) {
-	panic(fmt.Errorf("not implemented: Category - category"))
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &categorypb.GetCategoryRequest{
+		Id: id,
+	}
+
+	resp, err := client.GetCategory(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapCategory(resp.GetCategory()), nil
 }
 
 // Categories is the resolver for the categories field.
-func (r *queryResolver) Categories(ctx context.Context, limit *int, offset *int) (*model.CategoryList, error) {
-	panic(fmt.Errorf("not implemented: Categories - categories"))
+func (r *queryResolver) Categories(ctx context.Context, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) (*model.CategoryList, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var l int32 = 50
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	pID := ""
+	if parentCategoryID != nil {
+		pID = *parentCategoryID
+	}
+
+	rOnly := false
+	if rootOnly != nil {
+		rOnly = *rootOnly
+	}
+
+	req := &categorypb.ListCategoriesRequest{
+		Limit:            l,
+		Offset:           o,
+		ParentCategoryId: pID,
+		RootOnly:         rOnly,
+	}
+
+	resp, err := client.ListCategories(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.CategoryList{
+		Categories: maps.MapCategories(resp.GetCategories()),
+		Total:      int(resp.GetTotal()),
+	}, nil
+}
+
+// ChildCategories is the resolver for the childCategories field.
+func (r *queryResolver) ChildCategories(ctx context.Context, parentCategoryID string, limit *int, offset *int) (*model.CategoryList, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var l int32 = 50
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	req := &categorypb.GetChildCategoriesRequest{
+		ParentCategoryId: parentCategoryID,
+		Limit:            l,
+		Offset:           o,
+	}
+
+	resp, err := client.GetChildCategories(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.CategoryList{
+		Categories: maps.MapCategories(resp.GetCategories()),
+		Total:      int(resp.GetTotal()),
+	}, nil
+}
+
+// ValidateCategoryForAssignment is the resolver for the validateCategoryForAssignment field.
+func (r *queryResolver) ValidateCategoryForAssignment(ctx context.Context, categoryID string) (*model.ValidateCategoryResponse, error) {
+	client, err := r.getCategoryClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &categorypb.ValidateCategoryForAssignmentRequest{
+		CategoryId: categoryID,
+	}
+
+	resp, err := client.ValidateCategoryForAssignment(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ValidateCategoryResponse{
+		IsValid:  resp.GetIsValid(),
+		Message:  resp.GetMessage(),
+		Category: maps.MapCategory(resp.GetCategory()),
+	}, nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *Resolver) getCategoryClient() (categorypb.CategoryServiceClient, error) {
+	if r.Clients != nil && r.Clients.CategoryClient != nil {
+		return r.Clients.CategoryClient, nil
+	}
+	if r.ClientMgr != nil && r.ClientMgr.CategoryClient != nil {
+		return r.ClientMgr.CategoryClient, nil
+	}
+	return nil, appErrors.Internal(nil, "category service client unavailable")
 }

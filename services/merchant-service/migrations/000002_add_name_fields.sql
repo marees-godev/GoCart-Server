@@ -1,3 +1,9 @@
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL DEFAULT '';
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) NOT NULL DEFAULT '';
-CREATE INDEX IF NOT EXISTS idx_merchants_user_id ON merchants(user_id);
+ALTER TABLE merchants DROP COLUMN IF EXISTS user_id;
+DROP INDEX IF EXISTS idx_merchants_user_id;
+ALTER TABLE merchants ALTER COLUMN business_name SET DEFAULT '';
+ALTER TYPE merchant_status ADD VALUE IF NOT EXISTS 'SUSPENDED';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_merchants_deleted_at ON merchants(deleted_at);
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pan_card_number VARCHAR(100) NOT NULL DEFAULT '';

@@ -448,7 +448,7 @@ func (s *storeService) SubmitStore(ctx context.Context, authMerchantID string, r
 		return nil, errors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot be submitted for approval (must be %s)", existingStore.ApprovalStatus, model.StoreStatusDraft))
 	}
 
-	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusDraft, model.StoreStatusPendingApproval, nil)
+	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusDraft, model.StoreStatusPendingApproval, nil, merchantID)
 }
 
 func (s *storeService) ApproveStore(ctx context.Context, authAdminID string, req dto.ApproveStoreRequest) (*model.Store, error) {
@@ -477,7 +477,7 @@ func (s *storeService) ApproveStore(ctx context.Context, authAdminID string, req
 		return nil, errors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot be approved (must be %s)", existingStore.ApprovalStatus, model.StoreStatusPendingApproval))
 	}
 
-	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusApproved, nil)
+	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusApproved, nil, adminID)
 }
 
 func (s *storeService) RejectStore(ctx context.Context, authAdminID string, req dto.RejectStoreRequest) (*model.Store, error) {
@@ -511,7 +511,7 @@ func (s *storeService) RejectStore(ctx context.Context, authAdminID string, req 
 		return nil, errors.UnprocessableEntity(fmt.Sprintf("invalid state transition: store in status %s cannot be rejected (must be %s)", existingStore.ApprovalStatus, model.StoreStatusPendingApproval))
 	}
 
-	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusRejected, &reason)
+	return s.repo.UpdateStatus(ctx, existingStore.ID, model.StoreStatusPendingApproval, model.StoreStatusRejected, &reason, adminID)
 }
 
 func (s *storeService) SubmitKYC(ctx context.Context, authMerchantID string, req dto.SubmitKYCRequest) (*model.Store, error) {
@@ -582,8 +582,28 @@ func (s *storeService) SubmitKYC(ctx context.Context, authMerchantID string, req
 	return s.repo.SubmitKYC(ctx, existingStore.ID, model.KYCStatusPending, bank)
 }
 
+func resolveUserContext(ctx context.Context, fallbackID string) (userID, role string, err error) {
+	if user, ok := auth.UserFromContext(ctx); ok && user != nil {
+		userID = strings.TrimSpace(user.UserID)
+		role = strings.ToUpper(strings.TrimSpace(user.Role))
+	}
+	if userID == "" {
+		userID = grpcclient.GetUserID(ctx)
+	}
+	if role == "" {
+		role = strings.ToUpper(strings.TrimSpace(grpcclient.GetUserRole(ctx)))
+	}
+	if userID == "" {
+		userID = strings.TrimSpace(fallbackID)
+	}
+	if role == "" && userID == "" {
+		return "", "", errors.Unauthorized("missing authenticated context")
+	}
+	return userID, role, nil
+}
+
 func (s *storeService) PublishStore(ctx context.Context, authMerchantID string, req dto.PublishStoreRequest) (*model.Store, error) {
-	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	userID, role, err := resolveUserContext(ctx, authMerchantID)
 	if err != nil {
 		return nil, err
 	}
@@ -600,7 +620,7 @@ func (s *storeService) PublishStore(ctx context.Context, authMerchantID string, 
 		return nil, errors.NotFound("store not found")
 	}
 
-	if existingStore.MerchantID != merchantID {
+	if role != auth.RoleAdmin && existingStore.MerchantID != userID {
 		return nil, errors.Forbidden("merchant can only operate on their own store")
 	}
 
@@ -620,7 +640,7 @@ func (s *storeService) PublishStore(ctx context.Context, authMerchantID string, 
 }
 
 func (s *storeService) UnpublishStore(ctx context.Context, authMerchantID string, req dto.UnpublishStoreRequest) (*model.Store, error) {
-	merchantID, err := resolveMerchantContext(ctx, authMerchantID)
+	userID, role, err := resolveUserContext(ctx, authMerchantID)
 	if err != nil {
 		return nil, err
 	}
@@ -637,7 +657,7 @@ func (s *storeService) UnpublishStore(ctx context.Context, authMerchantID string
 		return nil, errors.NotFound("store not found")
 	}
 
-	if existingStore.MerchantID != merchantID {
+	if role != auth.RoleAdmin && existingStore.MerchantID != userID {
 		return nil, errors.Forbidden("merchant can only operate on their own store")
 	}
 
@@ -667,7 +687,7 @@ func (s *storeService) SuspendStore(ctx context.Context, authAdminID string, req
 	}
 
 	reason := strings.TrimSpace(req.Reason)
-	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusSuspended, &reason)
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusSuspended, &reason, adminID)
 }
 
 func (s *storeService) UnsuspendStore(ctx context.Context, authAdminID string, req dto.UnsuspendStoreRequest) (*model.Store, error) {
@@ -711,7 +731,7 @@ func (s *storeService) UnsuspendStore(ctx context.Context, authAdminID string, r
 		}
 	}
 
-	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusApproved, nil)
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusApproved, nil, adminID)
 }
 
 func (s *storeService) AppealStore(ctx context.Context, authMerchantID string, req dto.AppealStoreRequest) (*model.Store, *model.StoreAppeal, error) {
@@ -843,5 +863,5 @@ func (s *storeService) CloseStore(ctx context.Context, authUserID string, req dt
 		reason = &r
 	}
 
-	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusClosed, reason)
+	return s.repo.UpdateApprovalStatus(ctx, existingStore.ID, model.StoreStatusClosed, reason, userID)
 }

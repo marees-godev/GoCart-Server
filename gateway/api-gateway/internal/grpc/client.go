@@ -2,6 +2,11 @@ package grpc
 
 import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -11,16 +16,25 @@ import (
 )
 
 type Clients struct {
-	AuthClient  auth.AuthServiceClient
-	UserClient  userpb.UserServiceClient
-	StoreClient store.StoreServiceClient
-	conns       []*grpc.ClientConn
+	AuthClient      auth.AuthServiceClient
+	UserClient      userpb.UserServiceClient
+	ProductClient   productpb.ProductServiceClient
+	StoreClient     store.StoreServiceClient
+	CategoryClient  categorypb.CategoryServiceClient
+	CartClient      cartpb.CartServiceClient
+	InventoryClient inventorypb.InventoryServiceClient
+	OrderClient     orderpb.OrderServiceClient
+	conns           []*grpc.ClientConn
 }
 
 func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, error) {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(grpcclient.UnaryClientInterceptor(cfg.GRPC.DefaultTimeout)),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(10*1024*1024),
+			grpc.MaxCallSendMsgSize(10*1024*1024),
+		),
 	}
 	opts = append(opts, extraOpts...)
 
@@ -91,12 +105,13 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
-	storeAddr := cfg.GRPC.StoreServiceAddr
-	if storeAddr == "" {
-		storeAddr = "localhost:50055"
+	categoryAddr := cfg.GRPC.CategoryServiceAddr
+	if categoryAddr == "" {
+		categoryAddr = "localhost:50054"
 	}
-	storeConn, err := grpc.NewClient(storeAddr, opts...)
+	categoryConn, err := grpc.NewClient(categoryAddr, opts...)
 	if err != nil {
+		authConn.Close()
 		userConn.Close()
 		productConn.Close()
 		cartConn.Close()
@@ -104,12 +119,46 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
+	storeAddr := cfg.GRPC.StoreServiceAddr
+	if storeAddr == "" {
+		storeAddr = "localhost:50055"
+	}
+	storeConn, err := grpc.NewClient(storeAddr, opts...)
+	if err != nil {
+		authConn.Close()
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		categoryConn.Close()
+		return nil, err
+	}
+
+	invAddr := cfg.GRPC.InventoryServiceAddr
+	if invAddr == "" {
+		invAddr = "localhost:50058"
+	}
+	invConn, err := grpc.NewClient(invAddr, opts...)
+	if err != nil {
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		storeConn.Close()
+		return nil, err
+	}
+
 	return &Clients{
-		AuthClient:  auth.NewAuthServiceClient(authConn),
-		UserClient:  userpb.NewUserServiceClient(userConn),
-		StoreClient: store.NewStoreServiceClient(storeConn),
+		AuthClient:      auth.NewAuthServiceClient(authConn),
+		UserClient:      userpb.NewUserServiceClient(userConn),
+		ProductClient:   productpb.NewProductServiceClient(productConn),
+		StoreClient:     store.NewStoreServiceClient(storeConn),
+		CategoryClient:  categorypb.NewCategoryServiceClient(categoryConn),
+		CartClient:      cartpb.NewCartServiceClient(cartConn),
+		InventoryClient: inventorypb.NewInventoryServiceClient(invConn),
+		OrderClient:     orderpb.NewOrderServiceClient(orderConn),
 		conns: []*grpc.ClientConn{
-			authConn, userConn, productConn, cartConn, orderConn, storeConn,
+			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn,
 		},
 	}, nil
 }
@@ -127,6 +176,18 @@ func NewClientsWithServices(
 		}
 		if a, ok := svc.(auth.AuthServiceClient); ok {
 			c.AuthClient = a
+		}
+		if cat, ok := svc.(categorypb.CategoryServiceClient); ok {
+			c.CategoryClient = cat
+		}
+		if p, ok := svc.(productpb.ProductServiceClient); ok {
+			c.ProductClient = p
+		}
+		if inv, ok := svc.(inventorypb.InventoryServiceClient); ok {
+			c.InventoryClient = inv
+		}
+		if ord, ok := svc.(orderpb.OrderServiceClient); ok {
+			c.OrderClient = ord
 		}
 	}
 	return c

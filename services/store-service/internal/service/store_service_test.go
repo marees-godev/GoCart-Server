@@ -159,7 +159,7 @@ func (m *mockStoreRepository) IsSlugAvailable(ctx context.Context, slug string, 
 	return false, nil
 }
 
-func (m *mockStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string) (*model.Store, error) {
+func (m *mockStoreRepository) UpdateStatus(ctx context.Context, id string, expectedStatus, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error) {
 	existing, exists := m.stores[id]
 	if !exists {
 		return nil, appErrors.NotFound("store not found")
@@ -174,7 +174,7 @@ func (m *mockStoreRepository) UpdateStatus(ctx context.Context, id string, expec
 	return &cp, nil
 }
 
-func (m *mockStoreRepository) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string) (*model.Store, error) {
+func (m *mockStoreRepository) UpdateApprovalStatus(ctx context.Context, id string, newStatus string, rejectionReason *string, actorID ...string) (*model.Store, error) {
 	existing, exists := m.stores[id]
 	if !exists {
 		return nil, appErrors.NotFound("store not found")

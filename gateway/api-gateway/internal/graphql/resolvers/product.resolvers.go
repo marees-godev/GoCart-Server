@@ -6,32 +6,354 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // CreateProduct is the resolver for the createProduct field.
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: CreateProduct - createProduct"))
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	name := input.Name
+
+	desc := ""
+	if input.Description != nil {
+		desc = *input.Description
+	}
+
+	statusStr := ""
+	if input.Status != nil {
+		statusStr = string(*input.Status)
+	}
+
+	var tax float64 = 0.0
+	if input.Tax != nil {
+		tax = *input.Tax
+	}
+
+	variants := make([]*productpb.CreateProductVariantInput, 0, len(input.Variants))
+	for _, v := range input.Variants {
+		if v != nil {
+			var stock int32 = 0
+			if v.Stock != nil {
+				stock = int32(*v.Stock)
+			}
+			attrJSON := ""
+			if v.AttributesJSON != nil {
+				attrJSON = *v.AttributesJSON
+			}
+			variants = append(variants, &productpb.CreateProductVariantInput{
+				Sku:            v.Sku,
+				Name:           v.Name,
+				Price:          v.Price,
+				Mrp:            v.Mrp,
+				Stock:          stock,
+				AttributesJson: attrJSON,
+			})
+		}
+	}
+
+	var images []string
+	if len(input.Images) > 0 {
+		images = append(images, input.Images...)
+	}
+
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process imagesUpload file upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
+	imgURL := ""
+	if input.ImageURL != nil {
+		imgURL = *input.ImageURL
+	} else if len(images) > 0 {
+		imgURL = images[0]
+	}
+
+	req := &productpb.CreateProductRequest{
+		StoreId:     input.StoreID,
+		CategoryId:  input.CategoryID,
+		Sku:         input.Sku,
+		Name:        name,
+		Productname: name,
+		Description: desc,
+		Price:       input.Price,
+		Mrp:         input.Mrp,
+		Tax:         tax,
+		Status:      statusStr,
+		ImageUrl:    imgURL,
+		Images:      images,
+		Variants:    variants,
+	}
+
+	resp, err := client.CreateProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProduct(resp.GetProduct()), nil
 }
 
 // UpdateProduct is the resolver for the updateProduct field.
 func (r *mutationResolver) UpdateProduct(ctx context.Context, id string, input model.UpdateProductInput) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: UpdateProduct - updateProduct"))
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &productpb.UpdateProductRequest{
+		Id:         id,
+		CategoryId: input.CategoryID,
+		Images:     input.Images,
+	}
+
+	if input.Name != nil {
+		req.Name = input.Name
+	}
+
+	if input.Description != nil {
+		req.Description = input.Description
+	}
+
+	if input.Price != nil {
+		req.Price = input.Price
+	}
+
+	if input.Mrp != nil {
+		req.Mrp = input.Mrp
+	}
+
+	if input.Tax != nil {
+		req.Tax = input.Tax
+	}
+
+	if input.Status != nil {
+		st := string(*input.Status)
+		req.Status = &st
+	}
+
+	var images []string
+	if len(input.Images) > 0 {
+		images = append(images, input.Images...)
+	}
+
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process imagesUpload file upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
+	req.Images = images
+
+	if input.ImageURL != nil {
+		req.ImageUrl = input.ImageURL
+	} else if len(images) > 0 {
+		req.ImageUrl = &images[0]
+	}
+
+	if len(input.Variants) > 0 {
+		variants := make([]*productpb.UpdateProductVariantInput, 0, len(input.Variants))
+		for _, v := range input.Variants {
+			if v != nil {
+				var vID string
+				if v.ID != nil {
+					vID = *v.ID
+				}
+				var sku string
+				if v.Sku != nil {
+					sku = *v.Sku
+				}
+				var name string
+				if v.Name != nil {
+					name = *v.Name
+				}
+				var price float64
+				if v.Price != nil {
+					price = *v.Price
+				}
+				var mrp float64
+				if v.Mrp != nil {
+					mrp = *v.Mrp
+				}
+				var stock int32
+				if v.Stock != nil {
+					stock = int32(*v.Stock)
+				}
+				var attrJSON string
+				if v.AttributesJSON != nil {
+					attrJSON = *v.AttributesJSON
+				}
+				var statusStr string
+				if v.Status != nil {
+					statusStr = string(*v.Status)
+				}
+
+				variants = append(variants, &productpb.UpdateProductVariantInput{
+					Id:             vID,
+					Sku:            sku,
+					Name:           name,
+					Price:          price,
+					Mrp:            mrp,
+					Stock:          stock,
+					AttributesJson: attrJSON,
+					Status:         statusStr,
+				})
+			}
+		}
+		req.Variants = variants
+	}
+
+	resp, err := client.UpdateProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProduct(resp.GetProduct()), nil
 }
 
 // DeleteProduct is the resolver for the deleteProduct field.
-func (r *mutationResolver) DeleteProduct(ctx context.Context, id string) (bool, error) {
-	panic(fmt.Errorf("not implemented: DeleteProduct - deleteProduct"))
+func (r *mutationResolver) DeleteProduct(ctx context.Context, id string) (*model.DeleteProductResponse, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &productpb.DeleteProductRequest{
+		Id: id,
+	}
+
+	resp, err := client.DeleteProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteProductResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
+}
+
+// DeleteProductVariant is the resolver for the deleteProductVariant field.
+func (r *mutationResolver) DeleteProductVariant(ctx context.Context, productID string, id string) (*model.DeleteProductVariantResponse, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &productpb.DeleteProductVariantRequest{
+		ProductId: productID,
+		Id:        id,
+	}
+
+	resp, err := client.DeleteProductVariant(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteProductVariantResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
 }
 
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id string) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: Product - product"))
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &productpb.GetProductRequest{
+		Id: id,
+	}
+
+	resp, err := client.GetProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProduct(resp.GetProduct()), nil
 }
 
 // Products is the resolver for the products field.
-func (r *queryResolver) Products(ctx context.Context, limit *int, offset *int, categoryID *string, storeID *string) (*model.ProductList, error) {
-	panic(fmt.Errorf("not implemented: Products - products"))
+func (r *queryResolver) Products(ctx context.Context, limit *int, offset *int, categoryID *string, storeID *string, status *model.ProductStatus) (*model.ProductList, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var l int32 = 50
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	catID := ""
+	if categoryID != nil {
+		catID = *categoryID
+	}
+
+	sID := ""
+	if storeID != nil {
+		sID = *storeID
+	}
+
+	stStr := ""
+	if status != nil {
+		stStr = string(*status)
+	}
+
+	req := &productpb.ListProductsRequest{
+		Limit:      l,
+		Offset:     o,
+		CategoryId: catID,
+		StoreId:    sID,
+		Status:     stStr,
+	}
+
+	resp, err := client.ListProducts(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ProductList{
+		Products: maps.MapProducts(resp.GetProducts()),
+		Total:    int(resp.GetTotal()),
+	}, nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *Resolver) getProductClient() (productpb.ProductServiceClient, error) {
+	if r.Clients != nil && r.Clients.ProductClient != nil {
+		return r.Clients.ProductClient, nil
+	}
+	if r.ClientMgr != nil && r.ClientMgr.ProductClient != nil {
+		return r.ClientMgr.ProductClient, nil
+	}
+	return nil, appErrors.Internal(nil, "product service client unavailable")
 }

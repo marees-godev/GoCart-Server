@@ -1,8 +1,11 @@
 package resolvers
 
 import (
-	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"time"
+
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 )
 
@@ -44,19 +47,14 @@ func toModelUser(u *userpb.User) *model.User {
 	}
 }
 
-func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
+func toModelMerchant(m *merchantpb.MerchantResponseData) *model.Merchant {
 	if m == nil {
 		return nil
 	}
 	res := &model.Merchant{
 		ID:           m.Id,
-		MerchantID:   m.Id,
 		BusinessName: m.BusinessName,
-		Status:       m.Status,
-	}
-	if m.UserId != "" {
-		uid := m.UserId
-		res.UserID = &uid
+		Status:       model.MerchantStatus(m.Status.String()),
 	}
 	if m.FirstName != "" {
 		fn := m.FirstName
@@ -66,17 +64,21 @@ func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
 		ln := m.LastName
 		res.LastName = &ln
 	}
-	if m.CreatedAt != "" {
-		ca := m.CreatedAt
+	if m.CreatedAt != nil {
+		ca := m.CreatedAt.AsTime().Format(time.RFC3339)
 		res.CreatedAt = &ca
 	}
-	if m.UpdatedAt != "" {
-		ua := m.UpdatedAt
+	if m.UpdatedAt != nil {
+		ua := m.UpdatedAt.AsTime().Format(time.RFC3339)
 		res.UpdatedAt = &ua
 	}
-	if m.TaxId != "" {
-		tid := m.TaxId
-		res.TaxID = &tid
+	if m.DeletedAt != nil {
+		da := m.DeletedAt.AsTime().Format(time.RFC3339)
+		res.DeletedAt = &da
+	}
+	if m.PanCardNumber != "" {
+		tid := m.PanCardNumber
+		res.PanCardNumber = &tid
 	}
 	if m.BusinessEmail != "" {
 		be := m.BusinessEmail
@@ -92,6 +94,34 @@ func toModelMerchant(m *merchantpb.Merchant) *model.Merchant {
 	}
 	return res
 }
+
+func toModelMerchantAppeal(a *merchantpb.MerchantAppealData) *model.MerchantAppeal {
+	if a == nil {
+		return nil
+	}
+	res := &model.MerchantAppeal{
+		ID:         a.Id,
+		MerchantID: a.MerchantId,
+		Reason:     a.Reason,
+		Status:     a.Status,
+	}
+	if a.AdminComment != "" {
+		comment := a.AdminComment
+		res.AdminComment = &comment
+	}
+	if a.ReviewedAt != nil {
+		reviewedAt := a.ReviewedAt.AsTime().Format(time.RFC3339)
+		res.ReviewedAt = &reviewedAt
+	}
+	if a.CreatedAt != nil {
+		res.CreatedAt = a.CreatedAt.AsTime().Format(time.RFC3339)
+	}
+	if a.UpdatedAt != nil {
+		res.UpdatedAt = a.UpdatedAt.AsTime().Format(time.RFC3339)
+	}
+	return res
+}
+
 
 func toModelAddress(a *userpb.Address) *model.Address {
 	if a == nil {
@@ -150,4 +180,31 @@ func toModelAddressList(list []*userpb.Address) []*model.Address {
 		res[i] = toModelAddress(a)
 	}
 	return res
+}
+
+func mapInventoryItem(inv *inventorypb.InventoryItem) *model.InventoryItem {
+	if inv == nil {
+		return nil
+	}
+	var variantID *string
+	if inv.VariantId != "" {
+		v := inv.VariantId
+		variantID = &v
+	}
+	var createdAt *string
+	if inv.CreatedAt != "" {
+		c := inv.CreatedAt
+		createdAt = &c
+	}
+	return &model.InventoryItem{
+		InventoryID:       inv.InventoryId,
+		ProductID:         inv.ProductId,
+		VariantID:         variantID,
+		Sku:               inv.Sku,
+		AvailableQuantity: int(inv.AvailableQuantity),
+		ReservedQuantity:  int(inv.ReservedQuantity),
+		LowStockThreshold: int(inv.LowStockThreshold),
+		UpdatedAt:         inv.UpdatedAt,
+		CreatedAt:         createdAt,
+	}
 }

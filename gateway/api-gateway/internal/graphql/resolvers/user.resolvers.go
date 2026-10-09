@@ -6,9 +6,11 @@ package resolvers
 
 import (
 	"context"
+	"io"
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -46,17 +48,40 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		gender = &g
 	}
 
+	var avatarImage []byte
+	var avatarContentType *string
+	var avatarFilename *string
+
+	if input.Avatar != nil && input.Avatar.File != nil {
+		data, err := io.ReadAll(input.Avatar.File)
+		if err != nil {
+			return nil, appErrors.BadRequest("failed to read avatar file upload")
+		}
+		avatarImage = data
+		if input.Avatar.ContentType != "" {
+			ct := input.Avatar.ContentType
+			avatarContentType = &ct
+		}
+		if input.Avatar.Filename != "" {
+			fn := input.Avatar.Filename
+			avatarFilename = &fn
+		}
+	}
+
 	req := &userpb.UpdateUserRequest{
-		Id:             id,
-		FirstName:      firstName,
-		LastName:       lastName,
-		Phone:          phone,
-		Username:       input.Username,
-		AlternatePhone: input.AlternatePhone,
-		DateOfBirth:    input.DateOfBirth,
-		Gender:         gender,
-		Bio:            input.Bio,
-		AvatarUrl:      input.AvatarURL,
+		Id:                id,
+		FirstName:         firstName,
+		LastName:          lastName,
+		Phone:             phone,
+		Username:          input.Username,
+		AlternatePhone:    input.AlternatePhone,
+		DateOfBirth:       input.DateOfBirth,
+		Gender:            gender,
+		Bio:               input.Bio,
+		AvatarUrl:         input.AvatarURL,
+		AvatarImage:       avatarImage,
+		AvatarContentType: avatarContentType,
+		AvatarFilename:    avatarFilename,
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
 	if err != nil {
@@ -300,7 +325,12 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
-	return toModelUser(res.User), nil
+	user := toModelUser(res.User)
+	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil && user != nil && userCtx.Role != "" {
+		rStr := userCtx.Role
+		user.Role = &rStr
+	}
+	return user, nil
 }
 
 // User is the resolver for the user field.

@@ -20,6 +20,7 @@ const (
 	CodeInternalError       = "INTERNAL_SERVER_ERROR"
 	CodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
 	CodeTooManyRequests     = "TOO_MANY_REQUESTS"
+	CodeInvalidCredentials  = "INVALID_CREDENTIALS"
 )
 
 type ErrorDetail struct {
@@ -98,11 +99,22 @@ func BadRequest(message string) *AppError {
 	return New(CodeBadRequest, message, http.StatusBadRequest)
 }
 
+func InvalidArgument(message string) *AppError {
+	return BadRequest(message)
+}
+
 func Unauthorized(message string) *AppError {
 	if message == "" {
 		message = "Unauthorized access"
 	}
 	return New(CodeUnauthorized, message, http.StatusUnauthorized)
+}
+
+func InvalidCredentials(message string) *AppError {
+	if message == "" {
+		message = "Invalid credentials"
+	}
+	return New(CodeInvalidCredentials, message, http.StatusUnauthorized)
 }
 
 func Forbidden(message string) *AppError {
@@ -124,6 +136,10 @@ func Conflict(message string) *AppError {
 		message = "Resource conflict"
 	}
 	return New(CodeConflict, message, http.StatusConflict)
+}
+
+func AlreadyExists(message string) *AppError {
+	return Conflict(message)
 }
 
 func UnprocessableEntity(message string) *AppError {
@@ -171,6 +187,10 @@ func AsAppError(err error) *AppError {
 		case codes.AlreadyExists:
 			return Conflict(st.Message())
 		case codes.Unauthenticated:
+			lower := strings.ToLower(st.Message())
+			if strings.Contains(lower, "credential") || strings.Contains(st.Message(), "INVALID_CREDENTIALS") || strings.Contains(lower, "password") {
+				return InvalidCredentials(st.Message())
+			}
 			return Unauthorized(st.Message())
 		case codes.PermissionDenied:
 			return Forbidden(st.Message())
@@ -192,9 +212,6 @@ func AsAppError(err error) *AppError {
 	return Internal(err, err.Error())
 }
 
-// MapAppErrorToGRPC converts an application error into an equivalent gRPC status error.
-// If err is nil, it returns nil.
-// If err is already a gRPC status error, it is returned directly.
 func MapAppErrorToGRPC(err error) error {
 	if err == nil {
 		return nil
@@ -209,7 +226,7 @@ func MapAppErrorToGRPC(err error) error {
 	switch appErr.Code {
 	case CodeNotFound:
 		return status.Error(codes.NotFound, appErr.Message)
-	case CodeUnauthorized:
+	case CodeUnauthorized, CodeInvalidCredentials:
 		return status.Error(codes.Unauthenticated, appErr.Message)
 	case CodeForbidden:
 		return status.Error(codes.PermissionDenied, appErr.Message)
@@ -226,12 +243,20 @@ func MapAppErrorToGRPC(err error) error {
 	}
 }
 
-// ToGRPC converts an error into an equivalent gRPC status error.
 func ToGRPC(err error) error {
 	return MapAppErrorToGRPC(err)
 }
 
-// ToGRPC converts the AppError into an equivalent gRPC status error.
 func (e *AppError) ToGRPC() error {
 	return MapAppErrorToGRPC(e)
+}
+
+func IsConflict(err error) bool {
+	appErr := AsAppError(err)
+	return appErr != nil && appErr.Code == CodeConflict
+}
+
+func IsNotFound(err error) bool {
+	appErr := AsAppError(err)
+	return appErr != nil && appErr.Code == CodeNotFound
 }

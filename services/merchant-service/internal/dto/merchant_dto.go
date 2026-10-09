@@ -8,22 +8,17 @@ import (
 
 type CreateMerchantRequest struct {
 	ID            string `json:"id,omitempty"`
-	UserID        string `json:"user_id,omitempty"`
-	BusinessName  string `json:"business_name"`
 	FirstName     string `json:"first_name,omitempty"`
 	LastName      string `json:"last_name,omitempty"`
 	BusinessEmail string `json:"business_email,omitempty"`
-	BusinessPhone string `json:"business_phone,omitempty"`
-	TaxID         string `json:"tax_id,omitempty"`
 }
 
 type UpdateMerchantRequest struct {
-	BusinessName  string `json:"business_name,omitempty"`
+	BusinessName  string `json:"business_name"`
 	FirstName     string `json:"first_name,omitempty"`
 	LastName      string `json:"last_name,omitempty"`
-	BusinessEmail string `json:"business_email,omitempty"`
-	BusinessPhone string `json:"business_phone,omitempty"`
-	TaxID         string `json:"tax_id,omitempty"`
+	BusinessPhone string `json:"business_phone"`
+	PanCardNumber string `json:"pan_card_number"`
 }
 
 type UpdateMerchantStatusRequest struct {
@@ -33,13 +28,12 @@ type UpdateMerchantStatusRequest struct {
 
 type MerchantResponse struct {
 	ID              string `json:"id"`
-	UserID          string `json:"user_id,omitempty"`
 	BusinessName    string `json:"business_name"`
 	FirstName       string `json:"first_name,omitempty"`
 	LastName        string `json:"last_name,omitempty"`
 	BusinessEmail   string `json:"business_email,omitempty"`
 	BusinessPhone   string `json:"business_phone,omitempty"`
-	TaxID           string `json:"tax_id,omitempty"`
+	PanCardNumber   string `json:"pan_card_number,omitempty"`
 	Status          string `json:"status"`
 	RejectionReason string `json:"rejection_reason,omitempty"`
 	CreatedAt       string `json:"created_at"`
@@ -59,13 +53,12 @@ func ToMerchantResponse(m *model.Merchant) MerchantResponse {
 	}
 	return MerchantResponse{
 		ID:              m.ID.String(),
-		UserID:          m.UserID.String(),
 		BusinessName:    m.BusinessName,
 		FirstName:       m.FirstName,
 		LastName:        m.LastName,
 		BusinessEmail:   m.BusinessEmail,
 		BusinessPhone:   m.BusinessPhone,
-		TaxID:           m.TaxID,
+		PanCardNumber:   m.PanCardNumber,
 		Status:          m.Status,
 		RejectionReason: m.RejectionReason,
 		CreatedAt:       m.CreatedAt.Format(time.RFC3339),

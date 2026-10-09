@@ -26,6 +26,8 @@ func NewProducer(cfg Config) *Producer {
 		BatchTimeout:           10 * time.Millisecond,
 		Async:                  false,
 		AllowAutoTopicCreation: true,
+		Logger:                 segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
+		ErrorLogger:            segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
 	}
 
 	return &Producer{
@@ -51,7 +53,9 @@ func (p *Producer) Publish(ctx context.Context, topic, key string, envelope *eve
 		Value: payloadBytes,
 		Headers: []segmentio.Header{
 			{Key: "event_id", Value: []byte(envelope.EventID)},
+			{Key: "idempotency_key", Value: []byte(envelope.EventID)},
 			{Key: "event_type", Value: []byte(envelope.EventType)},
+			{Key: "aggregate_id", Value: []byte(key)},
 			{Key: "source", Value: []byte(envelope.Source)},
 			{Key: "timestamp", Value: []byte(envelope.Timestamp.Format(time.RFC3339))},
 		},

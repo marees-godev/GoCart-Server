@@ -23,9 +23,10 @@ const (
 )
 
 type UserContext struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email,omitempty"`
+	UserID   string `json:"user_id"`
+	Role     string `json:"role"`
+	Email    string `json:"email,omitempty"`
+	RawToken string `json:"raw_token,omitempty"`
 }
 
 type UserClaims struct {
@@ -95,11 +96,40 @@ func ValidateToken(tokenStr, secret string) (*UserContext, error) {
 	}
 
 	return &UserContext{
-		UserID: userID,
-		Role:   claims.Role,
-		Email:  claims.Email,
+		UserID:   userID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+		RawToken: tokenStr,
 	}, nil
 }
+
+func ExtractClaimsWithoutExpiry(tokenStr, secret string) (*UserContext, error) {
+	if tokenStr == "" {
+		return nil, errors.New("token is empty")
+	}
+	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
+	tokenStr = strings.TrimSpace(tokenStr)
+
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var claims UserClaims
+	token, _, err := parser.ParseUnverified(tokenStr, &claims)
+	if err != nil || token == nil {
+		return nil, fmt.Errorf("invalid token format: %w", err)
+	}
+
+	userID := claims.UserID
+	if userID == "" {
+		userID = claims.Subject
+	}
+
+	return &UserContext{
+		UserID:   userID,
+		Role:     claims.Role,
+		Email:    claims.Email,
+		RawToken: tokenStr,
+	}, nil
+}
+
 
 func WithUser(ctx context.Context, user *UserContext) context.Context {
 	if ctx == nil {

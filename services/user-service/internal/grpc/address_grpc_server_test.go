@@ -324,7 +324,7 @@ func TestGRPC_ListUserAddresses(t *testing.T) {
 	server, _, _ := setupGRPCTestServer()
 	ctx := context.Background()
 
-	server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
+	_, _ = server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
 		UserId:      "user-1",
 		FullName:    "Alex Morgan",
 		PhoneNumber: "+1 (555) 123-4567",
@@ -335,7 +335,7 @@ func TestGRPC_ListUserAddresses(t *testing.T) {
 		Country:     "United States",
 	})
 
-	server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
+	_, _ = server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
 		UserId:      "user-1",
 		FullName:    "Alex Morgan",
 		PhoneNumber: "+1 (555) 123-4567",

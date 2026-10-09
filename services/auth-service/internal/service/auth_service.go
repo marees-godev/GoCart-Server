@@ -24,6 +24,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/otp"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/validator"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -34,6 +35,7 @@ const (
 	MaxFailedLoginAttempts = 5
 	AccountLockDuration    = 15 * time.Minute
 	RefreshTokenTTL        = 7 * 24 * time.Hour
+	dummyBcryptHash        = "$2a$10$e8N7z.0O2w9tP/V1O8m1o.7Hq6G3V3HkX/N1.1.1.1.1.1.1.1"
 )
 
 type AuthService interface {
@@ -41,8 +43,12 @@ type AuthService interface {
 	Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error)
 	ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error)
 	RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
+	Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.LogoutResponse, error)
 	VerifyEmail(ctx context.Context, req *dto.VerifyEmailRequest) (*dto.VerifyEmailResponse, error)
 	ResendVerificationEmail(ctx context.Context, req *dto.ResendVerificationEmailRequest) (*dto.ResendVerificationEmailResponse, error)
+	ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) (*dto.ForgotPasswordResponse, error)
+	ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPasswordWithOtpRequest) (*dto.ResetPasswordResponse, error)
+	ChangePassword(ctx context.Context, req *dto.ChangePasswordRequest) (*dto.ChangePasswordResponse, error)
 }
 
 type authService struct {
@@ -50,6 +56,8 @@ type authService struct {
 	cfg            *config.Config
 	mailer         mailer.Mailer
 	otpStore       otp.Store
+	resetStore     otp.PasswordResetStore
+	redisClient    *redis.Client
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
@@ -84,16 +92,52 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 			s.merchantClient = client
 		case otp.Store:
 			s.otpStore = client
+		case otp.PasswordResetStore:
+			s.resetStore = client
 		case *redis.Client:
 			if client != nil {
+				s.redisClient = client
 				s.otpStore = otp.NewRedisStore(client)
+				s.resetStore = otp.NewRedisPasswordResetStore(client)
 			}
 		}
 	}
 	if s.otpStore == nil {
 		s.otpStore = otp.NewMemoryStore()
 	}
+	if s.resetStore == nil {
+		s.resetStore = otp.NewMemoryPasswordResetStore()
+	}
 	return s
+}
+
+func failedLoginKey(email string) string {
+	return "auth:login:failed:" + email
+}
+
+func accountLockKey(email string) string {
+	return "auth:login:locked:" + email
+}
+
+func (s *authService) getMaxLoginAttempts() int {
+	if s.cfg != nil && s.cfg.Security.MaxLoginAttempts > 0 {
+		return s.cfg.Security.MaxLoginAttempts
+	}
+	return MaxFailedLoginAttempts
+}
+
+func (s *authService) getLoginAttemptWindow() time.Duration {
+	if s.cfg != nil && s.cfg.Security.LoginAttemptWindow > 0 {
+		return s.cfg.Security.LoginAttemptWindow
+	}
+	return 15 * time.Minute
+}
+
+func (s *authService) getAccountLockDuration() time.Duration {
+	if s.cfg != nil && s.cfg.Security.AccountLockDuration > 0 {
+		return s.cfg.Security.AccountLockDuration
+	}
+	return AccountLockDuration
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -109,21 +153,62 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		role = model.RoleMerchant
 	}
 
+	maxAttempts := s.getMaxLoginAttempts()
+	window := s.getLoginAttemptWindow()
+	lockDuration := s.getAccountLockDuration()
+
+	failedKey := failedLoginKey(email)
+	lockKey := accountLockKey(email)
+
+	// 1. Check if account is locked in Redis
+	if s.redisClient != nil {
+		isLocked, err := s.redisClient.Exists(ctx, lockKey)
+		if err != nil {
+			s.logger.Warn("Redis error checking lock status, falling back to DB check", "email", email, "error", err)
+		} else if isLocked {
+			s.logger.Warn("Login attempt failed: account locked (Redis)", "email", email)
+			return nil, appErrors.Unauthorized("Invalid email or password")
+		}
+	}
+
+	// 2. Query user credential from DB
 	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			s.logger.Warn("Login attempt failed: user not found", "email", email, "role", role.String())
+			// Perform dummy hash comparison to prevent timing attack enumeration
+			_ = bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(req.Password))
+
+			// Track failed attempt in Redis for normalized email even if user doesn't exist
+			if s.redisClient != nil {
+				count, rErr := s.redisClient.IncrWithExpiry(ctx, failedKey, window)
+				if rErr != nil {
+					s.logger.Warn("Redis error incrementing failed login counter", "email", email, "error", rErr)
+				} else if int(count) >= maxAttempts {
+					if lErr := s.redisClient.Set(ctx, lockKey, "locked", lockDuration); lErr != nil {
+						s.logger.Warn("Redis error setting lock key", "email", email, "error", lErr)
+					}
+				}
+			}
+
 			return nil, appErrors.Unauthorized("Invalid email or password")
 		}
 		s.logger.Error("Login failed: database query error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to query credentials")
 	}
-	
+
+	// 3. Check if account is locked in DB
+	if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
+		s.logger.Warn("Login attempt failed: account locked (DB)", "user_id", cred.UserID.String(), "email", cred.Email, "locked_until", cred.LockedUntil)
+		return nil, appErrors.Unauthorized("Invalid email or password")
+	}
+
+	// 4. Validate user status and role
 	if !cred.EmailVerified {
 		s.logger.Warn("Login attempt failed: email not verified", "user_id", cred.UserID.String(), "email", cred.Email)
 		return nil, appErrors.Forbidden("email is not verified, please verify your email first and then login")
 	}
-	
+
 	if cred.Role != "" && cred.Role != role {
 		s.logger.Warn("Login attempt failed: role mismatch", "user_id", cred.UserID.String(), "email", cred.Email, "role", cred.Role.String(), "expected_role", role.String())
 		return nil, appErrors.Unauthorized("Invalid email or password")
@@ -134,32 +219,55 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
-	if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
-		s.logger.Warn("Login attempt failed: account locked", "user_id", cred.UserID.String(), "email", cred.Email, "locked_until", cred.LockedUntil)
-		return nil, appErrors.Unauthorized("Invalid email or password")
-	}
-
+	// 5. Compare Password
 	if err := bcrypt.CompareHashAndPassword([]byte(cred.PasswordHash), []byte(req.Password)); err != nil {
+		var redisCount int64
+		var redisErr error
+		if s.redisClient != nil {
+			redisCount, redisErr = s.redisClient.IncrWithExpiry(ctx, failedKey, window)
+			if redisErr != nil {
+				s.logger.Warn("Redis error incrementing failed attempts", "email", email, "error", redisErr)
+			}
+		}
+
 		failedCount := cred.FailedLoginCount + 1
+		if s.redisClient != nil && redisErr == nil {
+			failedCount = int(redisCount)
+		}
+
 		var lockedUntil *time.Time
-		if failedCount >= MaxFailedLoginAttempts {
-			t := time.Now().Add(AccountLockDuration)
+		if failedCount >= maxAttempts {
+			t := time.Now().Add(lockDuration)
 			lockedUntil = &t
 			s.logger.Warn("Account locked due to max failed login attempts", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount, "locked_until", t)
+			if s.redisClient != nil {
+				if lErr := s.redisClient.Set(ctx, lockKey, "locked", lockDuration); lErr != nil {
+					s.logger.Warn("Redis error setting lock key", "email", email, "error", lErr)
+				}
+			}
 		} else {
 			s.logger.Warn("Login attempt failed: invalid password", "user_id", cred.UserID.String(), "email", cred.Email, "failed_attempts", failedCount)
 		}
-		err = s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
-		if err != nil {
-			return nil, appErrors.Internal(err, "failed to update failed login")
+
+		// Always update DB as fallback/persistence
+		dbErr := s.repo.UpdateFailedLogin(ctx, cred.ID, failedCount, lockedUntil)
+		if dbErr != nil {
+			s.logger.Error("Failed to update DB failed login record", "user_id", cred.UserID.String(), "error", dbErr)
 		}
+
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
 
-	if cred.FailedLoginCount > 0 {
-		_ = s.repo.ResetFailedLogin(ctx, cred.ID)
+	// 6. Successful Login: Reset failed login attempt counters and locks in Redis and DB
+	if s.redisClient != nil {
+		if rErr := s.redisClient.Delete(ctx, failedKey, lockKey); rErr != nil {
+			s.logger.Warn("Redis error clearing failed login key on successful login", "email", email, "error", rErr)
+		}
 	}
 
+	if cred.FailedLoginCount > 0 || cred.LockedUntil != nil {
+		_ = s.repo.ResetFailedLogin(ctx, cred.ID)
+	}
 
 	var merchantID string
 	var businessEmail string
@@ -177,12 +285,17 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		}
 
 		if mClient != nil {
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: cred.UserID.String(),
+				Role:   model.RoleMerchant.String(),
+				Email:  cred.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", cred.UserID.String(),
-				"x-user-role", "MERCHANT",
+				"x-user-role", model.RoleMerchant.String(),
 			))
-			mResp, err := mClient.GetMerchantByUserID(mCtx, &merchantpb.GetMerchantByUserIDRequest{
-				UserId: cred.UserID.String(),
+			mResp, err := mClient.GetMerchant(mCtx, &merchantpb.GetMerchantRequest{
+				Id: cred.UserID.String(),
 			})
 			if err == nil && mResp != nil && mResp.Merchant != nil {
 				merchantID = mResp.Merchant.Id
@@ -338,25 +451,21 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 
 		if mClient != nil {
-			businessName := strings.TrimSpace(req.BusinessName)
-			if businessName == "" {
-				businessName = strings.TrimSpace(req.FirstName + " " + req.LastName)
-			}
-			if businessName == "" {
-				businessName = req.Email
-			}
-
-			mCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs(
+			mCtx := auth.WithUser(ctx, &auth.UserContext{
+				UserID: userID.String(),
+				Role:   model.RoleMerchant.String(),
+				Email:  req.Email,
+			})
+			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
 				"x-user-id", userID.String(),
-				"x-user-role", "MERCHANT",
+				"x-user-role", model.RoleMerchant.String(),
 			))
 
 			createReq := &merchantpb.CreateMerchantRequest{
-				UserId:        userID.String(),
+				Id:            userID.String(),
 				FirstName:     req.FirstName,
 				LastName:      req.LastName,
 				BusinessEmail: req.Email,
-				BusinessName:  businessName,
 			}
 
 			mResp, err := mClient.CreateMerchant(mCtx, createReq)
@@ -475,6 +584,16 @@ func (s *authService) ValidateToken(ctx context.Context, req *dto.ValidateTokenR
 		return &dto.ValidateTokenResponse{Valid: false}, nil
 	}
 
+	if userCtx.UserID != "" {
+		if parsedID, err := uuid.FromString(userCtx.UserID); err == nil {
+			if cred, err := s.repo.GetByUserID(ctx, parsedID); err == nil && cred != nil {
+				if !cred.IsActive {
+					return &dto.ValidateTokenResponse{Valid: false}, nil
+				}
+			}
+		}
+	}
+
 	return &dto.ValidateTokenResponse{
 		Valid:  true,
 		UserID: userCtx.UserID,
@@ -484,14 +603,24 @@ func (s *authService) ValidateToken(ctx context.Context, req *dto.ValidateTokenR
 }
 
 func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error) {
-
-	if req == nil || req.RefreshToken == "" {
+	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
 		s.logger.Warn("Refresh token failed: missing refresh token")
 		return nil, appErrors.BadRequest("refresh token is required")
 	}
 
+	var identity string
+	if req.AccessToken != "" {
+		if userCtx, err := auth.ExtractClaimsWithoutExpiry(req.AccessToken, s.cfg.JWT.Secret); err == nil && userCtx != nil {
+			if userCtx.UserID != "" {
+				identity = userCtx.UserID
+			} else if userCtx.Email != "" {
+				identity = userCtx.Email
+			}
+		}
+	}
+
 	tokenHash := hashToken(req.RefreshToken)
-	tok, err := s.repo.GetRefreshToken(ctx, tokenHash)
+	tok, err := s.repo.GetRefreshToken(ctx, tokenHash, identity)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			s.logger.Warn("Refresh token failed: token not found")
@@ -501,9 +630,29 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		return nil, appErrors.Internal(err, "failed to query refresh token")
 	}
 
-	if tok.Revoked || time.Now().After(tok.ExpiresAt) {
-		s.logger.Warn("Refresh token failed: token revoked or expired", "user_id", tok.UserID.String(), "revoked", tok.Revoked, "expires_at", tok.ExpiresAt)
-		return nil, appErrors.Unauthorized("refresh token expired or revoked")
+	if tok.Revoked {
+		s.logger.Warn("Refresh token failed: token is revoked", "user_id", tok.UserID.String())
+		return nil, appErrors.Unauthorized("refresh token revoked")
+	}
+
+	if time.Now().After(tok.ExpiresAt) {
+		s.logger.Warn("Refresh token failed: token is expired", "user_id", tok.UserID.String(), "expires_at", tok.ExpiresAt)
+		return nil, appErrors.Unauthorized("refresh token expired")
+	}
+
+	cred, err := s.repo.GetByUserID(ctx, tok.UserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Warn("Refresh token failed: associated user not found", "user_id", tok.UserID.String())
+			return nil, appErrors.Unauthorized("associated user not found")
+		}
+		s.logger.Error("Refresh token failed: failed to get user", "user_id", tok.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if !cred.IsActive {
+		s.logger.Warn("Refresh token failed: user is deactivated", "user_id", tok.UserID.String())
+		return nil, appErrors.Unauthorized("user account is deactivated")
 	}
 
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
@@ -513,20 +662,42 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	accessTTL := time.Duration(ttlMinutes) * time.Minute
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
-		UserID: tok.UserID.String(),
-		Role:   model.RoleCustomer.String(),
+		UserID: cred.UserID.String(),
+		Email:  cred.Email,
+		Role:   cred.Role.String(),
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
-		s.logger.Error("Refresh token failed: generate access token error", "user_id", tok.UserID.String(), "error", err)
+		s.logger.Error("Refresh token failed: generate access token error", "user_id", cred.UserID.String(), "error", err)
 		return nil, appErrors.Internal(err, "failed to generate access token")
+	}
+
+	newRawRefreshToken, err := generateRandomToken(32)
+	if err != nil {
+		s.logger.Error("Refresh token failed: generate new refresh token error", "user_id", cred.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to generate new refresh token")
+	}
+
+	newTokenHash := hashToken(newRawRefreshToken)
+	newRefreshTokenModel := &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    cred.UserID,
+		TokenHash: newTokenHash,
+		ExpiresAt: time.Now().Add(RefreshTokenTTL),
+		Revoked:   false,
+	}
+
+	if err := s.repo.RotateRefreshToken(ctx, tok.ID, newRefreshTokenModel); err != nil {
+		s.logger.Error("Refresh token failed: rotate token error", "user_id", cred.UserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to rotate refresh token")
 	}
 
 	return &dto.LoginResponse{
 		AccessToken:  accessToken,
-		RefreshToken: req.RefreshToken,
+		RefreshToken: newRawRefreshToken,
 		TokenType:    "Bearer",
 		ExpiresIn:    int(accessTTL.Seconds()),
-		UserID:       tok.UserID.String(),
+		UserID:       cred.UserID.String(),
+		Role:         cred.Role.String(),
 	}, nil
 }
 
@@ -661,6 +832,68 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	}, nil
 }
 
+func (s *authService) Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.LogoutResponse, error) {
+	if req == nil {
+		req = &dto.LogoutRequest{}
+	}
+
+	var userIDStr string
+	var emailStr string
+
+	if req.AccessToken != "" {
+		if userCtx, err := auth.ExtractClaimsWithoutExpiry(req.AccessToken, s.cfg.JWT.Secret); err == nil && userCtx != nil {
+			if userCtx.UserID != "" {
+				userIDStr = userCtx.UserID
+			}
+			if userCtx.Email != "" {
+				emailStr = userCtx.Email
+			}
+		} else {
+			userIDStr = req.AccessToken
+		}
+	}
+
+	if userIDStr == "" && emailStr == "" {
+		if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
+			if userCtx.UserID != "" {
+				userIDStr = userCtx.UserID
+			}
+			if userCtx.Email != "" {
+				emailStr = userCtx.Email
+			}
+		}
+	}
+
+	var targetUserID uuid.UUID
+	if userIDStr != "" {
+		if parsed, err := uuid.FromString(userIDStr); err == nil {
+			targetUserID = parsed
+		}
+	}
+
+	if targetUserID == uuid.Nil && emailStr != "" {
+		if cred, err := s.repo.GetByEmail(ctx, cleanEmail(emailStr)); err == nil && cred != nil {
+			targetUserID = cred.UserID
+		}
+	}
+
+	if targetUserID == uuid.Nil {
+		s.logger.Warn("Logout failed: missing authentication context or identity")
+		return nil, appErrors.Unauthorized("authentication required for logout")
+	}
+
+	if err := s.repo.RevokeRefreshTokensByUserID(ctx, targetUserID); err != nil {
+		s.logger.Error("Logout failed: failed to revoke user refresh tokens", "user_id", targetUserID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to revoke refresh tokens")
+	}
+
+	s.logger.Info("Logout successful", "user_id", targetUserID.String())
+	return &dto.LogoutResponse{
+		Success: true,
+		Message: "Logged out successfully",
+	}, nil
+}
+
 func cleanEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
@@ -677,3 +910,318 @@ func hashToken(token string) string {
 	return pkgotp.HashToken(token)
 }
 
+func hashWithSalt(token, salt string) string {
+	return pkgotp.HashToken(salt + ":" + token)
+}
+
+const uniformForgotPasswordMessage = "If an account exists with this email address, a password reset code has been sent."
+
+func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) (*dto.ForgotPasswordResponse, error) {
+	if req == nil || strings.TrimSpace(req.Email) == "" {
+		return nil, appErrors.BadRequest("email is required")
+	}
+
+	email := cleanEmail(req.Email)
+	clientIP := strings.TrimSpace(req.ClientIP)
+
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))
+
+	maxReqs := 3
+	if s.cfg != nil && s.cfg.Security.PasswordResetMaxRequests > 0 {
+		maxReqs = s.cfg.Security.PasswordResetMaxRequests
+	}
+	window := 30 * time.Minute
+	if s.cfg != nil && s.cfg.Security.PasswordResetRequestWindow > 0 {
+		window = s.cfg.Security.PasswordResetRequestWindow
+	}
+
+	// 1. Rate limiting by account (email:role)
+	allowedEmail, err := s.resetStore.RecordRequest(ctx, accountKey, maxReqs, window)
+	if err == nil && !allowedEmail {
+		s.logger.Warn("Forgot password rate limit exceeded by account", "account", accountKey)
+		return nil, appErrors.TooManyRequests("too many password reset requests; please try again later")
+	}
+
+	// 2. Rate limiting by IP (if provided)
+	if clientIP != "" {
+		allowedIP, err := s.resetStore.RecordRequest(ctx, "ip:"+clientIP, maxReqs, window)
+		if err == nil && !allowedIP {
+			s.logger.Warn("Forgot password rate limit exceeded by IP", "ip", clientIP)
+			return nil, appErrors.TooManyRequests("too many password reset requests; please try again later")
+		}
+	}
+
+	// 3. Uniform response / Enumeration Defense: Check if user exists for email and role
+	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			s.logger.Info("Forgot password requested for non-existent email and role", "email", email, "role", role)
+			return &dto.ForgotPasswordResponse{
+				Success: true,
+				Message: uniformForgotPasswordMessage,
+			}, nil
+		}
+		s.logger.Error("Forgot password database error", "email", email, "role", role, "error", err)
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if !cred.IsActive {
+		s.logger.Warn("Forgot password requested for inactive account", "email", email, "role", role)
+		return &dto.ForgotPasswordResponse{
+			Success: true,
+			Message: uniformForgotPasswordMessage,
+		}, nil
+	}
+
+	// 4. Generate cryptographically secure 6-digit numeric OTP
+	rawOTP, err := generateOTP()
+	if err != nil {
+		s.logger.Error("Failed to generate password reset OTP", "error", err)
+		return nil, appErrors.Internal(err, "failed to generate password reset code")
+	}
+
+	salt, err := generateRandomToken(16)
+	if err != nil {
+		salt = "gocart-salt"
+	}
+
+	otpHash := hashWithSalt(rawOTP, salt)
+
+	ttlMinutes := 15
+	if s.cfg != nil && s.cfg.Security.PasswordResetOTPTTLMinutes > 0 {
+		ttlMinutes = s.cfg.Security.PasswordResetOTPTTLMinutes
+	}
+	ttl := time.Duration(ttlMinutes) * time.Minute
+
+	if err := s.resetStore.SetResetOTP(ctx, accountKey, otpHash, salt, ttl); err != nil {
+		s.logger.Error("Failed to store password reset OTP", "error", err)
+		return nil, appErrors.Internal(err, "failed to store password reset code")
+	}
+
+	// 5. Send password reset email asynchronously
+	go func(toEmail, otpCode string) {
+		_ = s.mailer.SendPasswordResetEmail(context.Background(), toEmail, otpCode)
+	}(email, rawOTP)
+
+	s.logger.Info("Password reset OTP generated and email dispatched", "email", email, "role", role)
+	return &dto.ForgotPasswordResponse{
+		Success: true,
+		Message: uniformForgotPasswordMessage,
+	}, nil
+}
+
+func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPasswordWithOtpRequest) (*dto.ResetPasswordResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be empty")
+	}
+
+	email := cleanEmail(req.Email)
+	if email == "" {
+		return nil, appErrors.BadRequest("email is required")
+	}
+	otpVal := strings.TrimSpace(req.OTP)
+	if otpVal == "" {
+		return nil, appErrors.BadRequest("otp is required")
+	}
+	if req.NewPassword == "" {
+		return nil, appErrors.BadRequest("new password is required")
+	}
+
+	role := model.RoleCustomer
+	if req.IsMerchant {
+		role = model.RoleMerchant
+	}
+	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))
+
+	// 1. Validate password complexity first
+	if err := validator.ValidatePasswordStrength(req.NewPassword); err != nil {
+		return nil, appErrors.BadRequest(err.Error())
+	}
+
+	// 2. Check if locked out due to >= 5 failed attempts
+	if isLocked, _, err := s.resetStore.IsLocked(ctx, accountKey); err == nil && isLocked {
+		s.logger.Warn("Reset password attempt blocked: lockout active", "account", accountKey)
+		return nil, appErrors.TooManyRequests("maximum invalid OTP attempts exceeded; password reset locked for 1 hour")
+	}
+
+	// 3. Retrieve stored reset OTP
+	otpData, err := s.resetStore.GetResetOTP(ctx, accountKey)
+	if err != nil {
+		s.logger.Warn("Reset password failed: OTP not found or expired", "account", accountKey)
+		return nil, appErrors.BadRequest("password reset code has expired or is invalid")
+	}
+
+	// 4. Verify salted hash of OTP
+	expectedHash := hashWithSalt(otpVal, otpData.Salt)
+	if otpData.Hash != expectedHash {
+		attempts, _ := s.resetStore.IncrementAttempts(ctx, accountKey)
+		maxAttempts := 5
+		if s.cfg != nil && s.cfg.Security.PasswordResetMaxAttempts > 0 {
+			maxAttempts = s.cfg.Security.PasswordResetMaxAttempts
+		}
+		lockoutDuration := 1 * time.Hour
+		if s.cfg != nil && s.cfg.Security.PasswordResetLockoutDuration > 0 {
+			lockoutDuration = s.cfg.Security.PasswordResetLockoutDuration
+		}
+
+		if attempts >= maxAttempts {
+			s.logger.Warn("Reset password locked out: max invalid OTP attempts reached", "account", accountKey, "attempts", attempts)
+			_ = s.resetStore.LockReset(ctx, accountKey, lockoutDuration)
+			return nil, appErrors.TooManyRequests("maximum invalid OTP attempts exceeded; password reset locked for 1 hour")
+		}
+
+		s.logger.Warn("Reset password failed: invalid OTP code", "account", accountKey, "attempt", attempts)
+		return nil, appErrors.BadRequest("invalid password reset code")
+	}
+
+	// 5. Look up user by email and role
+	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, appErrors.NotFound("user not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if !cred.IsActive {
+		return nil, appErrors.Unauthorized("account is inactive")
+	}
+
+	// 6. Hash new password with bcrypt
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to hash new password")
+	}
+
+	// 7. Update password and invalidate sessions in database transaction
+	evtPayload, _ := json.Marshal(map[string]any{
+		"user_id":    cred.UserID.String(),
+		"email":      cred.Email,
+		"role":       cred.Role.String(),
+		"reset_at":   time.Now().UTC(),
+		"reset_type": "otp",
+	})
+	outboxEvt := &outbox.Event{
+		ID:            uuid.Must(uuid.NewV7()),
+		AggregateType: "auth",
+		AggregateID:   cred.UserID.String(),
+		EventType:     "PasswordReset",
+		Topic:         "auth.user.password_reset",
+		Payload:       evtPayload,
+	}
+
+	if err := s.repo.UpdatePassword(ctx, cred.UserID, string(hashedPassword), outboxEvt); err != nil {
+		return nil, appErrors.Internal(err, "failed to update password")
+	}
+
+	// 8. Consume (delete) the OTP immediately - single use
+	_ = s.resetStore.DeleteResetOTP(ctx, accountKey)
+
+	// 9. Session & cache invalidation
+	if s.redisClient != nil {
+		_ = s.redisClient.Delete(ctx, failedLoginKey(email), accountLockKey(email), failedLoginKey(accountKey), accountLockKey(accountKey))
+	}
+
+	s.logger.Info("Password reset successful", "user_id", cred.UserID.String(), "email", email, "role", role)
+	return &dto.ResetPasswordResponse{
+		Success: true,
+		Message: "Password has been reset successfully",
+	}, nil
+}
+
+func (s *authService) ChangePassword(ctx context.Context, req *dto.ChangePasswordRequest) (*dto.ChangePasswordResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be empty")
+	}
+
+	userIDStr := strings.TrimSpace(req.UserID)
+	if userIDStr == "" {
+		if userCtx, ok := auth.FromContext(ctx); ok && userCtx != nil {
+			userIDStr = userCtx.UserID
+		}
+	}
+	if userIDStr == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	targetUserID, err := uuid.FromString(userIDStr)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid user id format")
+	}
+
+	if req.OldPassword == "" {
+		return nil, appErrors.BadRequest("current password is required")
+	}
+	if req.NewPassword == "" {
+		return nil, appErrors.BadRequest("new password is required")
+	}
+
+	// Ensure newPassword is distinct from oldPassword
+	if req.OldPassword == req.NewPassword {
+		return nil, appErrors.BadRequest("new password must be distinct from current password")
+	}
+
+	// Validate password complexity
+	if err := validator.ValidatePasswordStrength(req.NewPassword); err != nil {
+		return nil, appErrors.BadRequest(err.Error())
+	}
+
+	// Query credential by user_id
+	cred, err := s.repo.GetByUserID(ctx, targetUserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, appErrors.NotFound("user not found")
+		}
+		return nil, appErrors.Internal(err, "failed to query user credentials")
+	}
+
+	if !cred.IsActive {
+		return nil, appErrors.Unauthorized("account is inactive")
+	}
+
+	// Verify oldPassword using bcrypt
+	if err := bcrypt.CompareHashAndPassword([]byte(cred.PasswordHash), []byte(req.OldPassword)); err != nil {
+		s.logger.Warn("Change password failed: incorrect old password", "user_id", cred.UserID.String())
+		return nil, appErrors.InvalidCredentials("invalid current password")
+	}
+
+	// Hash new password using bcrypt
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to hash new password")
+	}
+
+	// Invalidate sessions and update password in DB
+	evtPayload, _ := json.Marshal(map[string]any{
+		"user_id":    cred.UserID.String(),
+		"email":      cred.Email,
+		"changed_at": time.Now().UTC(),
+	})
+	outboxEvt := &outbox.Event{
+		ID:            uuid.Must(uuid.NewV7()),
+		AggregateType: "auth",
+		AggregateID:   cred.UserID.String(),
+		EventType:     "PasswordChanged",
+		Topic:         "auth.user.password_changed",
+		Payload:       evtPayload,
+	}
+
+	if err := s.repo.UpdatePassword(ctx, cred.UserID, string(hashedPassword), outboxEvt); err != nil {
+		return nil, appErrors.Internal(err, "failed to update password")
+	}
+
+	// Invalidate cache
+	if s.redisClient != nil {
+		_ = s.redisClient.Delete(ctx, failedLoginKey(cred.Email), accountLockKey(cred.Email))
+	}
+
+	s.logger.Info("Password changed successfully", "user_id", cred.UserID.String())
+	return &dto.ChangePasswordResponse{
+		Success: true,
+		Message: "Password changed successfully",
+	}, nil
+}
