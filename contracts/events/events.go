@@ -20,6 +20,28 @@ type OrderItemPayload struct {
 	UnitPrice float64 `json:"unit_price"`
 }
 
+// PaymentInitiatedEvent represents the payload for PaymentInitiated domain event.
+type PaymentInitiatedEvent struct {
+	PaymentID     string    `json:"payment_id"`
+	OrderID       string    `json:"order_id"`
+	UserID        string    `json:"user_id"`
+	Amount        float64   `json:"amount"`
+	Currency      string    `json:"currency"`
+	PaymentMethod string    `json:"payment_method"`
+	InitiatedAt   time.Time `json:"initiated_at"`
+}
+
+// PaymentPendingEvent represents the payload when a payment enters PENDING status.
+type PaymentPendingEvent struct {
+	PaymentID            string    `json:"payment_id"`
+	OrderID              string    `json:"order_id"`
+	UserID               string    `json:"user_id"`
+	Amount               float64   `json:"amount"`
+	Currency             string    `json:"currency"`
+	GatewayTransactionID string    `json:"gateway_transaction_id,omitempty"`
+	PendingAt            time.Time `json:"pending_at"`
+}
+
 // PaymentSuccessfulEvent represents the payload for PaymentSuccessful domain event.
 type PaymentSuccessfulEvent struct {
 	PaymentID     string    `json:"payment_id"`

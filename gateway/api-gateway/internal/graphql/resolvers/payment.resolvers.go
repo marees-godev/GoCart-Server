@@ -17,11 +17,16 @@ func (r *mutationResolver) ProcessPayment(ctx context.Context, input model.Proce
 }
 
 // CreateRefund is the resolver for the createRefund field.
-func (r *mutationResolver) CreateRefund(ctx context.Context, paymentID string, amount float64, reason *string) (*model.RefundPayload, error) {
+func (r *mutationResolver) CreateRefund(ctx context.Context, paymentID string, amount float64, reason *string, idempotencyKey *string) (*model.RefundPayload, error) {
 	panic(fmt.Errorf("not implemented: CreateRefund - createRefund"))
 }
 
 // Payment is the resolver for the payment field.
 func (r *queryResolver) Payment(ctx context.Context, id string) (*model.Payment, error) {
 	panic(fmt.Errorf("not implemented: Payment - payment"))
+}
+
+// PaymentByOrderID is the resolver for the paymentByOrderId field.
+func (r *queryResolver) PaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error) {
+	panic(fmt.Errorf("not implemented: PaymentByOrderID - paymentByOrderId"))
 }

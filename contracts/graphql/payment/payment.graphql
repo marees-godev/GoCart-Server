@@ -1,32 +1,42 @@
 type Payment {
   id: ID!
   orderId: String!
+  userId: String
   amount: Float!
   currency: String!
   paymentMethod: String!
   status: String!
   transactionReference: String
+  gatewayTransactionId: String
+  idempotencyKey: String
+  failureReason: String
   createdAt: String
+  updatedAt: String
 }
 
 type RefundPayload {
   refundId: String!
   status: String!
   amount: Float!
+  gatewayRefundId: String
+  createdAt: String
 }
 
 input ProcessPaymentInput {
   orderId: String!
-  amount: Float!
-  currency: String!
+  amount: Float
+  currency: String
   paymentMethod: String!
+  idempotencyKey: String!
 }
 
 extend type Query {
   payment(id: ID!): Payment @auth
+  paymentByOrderId(orderId: String!): Payment @auth
 }
 
 extend type Mutation {
   processPayment(input: ProcessPaymentInput!): Payment @auth
-  createRefund(paymentId: ID!, amount: Float!, reason: String): RefundPayload @auth(requires: [ADMIN, MERCHANT])
+  createRefund(paymentId: ID!, amount: Float!, reason: String, idempotencyKey: String): RefundPayload @auth(requires: [ADMIN, MERCHANT])
 }
+

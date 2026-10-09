@@ -19,10 +19,12 @@ import (
 // poll cycle. If the process crashes mid-cycle, Postgres automatically rolls
 // back the open transaction and returns all rows to PENDING.
 type Publisher struct {
-	pool     *pgxpool.Pool
-	producer KafkaPublisher
-	store    *Store
-	cfg      Config
+	pool          *pgxpool.Pool
+	producer      KafkaPublisher
+	store         *Store
+	cfg           Config
+	lastErr       string
+	lastErrLogged time.Time
 }
 
 // NewPublisher constructs a Publisher. Use DefaultConfig() if you have no

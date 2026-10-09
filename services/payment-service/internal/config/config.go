@@ -10,9 +10,17 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Gateway  GatewayConfig
+	Services ServicesConfig
+	Kafka    KafkaConfig
+}
+
+type KafkaConfig struct {
+	Brokers []string
 }
 
 type AppConfig struct {
@@ -22,6 +30,10 @@ type AppConfig struct {
 }
 
 type HTTPConfig struct {
+	Port string
+}
+
+type GRPCConfig struct {
 	Port string
 }
 
@@ -44,6 +56,19 @@ type TracingConfig struct {
 	OTLPEndpoint string
 }
 
+type GatewayConfig struct {
+	Provider              string
+	APIKey                string
+	RazorpayKeyID         string
+	RazorpayKeySecret     string
+	RazorpayWebhookSecret string
+	Timeout               int
+}
+
+type ServicesConfig struct {
+	OrderServiceURL string
+}
+
 func LoadEnv() *Config {
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load("services/payment-service/.env")
@@ -59,8 +84,11 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "8888"),
 		},
+		GRPC: GRPCConfig{
+			Port: GetEnv("GRPC_PORT", "50055"),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("PAYMENT_SERVICE_DATABASE_URL", ""),
+			URL:            GetEnv("PAYMENT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -74,6 +102,20 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Gateway: GatewayConfig{
+			Provider:              GetEnv("PAYMENT_GATEWAY_PROVIDER", "mock"),
+			APIKey:                GetEnv("PAYMENT_GATEWAY_API_KEY", "mock_key"),
+			RazorpayKeyID:         GetEnv("RAZORPAY_KEY_ID", GetEnv("PAYMENT_GATEWAY_API_KEY", "")),
+			RazorpayKeySecret:     GetEnv("RAZORPAY_KEY_SECRET", GetEnv("PAYMENT_GATEWAY_API_SECRET", "")),
+			RazorpayWebhookSecret: GetEnv("RAZORPAY_WEBHOOK_SECRET", GetEnv("RAZORPAY_KEY_SECRET", GetEnv("PAYMENT_GATEWAY_API_SECRET", ""))),
+			Timeout:               GetEnvAsInt("PAYMENT_GATEWAY_TIMEOUT_SECONDS", 10),
+		},
+		Services: ServicesConfig{
+			OrderServiceURL: GetEnv("ORDER_SERVICE_URL", "localhost:50054"),
+		},
+		Kafka: KafkaConfig{
+			Brokers: []string{GetEnv("KAFKA_BROKERS", "localhost:9092")},
 		},
 	}
 }

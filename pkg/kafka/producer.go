@@ -26,6 +26,8 @@ func NewProducer(cfg Config) *Producer {
 		BatchTimeout:           10 * time.Millisecond,
 		Async:                  false,
 		AllowAutoTopicCreation: true,
+		Logger:                 segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
+		ErrorLogger:            segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
 	}
 
 	return &Producer{

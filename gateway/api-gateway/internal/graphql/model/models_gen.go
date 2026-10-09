@@ -334,19 +334,25 @@ type OrderList struct {
 type Payment struct {
 	ID                   string  `json:"id"`
 	OrderID              string  `json:"orderId"`
+	UserID               *string `json:"userId,omitempty"`
 	Amount               float64 `json:"amount"`
 	Currency             string  `json:"currency"`
 	PaymentMethod        string  `json:"paymentMethod"`
 	Status               string  `json:"status"`
 	TransactionReference *string `json:"transactionReference,omitempty"`
+	GatewayTransactionID *string `json:"gatewayTransactionId,omitempty"`
+	IdempotencyKey       *string `json:"idempotencyKey,omitempty"`
+	FailureReason        *string `json:"failureReason,omitempty"`
 	CreatedAt            *string `json:"createdAt,omitempty"`
+	UpdatedAt            *string `json:"updatedAt,omitempty"`
 }
 
 type ProcessPaymentInput struct {
-	OrderID       string  `json:"orderId"`
-	Amount        float64 `json:"amount"`
-	Currency      string  `json:"currency"`
-	PaymentMethod string  `json:"paymentMethod"`
+	OrderID        string   `json:"orderId"`
+	Amount         *float64 `json:"amount,omitempty"`
+	Currency       *string  `json:"currency,omitempty"`
+	PaymentMethod  string   `json:"paymentMethod"`
+	IdempotencyKey string   `json:"idempotencyKey"`
 }
 
 type Product struct {
@@ -412,9 +418,11 @@ type RefreshTokenInput struct {
 }
 
 type RefundPayload struct {
-	RefundID string  `json:"refundId"`
-	Status   string  `json:"status"`
-	Amount   float64 `json:"amount"`
+	RefundID        string  `json:"refundId"`
+	Status          string  `json:"status"`
+	Amount          float64 `json:"amount"`
+	GatewayRefundID *string `json:"gatewayRefundId,omitempty"`
+	CreatedAt       *string `json:"createdAt,omitempty"`
 }
 
 type RegisterInput struct {

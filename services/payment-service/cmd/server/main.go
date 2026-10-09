@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,25 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
+	paymentGRPC "github.com/marees-godev/GoCart-Server/services/payment-service/internal/grpc"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -78,7 +91,55 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize Outbox Publisher background worker for Kafka event streaming
+	kafkaProducer := kafka.NewProducer(kafka.Config{
+		Brokers: cfg.Kafka.Brokers,
+	})
+	defer kafkaProducer.Close()
+
+	outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outbox.NewStore(), outbox.DefaultConfig())
+	go outboxPublisher.Start(ctx)
+
+	// 6. Initialize domain dependencies & Payment Service
+	paymentRepo := repository.NewPaymentRepository(db.Pool)
+
+	gwConfig := gateway.GatewayConfig{
+		Provider:          cfg.Gateway.Provider,
+		APIKey:            cfg.Gateway.APIKey,
+		RazorpayKeyID:     cfg.Gateway.RazorpayKeyID,
+		RazorpayKeySecret: cfg.Gateway.RazorpayKeySecret,
+		Timeout:           time.Duration(cfg.Gateway.Timeout) * time.Second,
+	}
+	paymentGW := gateway.NewPaymentGateway(gwConfig)
+
+	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
+	paymentService := service.NewPaymentService(paymentRepo, paymentGW, orderClient, gwConfig.Timeout)
+
+	paymentGRPCServer := paymentGRPC.NewPaymentGRPCServer(paymentService)
+
+	// 7. Setup gRPC server
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),
+		grpc.MaxRecvMsgSize(10*1024*1024),
+		grpc.MaxSendMsgSize(10*1024*1024),
+	)
+	paymentpb.RegisterPaymentServiceServer(grpcServer, paymentGRPCServer)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 8. Setup Fiber HTTP server for observability (/health, /ready, /metrics)
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -94,8 +155,15 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
+	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log)
+	paymentHandler.RegisterRoutes(app)
+
+	// Webhook endpoints
+	webhookHandler := handler.NewWebhookHandler(paymentService, gwConfig.RazorpayWebhookSecret)
+	webhookHandler.RegisterRoutes(app)
+
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -104,6 +172,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
