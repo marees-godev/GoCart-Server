@@ -409,7 +409,7 @@ func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
 				StoreId:  "store-1",
 				Name:     "Product 1",
 				Price:    29.99, // Authoritative price from Product Service
-				Status:   "IN_STOCK",
+				Status:   string(productpb.StatusInStock),
 			},
 		},
 	}
@@ -469,7 +469,7 @@ func TestCartService_ValidateCart_OutOfStock(t *testing.T) {
 			"p1": {
 				Id:       "p1",
 				Price:    50.0,
-				Status:   "IN_STOCK",
+				Status:   string(productpb.StatusInStock),
 			},
 		},
 	}
@@ -539,8 +539,8 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 
 	prodClient := &mockProductClient{
 		products: map[string]*productpb.Product{
-			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, Status: "IN_STOCK"},
-			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, Status: "IN_STOCK"},
+			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, Status: string(productpb.StatusInStock)},
+			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, Status: string(productpb.StatusInStock)},
 		},
 	}
 	invClient := &mockInventoryClient{
@@ -597,5 +597,63 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 			t.Errorf("expected shipping address to be passed through, got %s", o.ShippingAddress)
 		}
 	}
+}
+
+func TestCartService_ValidateCart_UnpublishedAndSuspendedProducts(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"p-unpub": {Id: "p-unpub", Price: 50.0, Status: string(productpb.StatusUnpublished)},
+			"p-susp":  {Id: "p-susp", Price: 50.0, Status: string(productpb.StatusSuspended)},
+			"p-pub":   {Id: "p-pub", Price: 50.0, Status: string(productpb.StatusPublished)},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			"p-unpub": {ProductId: "p-unpub", AvailableQuantity: 10},
+			"p-susp":  {ProductId: "p-susp", AvailableQuantity: 10},
+			"p-pub":   {ProductId: "p-pub", AvailableQuantity: 10},
+		},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+
+	t.Run("unpublished product cannot be purchased", func(t *testing.T) {
+		userID := "u-unpub"
+		_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{UserID: userID, ProductID: "p-unpub", Quantity: 1, UnitPrice: 50.0})
+		res, err := svc.ValidateCart(ctx, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.IsValid {
+			t.Fatal("expected unpublished product to fail cart validation")
+		}
+	})
+
+	t.Run("suspended product cannot be purchased", func(t *testing.T) {
+		userID := "u-susp"
+		_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{UserID: userID, ProductID: "p-susp", Quantity: 1, UnitPrice: 50.0})
+		res, err := svc.ValidateCart(ctx, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.IsValid {
+			t.Fatal("expected suspended product to fail cart validation")
+		}
+	})
+
+	t.Run("published product can be purchased", func(t *testing.T) {
+		userID := "u-pub"
+		_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{UserID: userID, ProductID: "p-pub", Quantity: 1, UnitPrice: 50.0})
+		res, err := svc.ValidateCart(ctx, userID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !res.IsValid {
+			t.Fatalf("expected published product to pass cart validation, got errors: %+v", res.Errors)
+		}
+	})
 }
 
