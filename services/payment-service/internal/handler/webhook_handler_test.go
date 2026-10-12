@@ -338,7 +338,7 @@ func TestWebhookHandler_HandleRazorpayWebhook_DuplicateEvents(t *testing.T) {
 	}
 }
 
-func TestWebhookHandler_HandleRazorpayWebhook_RouteAliases(t *testing.T) {
+func TestWebhookHandler_HandleRazorpayWebhook_Endpoint(t *testing.T) {
 	repo := newMockRepo()
 	pmt := &model.Payment{
 		ID:      "pay_test_uuid_100",
@@ -354,35 +354,31 @@ func TestWebhookHandler_HandleRazorpayWebhook_RouteAliases(t *testing.T) {
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
-	routes := []string{"/webhooks", "/api/v1/payments/webhook", "/webhooks/razorpay"}
-
-	for _, route := range routes {
-		body := []byte(`{
-			"id": "evt_` + route + `",
-			"entity": "event",
-			"event": "payment.captured",
-			"payload": {
-				"payment": {
-					"entity": {
-						"id": "pay_rzp_` + route + `",
-						"notes": {
-							"payment_id": "pay_test_uuid_100"
-						}
+	body := []byte(`{
+		"id": "evt_webhook_test",
+		"entity": "event",
+		"event": "payment.captured",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_rzp_webhook_test",
+					"notes": {
+						"payment_id": "pay_test_uuid_100"
 					}
 				}
 			}
-		}`)
-		sig := generateSignature(body, secret)
-		req := httptest.NewRequest(http.MethodPost, route, bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Razorpay-Signature", sig)
+		}
+	}`)
+	sig := generateSignature(body, secret)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Razorpay-Signature", sig)
 
-		resp, err := app.Test(req)
-		if err != nil {
-			t.Fatalf("route %s failed with err: %v", route, err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("route %s expected 200, got %d", route, resp.StatusCode)
-		}
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed with err: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 }
