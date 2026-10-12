@@ -3,36 +3,27 @@ package model
 import (
 	"time"
 
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
-type ProductStatus string
+type ProductStatus = productpb.ProductStatus
 
 const (
-	StatusDraft         ProductStatus = "DRAFT"
-	StatusPendingReview ProductStatus = "PENDING_REVIEW"
-	StatusPublished     ProductStatus = "PUBLISHED"
-	StatusUnpublished   ProductStatus = "UNPUBLISHED"
-	StatusSuspended     ProductStatus = "SUSPENDED"
-	StatusDeleted       ProductStatus = "DELETED"
+	StatusDraft         = productpb.StatusDraft
+	StatusPendingReview = productpb.StatusPendingReview
+	StatusPublished     = productpb.StatusPublished
+	StatusUnpublished   = productpb.StatusUnpublished
+	StatusSuspended     = productpb.StatusSuspended
+	StatusDeleted       = productpb.StatusDeleted
 
 	// Legacy / Inventory compatibility statuses
-	StatusInStock      ProductStatus = "IN_STOCK"
-	StatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
-	StatusLowStock     ProductStatus = "LOW_STOCK"
-	StatusReserved     ProductStatus = "RESERVED"
-	StatusDiscontinued ProductStatus = "DISCONTINUED"
+	StatusInStock      = productpb.StatusInStock
+	StatusOutOfStock   = productpb.StatusOutOfStock
+	StatusLowStock     = productpb.StatusLowStock
+	StatusReserved     = productpb.StatusReserved
+	StatusDiscontinued = productpb.StatusDiscontinued
 )
-
-func (s ProductStatus) IsValid() bool {
-	switch s {
-	case StatusDraft, StatusPendingReview, StatusPublished, StatusUnpublished, StatusSuspended, StatusDeleted,
-		StatusInStock, StatusOutOfStock, StatusLowStock, StatusReserved, StatusDiscontinued:
-		return true
-	default:
-		return false
-	}
-}
 
 type Product struct {
 	ID          string           `json:"id" db:"id"`

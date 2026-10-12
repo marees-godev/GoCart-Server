@@ -409,7 +409,7 @@ func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
 				StoreId:  "store-1",
 				Name:     "Product 1",
 				Price:    29.99, // Authoritative price from Product Service
-				Status:   "IN_STOCK",
+				Status:   string(productpb.StatusInStock),
 			},
 		},
 	}
@@ -469,7 +469,7 @@ func TestCartService_ValidateCart_OutOfStock(t *testing.T) {
 			"p1": {
 				Id:       "p1",
 				Price:    50.0,
-				Status:   "IN_STOCK",
+				Status:   string(productpb.StatusInStock),
 			},
 		},
 	}
@@ -539,8 +539,8 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 
 	prodClient := &mockProductClient{
 		products: map[string]*productpb.Product{
-			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, Status: "IN_STOCK"},
-			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, Status: "IN_STOCK"},
+			"p1": {Id: "p1", StoreId: "store-A", Price: 100.0, Status: string(productpb.StatusInStock)},
+			"p2": {Id: "p2", StoreId: "store-B", Price: 50.0, Status: string(productpb.StatusInStock)},
 		},
 	}
 	invClient := &mockInventoryClient{
@@ -605,9 +605,9 @@ func TestCartService_ValidateCart_UnpublishedAndSuspendedProducts(t *testing.T) 
 
 	prodClient := &mockProductClient{
 		products: map[string]*productpb.Product{
-			"p-unpub": {Id: "p-unpub", Price: 50.0, Status: "UNPUBLISHED"},
-			"p-susp":  {Id: "p-susp", Price: 50.0, Status: "SUSPENDED"},
-			"p-pub":   {Id: "p-pub", Price: 50.0, Status: "PUBLISHED"},
+			"p-unpub": {Id: "p-unpub", Price: 50.0, Status: string(productpb.StatusUnpublished)},
+			"p-susp":  {Id: "p-susp", Price: 50.0, Status: string(productpb.StatusSuspended)},
+			"p-pub":   {Id: "p-pub", Price: 50.0, Status: string(productpb.StatusPublished)},
 		},
 	}
 	invClient := &mockInventoryClient{
