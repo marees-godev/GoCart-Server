@@ -16,9 +16,11 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/config"
@@ -100,9 +102,36 @@ func main() {
 	categoryClient, _, _ := grpcclient.NewCategoryClient(cfg.GRPC.CategoryServiceAddr, 5*time.Second)
 	merchantClient, _, _ := grpcclient.NewMerchantClient(cfg.GRPC.MerchantServiceAddr, 5*time.Second)
 
-	productRepo := repository.NewProductRepository(db.Pool, log)
+	outboxStore := outbox.NewStore()
+	productRepo := repository.NewProductRepositoryWithOutbox(db.Pool, outboxStore, log)
 	productService := service.NewProductServiceWithClients(productRepo, storeClient, categoryClient, merchantClient, s3Client, log)
 	productGRPCHandler := handler.NewProductGRPCHandler(productService, log)
+
+	if cfg.Outbox.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		producer := kafka.NewProducer(kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       cfg.Kafka.ClientID,
+			ConnectTimeout: 10 * time.Second,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			RetryInterval:  500 * time.Millisecond,
+		})
+		defer func() {
+			if err := producer.Close(); err != nil {
+				log.Error("Failed to close Kafka producer", "error", err)
+			}
+		}()
+
+		outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
+			ServiceName:    cfg.App.Name,
+			PollInterval:   cfg.Outbox.PollInterval,
+			BatchSize:      cfg.Outbox.BatchSize,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			BaseRetryDelay: cfg.Outbox.BaseRetryDelay,
+			MaxRetryDelay:  cfg.Outbox.MaxRetryDelay,
+			DLQTopic:       cfg.Outbox.DLQTopic,
+		})
+		go outboxPublisher.Start(ctx)
+	}
 
 	productMethodRoles := map[string][]string{
 		"/gocart.product.v1.ProductService/CreateProduct": {auth.RoleAdmin, auth.RoleMerchant},
