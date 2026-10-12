@@ -98,9 +98,10 @@ func main() {
 
 	storeClient, _, _ := grpcclient.NewStoreClient(cfg.GRPC.StoreServiceAddr, 5*time.Second)
 	categoryClient, _, _ := grpcclient.NewCategoryClient(cfg.GRPC.CategoryServiceAddr, 5*time.Second)
+	merchantClient, _, _ := grpcclient.NewMerchantClient(cfg.GRPC.MerchantServiceAddr, 5*time.Second)
 
 	productRepo := repository.NewProductRepository(db.Pool, log)
-	productService := service.NewProductService(productRepo, storeClient, categoryClient, s3Client, log)
+	productService := service.NewProductServiceWithClients(productRepo, storeClient, categoryClient, merchantClient, s3Client, log)
 	productGRPCHandler := handler.NewProductGRPCHandler(productService, log)
 
 	productMethodRoles := map[string][]string{

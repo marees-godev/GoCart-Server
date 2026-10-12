@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/cart-service/internal/dto"
@@ -277,11 +279,11 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 					Message:   "product not found",
 					Code:      dto.ErrCodeProductNotFound,
 				})
-			} else if product.GetStatus() == "inactive" || product.GetStatus() == "discontinued" {
+			} else if prodStatus := productpb.ProductStatus(strings.ToUpper(strings.TrimSpace(product.GetStatus()))); prodStatus != productpb.StatusPublished && prodStatus != productpb.StatusInStock {
 				isValid = false
 				validationErrors = append(validationErrors, dto.ValidationError{
 					ProductID: item.ProductID,
-					Message:   "product is inactive",
+					Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
 					Code:      dto.ErrCodeProductInactive,
 				})
 			} else {
