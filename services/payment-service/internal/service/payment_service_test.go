@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
@@ -14,22 +15,32 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
+type outboxRecord struct {
+	AggregateID string
+	EventType   string
+	Topic       string
+}
+
 // In-Memory Repository Mock
 type mockPaymentRepo struct {
-	mu       sync.Mutex
-	payments map[string]*model.Payment
-	idempMap map[string]*model.Payment
-	orderMap map[string]*model.Payment
-	refunds  map[string]*model.Refund
-	nextID   int
+	mu           sync.Mutex
+	payments     map[string]*model.Payment
+	idempMap     map[string]*model.Payment
+	orderMap     map[string]*model.Payment
+	refunds      map[string]*model.Refund
+	processedEvs map[string]bool
+	outboxEvents []outboxRecord
+	updateCalls  int
+	nextID       int
 }
 
 func newMockPaymentRepo() *mockPaymentRepo {
 	return &mockPaymentRepo{
-		payments: make(map[string]*model.Payment),
-		idempMap: make(map[string]*model.Payment),
-		orderMap: make(map[string]*model.Payment),
-		refunds:  make(map[string]*model.Refund),
+		payments:     make(map[string]*model.Payment),
+		idempMap:     make(map[string]*model.Payment),
+		orderMap:     make(map[string]*model.Payment),
+		refunds:      make(map[string]*model.Refund),
+		processedEvs: make(map[string]bool),
 	}
 }
 
@@ -115,6 +126,12 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 		return nil, appErrors.NotFound("payment not found")
 	}
 
+	oldStatus := p.Status
+	if oldStatus != status && !model.CanTransitionPayment(oldStatus, status) {
+		return nil, appErrors.BadRequest("cannot transition payment")
+	}
+
+	m.updateCalls++
 	p.Status = status
 	if gatewayTxID != "" {
 		p.GatewayTransactionID = gatewayTxID
@@ -126,6 +143,40 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 		p.PaymentMethod = model.NormalizePaymentMethod(paymentMethod[0])
 	}
 	p.UpdatedAt = time.Now()
+
+	if oldStatus != status {
+		if status == model.PaymentStatusSuccess {
+			exists := false
+			for _, rec := range m.outboxEvents {
+				if rec.AggregateID == p.ID && rec.EventType == events.EventTypePaymentSuccessful {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				m.outboxEvents = append(m.outboxEvents, outboxRecord{
+					AggregateID: p.ID,
+					EventType:   events.EventTypePaymentSuccessful,
+					Topic:       events.TopicPaymentSuccessful,
+				})
+			}
+		} else if status == model.PaymentStatusFailed {
+			exists := false
+			for _, rec := range m.outboxEvents {
+				if rec.AggregateID == p.ID && rec.EventType == events.EventTypePaymentFailed {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				m.outboxEvents = append(m.outboxEvents, outboxRecord{
+					AggregateID: p.ID,
+					EventType:   events.EventTypePaymentFailed,
+					Topic:       events.TopicPaymentFailed,
+				})
+			}
+		}
+	}
 
 	m.idempMap[p.IdempotencyKey] = p
 	m.orderMap[p.OrderID] = p
@@ -165,10 +216,15 @@ func (m *mockPaymentRepo) SaveWebhookEvent(ctx context.Context, w *model.Payment
 }
 
 func (m *mockPaymentRepo) IsWebhookProcessed(ctx context.Context, eventID string) (bool, error) {
-	return false, nil
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.processedEvs[eventID], nil
 }
 
 func (m *mockPaymentRepo) MarkWebhookProcessed(ctx context.Context, eventID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.processedEvs[eventID] = true
 	return nil
 }
 
@@ -413,7 +469,7 @@ func TestHandleRazorpayWebhook_Success(t *testing.T) {
 	}
 
 	// Reset status back to PENDING to test webhook status transition
-	_, _ = repo.UpdatePaymentStatus(context.Background(), payment.ID, model.PaymentStatusPending, "", "")
+	repo.payments[payment.ID].Status = model.PaymentStatusPending
 
 	webhookPayload := []byte(`{
 		"entity": "event",
@@ -483,7 +539,7 @@ func TestHandleRazorpayWebhook_Failed(t *testing.T) {
 	}
 
 	// Set status to PENDING
-	_, _ = repo.UpdatePaymentStatus(context.Background(), payment.ID, model.PaymentStatusPending, "", "")
+	repo.payments[payment.ID].Status = model.PaymentStatusPending
 
 	webhookPayload := []byte(`{
 		"entity": "event",
@@ -558,5 +614,315 @@ func TestProcessPayment_NetBanking_NormalizedAndUUID(t *testing.T) {
 
 	if payment.PaymentMethodID == nil || *payment.PaymentMethodID == "" {
 		t.Errorf("expected non-nil UUID for PaymentMethodID, got nil/empty")
+	}
+}
+
+func TestHandleRazorpayWebhook_DuplicateSuccess_PublishedOnce(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID: "ord_dup_succ",
+		Status:  model.PaymentStatusPending,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	payload := []byte(`{
+		"id": "evt_captured_100",
+		"entity": "event",
+		"event": "payment.captured",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_rzp_dup_succ",
+					"notes": {
+						"payment_id": "` + pmt.ID + `"
+					}
+				}
+			}
+		}
+	}`)
+
+	// First event processing
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("first webhook failed: %v", err)
+	}
+
+	p1, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p1.Status != model.PaymentStatusSuccess {
+		t.Fatalf("expected SUCCESS, got %s", p1.Status)
+	}
+
+	successEventsCount := 0
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentSuccessful {
+			successEventsCount++
+		}
+	}
+	if successEventsCount != 1 {
+		t.Fatalf("expected PaymentSuccessful outbox event count 1, got %d", successEventsCount)
+	}
+
+	callsAfterFirst := repo.updateCalls
+
+	// Second duplicate event processing
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("duplicate webhook failed: %v", err)
+	}
+
+	p2, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p2.Status != model.PaymentStatusSuccess {
+		t.Fatalf("expected SUCCESS after duplicate, got %s", p2.Status)
+	}
+
+	// Ensure no new update calls or outbox events occurred
+	if repo.updateCalls != callsAfterFirst {
+		t.Errorf("expected no additional update calls on duplicate event, had %d, now %d", callsAfterFirst, repo.updateCalls)
+	}
+
+	successEventsCountAfter := 0
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentSuccessful {
+			successEventsCountAfter++
+		}
+	}
+	if successEventsCountAfter != 1 {
+		t.Errorf("expected PaymentSuccessful outbox event count to remain 1, got %d", successEventsCountAfter)
+	}
+}
+
+func TestHandleRazorpayWebhook_DuplicateFailed_PublishedOnce(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID: "ord_dup_fail",
+		Status:  model.PaymentStatusPending,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	payload := []byte(`{
+		"id": "evt_failed_200",
+		"entity": "event",
+		"event": "payment.failed",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_rzp_dup_fail",
+					"error_description": "Insufficient funds",
+					"notes": {
+						"payment_id": "` + pmt.ID + `"
+					}
+				}
+			}
+		}
+	}`)
+
+	// First event processing
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("first webhook failed: %v", err)
+	}
+
+	p1, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p1.Status != model.PaymentStatusFailed {
+		t.Fatalf("expected FAILED, got %s", p1.Status)
+	}
+
+	failedEventsCount := 0
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentFailed {
+			failedEventsCount++
+		}
+	}
+	if failedEventsCount != 1 {
+		t.Fatalf("expected PaymentFailed outbox event count 1, got %d", failedEventsCount)
+	}
+
+	callsAfterFirst := repo.updateCalls
+
+	// Second duplicate event processing
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("duplicate webhook failed: %v", err)
+	}
+
+	p2, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p2.Status != model.PaymentStatusFailed {
+		t.Fatalf("expected FAILED after duplicate, got %s", p2.Status)
+	}
+
+	if repo.updateCalls != callsAfterFirst {
+		t.Errorf("expected no additional update calls on duplicate event, had %d, now %d", callsAfterFirst, repo.updateCalls)
+	}
+
+	failedEventsCountAfter := 0
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentFailed {
+			failedEventsCountAfter++
+		}
+	}
+	if failedEventsCountAfter != 1 {
+		t.Errorf("expected PaymentFailed outbox event count to remain 1, got %d", failedEventsCountAfter)
+	}
+}
+
+func TestHandleRazorpayWebhook_StateMachine_SuccessCannotTransitionToFailed(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID: "ord_succ_to_fail",
+		Status:  model.PaymentStatusPending,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+	repo.payments[pmt.ID].Status = model.PaymentStatusSuccess
+
+	// Simulate incoming payment.failed event for already successful payment
+	payload := []byte(`{
+		"id": "evt_conflict_300",
+		"entity": "event",
+		"event": "payment.failed",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_rzp_conflict",
+					"error_description": "Network timeout",
+					"notes": {
+						"payment_id": "` + pmt.ID + `"
+					}
+				}
+			}
+		}
+	}`)
+
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("expected webhook to be safely handled, got error: %v", err)
+	}
+
+	p, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p.Status != model.PaymentStatusSuccess {
+		t.Errorf("expected status to remain SUCCESS according to state machine, got %s", p.Status)
+	}
+
+	// Verify PaymentFailed was never published
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentFailed {
+			t.Errorf("unexpected PaymentFailed event published for successful payment")
+		}
+	}
+}
+
+func TestHandleRazorpayWebhook_StateMachine_FailedCannotTransitionToSuccess(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID: "ord_fail_to_succ",
+		Status:  model.PaymentStatusPending,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+	repo.payments[pmt.ID].Status = model.PaymentStatusFailed
+
+	// Simulate incoming payment.captured event for already failed payment
+	payload := []byte(`{
+		"id": "evt_conflict_400",
+		"entity": "event",
+		"event": "payment.captured",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_rzp_conflict_2",
+					"notes": {
+						"payment_id": "` + pmt.ID + `"
+					}
+				}
+			}
+		}
+	}`)
+
+	if err := svc.HandleRazorpayWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("expected webhook to be safely handled, got error: %v", err)
+	}
+
+	p, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if p.Status != model.PaymentStatusFailed {
+		t.Errorf("expected status to remain FAILED according to state machine, got %s", p.Status)
+	}
+
+	// Verify PaymentSuccessful was never published
+	for _, evt := range repo.outboxEvents {
+		if evt.AggregateID == pmt.ID && evt.EventType == events.EventTypePaymentSuccessful {
+			t.Errorf("unexpected PaymentSuccessful event published for failed payment")
+		}
+	}
+}
+
+func TestHandleRazorpayWebhook_UnknownPayment_HandledSafely(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	payload := []byte(`{
+		"id": "evt_unknown_500",
+		"entity": "event",
+		"event": "payment.captured",
+		"payload": {
+			"payment": {
+				"entity": {
+					"id": "pay_unknown_none",
+					"notes": {
+						"payment_id": "non_existent_payment_id"
+					}
+				}
+			}
+		}
+	}`)
+
+	err := svc.HandleRazorpayWebhook(context.Background(), payload)
+	if err == nil {
+		t.Fatalf("expected error for unknown payment, got nil")
+	}
+
+	if !appErrors.IsNotFound(err) {
+		t.Errorf("expected NotFound error for unknown payment, got %v", err)
+	}
+
+	if len(repo.payments) != 0 {
+		t.Errorf("expected no fake payments auto-created, found %d", len(repo.payments))
+	}
+	if len(repo.outboxEvents) != 0 {
+		t.Errorf("expected no outbox events created for unknown payment, found %d", len(repo.outboxEvents))
+	}
+}
+
+func TestHandleRazorpayWebhook_EmptyBody_Rejected(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	err := svc.HandleRazorpayWebhook(context.Background(), []byte{})
+	if err == nil {
+		t.Fatalf("expected error for empty body, got nil")
+	}
+}
+
+func TestHandleRazorpayWebhook_MalformedJSON_Rejected(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	err := svc.HandleRazorpayWebhook(context.Background(), []byte(`{invalid_json`))
+	if err == nil {
+		t.Fatalf("expected error for malformed json, got nil")
 	}
 }

@@ -342,12 +342,19 @@ func (s *paymentService) HandleRazorpayWebhook(ctx context.Context, body []byte)
 	slog.InfoContext(ctx, "received razorpay webhook event", "event_type", event.Event, "account_id", event.AccountID)
 
 	// Deduplication / event ID resolution
-	eventID := fmt.Sprintf("%s_%s_%d", event.Event, event.Payload.Payment.Entity.ID, event.CreatedAt)
-	if event.Payload.Payment.Entity.ID == "" && event.Payload.Order.Entity.ID != "" {
-		eventID = fmt.Sprintf("%s_%s_%d", event.Event, event.Payload.Order.Entity.ID, event.CreatedAt)
+	eventID := event.ID
+	if eventID == "" {
+		eventID = event.EventID
 	}
-	if event.Payload.Refund.Entity.ID != "" {
-		eventID = fmt.Sprintf("%s_%s_%d", event.Event, event.Payload.Refund.Entity.ID, event.CreatedAt)
+	if eventID == "" {
+		entityID := event.Payload.Payment.Entity.ID
+		if entityID == "" {
+			entityID = event.Payload.Order.Entity.ID
+		}
+		if entityID == "" {
+			entityID = event.Payload.Refund.Entity.ID
+		}
+		eventID = fmt.Sprintf("%s_%s_%d", event.Event, entityID, event.CreatedAt)
 	}
 
 	// 1. Check idempotency / deduplication in payment_webhooks
@@ -450,62 +457,6 @@ func (s *paymentService) findPaymentForWebhook(ctx context.Context, event *model
 		}
 	}
 
-	// 8. Fallback: Auto-create payment record if not found in database to prevent 404 webhook failures
-	gatewayTxID := p.OrderID
-	if gatewayTxID == "" {
-		gatewayTxID = p.ID
-	}
-	if gatewayTxID == "" {
-		gatewayTxID = ord.ID
-	}
-
-	if gatewayTxID != "" {
-		amt := float64(p.Amount) / 100.0
-		if amt <= 0 {
-			amt = float64(ord.Amount) / 100.0
-		}
-		if amt <= 0 {
-			amt = 1499.0
-		}
-		curr := p.Currency
-		if curr == "" {
-			curr = ord.Currency
-		}
-		if curr == "" {
-			curr = "INR"
-		}
-
-		pmMethod := model.NormalizePaymentMethod(p.Method)
-		initStatus := model.PaymentStatusPending
-		if event.Event == "payment.failed" || event.Event == "payment.disputed" || event.Event == "payment.dispute.created" || p.Status == "failed" {
-			initStatus = model.PaymentStatusFailed
-		} else if event.Event == "payment.captured" || event.Event == "order.paid" || p.Status == "captured" || p.Status == "paid" {
-			initStatus = model.PaymentStatusSuccess
-		}
-
-		fallbackPmt := &model.Payment{
-			ID:                   uuid.New().String(),
-			OrderID:              uuid.New().String(),
-			UserID:               uuid.New().String(),
-			PaymentMethod:        pmMethod,
-			Amount:               amt,
-			Currency:             curr,
-			Status:               initStatus,
-			TransactionID:        fmt.Sprintf("tx_%s", uuid.New().String()),
-			GatewayTransactionID: gatewayTxID,
-			IdempotencyKey:       fmt.Sprintf("auto_wh_%s", gatewayTxID),
-		}
-
-		if createErr := s.repo.CreatePayment(ctx, fallbackPmt); createErr == nil {
-			slog.InfoContext(ctx, "auto-created fallback payment record for razorpay webhook event",
-				"payment_id", fallbackPmt.ID,
-				"gateway_transaction_id", gatewayTxID,
-				"event_type", event.Event,
-			)
-			return fallbackPmt, nil
-		}
-	}
-
 	slog.WarnContext(ctx, "could not locate payment record for razorpay webhook event",
 		"event_type", event.Event,
 		"razorpay_payment_id", p.ID,
@@ -521,7 +472,12 @@ func (s *paymentService) handlePaymentPendingWebhook(ctx context.Context, event 
 		return err
 	}
 
-	if payment.Status == model.PaymentStatusSuccess || payment.Status == model.PaymentStatusFailed {
+	if payment.Status == model.PaymentStatusPending {
+		slog.InfoContext(ctx, "payment is already marked PENDING, skipping webhook update", "payment_id", payment.ID)
+		return nil
+	}
+
+	if !model.CanTransitionPayment(payment.Status, model.PaymentStatusPending) {
 		slog.InfoContext(ctx, "payment in terminal state, skipping pending update", "payment_id", payment.ID, "current_status", payment.Status)
 		return nil
 	}
@@ -565,10 +521,16 @@ func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event 
 	}
 
 	if payment.Status == model.PaymentStatusSuccess {
-		if paymentMethod != "" && payment.PaymentMethod != paymentMethod {
-			_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusSuccess, gatewayTxID, "", paymentMethod)
-		}
 		slog.InfoContext(ctx, "payment is already marked SUCCESS, skipping webhook update", "payment_id", payment.ID)
+		return nil
+	}
+
+	if !model.CanTransitionPayment(payment.Status, model.PaymentStatusSuccess) {
+		slog.WarnContext(ctx, "ignoring success webhook due to invalid state transition",
+			"payment_id", payment.ID,
+			"current_status", payment.Status,
+			"target_status", model.PaymentStatusSuccess,
+		)
 		return nil
 	}
 
@@ -595,14 +557,16 @@ func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *
 	}
 
 	if payment.Status == model.PaymentStatusFailed {
-		if paymentMethod != "" && payment.PaymentMethod != paymentMethod {
-			gatewayTxID := pEntity.ID
-			if gatewayTxID == "" {
-				gatewayTxID = event.Payload.Order.Entity.ID
-			}
-			_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusFailed, gatewayTxID, "", paymentMethod)
-		}
 		slog.InfoContext(ctx, "payment is already marked FAILED, skipping webhook update", "payment_id", payment.ID)
+		return nil
+	}
+
+	if !model.CanTransitionPayment(payment.Status, model.PaymentStatusFailed) {
+		slog.WarnContext(ctx, "ignoring failed webhook due to invalid state transition",
+			"payment_id", payment.ID,
+			"current_status", payment.Status,
+			"target_status", model.PaymentStatusFailed,
+		)
 		return nil
 	}
 

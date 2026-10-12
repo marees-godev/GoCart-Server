@@ -2,6 +2,8 @@ package model
 
 // RazorpayWebhookEvent represents the top-level Razorpay webhook event envelope.
 type RazorpayWebhookEvent struct {
+	ID        string                 `json:"id,omitempty"`
+	EventID   string                 `json:"event_id,omitempty"`
 	Entity    string                 `json:"entity"`
 	AccountID string                 `json:"account_id"`
 	Event     string                 `json:"event"`

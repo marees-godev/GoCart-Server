@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -34,23 +33,9 @@ func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gatew
 }
 
 func (h *PaymentHandler) RegisterRoutes(app *fiber.App) {
-	app.Get("/", h.RenderCheckout)
-	app.Get("/checkout", h.RenderCheckout)
 	app.Get("/get-key", h.GetKey)
 	app.Post("/create-order", h.CreateOrder)
 	app.All("/payment-callback", h.PaymentCallback)
-}
-
-func (h *PaymentHandler) RenderCheckout(c *fiber.Ctx) error {
-	c.Type("html")
-	content, err := os.ReadFile("./templates/checkout.html")
-	if err != nil {
-		content, err = os.ReadFile("../templates/checkout.html")
-	}
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString("Checkout template not found")
-	}
-	return c.Send(content)
 }
 
 func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
@@ -63,6 +48,10 @@ func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
 
 func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	type orderReq struct {
+		OrderID          string  `json:"order_id"`
+		OrderIDAlt       string  `json:"orderId"`
+		UserID           string  `json:"user_id"`
+		UserIDAlt        string  `json:"userId"`
 		Amount           float64 `json:"amount"`
 		Currency         string  `json:"currency"`
 		PaymentMethod    string  `json:"payment_method"`
@@ -85,11 +74,38 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	}
 	paymentMethod := model.NormalizePaymentMethod(method)
 
+	orderID := req.OrderID
+	if orderID == "" {
+		orderID = req.OrderIDAlt
+	}
+	if orderID != "" && h.paymentRepo != nil {
+		existing, err := h.paymentRepo.GetPaymentByOrderID(c.UserContext(), orderID)
+		if err == nil && existing != nil && existing.Status == model.PaymentStatusPending && existing.GatewayTransactionID != "" {
+			return c.JSON(fiber.Map{
+				"id":         existing.GatewayTransactionID,
+				"payment_id": existing.ID,
+				"amount":     int64(existing.Amount * 100),
+				"currency":   existing.Currency,
+				"status":     "created",
+				"is_real":    true,
+			})
+		}
+	}
+	if orderID == "" {
+		orderID = uuid.New().String()
+	}
+
+	userID := req.UserID
+	if userID == "" {
+		userID = req.UserIDAlt
+	}
+	if userID == "" {
+		userID = uuid.New().String()
+	}
+
 	// If real Razorpay key & secret are provided, create genuine Razorpay Order ID via API
 	if h.gwConfig.RazorpayKeyID != "" && h.gwConfig.RazorpayKeySecret != "" && !strings.Contains(h.gwConfig.RazorpayKeyID, "xxxx") {
 		paymentID := uuid.New().String()
-		orderID := uuid.New().String()
-		userID := uuid.New().String()
 		idempKey := fmt.Sprintf("idemp_%d", time.Now().UnixNano())
 
 		rzpResp, err := h.paymentGW.ProcessPayment(c.UserContext(), &gateway.ProcessGatewayRequest{
@@ -159,6 +175,12 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 			lookupID = paymentID
 		}
 		pmt, err := h.paymentRepo.GetPaymentByID(c.UserContext(), lookupID)
+		if (err != nil || pmt == nil) && orderID != "" {
+			pmt, err = h.paymentRepo.GetPaymentByOrderID(c.UserContext(), orderID)
+		}
+		if (err != nil || pmt == nil) && paymentID != "" && lookupID != paymentID {
+			pmt, err = h.paymentRepo.GetPaymentByID(c.UserContext(), paymentID)
+		}
 		if err == nil && pmt != nil {
 			if isFailed {
 				reason := errorDesc
