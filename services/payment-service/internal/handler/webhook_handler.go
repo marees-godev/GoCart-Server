@@ -23,8 +23,6 @@ func NewWebhookHandler(paymentService service.PaymentService, webhookSecret stri
 
 func (h *WebhookHandler) RegisterRoutes(app *fiber.App) {
 	app.Post("/webhooks", h.HandleRazorpayWebhook)
-	app.Post("/api/v1/payments/webhook", h.HandleRazorpayWebhook)
-	app.Post("/webhooks/razorpay", h.HandleRazorpayWebhook)
 }
 
 func (h *WebhookHandler) HandleRazorpayWebhook(c *fiber.Ctx) error {
@@ -65,4 +63,3 @@ func (h *WebhookHandler) HandleRazorpayWebhook(c *fiber.Ctx) error {
 		"message": "webhook processed successfully",
 	})
 }
-

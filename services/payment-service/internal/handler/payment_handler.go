@@ -49,9 +49,7 @@ func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
 func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	type orderReq struct {
 		OrderID          string  `json:"order_id"`
-		OrderIDAlt       string  `json:"orderId"`
 		UserID           string  `json:"user_id"`
-		UserIDAlt        string  `json:"userId"`
 		Amount           float64 `json:"amount"`
 		Currency         string  `json:"currency"`
 		PaymentMethod    string  `json:"payment_method"`
@@ -75,9 +73,6 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	paymentMethod := model.NormalizePaymentMethod(method)
 
 	orderID := req.OrderID
-	if orderID == "" {
-		orderID = req.OrderIDAlt
-	}
 	if orderID != "" && h.paymentRepo != nil {
 		existing, err := h.paymentRepo.GetPaymentByOrderID(c.UserContext(), orderID)
 		if err == nil && existing != nil && existing.Status == model.PaymentStatusPending && existing.GatewayTransactionID != "" {
@@ -96,9 +91,6 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 	}
 
 	userID := req.UserID
-	if userID == "" {
-		userID = req.UserIDAlt
-	}
 	if userID == "" {
 		userID = uuid.New().String()
 	}
