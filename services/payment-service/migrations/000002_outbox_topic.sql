@@ -8,3 +8,6 @@ ALTER TABLE outbox_events
 CREATE INDEX IF NOT EXISTS idx_outbox_pending_created
     ON outbox_events (created_at ASC)
     WHERE status = 'PENDING';
+
+CREATE INDEX IF NOT EXISTS idx_payment_outbox_aggregate
+    ON outbox_events (aggregate_id, event_type);
