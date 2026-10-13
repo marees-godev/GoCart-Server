@@ -92,13 +92,27 @@ func main() {
 	}
 
 	// 5. Initialize Outbox Publisher background worker for Kafka event streaming
-	kafkaProducer := kafka.NewProducer(kafka.Config{
-		Brokers: cfg.Kafka.Brokers,
-	})
-	defer kafkaProducer.Close()
+	if cfg.Kafka.Enabled && cfg.Outbox.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		kafkaProducer := kafka.NewProducer(kafka.Config{
+			Brokers:       cfg.Kafka.Brokers,
+			MaxRetries:    3,
+			RetryInterval: 1 * time.Second,
+		})
+		defer func() { _ = kafkaProducer.Close() }()
 
-	outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outbox.NewStore(), outbox.DefaultConfig())
-	go outboxPublisher.Start(ctx)
+		outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outbox.NewStore(), outbox.Config{
+			ServiceName:    cfg.App.Name,
+			PollInterval:   cfg.Outbox.PollInterval,
+			BatchSize:      cfg.Outbox.BatchSize,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			BaseRetryDelay: cfg.Outbox.BaseRetryDelay,
+			MaxRetryDelay:  cfg.Outbox.MaxRetryDelay,
+			DLQTopic:       cfg.Outbox.DLQTopic,
+		})
+		go outboxPublisher.Start(ctx)
+	} else {
+		log.Info("Outbox publisher or Kafka disabled via configuration")
+	}
 
 	// 6. Initialize domain dependencies & Payment Service
 	paymentRepo := repository.NewPaymentRepository(db.Pool)

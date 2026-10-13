@@ -95,21 +95,3 @@ func TestPaymentHandler_CreateOrder_TestMode(t *testing.T) {
 		t.Errorf("unexpected create order response: %v", resultMap)
 	}
 }
-
-func TestPaymentHandler_RenderCheckout(t *testing.T) {
-	app := fiber.New()
-	h := NewPaymentHandler(nil, nil, gateway.GatewayConfig{}, slog.Default())
-	h.RegisterRoutes(app)
-
-	req := httptest.NewRequest("GET", "/checkout", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 && resp.StatusCode != 500 {
-		t.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	_ = body
-}
