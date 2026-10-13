@@ -99,7 +99,7 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "8888"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50055"),
+			Port: GetEnv("GRPC_PORT", "50060"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("PAYMENT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
