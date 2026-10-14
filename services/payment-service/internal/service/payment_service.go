@@ -32,11 +32,19 @@ type CreateRefundDTO struct {
 	IdempotencyKey string
 }
 
+type CancelPaymentDTO struct {
+	PaymentID string
+	OrderID   string
+	Reason    string
+}
+
 type PaymentService interface {
 	ProcessPayment(ctx context.Context, dto *ProcessPaymentDTO) (*model.Payment, error)
 	GetPaymentByID(ctx context.Context, id string) (*model.Payment, error)
 	GetPaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error)
 	CreateRefund(ctx context.Context, dto *CreateRefundDTO) (*model.Refund, error)
+	CancelPayment(ctx context.Context, dto *CancelPaymentDTO) (*model.Payment, error)
+	GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error)
 	HandleRazorpayWebhook(ctx context.Context, body []byte) error
 }
 
@@ -252,6 +260,56 @@ func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID string
 	return payment, nil
 }
 
+func (s *paymentService) CancelPayment(ctx context.Context, dto *CancelPaymentDTO) (*model.Payment, error) {
+	if dto == nil {
+		slog.WarnContext(ctx, "cancel payment request payload is nil in CancelPayment service")
+		return nil, appErrors.BadRequest("cancel payment request payload cannot be nil")
+	}
+	if dto.PaymentID == "" && dto.OrderID == "" {
+		slog.WarnContext(ctx, "both payment_id and order_id are empty in CancelPayment service")
+		return nil, appErrors.BadRequest("payment_id or order_id is required for cancellation")
+	}
+
+	var payment *model.Payment
+	var err error
+	if dto.PaymentID != "" {
+		payment, err = s.repo.GetPaymentByID(ctx, dto.PaymentID)
+	} else {
+		payment, err = s.repo.GetPaymentByOrderID(ctx, dto.OrderID)
+	}
+	if err != nil {
+		slog.WarnContext(ctx, "payment not found for cancellation", "payment_id", dto.PaymentID, "order_id", dto.OrderID, "error", err)
+		return nil, err
+	}
+
+	if payment.Status == model.PaymentStatusCancelled {
+		slog.InfoContext(ctx, "payment is already cancelled, returning existing record", "payment_id", payment.ID)
+		return payment, nil
+	}
+
+	if payment.Status != model.PaymentStatusInitiated && payment.Status != model.PaymentStatusPending {
+		slog.WarnContext(ctx, "cancellation not permitted for payment status", "payment_id", payment.ID, "status", payment.Status)
+		if payment.Status == model.PaymentStatusSuccess {
+			return nil, appErrors.BadRequest("cannot cancel a successful payment; use refund instead")
+		}
+		return nil, appErrors.BadRequest(fmt.Sprintf("cannot cancel payment with status %s", payment.Status))
+	}
+
+	reason := dto.Reason
+	if reason == "" {
+		reason = "Payment cancelled"
+	}
+
+	updated, err := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusCancelled, "", reason)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to update payment status to CANCELLED", "payment_id", payment.ID, "error", err)
+		return nil, err
+	}
+
+	slog.InfoContext(ctx, "payment successfully cancelled", "payment_id", updated.ID, "reason", reason)
+	return updated, nil
+}
+
 func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO) (*model.Refund, error) {
 	if dto == nil || dto.PaymentID == "" {
 		slog.WarnContext(ctx, "payment_id is required in CreateRefund service")
@@ -264,22 +322,64 @@ func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO)
 
 	slog.InfoContext(ctx, "CreateRefund service called", "payment_id", dto.PaymentID, "amount", dto.Amount)
 
+	// 1. Idempotency check: prevent duplicate refund requests
+	if dto.IdempotencyKey != "" {
+		existingRef, err := s.repo.GetRefundByIdempotencyKey(ctx, dto.IdempotencyKey)
+		if err == nil && existingRef != nil {
+			if existingRef.PaymentID == dto.PaymentID {
+				slog.InfoContext(ctx, "returning existing refund for duplicate idempotency key", "idempotency_key", dto.IdempotencyKey, "refund_id", existingRef.ID)
+				return existingRef, nil
+			}
+			slog.WarnContext(ctx, "idempotency key conflict for refund", "idempotency_key", dto.IdempotencyKey)
+			return nil, appErrors.Conflict("refund request with this idempotency key already exists for a different payment")
+		}
+	}
+
+	// 2. Fetch payment
 	payment, err := s.repo.GetPaymentByID(ctx, dto.PaymentID)
 	if err != nil {
 		slog.WarnContext(ctx, "failed to get payment for refund in service", "payment_id", dto.PaymentID, "error", err)
 		return nil, err
 	}
 
-	if payment.Status != model.PaymentStatusSuccess {
-		slog.WarnContext(ctx, "cannot refund non-SUCCESS payment in service", "payment_id", dto.PaymentID, "status", payment.Status)
+	if payment.Status == model.PaymentStatusRefunded {
+		slog.WarnContext(ctx, "payment is already fully refunded", "payment_id", dto.PaymentID)
+		return nil, appErrors.BadRequest("payment is already fully refunded")
+	}
+
+	if payment.Status != model.PaymentStatusSuccess && payment.Status != model.PaymentStatusPartiallyRefunded {
+		slog.WarnContext(ctx, "cannot refund payment in non-refundable state", "payment_id", dto.PaymentID, "status", payment.Status)
 		return nil, appErrors.BadRequest(fmt.Sprintf("cannot refund payment with status %s", payment.Status))
 	}
 
-	if dto.Amount > payment.Amount {
-		slog.WarnContext(ctx, "refund amount exceeds payment amount in service", "payment_id", dto.PaymentID, "refund_amount", dto.Amount, "payment_amount", payment.Amount)
-		return nil, appErrors.BadRequest(fmt.Sprintf("refund amount %.2f exceeds payment amount %.2f", dto.Amount, payment.Amount))
+	// 3. Check refundable amount: refund amount cannot exceed refundable amount
+	totalRefunded, err := s.repo.GetTotalRefundedAmount(ctx, payment.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to query total refunded amount", "payment_id", payment.ID, "error", err)
+		return nil, err
 	}
 
+	refundableAmount := payment.Amount - totalRefunded
+	if dto.Amount > refundableAmount+1e-6 {
+		slog.WarnContext(ctx, "refund amount exceeds refundable amount in service",
+			"payment_id", dto.PaymentID,
+			"requested_amount", dto.Amount,
+			"total_payment_amount", payment.Amount,
+			"already_refunded", totalRefunded,
+			"remaining_refundable", refundableAmount,
+		)
+		return nil, appErrors.BadRequest(fmt.Sprintf("refund amount %.2f exceeds refundable amount %.2f", dto.Amount, refundableAmount))
+	}
+
+	// 4. Save previous status and transition payment to REFUND_PENDING
+	prevStatus := payment.Status
+	_, err = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusRefundPending, "", "")
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to update payment to REFUND_PENDING", "payment_id", payment.ID, "error", err)
+		return nil, err
+	}
+
+	// 5. Persist initial refund record (status PENDING) and publish RefundInitiated
 	refund := &model.Refund{
 		PaymentID:      payment.ID,
 		OrderID:        payment.OrderID,
@@ -291,9 +391,11 @@ func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO)
 
 	if err := s.repo.CreateRefund(ctx, refund); err != nil {
 		slog.ErrorContext(ctx, "failed to create refund record in service", "payment_id", payment.ID, "error", err)
+		_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, prevStatus, "", "")
 		return nil, err
 	}
 
+	// 6. Call Payment Gateway
 	gwCtx, gwCancel := context.WithTimeout(ctx, s.gatewayTimeout)
 	defer gwCancel()
 
@@ -310,21 +412,58 @@ func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO)
 	if gwErr != nil {
 		sanitizedErr := gateway.SanitizeGatewayError(gwErr)
 		slog.WarnContext(ctx, "gateway refund failed in service", "refund_id", refund.ID, "error", sanitizedErr)
+		updatedRef, _ := s.repo.UpdateRefundStatus(ctx, refund.ID, model.RefundStatusFailed, "")
+		_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, prevStatus, "", sanitizedErr.Error())
+		if updatedRef != nil {
+			return updatedRef, sanitizedErr
+		}
 		refund.Status = model.RefundStatusFailed
 		return refund, sanitizedErr
 	}
 
 	if gwResp != nil && gwResp.Status == "SUCCESS" {
-		refund.Status = model.RefundStatusSuccess
-		refund.GatewayRefundID = gwResp.GatewayRefundID
-		_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusRefunded, payment.GatewayTransactionID, "")
-		slog.InfoContext(ctx, "refund processed successfully in service", "refund_id", refund.ID, "gateway_refund_id", refund.GatewayRefundID)
-	} else {
-		refund.Status = model.RefundStatusFailed
-		slog.WarnContext(ctx, "gateway refund rejected in service", "refund_id", refund.ID)
+		newTotalRefunded := totalRefunded + dto.Amount
+		targetPaymentStatus := model.PaymentStatusPartiallyRefunded
+		if newTotalRefunded >= payment.Amount-1e-6 {
+			targetPaymentStatus = model.PaymentStatusRefunded
+		}
+
+		updatedRef, updateRefErr := s.repo.UpdateRefundStatus(ctx, refund.ID, model.RefundStatusSuccess, gwResp.GatewayRefundID)
+		if updateRefErr != nil {
+			slog.ErrorContext(ctx, "failed to update refund status to SUCCESS in repository", "refund_id", refund.ID, "error", updateRefErr)
+			return nil, updateRefErr
+		}
+
+		_, updatePmtErr := s.repo.UpdatePaymentStatus(ctx, payment.ID, targetPaymentStatus, payment.GatewayTransactionID, "")
+		if updatePmtErr != nil {
+			slog.ErrorContext(ctx, "failed to update payment status after refund success", "payment_id", payment.ID, "target_status", targetPaymentStatus, "error", updatePmtErr)
+			return updatedRef, updatePmtErr
+		}
+
+		slog.InfoContext(ctx, "refund processed successfully in service",
+			"refund_id", updatedRef.ID,
+			"gateway_refund_id", updatedRef.GatewayRefundID,
+			"payment_status", targetPaymentStatus,
+		)
+		return updatedRef, nil
 	}
 
+	slog.WarnContext(ctx, "gateway refund rejected in service", "refund_id", refund.ID)
+	updatedRef, _ := s.repo.UpdateRefundStatus(ctx, refund.ID, model.RefundStatusFailed, "")
+	_, _ = s.repo.UpdatePaymentStatus(ctx, payment.ID, prevStatus, "", "Refund declined by gateway")
+	if updatedRef != nil {
+		return updatedRef, nil
+	}
+	refund.Status = model.RefundStatusFailed
 	return refund, nil
+}
+
+func (s *paymentService) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
+	if paymentID == "" {
+		slog.WarnContext(ctx, "payment_id is empty in GetRefundsByPaymentID service")
+		return nil, appErrors.BadRequest("payment_id cannot be empty")
+	}
+	return s.repo.GetRefundsByPaymentID(ctx, paymentID)
 }
 
 func (s *paymentService) HandleRazorpayWebhook(ctx context.Context, body []byte) error {
@@ -600,31 +739,41 @@ func (s *paymentService) handleRefundSuccessWebhook(ctx context.Context, event *
 		return nil
 	}
 
+	var targetRefund *model.Refund
 	refund, err := s.repo.GetRefundByGatewayRefundID(ctx, refEntity.ID)
 	if err == nil && refund != nil {
-		_, _ = s.repo.UpdateRefundStatus(ctx, refund.ID, model.RefundStatusSuccess, refEntity.ID)
-		_, _ = s.repo.UpdatePaymentStatus(ctx, refund.PaymentID, model.PaymentStatusRefunded, "", "")
-		slog.InfoContext(ctx, "refund marked SUCCESS via razorpay webhook", "refund_id", refund.ID, "gateway_refund_id", refEntity.ID)
-		return nil
+		targetRefund = refund
 	}
 
 	var targetPayment *model.Payment
-	if paymentID, ok := refEntity.Notes["payment_id"]; ok && paymentID != "" {
-		targetPayment, _ = s.repo.GetPaymentByID(ctx, paymentID)
+	if targetRefund != nil {
+		targetPayment, _ = s.repo.GetPaymentByID(ctx, targetRefund.PaymentID)
+	} else {
+		if paymentID, ok := refEntity.Notes["payment_id"]; ok && paymentID != "" {
+			targetPayment, _ = s.repo.GetPaymentByID(ctx, paymentID)
+		}
+		if targetPayment == nil && refEntity.PaymentID != "" {
+			targetPayment, _ = s.repo.GetPaymentByID(ctx, refEntity.PaymentID)
+		}
 	}
-	if targetPayment == nil && refEntity.PaymentID != "" {
-		targetPayment, _ = s.repo.GetPaymentByID(ctx, refEntity.PaymentID)
+
+	if targetRefund != nil {
+		_, _ = s.repo.UpdateRefundStatus(ctx, targetRefund.ID, model.RefundStatusSuccess, refEntity.ID)
 	}
 
 	if targetPayment != nil {
-		_, _ = s.repo.UpdatePaymentStatus(ctx, targetPayment.ID, model.PaymentStatusRefunded, "", "")
-		slog.InfoContext(ctx, "payment marked REFUNDED via razorpay webhook", "payment_id", targetPayment.ID, "gateway_refund_id", refEntity.ID)
+		totalRefunded, _ := s.repo.GetTotalRefundedAmount(ctx, targetPayment.ID)
+		targetStatus := model.PaymentStatusPartiallyRefunded
+		if totalRefunded >= targetPayment.Amount-1e-6 {
+			targetStatus = model.PaymentStatusRefunded
+		}
+		_, _ = s.repo.UpdatePaymentStatus(ctx, targetPayment.ID, targetStatus, "", "")
+		slog.InfoContext(ctx, "payment marked after refund webhook", "payment_id", targetPayment.ID, "status", targetStatus, "gateway_refund_id", refEntity.ID)
 	}
 	return nil
 }
 
 func (s *paymentService) handleRefundFailedWebhook(ctx context.Context, event *model.RazorpayWebhookEvent) error {
-
 	refEntity := event.Payload.Refund.Entity
 	if refEntity.ID == "" {
 		return nil
@@ -633,7 +782,14 @@ func (s *paymentService) handleRefundFailedWebhook(ctx context.Context, event *m
 	refund, err := s.repo.GetRefundByGatewayRefundID(ctx, refEntity.ID)
 	if err == nil && refund != nil {
 		_, _ = s.repo.UpdateRefundStatus(ctx, refund.ID, model.RefundStatusFailed, refEntity.ID)
-		slog.InfoContext(ctx, "refund marked FAILED via razorpay webhook", "refund_id", refund.ID)
+		// Safely restore payment status
+		totalRefunded, _ := s.repo.GetTotalRefundedAmount(ctx, refund.PaymentID)
+		targetStatus := model.PaymentStatusSuccess
+		if totalRefunded > 0 {
+			targetStatus = model.PaymentStatusPartiallyRefunded
+		}
+		_, _ = s.repo.UpdatePaymentStatus(ctx, refund.PaymentID, targetStatus, "", "Refund failed at Razorpay gateway")
+		slog.InfoContext(ctx, "refund marked FAILED via razorpay webhook, restored payment status", "refund_id", refund.ID, "payment_status", targetStatus)
 	}
 	return nil
 }

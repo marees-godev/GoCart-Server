@@ -92,6 +92,15 @@ func (m *mockRepo) GetRefundByGatewayRefundID(ctx context.Context, gatewayRefund
 func (m *mockRepo) UpdateRefundStatus(ctx context.Context, id string, status model.RefundStatus, gatewayRefundID string) (*model.Refund, error) {
 	return nil, appErrors.NotFound("refund not found")
 }
+func (m *mockRepo) GetRefundByIdempotencyKey(ctx context.Context, key string) (*model.Refund, error) {
+	return nil, appErrors.NotFound("refund not found")
+}
+func (m *mockRepo) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
+	return nil, nil
+}
+func (m *mockRepo) GetTotalRefundedAmount(ctx context.Context, paymentID string) (float64, error) {
+	return 0, nil
+}
 func (m *mockRepo) SaveWebhookEvent(ctx context.Context, w *model.PaymentWebhook) error { return nil }
 
 func (m *mockRepo) IsWebhookProcessed(ctx context.Context, eventID string) (bool, error) {

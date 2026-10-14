@@ -28,6 +28,20 @@ func TestCanTransitionPayment(t *testing.T) {
 		{"Failed to Pending (Invalid)", model.PaymentStatusFailed, model.PaymentStatusPending, false},
 		{"Refunded to Success (Invalid)", model.PaymentStatusRefunded, model.PaymentStatusSuccess, false},
 		{"Cancelled to Success (Invalid)", model.PaymentStatusCancelled, model.PaymentStatusSuccess, false},
+		{"Initiated to Cancelled", model.PaymentStatusInitiated, model.PaymentStatusCancelled, true},
+		{"Pending to Cancelled", model.PaymentStatusPending, model.PaymentStatusCancelled, true},
+		{"Success to Cancelled (Invalid)", model.PaymentStatusSuccess, model.PaymentStatusCancelled, false},
+		{"Success to RefundPending", model.PaymentStatusSuccess, model.PaymentStatusRefundPending, true},
+		{"Success to PartiallyRefunded", model.PaymentStatusSuccess, model.PaymentStatusPartiallyRefunded, true},
+		{"RefundPending to Refunded", model.PaymentStatusRefundPending, model.PaymentStatusRefunded, true},
+		{"RefundPending to PartiallyRefunded", model.PaymentStatusRefundPending, model.PaymentStatusPartiallyRefunded, true},
+		{"RefundPending to Success", model.PaymentStatusRefundPending, model.PaymentStatusSuccess, true},
+		{"PartiallyRefunded to RefundPending", model.PaymentStatusPartiallyRefunded, model.PaymentStatusRefundPending, true},
+		{"PartiallyRefunded to Refunded", model.PaymentStatusPartiallyRefunded, model.PaymentStatusRefunded, true},
+		{"PartiallyRefunded to PartiallyRefunded (Invalid)", model.PaymentStatusPartiallyRefunded, model.PaymentStatusPartiallyRefunded, false},
+		{"PartiallyRefunded to Cancelled (Invalid)", model.PaymentStatusPartiallyRefunded, model.PaymentStatusCancelled, false},
+		{"Refunded to RefundPending (Invalid)", model.PaymentStatusRefunded, model.PaymentStatusRefundPending, false},
+		{"Cancelled to Cancelled (Invalid)", model.PaymentStatusCancelled, model.PaymentStatusCancelled, false},
 	}
 
 	for _, tt := range tests {

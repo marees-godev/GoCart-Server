@@ -38,5 +38,6 @@ extend type Query {
 extend type Mutation {
   processPayment(input: ProcessPaymentInput!): Payment @auth
   createRefund(paymentId: ID!, amount: Float!, reason: String, idempotencyKey: String): RefundPayload @auth(requires: [ADMIN, MERCHANT])
+  cancelPayment(paymentId: ID, orderId: String, reason: String): Payment @auth
 }
 

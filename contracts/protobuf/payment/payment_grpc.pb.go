@@ -19,10 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PaymentService_ProcessPayment_FullMethodName      = "/gocart.payment.v1.PaymentService/ProcessPayment"
-	PaymentService_GetPayment_FullMethodName          = "/gocart.payment.v1.PaymentService/GetPayment"
-	PaymentService_GetPaymentByOrderID_FullMethodName = "/gocart.payment.v1.PaymentService/GetPaymentByOrderID"
-	PaymentService_CreateRefund_FullMethodName        = "/gocart.payment.v1.PaymentService/CreateRefund"
+	PaymentService_ProcessPayment_FullMethodName        = "/gocart.payment.v1.PaymentService/ProcessPayment"
+	PaymentService_GetPayment_FullMethodName            = "/gocart.payment.v1.PaymentService/GetPayment"
+	PaymentService_GetPaymentByOrderID_FullMethodName   = "/gocart.payment.v1.PaymentService/GetPaymentByOrderID"
+	PaymentService_CreateRefund_FullMethodName          = "/gocart.payment.v1.PaymentService/CreateRefund"
+	PaymentService_CancelPayment_FullMethodName         = "/gocart.payment.v1.PaymentService/CancelPayment"
+	PaymentService_GetRefundsByPaymentID_FullMethodName = "/gocart.payment.v1.PaymentService/GetRefundsByPaymentID"
 )
 
 // PaymentServiceClient is the client API for PaymentService service.
@@ -33,6 +35,8 @@ type PaymentServiceClient interface {
 	GetPayment(ctx context.Context, in *GetPaymentRequest, opts ...grpc.CallOption) (*GetPaymentResponse, error)
 	GetPaymentByOrderID(ctx context.Context, in *GetPaymentByOrderIDRequest, opts ...grpc.CallOption) (*GetPaymentResponse, error)
 	CreateRefund(ctx context.Context, in *CreateRefundRequest, opts ...grpc.CallOption) (*CreateRefundResponse, error)
+	CancelPayment(ctx context.Context, in *CancelPaymentRequest, opts ...grpc.CallOption) (*CancelPaymentResponse, error)
+	GetRefundsByPaymentID(ctx context.Context, in *GetRefundsByPaymentIDRequest, opts ...grpc.CallOption) (*GetRefundsByPaymentIDResponse, error)
 }
 
 type paymentServiceClient struct {
@@ -83,6 +87,26 @@ func (c *paymentServiceClient) CreateRefund(ctx context.Context, in *CreateRefun
 	return out, nil
 }
 
+func (c *paymentServiceClient) CancelPayment(ctx context.Context, in *CancelPaymentRequest, opts ...grpc.CallOption) (*CancelPaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelPaymentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_CancelPayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paymentServiceClient) GetRefundsByPaymentID(ctx context.Context, in *GetRefundsByPaymentIDRequest, opts ...grpc.CallOption) (*GetRefundsByPaymentIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRefundsByPaymentIDResponse)
+	err := c.cc.Invoke(ctx, PaymentService_GetRefundsByPaymentID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PaymentServiceServer is the server API for PaymentService service.
 // All implementations must embed UnimplementedPaymentServiceServer
 // for forward compatibility.
@@ -91,6 +115,8 @@ type PaymentServiceServer interface {
 	GetPayment(context.Context, *GetPaymentRequest) (*GetPaymentResponse, error)
 	GetPaymentByOrderID(context.Context, *GetPaymentByOrderIDRequest) (*GetPaymentResponse, error)
 	CreateRefund(context.Context, *CreateRefundRequest) (*CreateRefundResponse, error)
+	CancelPayment(context.Context, *CancelPaymentRequest) (*CancelPaymentResponse, error)
+	GetRefundsByPaymentID(context.Context, *GetRefundsByPaymentIDRequest) (*GetRefundsByPaymentIDResponse, error)
 	mustEmbedUnimplementedPaymentServiceServer()
 }
 
@@ -112,6 +138,12 @@ func (UnimplementedPaymentServiceServer) GetPaymentByOrderID(context.Context, *G
 }
 func (UnimplementedPaymentServiceServer) CreateRefund(context.Context, *CreateRefundRequest) (*CreateRefundResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateRefund not implemented")
+}
+func (UnimplementedPaymentServiceServer) CancelPayment(context.Context, *CancelPaymentRequest) (*CancelPaymentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelPayment not implemented")
+}
+func (UnimplementedPaymentServiceServer) GetRefundsByPaymentID(context.Context, *GetRefundsByPaymentIDRequest) (*GetRefundsByPaymentIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRefundsByPaymentID not implemented")
 }
 func (UnimplementedPaymentServiceServer) mustEmbedUnimplementedPaymentServiceServer() {}
 func (UnimplementedPaymentServiceServer) testEmbeddedByValue()                        {}
@@ -206,6 +238,42 @@ func _PaymentService_CreateRefund_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PaymentService_CancelPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelPaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).CancelPayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_CancelPayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).CancelPayment(ctx, req.(*CancelPaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PaymentService_GetRefundsByPaymentID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRefundsByPaymentIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaymentServiceServer).GetRefundsByPaymentID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PaymentService_GetRefundsByPaymentID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaymentServiceServer).GetRefundsByPaymentID(ctx, req.(*GetRefundsByPaymentIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PaymentService_ServiceDesc is the grpc.ServiceDesc for PaymentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +296,14 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateRefund",
 			Handler:    _PaymentService_CreateRefund_Handler,
+		},
+		{
+			MethodName: "CancelPayment",
+			Handler:    _PaymentService_CancelPayment_Handler,
+		},
+		{
+			MethodName: "GetRefundsByPaymentID",
+			Handler:    _PaymentService_GetRefundsByPaymentID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
