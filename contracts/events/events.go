@@ -63,6 +63,51 @@ type PaymentFailedEvent struct {
 	FailedAt  time.Time `json:"failed_at"`
 }
 
+// PaymentCancelledEvent represents the payload for PaymentCancelled domain event.
+type PaymentCancelledEvent struct {
+	PaymentID   string    `json:"payment_id"`
+	OrderID     string    `json:"order_id"`
+	UserID      string    `json:"user_id"`
+	Amount      float64   `json:"amount"`
+	Currency    string    `json:"currency,omitempty"`
+	Reason      string    `json:"reason,omitempty"`
+	CancelledAt time.Time `json:"cancelled_at"`
+}
+
+// RefundInitiatedEvent represents the payload for RefundInitiated domain event.
+type RefundInitiatedEvent struct {
+	RefundID    string    `json:"refund_id"`
+	PaymentID   string    `json:"payment_id"`
+	OrderID     string    `json:"order_id"`
+	Amount      float64   `json:"amount"`
+	Currency    string    `json:"currency,omitempty"`
+	Reason      string    `json:"reason,omitempty"`
+	InitiatedAt time.Time `json:"initiated_at"`
+}
+
+// RefundCompletedEvent represents the payload for RefundCompleted domain event.
+type RefundCompletedEvent struct {
+	RefundID        string    `json:"refund_id"`
+	PaymentID       string    `json:"payment_id"`
+	OrderID         string    `json:"order_id"`
+	Amount          float64   `json:"amount"`
+	Currency        string    `json:"currency,omitempty"`
+	GatewayRefundID string    `json:"gateway_refund_id,omitempty"`
+	IsPartial       bool      `json:"is_partial"`
+	PaymentStatus   string    `json:"payment_status,omitempty"`
+	CompletedAt     time.Time `json:"completed_at"`
+}
+
+// RefundFailedEvent represents the payload for RefundFailed domain event.
+type RefundFailedEvent struct {
+	RefundID  string    `json:"refund_id"`
+	PaymentID string    `json:"payment_id"`
+	OrderID   string    `json:"order_id"`
+	Amount    float64   `json:"amount"`
+	Reason    string    `json:"reason,omitempty"`
+	FailedAt  time.Time `json:"failed_at"`
+}
+
 // InventoryReservedEvent represents the payload for InventoryReserved domain event.
 type InventoryReservedEvent struct {
 	ReservationID string                `json:"reservation_id"`

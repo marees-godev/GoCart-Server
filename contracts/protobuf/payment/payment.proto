@@ -5,10 +5,12 @@ package gocart.payment.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment;payment";
 
 service PaymentService {
-  rpc ProcessPayment (ProcessPaymentRequest) returns (ProcessPaymentResponse);
-  rpc GetPayment (GetPaymentRequest) returns (GetPaymentResponse);
-  rpc GetPaymentByOrderID (GetPaymentByOrderIDRequest) returns (GetPaymentResponse);
-  rpc CreateRefund (CreateRefundRequest) returns (CreateRefundResponse);
+  rpc ProcessPayment(ProcessPaymentRequest) returns (ProcessPaymentResponse);
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+  rpc GetPaymentByOrderID(GetPaymentByOrderIDRequest) returns (GetPaymentResponse);
+  rpc CreateRefund(CreateRefundRequest) returns (CreateRefundResponse);
+  rpc CancelPayment(CancelPaymentRequest) returns (CancelPaymentResponse);
+  rpc GetRefundsByPaymentID(GetRefundsByPaymentIDRequest) returns (GetRefundsByPaymentIDResponse);
 }
 
 message Payment {
@@ -65,5 +67,38 @@ message CreateRefundResponse {
   double amount = 3;
   string gateway_refund_id = 4;
   string created_at = 5;
+  string payment_id = 6;
+  string order_id = 7;
+}
+
+message CancelPaymentRequest {
+  string payment_id = 1;
+  string reason = 2;
+  string order_id = 3;
+}
+
+message CancelPaymentResponse {
+  Payment payment = 1;
+}
+
+message Refund {
+  string id = 1;
+  string payment_id = 2;
+  string order_id = 3;
+  double amount = 4;
+  string reason = 5;
+  string status = 6;
+  string gateway_refund_id = 7;
+  string idempotency_key = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message GetRefundsByPaymentIDRequest {
+  string payment_id = 1;
+}
+
+message GetRefundsByPaymentIDResponse {
+  repeated Refund refunds = 1;
 }
 

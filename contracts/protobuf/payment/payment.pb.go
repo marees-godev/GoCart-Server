@@ -496,6 +496,8 @@ type CreateRefundResponse struct {
 	Amount          float64                `protobuf:"fixed64,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	GatewayRefundId string                 `protobuf:"bytes,4,opt,name=gateway_refund_id,json=gatewayRefundId,proto3" json:"gateway_refund_id,omitempty"`
 	CreatedAt       string                 `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	PaymentId       string                 `protobuf:"bytes,6,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	OrderId         string                 `protobuf:"bytes,7,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -565,6 +567,328 @@ func (x *CreateRefundResponse) GetCreatedAt() string {
 	return ""
 }
 
+func (x *CreateRefundResponse) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *CreateRefundResponse) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+type CancelPaymentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	OrderId       string                 `protobuf:"bytes,3,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelPaymentRequest) Reset() {
+	*x = CancelPaymentRequest{}
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelPaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelPaymentRequest) ProtoMessage() {}
+
+func (x *CancelPaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelPaymentRequest.ProtoReflect.Descriptor instead.
+func (*CancelPaymentRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_payment_payment_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CancelPaymentRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *CancelPaymentRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *CancelPaymentRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+type CancelPaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payment       *Payment               `protobuf:"bytes,1,opt,name=payment,proto3" json:"payment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelPaymentResponse) Reset() {
+	*x = CancelPaymentResponse{}
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelPaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelPaymentResponse) ProtoMessage() {}
+
+func (x *CancelPaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelPaymentResponse.ProtoReflect.Descriptor instead.
+func (*CancelPaymentResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_payment_payment_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CancelPaymentResponse) GetPayment() *Payment {
+	if x != nil {
+		return x.Payment
+	}
+	return nil
+}
+
+type Refund struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PaymentId       string                 `protobuf:"bytes,2,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	OrderId         string                 `protobuf:"bytes,3,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Amount          float64                `protobuf:"fixed64,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Reason          string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	Status          string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	GatewayRefundId string                 `protobuf:"bytes,7,opt,name=gateway_refund_id,json=gatewayRefundId,proto3" json:"gateway_refund_id,omitempty"`
+	IdempotencyKey  string                 `protobuf:"bytes,8,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	CreatedAt       string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt       string                 `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Refund) Reset() {
+	*x = Refund{}
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Refund) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Refund) ProtoMessage() {}
+
+func (x *Refund) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Refund.ProtoReflect.Descriptor instead.
+func (*Refund) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_payment_payment_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Refund) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Refund) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *Refund) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *Refund) GetAmount() float64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *Refund) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Refund) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Refund) GetGatewayRefundId() string {
+	if x != nil {
+		return x.GatewayRefundId
+	}
+	return ""
+}
+
+func (x *Refund) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *Refund) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Refund) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type GetRefundsByPaymentIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaymentId     string                 `protobuf:"bytes,1,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRefundsByPaymentIDRequest) Reset() {
+	*x = GetRefundsByPaymentIDRequest{}
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRefundsByPaymentIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRefundsByPaymentIDRequest) ProtoMessage() {}
+
+func (x *GetRefundsByPaymentIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRefundsByPaymentIDRequest.ProtoReflect.Descriptor instead.
+func (*GetRefundsByPaymentIDRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_payment_payment_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetRefundsByPaymentIDRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+type GetRefundsByPaymentIDResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refunds       []*Refund              `protobuf:"bytes,1,rep,name=refunds,proto3" json:"refunds,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRefundsByPaymentIDResponse) Reset() {
+	*x = GetRefundsByPaymentIDResponse{}
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRefundsByPaymentIDResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRefundsByPaymentIDResponse) ProtoMessage() {}
+
+func (x *GetRefundsByPaymentIDResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_payment_payment_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRefundsByPaymentIDResponse.ProtoReflect.Descriptor instead.
+func (*GetRefundsByPaymentIDResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_payment_payment_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetRefundsByPaymentIDResponse) GetRefunds() []*Refund {
+	if x != nil {
+		return x.Refunds
+	}
+	return nil
+}
+
 var File_contracts_protobuf_payment_payment_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_payment_payment_proto_rawDesc = "" +
@@ -607,20 +931,52 @@ const file_contracts_protobuf_payment_payment_proto_rawDesc = "" +
 	"payment_id\x18\x01 \x01(\tR\tpaymentId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12'\n" +
-	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\xae\x01\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"\xe8\x01\n" +
 	"\x14CreateRefundResponse\x12\x1b\n" +
 	"\trefund_id\x18\x01 \x01(\tR\brefundId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\x01R\x06amount\x12*\n" +
 	"\x11gateway_refund_id\x18\x04 \x01(\tR\x0fgatewayRefundId\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\tR\tcreatedAt2\xa0\x03\n" +
+	"created_at\x18\x05 \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x06 \x01(\tR\tpaymentId\x12\x19\n" +
+	"\border_id\x18\a \x01(\tR\aorderId\"h\n" +
+	"\x14CancelPaymentRequest\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x19\n" +
+	"\border_id\x18\x03 \x01(\tR\aorderId\"M\n" +
+	"\x15CancelPaymentResponse\x124\n" +
+	"\apayment\x18\x01 \x01(\v2\x1a.gocart.payment.v1.PaymentR\apayment\"\xad\x02\n" +
+	"\x06Refund\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x02 \x01(\tR\tpaymentId\x12\x19\n" +
+	"\border_id\x18\x03 \x01(\tR\aorderId\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x01R\x06amount\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12*\n" +
+	"\x11gateway_refund_id\x18\a \x01(\tR\x0fgatewayRefundId\x12'\n" +
+	"\x0fidempotency_key\x18\b \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\tR\tupdatedAt\"=\n" +
+	"\x1cGetRefundsByPaymentIDRequest\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x01 \x01(\tR\tpaymentId\"T\n" +
+	"\x1dGetRefundsByPaymentIDResponse\x123\n" +
+	"\arefunds\x18\x01 \x03(\v2\x19.gocart.payment.v1.RefundR\arefunds2\x80\x05\n" +
 	"\x0ePaymentService\x12e\n" +
 	"\x0eProcessPayment\x12(.gocart.payment.v1.ProcessPaymentRequest\x1a).gocart.payment.v1.ProcessPaymentResponse\x12Y\n" +
 	"\n" +
 	"GetPayment\x12$.gocart.payment.v1.GetPaymentRequest\x1a%.gocart.payment.v1.GetPaymentResponse\x12k\n" +
 	"\x13GetPaymentByOrderID\x12-.gocart.payment.v1.GetPaymentByOrderIDRequest\x1a%.gocart.payment.v1.GetPaymentResponse\x12_\n" +
-	"\fCreateRefund\x12&.gocart.payment.v1.CreateRefundRequest\x1a'.gocart.payment.v1.CreateRefundResponseBJZHgithub.com/marees-godev/GoCart-Server/contracts/protobuf/payment;paymentb\x06proto3"
+	"\fCreateRefund\x12&.gocart.payment.v1.CreateRefundRequest\x1a'.gocart.payment.v1.CreateRefundResponse\x12b\n" +
+	"\rCancelPayment\x12'.gocart.payment.v1.CancelPaymentRequest\x1a(.gocart.payment.v1.CancelPaymentResponse\x12z\n" +
+	"\x15GetRefundsByPaymentID\x12/.gocart.payment.v1.GetRefundsByPaymentIDRequest\x1a0.gocart.payment.v1.GetRefundsByPaymentIDResponseBJZHgithub.com/marees-godev/GoCart-Server/contracts/protobuf/payment;paymentb\x06proto3"
 
 var (
 	file_contracts_protobuf_payment_payment_proto_rawDescOnce sync.Once
@@ -634,33 +990,44 @@ func file_contracts_protobuf_payment_payment_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_payment_payment_proto_rawDescData
 }
 
-var file_contracts_protobuf_payment_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_contracts_protobuf_payment_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_contracts_protobuf_payment_payment_proto_goTypes = []any{
-	(*Payment)(nil),                    // 0: gocart.payment.v1.Payment
-	(*ProcessPaymentRequest)(nil),      // 1: gocart.payment.v1.ProcessPaymentRequest
-	(*ProcessPaymentResponse)(nil),     // 2: gocart.payment.v1.ProcessPaymentResponse
-	(*GetPaymentRequest)(nil),          // 3: gocart.payment.v1.GetPaymentRequest
-	(*GetPaymentByOrderIDRequest)(nil), // 4: gocart.payment.v1.GetPaymentByOrderIDRequest
-	(*GetPaymentResponse)(nil),         // 5: gocart.payment.v1.GetPaymentResponse
-	(*CreateRefundRequest)(nil),        // 6: gocart.payment.v1.CreateRefundRequest
-	(*CreateRefundResponse)(nil),       // 7: gocart.payment.v1.CreateRefundResponse
+	(*Payment)(nil),                       // 0: gocart.payment.v1.Payment
+	(*ProcessPaymentRequest)(nil),         // 1: gocart.payment.v1.ProcessPaymentRequest
+	(*ProcessPaymentResponse)(nil),        // 2: gocart.payment.v1.ProcessPaymentResponse
+	(*GetPaymentRequest)(nil),             // 3: gocart.payment.v1.GetPaymentRequest
+	(*GetPaymentByOrderIDRequest)(nil),    // 4: gocart.payment.v1.GetPaymentByOrderIDRequest
+	(*GetPaymentResponse)(nil),            // 5: gocart.payment.v1.GetPaymentResponse
+	(*CreateRefundRequest)(nil),           // 6: gocart.payment.v1.CreateRefundRequest
+	(*CreateRefundResponse)(nil),          // 7: gocart.payment.v1.CreateRefundResponse
+	(*CancelPaymentRequest)(nil),          // 8: gocart.payment.v1.CancelPaymentRequest
+	(*CancelPaymentResponse)(nil),         // 9: gocart.payment.v1.CancelPaymentResponse
+	(*Refund)(nil),                        // 10: gocart.payment.v1.Refund
+	(*GetRefundsByPaymentIDRequest)(nil),  // 11: gocart.payment.v1.GetRefundsByPaymentIDRequest
+	(*GetRefundsByPaymentIDResponse)(nil), // 12: gocart.payment.v1.GetRefundsByPaymentIDResponse
 }
 var file_contracts_protobuf_payment_payment_proto_depIdxs = []int32{
-	0, // 0: gocart.payment.v1.ProcessPaymentResponse.payment:type_name -> gocart.payment.v1.Payment
-	0, // 1: gocart.payment.v1.GetPaymentResponse.payment:type_name -> gocart.payment.v1.Payment
-	1, // 2: gocart.payment.v1.PaymentService.ProcessPayment:input_type -> gocart.payment.v1.ProcessPaymentRequest
-	3, // 3: gocart.payment.v1.PaymentService.GetPayment:input_type -> gocart.payment.v1.GetPaymentRequest
-	4, // 4: gocart.payment.v1.PaymentService.GetPaymentByOrderID:input_type -> gocart.payment.v1.GetPaymentByOrderIDRequest
-	6, // 5: gocart.payment.v1.PaymentService.CreateRefund:input_type -> gocart.payment.v1.CreateRefundRequest
-	2, // 6: gocart.payment.v1.PaymentService.ProcessPayment:output_type -> gocart.payment.v1.ProcessPaymentResponse
-	5, // 7: gocart.payment.v1.PaymentService.GetPayment:output_type -> gocart.payment.v1.GetPaymentResponse
-	5, // 8: gocart.payment.v1.PaymentService.GetPaymentByOrderID:output_type -> gocart.payment.v1.GetPaymentResponse
-	7, // 9: gocart.payment.v1.PaymentService.CreateRefund:output_type -> gocart.payment.v1.CreateRefundResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: gocart.payment.v1.ProcessPaymentResponse.payment:type_name -> gocart.payment.v1.Payment
+	0,  // 1: gocart.payment.v1.GetPaymentResponse.payment:type_name -> gocart.payment.v1.Payment
+	0,  // 2: gocart.payment.v1.CancelPaymentResponse.payment:type_name -> gocart.payment.v1.Payment
+	10, // 3: gocart.payment.v1.GetRefundsByPaymentIDResponse.refunds:type_name -> gocart.payment.v1.Refund
+	1,  // 4: gocart.payment.v1.PaymentService.ProcessPayment:input_type -> gocart.payment.v1.ProcessPaymentRequest
+	3,  // 5: gocart.payment.v1.PaymentService.GetPayment:input_type -> gocart.payment.v1.GetPaymentRequest
+	4,  // 6: gocart.payment.v1.PaymentService.GetPaymentByOrderID:input_type -> gocart.payment.v1.GetPaymentByOrderIDRequest
+	6,  // 7: gocart.payment.v1.PaymentService.CreateRefund:input_type -> gocart.payment.v1.CreateRefundRequest
+	8,  // 8: gocart.payment.v1.PaymentService.CancelPayment:input_type -> gocart.payment.v1.CancelPaymentRequest
+	11, // 9: gocart.payment.v1.PaymentService.GetRefundsByPaymentID:input_type -> gocart.payment.v1.GetRefundsByPaymentIDRequest
+	2,  // 10: gocart.payment.v1.PaymentService.ProcessPayment:output_type -> gocart.payment.v1.ProcessPaymentResponse
+	5,  // 11: gocart.payment.v1.PaymentService.GetPayment:output_type -> gocart.payment.v1.GetPaymentResponse
+	5,  // 12: gocart.payment.v1.PaymentService.GetPaymentByOrderID:output_type -> gocart.payment.v1.GetPaymentResponse
+	7,  // 13: gocart.payment.v1.PaymentService.CreateRefund:output_type -> gocart.payment.v1.CreateRefundResponse
+	9,  // 14: gocart.payment.v1.PaymentService.CancelPayment:output_type -> gocart.payment.v1.CancelPaymentResponse
+	12, // 15: gocart.payment.v1.PaymentService.GetRefundsByPaymentID:output_type -> gocart.payment.v1.GetRefundsByPaymentIDResponse
+	10, // [10:16] is the sub-list for method output_type
+	4,  // [4:10] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_payment_payment_proto_init() }
@@ -674,7 +1041,7 @@ func file_contracts_protobuf_payment_payment_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_payment_payment_proto_rawDesc), len(file_contracts_protobuf_payment_payment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

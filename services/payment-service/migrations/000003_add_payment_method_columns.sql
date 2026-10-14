@@ -1,7 +1,7 @@
 -- Ensure PostgreSQL ENUM types exist if missing
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
-        CREATE TYPE payment_status AS ENUM ('INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED');
+        CREATE TYPE payment_status AS ENUM ('INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUND_PENDING', 'PARTIALLY_REFUNDED', 'REFUNDED');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'refund_status') THEN
         CREATE TYPE refund_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED');

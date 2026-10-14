@@ -89,6 +89,28 @@ func (m *MockGateway) RefundPayment(ctx context.Context, req *RefundGatewayReque
 		return nil, ErrInvalidGatewayInput
 	}
 
+	// Trigger simulation via idempotency key or reason for testing
+	if strings.Contains(req.IdempotencyKey, "fail_gateway") || strings.Contains(req.Reason, "fail_gateway") {
+		gtx := fmt.Sprintf("ref_mock_failed_%s", uuid.New().String()[:8])
+		slog.InfoContext(ctx, "MockGateway simulated refund decline", "refund_id", req.RefundID, "gateway_refund_id", gtx)
+		return &RefundGatewayResponse{
+			GatewayRefundID: gtx,
+			Status:          "FAILED",
+			FailureReason:   "Refund declined by mock gateway",
+		}, nil
+	}
+
+	if strings.Contains(req.IdempotencyKey, "error_gateway") || strings.Contains(req.Reason, "error_gateway") {
+		slog.InfoContext(ctx, "MockGateway simulated refund error", "refund_id", req.RefundID)
+		return nil, ErrGatewayUnavailable
+	}
+
+	if strings.Contains(req.IdempotencyKey, "timeout_gateway") {
+		slog.InfoContext(ctx, "MockGateway simulating timeout", "refund_id", req.RefundID)
+		time.Sleep(m.timeout + 10*time.Millisecond)
+		return nil, ErrGatewayTimeout
+	}
+
 	refundID := fmt.Sprintf("ref_mock_%s", uuid.New().String())
 	slog.InfoContext(ctx, "MockGateway RefundPayment succeeded", "refund_id", req.RefundID, "gateway_refund_id", refundID)
 	return &RefundGatewayResponse{
