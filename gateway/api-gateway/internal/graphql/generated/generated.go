@@ -3805,7 +3805,6 @@ extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
 }
-
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/inventory/inventory.graphql", Input: `type StockItem {
   productId: ID!
