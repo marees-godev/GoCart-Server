@@ -197,11 +197,52 @@ type OrderCancelledEvent struct {
 	CancelledAt time.Time `json:"cancelled_at"`
 }
 
+// ShippingAddressPayload represents a normalized shipping address within event payloads.
+type ShippingAddressPayload struct {
+	Street        string `json:"street"`
+	City          string `json:"city"`
+	State         string `json:"state"`
+	PostalCode    string `json:"postal_code"`
+	Country       string `json:"country"`
+	ContactNumber string `json:"contact_number"`
+}
+
 // OrderConfirmedEvent represents the payload for OrderConfirmed domain event.
 type OrderConfirmedEvent struct {
-	OrderID     string    `json:"order_id"`
-	ConfirmedAt time.Time `json:"confirmed_at"`
+	OrderID         string                  `json:"order_id"`
+	ShippingAddress *ShippingAddressPayload `json:"shipping_address,omitempty"`
+	ConfirmedAt     time.Time               `json:"confirmed_at"`
 }
+
+// DeliveryCreatedEvent represents the payload for DeliveryCreated domain event.
+type DeliveryCreatedEvent struct {
+	DeliveryID      string    `json:"delivery_id"`
+	OrderID         string    `json:"order_id"`
+	DeliveryPartner string    `json:"delivery_partner"`
+	TrackingNumber  string    `json:"tracking_number"`
+	Status          string    `json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// DeliveryStatusUpdatedEvent represents the payload for DeliveryStatusUpdated domain event.
+type DeliveryStatusUpdatedEvent struct {
+	DeliveryID      string    `json:"delivery_id"`
+	OrderID         string    `json:"order_id"`
+	PreviousStatus  string    `json:"previous_status"`
+	NewStatus       string    `json:"new_status"`
+	TrackingNumber  string    `json:"tracking_number"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// DeliveryDispatchedEvent represents the payload for DeliveryDispatched domain event.
+type DeliveryDispatchedEvent struct {
+	DeliveryID      string    `json:"delivery_id"`
+	OrderID         string    `json:"order_id"`
+	DeliveryPartner string    `json:"delivery_partner"`
+	TrackingNumber  string    `json:"tracking_number"`
+	DispatchedAt    time.Time `json:"dispatched_at"`
+}
+
 
 // ProductCreatedEvent represents the payload for ProductCreated domain event.
 type ProductCreatedEvent struct {

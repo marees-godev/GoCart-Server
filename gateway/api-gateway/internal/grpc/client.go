@@ -9,6 +9,7 @@ import (
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ type Clients struct {
 	CartClient      cartpb.CartServiceClient
 	InventoryClient inventorypb.InventoryServiceClient
 	OrderClient     orderpb.OrderServiceClient
+	DeliveryClient  deliverypb.DeliveryServiceClient
 	conns           []*grpc.ClientConn
 }
 
@@ -148,6 +150,21 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
+	deliveryAddr := cfg.GRPC.DeliveryServiceAddr
+	if deliveryAddr == "" {
+		deliveryAddr = "localhost:50061"
+	}
+	deliveryConn, err := grpc.NewClient(deliveryAddr, opts...)
+	if err != nil {
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		storeConn.Close()
+		invConn.Close()
+		return nil, err
+	}
+
 	return &Clients{
 		AuthClient:      auth.NewAuthServiceClient(authConn),
 		UserClient:      userpb.NewUserServiceClient(userConn),
@@ -157,8 +174,9 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		CartClient:      cartpb.NewCartServiceClient(cartConn),
 		InventoryClient: inventorypb.NewInventoryServiceClient(invConn),
 		OrderClient:     orderpb.NewOrderServiceClient(orderConn),
+		DeliveryClient:  deliverypb.NewDeliveryServiceClient(deliveryConn),
 		conns: []*grpc.ClientConn{
-			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn,
+			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn, deliveryConn,
 		},
 	}, nil
 }
@@ -188,6 +206,9 @@ func NewClientsWithServices(
 		}
 		if ord, ok := svc.(orderpb.OrderServiceClient); ok {
 			c.OrderClient = ord
+		}
+		if d, ok := svc.(deliverypb.DeliveryServiceClient); ok {
+			c.DeliveryClient = d
 		}
 	}
 	return c
