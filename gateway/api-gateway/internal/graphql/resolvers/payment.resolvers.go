@@ -78,6 +78,71 @@ func (r *mutationResolver) CreateRefund(ctx context.Context, paymentID string, a
 	return maps.MapRefundPayload(resp), nil
 }
 
+// CancelPayment is the resolver for the cancelPayment field.
+func (r *mutationResolver) CancelPayment(ctx context.Context, paymentID *string, orderID *string, reason *string) (*model.Payment, error) {
+	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
+		return nil, appErrors.Internal(nil, "payment client unavailable")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	if userCtx == nil || userCtx.UserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var pid, oid, rsn string
+	if paymentID != nil {
+		pid = *paymentID
+	}
+	if orderID != nil {
+		oid = *orderID
+	}
+	if reason != nil {
+		rsn = *reason
+	}
+
+	if pid == "" && oid == "" {
+		return nil, appErrors.BadRequest("paymentId or orderId is required")
+	}
+
+	if userCtx.Role != auth.RoleAdmin {
+		var existing *paymentpb.Payment
+		if pid != "" {
+			resp, err := r.ClientMgr.PaymentClient.GetPayment(ctx, &paymentpb.GetPaymentRequest{Id: pid})
+			if err != nil {
+				return nil, grpcclient.TranslateGRPCError(err)
+			}
+			existing = resp.GetPayment()
+		} else {
+			resp, err := r.ClientMgr.PaymentClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: oid})
+			if err != nil {
+				return nil, grpcclient.TranslateGRPCError(err)
+			}
+			existing = resp.GetPayment()
+		}
+
+		if existing == nil {
+			return nil, appErrors.NotFound("payment not found")
+		}
+
+		if existing.UserId != userCtx.UserID {
+			return nil, appErrors.Forbidden("you do not have permission to cancel this payment")
+		}
+	}
+
+	req := &paymentpb.CancelPaymentRequest{
+		PaymentId: pid,
+		OrderId:   oid,
+		Reason:    rsn,
+	}
+
+	resp, err := r.ClientMgr.PaymentClient.CancelPayment(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapPayment(resp.Payment), nil
+}
+
 // Payment is the resolver for the payment field.
 func (r *queryResolver) Payment(ctx context.Context, id string) (*model.Payment, error) {
 	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
