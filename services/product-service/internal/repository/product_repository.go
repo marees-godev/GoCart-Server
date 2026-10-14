@@ -12,7 +12,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/dto"
+	productEvents "github.com/marees-godev/GoCart-Server/services/product-service/internal/events"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/model"
 )
 
@@ -27,18 +29,27 @@ type ProductRepository interface {
 }
 
 type pgProductRepository struct {
-	pool   *pgxpool.Pool
-	logger *slog.Logger
+	pool        *pgxpool.Pool
+	outboxStore *outbox.Store
+	logger      *slog.Logger
 }
 
 func NewProductRepository(pool *pgxpool.Pool, log ...*slog.Logger) ProductRepository {
+	return NewProductRepositoryWithOutbox(pool, outbox.NewStore(), log...)
+}
+
+func NewProductRepositoryWithOutbox(pool *pgxpool.Pool, outboxStore *outbox.Store, log ...*slog.Logger) ProductRepository {
+	if outboxStore == nil {
+		outboxStore = outbox.NewStore()
+	}
 	var l *slog.Logger
 	if len(log) > 0 {
 		l = log[0]
 	}
 	return &pgProductRepository{
-		pool:   pool,
-		logger: l,
+		pool:        pool,
+		outboxStore: outboxStore,
+		logger:      l,
 	}
 }
 
@@ -128,22 +139,23 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 		p.Variants[i] = v
 	}
 
-	// Insert Outbox Event
-	eventPayload, _ := json.Marshal(map[string]interface{}{
-		"product_id":  p.ID,
-		"store_id":    p.StoreID,
-		"category_id": p.CategoryID,
-		"sku":         p.SKU,
-		"name":        p.Name,
-		"status":      p.Status,
-	})
-	outboxQuery := `
-		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status)
-		VALUES ($1, $2, $3, $4, 'PENDING')
-	`
-	_, err = tx.Exec(ctx, outboxQuery, "PRODUCT", p.ID, "product.created", eventPayload)
+	// Insert Outbox Events
+	outboxEvt, err := productEvents.BuildProductCreatedOutboxEvent(p)
 	if err != nil {
-		return appErrors.Internal(err, "failed to record outbox event")
+		return appErrors.Internal(err, "failed to build ProductCreated outbox event")
+	}
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		return appErrors.Internal(err, "failed to record outbox event for ProductCreated")
+	}
+
+	if p.Status == model.StatusPublished {
+		pubEvt, err := productEvents.BuildProductPublishedOutboxEvent(p, p.CreatedAt)
+		if err != nil {
+			return appErrors.Internal(err, "failed to build ProductPublished outbox event")
+		}
+		if err := r.outboxStore.Insert(ctx, tx, pubEvt); err != nil {
+			return appErrors.Internal(err, "failed to record outbox event for ProductPublished")
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -349,6 +361,21 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	var oldStatus model.ProductStatus
+	var oldCurrency, oldSKU string
+	err = tx.QueryRow(ctx, `
+		SELECT status, COALESCE(currency, 'USD'), sku
+		FROM products
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE
+	`, p.ID).Scan(&oldStatus, &oldCurrency, &oldSKU)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return appErrors.NotFound("product not found")
+		}
+		return appErrors.Internal(err, "failed to query product for update")
+	}
+
 	query := `
 		UPDATE products
 		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, updated_at = NOW()
@@ -462,19 +489,32 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 		}
 	}
 
-	// Record outbox event
-	eventPayload, _ := json.Marshal(map[string]interface{}{
-		"product_id": p.ID,
-		"store_id":   p.StoreID,
-		"name":       p.Name,
-		"status":     p.Status,
-		"updated_at": p.UpdatedAt.Format(time.RFC3339),
-	})
-	outboxQuery := `
-		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status)
-		VALUES ($1, $2, $3, $4, 'PENDING')
-	`
-	_, _ = tx.Exec(ctx, outboxQuery, "PRODUCT", p.ID, "product.updated", eventPayload)
+	if p.Currency == "" {
+		p.Currency = oldCurrency
+	}
+	if p.SKU == "" {
+		p.SKU = oldSKU
+	}
+
+	// Record outbox event for ProductUpdated
+	outboxEvt, err := productEvents.BuildProductUpdatedOutboxEvent(p)
+	if err != nil {
+		return appErrors.Internal(err, "failed to build ProductUpdated outbox event")
+	}
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		return appErrors.Internal(err, "failed to record outbox event for ProductUpdated")
+	}
+
+	// If product transitioned to PUBLISHED, publish ProductPublished event
+	if p.Status == model.StatusPublished && oldStatus != model.StatusPublished {
+		pubEvt, err := productEvents.BuildProductPublishedOutboxEvent(p, p.UpdatedAt)
+		if err != nil {
+			return appErrors.Internal(err, "failed to build ProductPublished outbox event")
+		}
+		if err := r.outboxStore.Insert(ctx, tx, pubEvt); err != nil {
+			return appErrors.Internal(err, "failed to record outbox event for ProductPublished")
+		}
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return appErrors.Internal(err, "failed to commit transaction")
@@ -491,10 +531,10 @@ func (r *pgProductRepository) DeleteProduct(ctx context.Context, id string) erro
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now()
-	// Soft delete per product lifecycle setting status = 'discontinued' and deleted_at = NOW()
+	// Soft delete setting status = 'DELETED' and deleted_at = NOW()
 	query := `
 		UPDATE products
-		SET status = 'discontinued', deleted_at = $2, updated_at = $2
+		SET status = 'DELETED', deleted_at = $2, updated_at = $2
 		WHERE id = $1 AND deleted_at IS NULL
 		RETURNING store_id
 	`
@@ -507,21 +547,17 @@ func (r *pgProductRepository) DeleteProduct(ctx context.Context, id string) erro
 		return appErrors.Internal(err, "failed to delete product")
 	}
 
-	// Also soft delete variants setting status = 'discontinued' and deleted_at = NOW()
-	_, _ = tx.Exec(ctx, "UPDATE product_variants SET status = 'discontinued', deleted_at = $2, updated_at = $2 WHERE product_id = $1 AND deleted_at IS NULL", id, now)
+	// Also soft delete variants setting status = 'DELETED' and deleted_at = NOW()
+	_, _ = tx.Exec(ctx, "UPDATE product_variants SET status = 'DELETED', deleted_at = $2, updated_at = $2 WHERE product_id = $1 AND deleted_at IS NULL", id, now)
 
-	// Outbox event
-	eventPayload, _ := json.Marshal(map[string]interface{}{
-		"product_id": id,
-		"store_id":   storeID,
-		"status":     "discontinued",
-		"deleted_at": now.Format(time.RFC3339),
-	})
-	outboxQuery := `
-		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, status)
-		VALUES ($1, $2, $3, $4, 'PENDING')
-	`
-	_, _ = tx.Exec(ctx, outboxQuery, "PRODUCT", id, "product.deleted", eventPayload)
+	// Outbox event for ProductDeleted
+	delEvt, err := productEvents.BuildProductDeletedOutboxEvent(id, storeID, now)
+	if err != nil {
+		return appErrors.Internal(err, "failed to build ProductDeleted outbox event")
+	}
+	if err := r.outboxStore.Insert(ctx, tx, delEvt); err != nil {
+		return appErrors.Internal(err, "failed to record outbox event for ProductDeleted")
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return appErrors.Internal(err, "failed to commit transaction")
@@ -540,7 +576,7 @@ func (r *pgProductRepository) DeleteProductVariant(ctx context.Context, productI
 	now := time.Now()
 	query := `
 		UPDATE product_variants
-		SET status = 'discontinued', deleted_at = $3, updated_at = $3
+		SET status = 'DELETED', deleted_at = $3, updated_at = $3
 		WHERE id = $1 AND product_id = $2 AND deleted_at IS NULL
 		RETURNING sku
 	`

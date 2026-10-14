@@ -40,6 +40,12 @@ const (
 	EventTypeMerchantRegistered = "MerchantRegistered"
 	EventTypeMerchantActivated  = "MerchantActivated"
 	EventTypeMerchantSuspended  = "MerchantSuspended"
+
+	// Product Service Events
+	EventTypeProductCreated   = "ProductCreated"
+	EventTypeProductUpdated   = "ProductUpdated"
+	EventTypeProductPublished = "ProductPublished"
+	EventTypeProductDeleted   = "ProductDeleted"
 )
 
 // Standard Topic Constants
@@ -72,6 +78,12 @@ const (
 	TopicMerchantRegistered = "gocart.merchant.merchant-registered"
 	TopicMerchantActivated  = "gocart.merchant.merchant-activated"
 	TopicMerchantSuspended  = "gocart.merchant.merchant-suspended"
+
+	// Product Service Topics
+	TopicProductCreated   = "gocart.product.product-created"
+	TopicProductUpdated   = "gocart.product.product-updated"
+	TopicProductPublished = "gocart.product.product-published"
+	TopicProductDeleted   = "gocart.product.product-deleted"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.
