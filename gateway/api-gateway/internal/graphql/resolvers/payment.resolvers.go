@@ -6,27 +6,102 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // ProcessPayment is the resolver for the processPayment field.
 func (r *mutationResolver) ProcessPayment(ctx context.Context, input model.ProcessPaymentInput) (*model.Payment, error) {
-	panic(fmt.Errorf("not implemented: ProcessPayment - processPayment"))
+	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
+		return nil, appErrors.Internal(nil, "payment client unavailable")
+	}
+
+	var amt float64
+	if input.Amount != nil {
+		amt = *input.Amount
+	}
+	var curr string
+	if input.Currency != nil {
+		curr = *input.Currency
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	userID := ""
+	if userCtx != nil {
+		userID = userCtx.UserID
+	}
+
+	req := &paymentpb.ProcessPaymentRequest{
+		OrderId:        input.OrderID,
+		Amount:         amt,
+		Currency:       curr,
+		PaymentMethod:  input.PaymentMethod,
+		IdempotencyKey: input.IdempotencyKey,
+		UserId:         userID,
+	}
+
+	resp, err := r.ClientMgr.PaymentClient.ProcessPayment(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapPayment(resp.Payment), nil
 }
 
 // CreateRefund is the resolver for the createRefund field.
 func (r *mutationResolver) CreateRefund(ctx context.Context, paymentID string, amount float64, reason *string, idempotencyKey *string) (*model.RefundPayload, error) {
-	panic(fmt.Errorf("not implemented: CreateRefund - createRefund"))
+	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
+		return nil, appErrors.Internal(nil, "payment client unavailable")
+	}
+
+	req := &paymentpb.CreateRefundRequest{
+		PaymentId: paymentID,
+		Amount:    amount,
+	}
+	if reason != nil {
+		req.Reason = *reason
+	}
+	if idempotencyKey != nil {
+		req.IdempotencyKey = *idempotencyKey
+	}
+
+	resp, err := r.ClientMgr.PaymentClient.CreateRefund(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapRefundPayload(resp), nil
 }
 
 // Payment is the resolver for the payment field.
 func (r *queryResolver) Payment(ctx context.Context, id string) (*model.Payment, error) {
-	panic(fmt.Errorf("not implemented: Payment - payment"))
+	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
+		return nil, appErrors.Internal(nil, "payment client unavailable")
+	}
+
+	resp, err := r.ClientMgr.PaymentClient.GetPayment(ctx, &paymentpb.GetPaymentRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapPayment(resp.Payment), nil
 }
 
 // PaymentByOrderID is the resolver for the paymentByOrderId field.
 func (r *queryResolver) PaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error) {
-	panic(fmt.Errorf("not implemented: PaymentByOrderID - paymentByOrderId"))
+	if r.ClientMgr == nil || r.ClientMgr.PaymentClient == nil {
+		return nil, appErrors.Internal(nil, "payment client unavailable")
+	}
+
+	resp, err := r.ClientMgr.PaymentClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapPayment(resp.Payment), nil
 }

@@ -102,3 +102,85 @@ func TestSanitizeGatewayError(t *testing.T) {
 		t.Errorf("expected ErrGatewayUnavailable, got %v", sanitized)
 	}
 }
+
+func TestMockGateway_RefundPayment_Success(t *testing.T) {
+	gw := gateway.NewPaymentGateway(gateway.GatewayConfig{
+		Provider: "mock",
+		Timeout:  2 * time.Second,
+	})
+
+	req := &gateway.RefundGatewayRequest{
+		RefundID:             "ref_123",
+		PaymentID:            "pay_123",
+		GatewayTransactionID: "gtx_123",
+		Amount:               50.00,
+		Reason:               "customer return",
+		IdempotencyKey:       "idemp_ref_success",
+	}
+
+	resp, err := gw.RefundPayment(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if resp.Status != "SUCCESS" {
+		t.Errorf("expected status SUCCESS, got %s", resp.Status)
+	}
+	if resp.GatewayRefundID == "" {
+		t.Errorf("expected non-empty gateway refund id")
+	}
+}
+
+func TestMockGateway_RefundPayment_FailureSimulation(t *testing.T) {
+	gw := gateway.NewPaymentGateway(gateway.GatewayConfig{
+		Provider: "mock",
+		Timeout:  2 * time.Second,
+	})
+
+	req := &gateway.RefundGatewayRequest{
+		RefundID:             "ref_fail",
+		PaymentID:            "pay_fail",
+		GatewayTransactionID: "gtx_fail",
+		Amount:               25.00,
+		Reason:               "fail_gateway",
+		IdempotencyKey:       "idemp_ref_fail_gateway",
+	}
+
+	resp, err := gw.RefundPayment(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected no go error, got %v", err)
+	}
+
+	if resp.Status != "FAILED" {
+		t.Errorf("expected status FAILED, got %s", resp.Status)
+	}
+	if resp.FailureReason == "" {
+		t.Errorf("expected failure reason for failed refund")
+	}
+}
+
+func TestMockGateway_RefundPayment_TimeoutSimulation(t *testing.T) {
+	gw := gateway.NewPaymentGateway(gateway.GatewayConfig{
+		Provider: "mock",
+		Timeout:  50 * time.Millisecond,
+	})
+
+	req := &gateway.RefundGatewayRequest{
+		RefundID:             "ref_timeout",
+		PaymentID:            "pay_timeout",
+		GatewayTransactionID: "gtx_timeout",
+		Amount:               30.00,
+		Reason:               "timeout",
+		IdempotencyKey:       "idemp_timeout_gateway",
+	}
+
+	_, err := gw.RefundPayment(context.Background(), req)
+	if err == nil {
+		t.Fatalf("expected timeout error, got nil")
+	}
+
+	if !errors.Is(err, gateway.ErrGatewayTimeout) {
+		t.Errorf("expected ErrGatewayTimeout, got %v", err)
+	}
+}
+

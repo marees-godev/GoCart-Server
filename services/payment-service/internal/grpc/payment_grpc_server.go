@@ -120,6 +120,73 @@ func (s *PaymentGRPCServer) CreateRefund(ctx context.Context, req *paymentpb.Cre
 		Amount:          refund.Amount,
 		GatewayRefundId: refund.GatewayRefundID,
 		CreatedAt:       refund.CreatedAt.Format(time.RFC3339),
+		PaymentId:       refund.PaymentID,
+		OrderId:         refund.OrderID,
+	}, nil
+}
+
+func (s *PaymentGRPCServer) CancelPayment(ctx context.Context, req *paymentpb.CancelPaymentRequest) (*paymentpb.CancelPaymentResponse, error) {
+	if req == nil {
+		slog.WarnContext(ctx, "CancelPayment received nil request")
+		return nil, grpcclient.MapAppErrorToGRPC(appErrors.BadRequest("request cannot be nil"))
+	}
+	if req.PaymentId == "" && req.OrderId == "" {
+		slog.WarnContext(ctx, "CancelPayment received invalid request with empty payment_id and order_id")
+		return nil, grpcclient.MapAppErrorToGRPC(appErrors.BadRequest("payment_id or order_id is required"))
+	}
+
+	slog.InfoContext(ctx, "gRPC CancelPayment called", "payment_id", req.PaymentId, "order_id", req.OrderId, "reason", req.Reason)
+
+	dto := &service.CancelPaymentDTO{
+		PaymentID: req.PaymentId,
+		OrderID:   req.OrderId,
+		Reason:    req.Reason,
+	}
+
+	payment, err := s.paymentService.CancelPayment(ctx, dto)
+	if err != nil {
+		slog.WarnContext(ctx, "gRPC CancelPayment failed", "payment_id", req.PaymentId, "order_id", req.OrderId, "error", err)
+		return nil, grpcclient.MapAppErrorToGRPC(err)
+	}
+
+	slog.InfoContext(ctx, "gRPC CancelPayment completed successfully", "payment_id", payment.ID, "status", payment.Status)
+	return &paymentpb.CancelPaymentResponse{
+		Payment: mapModelToProtoPayment(payment),
+	}, nil
+}
+
+func (s *PaymentGRPCServer) GetRefundsByPaymentID(ctx context.Context, req *paymentpb.GetRefundsByPaymentIDRequest) (*paymentpb.GetRefundsByPaymentIDResponse, error) {
+	if req == nil || req.PaymentId == "" {
+		slog.WarnContext(ctx, "GetRefundsByPaymentID received invalid request")
+		return nil, grpcclient.MapAppErrorToGRPC(appErrors.BadRequest("payment_id is required"))
+	}
+
+	slog.InfoContext(ctx, "gRPC GetRefundsByPaymentID called", "payment_id", req.PaymentId)
+
+	refunds, err := s.paymentService.GetRefundsByPaymentID(ctx, req.PaymentId)
+	if err != nil {
+		slog.WarnContext(ctx, "gRPC GetRefundsByPaymentID failed", "payment_id", req.PaymentId, "error", err)
+		return nil, grpcclient.MapAppErrorToGRPC(err)
+	}
+
+	protoRefunds := make([]*paymentpb.Refund, len(refunds))
+	for i, r := range refunds {
+		protoRefunds[i] = &paymentpb.Refund{
+			Id:              r.ID,
+			PaymentId:       r.PaymentID,
+			OrderId:         r.OrderID,
+			Amount:          r.Amount,
+			Reason:          r.Reason,
+			Status:          string(r.Status),
+			GatewayRefundId: r.GatewayRefundID,
+			IdempotencyKey:  r.IdempotencyKey,
+			CreatedAt:       r.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:       r.UpdatedAt.Format(time.RFC3339),
+		}
+	}
+
+	return &paymentpb.GetRefundsByPaymentIDResponse{
+		Refunds: protoRefunds,
 	}, nil
 }
 

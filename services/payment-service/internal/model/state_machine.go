@@ -5,12 +5,14 @@ import (
 )
 
 var allowedPaymentTransitions = map[PaymentStatus][]PaymentStatus{
-	PaymentStatusInitiated: {PaymentStatusPending, PaymentStatusSuccess, PaymentStatusFailed, PaymentStatusCancelled},
-	PaymentStatusPending:   {PaymentStatusSuccess, PaymentStatusFailed, PaymentStatusCancelled},
-	PaymentStatusSuccess:   {PaymentStatusRefunded},
-	PaymentStatusFailed:    {},
-	PaymentStatusCancelled: {},
-	PaymentStatusRefunded:  {},
+	PaymentStatusInitiated:        {PaymentStatusPending, PaymentStatusSuccess, PaymentStatusFailed, PaymentStatusCancelled},
+	PaymentStatusPending:          {PaymentStatusSuccess, PaymentStatusFailed, PaymentStatusCancelled},
+	PaymentStatusSuccess:          {PaymentStatusRefundPending, PaymentStatusPartiallyRefunded, PaymentStatusRefunded},
+	PaymentStatusRefundPending:    {PaymentStatusSuccess, PaymentStatusPartiallyRefunded, PaymentStatusRefunded},
+	PaymentStatusPartiallyRefunded: {PaymentStatusRefundPending, PaymentStatusPartiallyRefunded, PaymentStatusRefunded},
+	PaymentStatusFailed:           {},
+	PaymentStatusCancelled:        {},
+	PaymentStatusRefunded:         {},
 }
 
 func CanTransitionPayment(from, to PaymentStatus) bool {

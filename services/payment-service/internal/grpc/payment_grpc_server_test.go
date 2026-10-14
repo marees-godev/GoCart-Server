@@ -87,6 +87,36 @@ func (m *mockPaymentService) CreateRefund(ctx context.Context, dto *service.Crea
 	return r, nil
 }
 
+func (m *mockPaymentService) CancelPayment(ctx context.Context, dto *service.CancelPaymentDTO) (*model.Payment, error) {
+	if dto == nil || (dto.PaymentID == "" && dto.OrderID == "") {
+		return nil, appErrors.BadRequest("payment_id or order_id is required")
+	}
+	pID := dto.PaymentID
+	if pID == "" {
+		pID = dto.OrderID
+	}
+	p, ok := m.payments[pID]
+	if !ok {
+		return nil, appErrors.NotFound("payment not found")
+	}
+	if p.Status != model.PaymentStatusInitiated && p.Status != model.PaymentStatusPending {
+		return nil, appErrors.BadRequest("cannot cancel payment")
+	}
+	p.Status = model.PaymentStatusCancelled
+	p.FailureReason = dto.Reason
+	return p, nil
+}
+
+func (m *mockPaymentService) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
+	var res []*model.Refund
+	for _, r := range m.refunds {
+		if r.PaymentID == paymentID {
+			res = append(res, r)
+		}
+	}
+	return res, nil
+}
+
 func (m *mockPaymentService) HandleRazorpayWebhook(ctx context.Context, body []byte) error {
 	return nil
 }
@@ -180,4 +210,71 @@ func TestPaymentGRPCServer_CreateRefund(t *testing.T) {
 	if resp.GatewayRefundId != "ref_mock_grpc_123" {
 		t.Errorf("expected gateway refund id ref_mock_grpc_123, got %s", resp.GatewayRefundId)
 	}
+	if resp.PaymentId != "pay_grpc_123" {
+		t.Errorf("expected payment id pay_grpc_123, got %s", resp.PaymentId)
+	}
 }
+
+func TestPaymentGRPCServer_CancelPayment(t *testing.T) {
+	mockSvc := newMockPaymentService()
+	server := paymentGRPC.NewPaymentGRPCServer(mockSvc)
+
+	// Setup pending payment
+	payID := "pay_to_cancel"
+	mockSvc.payments[payID] = &model.Payment{
+		ID:      payID,
+		OrderID: "ord_cancel_1",
+		Amount:  100.0,
+		Status:  model.PaymentStatusPending,
+	}
+
+	req := &paymentpb.CancelPaymentRequest{
+		PaymentId: payID,
+		Reason:    "Customer changed mind",
+	}
+
+	resp, err := server.CancelPayment(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected no error cancelling payment, got %v", err)
+	}
+
+	if resp.Payment.Status != string(model.PaymentStatusCancelled) {
+		t.Errorf("expected payment status CANCELLED, got %s", resp.Payment.Status)
+	}
+	if resp.Payment.FailureReason != "Customer changed mind" {
+		t.Errorf("expected failure reason 'Customer changed mind', got %s", resp.Payment.FailureReason)
+	}
+}
+
+func TestPaymentGRPCServer_GetRefundsByPaymentID(t *testing.T) {
+	mockSvc := newMockPaymentService()
+	server := paymentGRPC.NewPaymentGRPCServer(mockSvc)
+
+	payID := "pay_with_refunds"
+	mockSvc.refunds["ref_1"] = &model.Refund{
+		ID:        "ref_1",
+		PaymentID: payID,
+		OrderID:   "ord_1",
+		Amount:    25.0,
+		Status:    model.RefundStatusSuccess,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	req := &paymentpb.GetRefundsByPaymentIDRequest{
+		PaymentId: payID,
+	}
+
+	resp, err := server.GetRefundsByPaymentID(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected no error getting refunds, got %v", err)
+	}
+
+	if len(resp.Refunds) != 1 {
+		t.Fatalf("expected 1 refund, got %d", len(resp.Refunds))
+	}
+	if resp.Refunds[0].Id != "ref_1" || resp.Refunds[0].Amount != 25.0 {
+		t.Errorf("unexpected refund data: %+v", resp.Refunds[0])
+	}
+}
+
