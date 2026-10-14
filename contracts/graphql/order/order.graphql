@@ -1,18 +1,37 @@
 type OrderItem {
   id: ID!
   productId: String!
+  storeId: String
+  sku: String
+  productName: String
   quantity: Int!
   unitPrice: Float!
+  tax: Float
+  discount: Float
+  totalPrice: Float
 }
 
 type Order {
   id: ID!
   userId: String!
+  storeId: String
   status: String!
+  orderStatus: String
+  paymentStatus: String
   items: [OrderItem!]!
+  subtotal: Float
+  taxAmount: Float
+  shippingFee: Float
+  discountAmount: Float
   totalAmount: Float!
+  currency: String
   shippingAddress: String!
+  shippingAddressId: String
+  billingAddressId: String
+  parentOrderId: String
+  orderNumber: String
   createdAt: String
+  updatedAt: String
 }
 
 type OrderList {
@@ -21,17 +40,27 @@ type OrderList {
 }
 
 input CreateOrderInput {
-  userId: String!
-  cartId: String!
-  shippingAddress: String!
+  userId: String
+  cartId: String
+  shippingAddress: String
+  shippingAddressId: String
+  billingAddressId: String
+  currency: String
+  idempotencyKey: String
+  shippingFee: Float
+  discountAmount: Float
 }
 
 extend type Query {
   order(id: ID!): Order @auth
+  getOrder(id: ID!): Order @auth
+  listMyOrders(limit: Int, offset: Int): OrderList! @auth
   orders(userId: String!, limit: Int, offset: Int): OrderList! @auth
 }
 
 extend type Mutation {
   createOrder(input: CreateOrderInput!): Order @auth
+  checkout(input: CreateOrderInput!): Order @auth
+  cancelOrder(id: ID!, reason: String): Order @auth
   updateOrderStatus(id: ID!, status: String!): Order @auth(requires: [ADMIN, MERCHANT])
 }

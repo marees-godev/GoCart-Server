@@ -17,6 +17,15 @@ type Config struct {
 	Tracing  TracingConfig
 	Kafka    KafkaConfig
 	Outbox   OutboxConfig
+	GRPC     GRPCConfig
+}
+
+type GRPCConfig struct {
+	Port                 string
+	CartServiceAddr      string
+	ProductServiceAddr   string
+	InventoryServiceAddr string
+	TimeoutSeconds       int
 }
 
 type AppConfig struct {
@@ -98,6 +107,13 @@ func LoadEnv() *Config {
 			PollInterval: GetEnvAsDuration("OUTBOX_POLL_INTERVAL", 2*time.Second),
 			BatchSize:    GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
 			MaxRetries:   GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+		},
+		GRPC: GRPCConfig{
+			Port:                 GetEnv("GRPC_PORT", "50059"),
+			CartServiceAddr:      GetEnv("CART_SERVICE_GRPC_ADDR", "localhost:50057"),
+			ProductServiceAddr:   GetEnv("PRODUCT_SERVICE_GRPC_ADDR", "localhost:50053"),
+			InventoryServiceAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50056"),
+			TimeoutSeconds:       GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 5),
 		},
 	}
 }
