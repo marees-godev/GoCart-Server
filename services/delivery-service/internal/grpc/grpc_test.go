@@ -122,9 +122,8 @@ func setupTestGRPCServer(t *testing.T, svc *mockDeliveryService) (deliverypb.Del
 		_ = server.Serve(lis)
 	}()
 
-	conn, err := grpc.DialContext(
-		context.Background(),
-		"bufnet",
+	conn, err := grpc.NewClient(
+		"passthrough://bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}),
