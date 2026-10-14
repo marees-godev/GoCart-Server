@@ -137,13 +137,17 @@ type ComplexityRoot struct {
 	}
 
 	Delivery struct {
-		CourierName         func(childComplexity int) int
+		ContactNumber       func(childComplexity int) int
+		CreatedAt           func(childComplexity int) int
 		DeliveredAt         func(childComplexity int) int
+		DeliveryPartner     func(childComplexity int) int
 		EstimatedDeliveryAt func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		OrderID             func(childComplexity int) int
+		ShippingAddress     func(childComplexity int) int
 		Status              func(childComplexity int) int
 		TrackingNumber      func(childComplexity int) int
+		UpdatedAt           func(childComplexity int) int
 	}
 
 	ForgotPasswordPayload struct {
@@ -249,7 +253,7 @@ type ComplexityRoot struct {
 		UnpublishStore          func(childComplexity int, id string) int
 		UnsuspendStore          func(childComplexity int, id string, reason *string) int
 		UpdateCategory          func(childComplexity int, id string, input model.UpdateCategoryInput) int
-		UpdateDeliveryStatus    func(childComplexity int, id string, status string, location *string) int
+		UpdateDeliveryStatus    func(childComplexity int, id string, status model.DeliveryStatus, location *string) int
 		UpdateMerchant          func(childComplexity int, id string, input model.UpdateMerchantInput) int
 		UpdateMerchantStatus    func(childComplexity int, id string, status model.MerchantStatus, rejectionReason *string) int
 		UpdateOrderStatus       func(childComplexity int, id string, status string) int
@@ -367,6 +371,8 @@ type ComplexityRoot struct {
 		Category                      func(childComplexity int, id string) int
 		ChildCategories               func(childComplexity int, parentCategoryID string, limit *int, offset *int) int
 		Delivery                      func(childComplexity int, id string) int
+		DeliveryByOrder               func(childComplexity int, orderID string) int
+		DeliveryByTracking            func(childComplexity int, trackingNumber string) int
 		Health                        func(childComplexity int) int
 		Inventory                     func(childComplexity int, productID *string, variantID *string, inventoryID *string) int
 		Me                            func(childComplexity int) int
@@ -532,7 +538,7 @@ type MutationResolver interface {
 	UpdateCategory(ctx context.Context, id string, input model.UpdateCategoryInput) (*model.Category, error)
 	DeleteCategory(ctx context.Context, id string) (*model.DeleteCategoryResponse, error)
 	CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error)
-	UpdateDeliveryStatus(ctx context.Context, id string, status string, location *string) (*model.Delivery, error)
+	UpdateDeliveryStatus(ctx context.Context, id string, status model.DeliveryStatus, location *string) (*model.Delivery, error)
 	ReserveStock(ctx context.Context, orderID string, items []*model.ReservationItemInput) (*model.ReserveStockPayload, error)
 	ReleaseStock(ctx context.Context, reservationID string) (bool, error)
 	UpdateStock(ctx context.Context, inventoryID *string, productID *string, variantID *string, quantity int) (*model.StockItem, error)
@@ -585,6 +591,8 @@ type QueryResolver interface {
 	ChildCategories(ctx context.Context, parentCategoryID string, limit *int, offset *int) (*model.CategoryList, error)
 	ValidateCategoryForAssignment(ctx context.Context, categoryID string) (*model.ValidateCategoryResponse, error)
 	Delivery(ctx context.Context, id string) (*model.Delivery, error)
+	DeliveryByTracking(ctx context.Context, trackingNumber string) (*model.Delivery, error)
+	DeliveryByOrder(ctx context.Context, orderID string) (*model.Delivery, error)
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
 	Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string) (*model.InventoryItem, error)
 	Merchant(ctx context.Context, id string) (*model.Merchant, error)
@@ -999,12 +1007,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeleteProductVariantResponse.Success(childComplexity), true
 
-	case "Delivery.courierName":
-		if e.complexity.Delivery.CourierName == nil {
+	case "Delivery.contactNumber":
+		if e.complexity.Delivery.ContactNumber == nil {
 			break
 		}
 
-		return e.complexity.Delivery.CourierName(childComplexity), true
+		return e.complexity.Delivery.ContactNumber(childComplexity), true
+
+	case "Delivery.createdAt":
+		if e.complexity.Delivery.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Delivery.CreatedAt(childComplexity), true
 
 	case "Delivery.deliveredAt":
 		if e.complexity.Delivery.DeliveredAt == nil {
@@ -1012,6 +1027,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Delivery.DeliveredAt(childComplexity), true
+
+	case "Delivery.deliveryPartner":
+		if e.complexity.Delivery.DeliveryPartner == nil {
+			break
+		}
+
+		return e.complexity.Delivery.DeliveryPartner(childComplexity), true
 
 	case "Delivery.estimatedDeliveryAt":
 		if e.complexity.Delivery.EstimatedDeliveryAt == nil {
@@ -1034,6 +1056,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Delivery.OrderID(childComplexity), true
 
+	case "Delivery.shippingAddress":
+		if e.complexity.Delivery.ShippingAddress == nil {
+			break
+		}
+
+		return e.complexity.Delivery.ShippingAddress(childComplexity), true
+
 	case "Delivery.status":
 		if e.complexity.Delivery.Status == nil {
 			break
@@ -1047,6 +1076,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Delivery.TrackingNumber(childComplexity), true
+
+	case "Delivery.updatedAt":
+		if e.complexity.Delivery.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.Delivery.UpdatedAt(childComplexity), true
 
 	case "ForgotPasswordPayload.message":
 		if e.complexity.ForgotPasswordPayload.Message == nil {
@@ -1876,7 +1912,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateDeliveryStatus(childComplexity, args["id"].(string), args["status"].(string), args["location"].(*string)), true
+		return e.complexity.Mutation.UpdateDeliveryStatus(childComplexity, args["id"].(string), args["status"].(model.DeliveryStatus), args["location"].(*string)), true
 
 	case "Mutation.updateMerchant":
 		if e.complexity.Mutation.UpdateMerchant == nil {
@@ -2540,6 +2576,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Delivery(childComplexity, args["id"].(string)), true
+
+	case "Query.deliveryByOrder":
+		if e.complexity.Query.DeliveryByOrder == nil {
+			break
+		}
+
+		args, err := ec.field_Query_deliveryByOrder_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.DeliveryByOrder(childComplexity, args["orderId"].(string)), true
+
+	case "Query.deliveryByTracking":
+		if e.complexity.Query.DeliveryByTracking == nil {
+			break
+		}
+
+		args, err := ec.field_Query_deliveryByTracking_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.DeliveryByTracking(childComplexity, args["trackingNumber"].(string)), true
 
 	case "Query.health":
 		if e.complexity.Query.Health == nil {
@@ -3704,29 +3764,46 @@ type Mutation {
 }
 
 `, BuiltIn: false},
-	{Name: "../../../../../contracts/graphql/delivery/delivery.graphql", Input: `type Delivery {
+	{Name: "../../../../../contracts/graphql/delivery/delivery.graphql", Input: `enum DeliveryStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+type Delivery {
   id: ID!
   orderId: String!
   trackingNumber: String
-  courierName: String!
-  status: String!
+  status: DeliveryStatus!
   estimatedDeliveryAt: String
   deliveredAt: String
+  deliveryPartner: String!
+  shippingAddress: String
+  contactNumber: String
+  createdAt: String
+  updatedAt: String
 }
 
 input CreateDeliveryInput {
   orderId: String!
-  courierName: String!
+  deliveryPartner: String!
   shippingAddress: String!
+  contactNumber: String!
 }
 
 extend type Query {
   delivery(id: ID!): Delivery @auth
+  deliveryByTracking(trackingNumber: String!): Delivery @auth
+  deliveryByOrder(orderId: String!): Delivery @auth
 }
 
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
-  updateDeliveryStatus(id: ID!, status: String!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
+  updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/inventory/inventory.graphql", Input: `type StockItem {
@@ -5243,10 +5320,10 @@ func (ec *executionContext) field_Mutation_updateDeliveryStatus_args(ctx context
 		}
 	}
 	args["id"] = arg0
-	var arg1 string
+	var arg1 model.DeliveryStatus
 	if tmp, ok := rawArgs["status"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
-		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		arg1, err = ec.unmarshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -5639,6 +5716,36 @@ func (ec *executionContext) field_Query_childCategories_args(ctx context.Context
 		}
 	}
 	args["offset"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_deliveryByOrder_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["orderId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderId"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["orderId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_deliveryByTracking_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["trackingNumber"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("trackingNumber"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["trackingNumber"] = arg0
 	return args, nil
 }
 
@@ -8660,50 +8767,6 @@ func (ec *executionContext) fieldContext_Delivery_trackingNumber(_ context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _Delivery_courierName(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Delivery_courierName(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CourierName, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Delivery_courierName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Delivery",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Delivery_status(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Delivery_status(ctx, field)
 	if err != nil {
@@ -8730,9 +8793,9 @@ func (ec *executionContext) _Delivery_status(ctx context.Context, field graphql.
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(model.DeliveryStatus)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Delivery_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8742,7 +8805,7 @@ func (ec *executionContext) fieldContext_Delivery_status(_ context.Context, fiel
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type DeliveryStatus does not have child fields")
 		},
 	}
 	return fc, nil
@@ -8818,6 +8881,214 @@ func (ec *executionContext) _Delivery_deliveredAt(ctx context.Context, field gra
 }
 
 func (ec *executionContext) fieldContext_Delivery_deliveredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Delivery_deliveryPartner(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeliveryPartner, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_deliveryPartner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Delivery_shippingAddress(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_shippingAddress(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ShippingAddress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_shippingAddress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Delivery_contactNumber(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_contactNumber(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ContactNumber, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_contactNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Delivery_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Delivery_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Delivery",
 		Field:      field,
@@ -11519,14 +11790,22 @@ func (ec *executionContext) fieldContext_Mutation_createDelivery(ctx context.Con
 				return ec.fieldContext_Delivery_orderId(ctx, field)
 			case "trackingNumber":
 				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
-			case "courierName":
-				return ec.fieldContext_Delivery_courierName(ctx, field)
 			case "status":
 				return ec.fieldContext_Delivery_status(ctx, field)
 			case "estimatedDeliveryAt":
 				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
 			case "deliveredAt":
 				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
 		},
@@ -11560,7 +11839,7 @@ func (ec *executionContext) _Mutation_updateDeliveryStatus(ctx context.Context, 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateDeliveryStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(string), fc.Args["location"].(*string))
+			return ec.resolvers.Mutation().UpdateDeliveryStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(model.DeliveryStatus), fc.Args["location"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN", "MERCHANT"})
@@ -11611,14 +11890,22 @@ func (ec *executionContext) fieldContext_Mutation_updateDeliveryStatus(ctx conte
 				return ec.fieldContext_Delivery_orderId(ctx, field)
 			case "trackingNumber":
 				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
-			case "courierName":
-				return ec.fieldContext_Delivery_courierName(ctx, field)
 			case "status":
 				return ec.fieldContext_Delivery_status(ctx, field)
 			case "estimatedDeliveryAt":
 				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
 			case "deliveredAt":
 				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
 		},
@@ -19336,14 +19623,22 @@ func (ec *executionContext) fieldContext_Query_delivery(ctx context.Context, fie
 				return ec.fieldContext_Delivery_orderId(ctx, field)
 			case "trackingNumber":
 				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
-			case "courierName":
-				return ec.fieldContext_Delivery_courierName(ctx, field)
 			case "status":
 				return ec.fieldContext_Delivery_status(ctx, field)
 			case "estimatedDeliveryAt":
 				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
 			case "deliveredAt":
 				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
 		},
@@ -19356,6 +19651,198 @@ func (ec *executionContext) fieldContext_Query_delivery(ctx context.Context, fie
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_delivery_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_deliveryByTracking(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_deliveryByTracking(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().DeliveryByTracking(rctx, fc.Args["trackingNumber"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Delivery); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Delivery`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Delivery)
+	fc.Result = res
+	return ec.marshalODelivery2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_deliveryByTracking(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Delivery_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Delivery_orderId(ctx, field)
+			case "trackingNumber":
+				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
+			case "status":
+				return ec.fieldContext_Delivery_status(ctx, field)
+			case "estimatedDeliveryAt":
+				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
+			case "deliveredAt":
+				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_deliveryByTracking_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_deliveryByOrder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_deliveryByOrder(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().DeliveryByOrder(rctx, fc.Args["orderId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Delivery); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Delivery`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Delivery)
+	fc.Result = res
+	return ec.marshalODelivery2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_deliveryByOrder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Delivery_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Delivery_orderId(ctx, field)
+			case "trackingNumber":
+				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
+			case "status":
+				return ec.fieldContext_Delivery_status(ctx, field)
+			case "estimatedDeliveryAt":
+				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
+			case "deliveredAt":
+				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_deliveryByOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -27064,7 +27551,7 @@ func (ec *executionContext) unmarshalInputCreateDeliveryInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderId", "courierName", "shippingAddress"}
+	fieldsInOrder := [...]string{"orderId", "deliveryPartner", "shippingAddress", "contactNumber"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -27078,13 +27565,13 @@ func (ec *executionContext) unmarshalInputCreateDeliveryInput(ctx context.Contex
 				return it, err
 			}
 			it.OrderID = data
-		case "courierName":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("courierName"))
+		case "deliveryPartner":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deliveryPartner"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.CourierName = data
+			it.DeliveryPartner = data
 		case "shippingAddress":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shippingAddress"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -27092,6 +27579,13 @@ func (ec *executionContext) unmarshalInputCreateDeliveryInput(ctx context.Contex
 				return it, err
 			}
 			it.ShippingAddress = data
+		case "contactNumber":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contactNumber"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContactNumber = data
 		}
 	}
 
@@ -29273,11 +29767,6 @@ func (ec *executionContext) _Delivery(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "trackingNumber":
 			out.Values[i] = ec._Delivery_trackingNumber(ctx, field, obj)
-		case "courierName":
-			out.Values[i] = ec._Delivery_courierName(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "status":
 			out.Values[i] = ec._Delivery_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -29287,6 +29776,19 @@ func (ec *executionContext) _Delivery(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Delivery_estimatedDeliveryAt(ctx, field, obj)
 		case "deliveredAt":
 			out.Values[i] = ec._Delivery_deliveredAt(ctx, field, obj)
+		case "deliveryPartner":
+			out.Values[i] = ec._Delivery_deliveryPartner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "shippingAddress":
+			out.Values[i] = ec._Delivery_shippingAddress(ctx, field, obj)
+		case "contactNumber":
+			out.Values[i] = ec._Delivery_contactNumber(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._Delivery_createdAt(ctx, field, obj)
+		case "updatedAt":
+			out.Values[i] = ec._Delivery_updatedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -30833,6 +31335,44 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_delivery(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "deliveryByTracking":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_deliveryByTracking(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "deliveryByOrder":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_deliveryByOrder(ctx, field)
 				return res
 			}
 
@@ -32721,6 +33261,16 @@ func (ec *executionContext) marshalNDeleteProductVariantResponse2ᚖgithubᚗcom
 		return graphql.Null
 	}
 	return ec._DeleteProductVariantResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx context.Context, v interface{}) (model.DeliveryStatus, error) {
+	var res model.DeliveryStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx context.Context, sel ast.SelectionSet, v model.DeliveryStatus) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {

@@ -6,22 +6,121 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"strings"
 
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // CreateDelivery is the resolver for the createDelivery field.
 func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: CreateDelivery - createDelivery"))
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	partner := strings.TrimSpace(input.DeliveryPartner)
+	if partner == "" {
+		return nil, appErrors.BadRequest("deliveryPartner is required")
+	}
+
+	shippingAddr := strings.TrimSpace(input.ShippingAddress)
+	if shippingAddr == "" {
+		return nil, appErrors.BadRequest("shippingAddress is required")
+	}
+
+	contactNum := strings.TrimSpace(input.ContactNumber)
+	if contactNum == "" {
+		return nil, appErrors.BadRequest("contactNumber is required")
+	}
+
+	req := &deliverypb.CreateDeliveryRequest{
+		OrderId:         orderID,
+		DeliveryPartner: partner,
+		ShippingAddress: shippingAddr,
+		ContactNumber:   contactNum,
+	}
+
+	res, err := r.Clients.DeliveryClient.CreateDelivery(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
 }
 
 // UpdateDeliveryStatus is the resolver for the updateDeliveryStatus field.
-func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, status string, location *string) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: UpdateDeliveryStatus - updateDeliveryStatus"))
+func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, status model.DeliveryStatus, location *string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	loc := ""
+	if location != nil {
+		loc = *location
+	}
+
+	res, err := r.Clients.DeliveryClient.UpdateDeliveryStatus(ctx, &deliverypb.UpdateDeliveryStatusRequest{
+		Id:       id,
+		Status:   string(status),
+		Location: loc,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
 }
 
 // Delivery is the resolver for the delivery field.
 func (r *queryResolver) Delivery(ctx context.Context, id string) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: Delivery - delivery"))
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDelivery(ctx, &deliverypb.GetDeliveryRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryByTracking is the resolver for the deliveryByTracking field.
+func (r *queryResolver) DeliveryByTracking(ctx context.Context, trackingNumber string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDeliveryByTracking(ctx, &deliverypb.GetDeliveryByTrackingRequest{TrackingNumber: trackingNumber})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryByOrder is the resolver for the deliveryByOrder field.
+func (r *queryResolver) DeliveryByOrder(ctx context.Context, orderID string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDeliveryByOrder(ctx, &deliverypb.GetDeliveryByOrderRequest{OrderId: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
 }

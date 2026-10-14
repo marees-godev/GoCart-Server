@@ -41,6 +41,10 @@ const (
 	EventTypeMerchantActivated  = "MerchantActivated"
 	EventTypeMerchantSuspended  = "MerchantSuspended"
 
+	// Delivery Service Events
+	EventTypeDeliveryCreated       = "DeliveryCreated"
+	EventTypeDeliveryStatusUpdated = "DeliveryStatusUpdated"
+
 	// Product Service Events
 	EventTypeProductCreated   = "ProductCreated"
 	EventTypeProductUpdated   = "ProductUpdated"
@@ -78,6 +82,11 @@ const (
 	TopicMerchantRegistered = "gocart.merchant.merchant-registered"
 	TopicMerchantActivated  = "gocart.merchant.merchant-activated"
 	TopicMerchantSuspended  = "gocart.merchant.merchant-suspended"
+
+	// Delivery Service Topics
+	TopicDeliveryCreated       = "gocart.delivery.delivery-created"
+	TopicDeliveryDispatched    = "gocart.delivery.delivery-dispatched"
+	TopicDeliveryStatusUpdated = "gocart.delivery.delivery-status-updated"
 
 	// Product Service Topics
 	TopicProductCreated   = "gocart.product.product-created"

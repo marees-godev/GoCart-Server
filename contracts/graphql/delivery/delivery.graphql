@@ -1,24 +1,41 @@
+enum DeliveryStatus {
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
 type Delivery {
   id: ID!
   orderId: String!
   trackingNumber: String
-  courierName: String!
-  status: String!
+  status: DeliveryStatus!
   estimatedDeliveryAt: String
   deliveredAt: String
+  deliveryPartner: String!
+  shippingAddress: String
+  contactNumber: String
+  createdAt: String
+  updatedAt: String
 }
 
 input CreateDeliveryInput {
   orderId: String!
-  courierName: String!
+  deliveryPartner: String!
   shippingAddress: String!
+  contactNumber: String!
 }
 
 extend type Query {
   delivery(id: ID!): Delivery @auth
+  deliveryByTracking(trackingNumber: String!): Delivery @auth
+  deliveryByOrder(orderId: String!): Delivery @auth
 }
 
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
-  updateDeliveryStatus(id: ID!, status: String!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
+  updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
 }
