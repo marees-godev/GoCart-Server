@@ -202,3 +202,52 @@ type OrderConfirmedEvent struct {
 	OrderID     string    `json:"order_id"`
 	ConfirmedAt time.Time `json:"confirmed_at"`
 }
+
+// ProductCreatedEvent represents the payload for ProductCreated domain event.
+type ProductCreatedEvent struct {
+	ProductID   string    `json:"product_id"`
+	StoreID     string    `json:"store_id"`
+	CategoryID  string    `json:"category_id"`
+	SKU         string    `json:"sku"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Price       float64   `json:"price"`
+	Currency    string    `json:"currency"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// ProductUpdatedEvent represents the payload for ProductUpdated domain event.
+type ProductUpdatedEvent struct {
+	ProductID   string    `json:"product_id"`
+	StoreID     string    `json:"store_id"`
+	CategoryID  string    `json:"category_id,omitempty"`
+	SKU         string    `json:"sku,omitempty"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Price       float64   `json:"price"`
+	Currency    string    `json:"currency"`
+	Status      string    `json:"status"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ProductPublishedEvent represents the payload for ProductPublished domain event.
+type ProductPublishedEvent struct {
+	ProductID   string    `json:"product_id"`
+	StoreID     string    `json:"store_id"`
+	CategoryID  string    `json:"category_id,omitempty"`
+	SKU         string    `json:"sku,omitempty"`
+	Name        string    `json:"name"`
+	Price       float64   `json:"price"`
+	Currency    string    `json:"currency"`
+	PublishedAt time.Time `json:"published_at"`
+}
+
+// ProductDeletedEvent represents the payload for ProductDeleted domain event.
+type ProductDeletedEvent struct {
+	ProductID string    `json:"product_id"`
+	StoreID   string    `json:"store_id"`
+	Status    string    `json:"status"`
+	DeletedAt time.Time `json:"deleted_at"`
+}
+
