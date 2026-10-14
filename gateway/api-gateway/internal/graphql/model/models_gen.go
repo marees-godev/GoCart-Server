@@ -133,8 +133,9 @@ type CreateCategoryInput struct {
 
 type CreateDeliveryInput struct {
 	OrderID         string `json:"orderId"`
-	CourierName     string `json:"courierName"`
+	DeliveryPartner string `json:"deliveryPartner"`
 	ShippingAddress string `json:"shippingAddress"`
+	ContactNumber   string `json:"contactNumber"`
 }
 
 type CreateInventoryInput struct {
@@ -212,13 +213,17 @@ type DeleteProductVariantResponse struct {
 }
 
 type Delivery struct {
-	ID                  string  `json:"id"`
-	OrderID             string  `json:"orderId"`
-	TrackingNumber      *string `json:"trackingNumber,omitempty"`
-	CourierName         string  `json:"courierName"`
-	Status              string  `json:"status"`
-	EstimatedDeliveryAt *string `json:"estimatedDeliveryAt,omitempty"`
-	DeliveredAt         *string `json:"deliveredAt,omitempty"`
+	ID                  string         `json:"id"`
+	OrderID             string         `json:"orderId"`
+	TrackingNumber      *string        `json:"trackingNumber,omitempty"`
+	Status              DeliveryStatus `json:"status"`
+	EstimatedDeliveryAt *string        `json:"estimatedDeliveryAt,omitempty"`
+	DeliveredAt         *string        `json:"deliveredAt,omitempty"`
+	DeliveryPartner     string         `json:"deliveryPartner"`
+	ShippingAddress     *string        `json:"shippingAddress,omitempty"`
+	ContactNumber       *string        `json:"contactNumber,omitempty"`
+	CreatedAt           *string        `json:"createdAt,omitempty"`
+	UpdatedAt           *string        `json:"updatedAt,omitempty"`
 }
 
 type ForgotPasswordInput struct {
@@ -659,6 +664,57 @@ type ValidateCategoryResponse struct {
 	IsValid  bool      `json:"isValid"`
 	Message  string    `json:"message"`
 	Category *Category `json:"category,omitempty"`
+}
+
+type DeliveryStatus string
+
+const (
+	DeliveryStatusCreated        DeliveryStatus = "CREATED"
+	DeliveryStatusPickedUp       DeliveryStatus = "PICKED_UP"
+	DeliveryStatusInTransit      DeliveryStatus = "IN_TRANSIT"
+	DeliveryStatusOutForDelivery DeliveryStatus = "OUT_FOR_DELIVERY"
+	DeliveryStatusDelivered      DeliveryStatus = "DELIVERED"
+	DeliveryStatusFailed         DeliveryStatus = "FAILED"
+	DeliveryStatusCancelled      DeliveryStatus = "CANCELLED"
+)
+
+var AllDeliveryStatus = []DeliveryStatus{
+	DeliveryStatusCreated,
+	DeliveryStatusPickedUp,
+	DeliveryStatusInTransit,
+	DeliveryStatusOutForDelivery,
+	DeliveryStatusDelivered,
+	DeliveryStatusFailed,
+	DeliveryStatusCancelled,
+}
+
+func (e DeliveryStatus) IsValid() bool {
+	switch e {
+	case DeliveryStatusCreated, DeliveryStatusPickedUp, DeliveryStatusInTransit, DeliveryStatusOutForDelivery, DeliveryStatusDelivered, DeliveryStatusFailed, DeliveryStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e DeliveryStatus) String() string {
+	return string(e)
+}
+
+func (e *DeliveryStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = DeliveryStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid DeliveryStatus", str)
+	}
+	return nil
+}
+
+func (e DeliveryStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Gender string

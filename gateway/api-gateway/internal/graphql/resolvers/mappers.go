@@ -3,6 +3,7 @@ package resolvers
 import (
 	"time"
 
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
@@ -207,4 +208,38 @@ func mapInventoryItem(inv *inventorypb.InventoryItem) *model.InventoryItem {
 		UpdatedAt:         inv.UpdatedAt,
 		CreatedAt:         createdAt,
 	}
+}
+
+func toModelDelivery(d *deliverypb.Delivery) *model.Delivery {
+	if d == nil {
+		return nil
+	}
+	res := &model.Delivery{
+		ID:              d.Id,
+		OrderID:         d.OrderId,
+		Status:          model.DeliveryStatus(d.Status),
+		DeliveryPartner: d.DeliveryPartner,
+	}
+	if d.TrackingNumber != "" {
+		res.TrackingNumber = &d.TrackingNumber
+	}
+	if d.EstimatedDeliveryAt != "" {
+		res.EstimatedDeliveryAt = &d.EstimatedDeliveryAt
+	}
+	if d.DeliveredAt != "" {
+		res.DeliveredAt = &d.DeliveredAt
+	}
+	if d.ShippingAddress != "" {
+		res.ShippingAddress = &d.ShippingAddress
+	}
+	if d.ContactNumber != "" {
+		res.ContactNumber = &d.ContactNumber
+	}
+	if d.CreatedAt != "" {
+		res.CreatedAt = &d.CreatedAt
+	}
+	if d.UpdatedAt != "" {
+		res.UpdatedAt = &d.UpdatedAt
+	}
+	return res
 }
