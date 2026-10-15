@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,9 +26,10 @@ import (
 )
 
 type inMemOrderRepo struct {
-	orders   map[string]*model.Order
-	outbox   []*events.EventEnvelope
-	topic    string
+	mu     sync.RWMutex
+	orders map[string]*model.Order
+	outbox []*events.EventEnvelope
+	topic  string
 }
 
 func newInMemOrderRepo() *inMemOrderRepo {
@@ -43,6 +45,8 @@ func (m *inMemOrderRepo) CreateOrdersWithOutbox(
 	envelopes []*events.EventEnvelope,
 	topic string,
 ) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, o := range orders {
 		cp := *o
 		cp.Items = make([]model.OrderItem, len(o.Items))
@@ -55,6 +59,8 @@ func (m *inMemOrderRepo) CreateOrdersWithOutbox(
 }
 
 func (m *inMemOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -66,6 +72,8 @@ func (m *inMemOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Or
 }
 
 func (m *inMemOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit, offset int) ([]*model.Order, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	res := make([]*model.Order, 0)
 	for _, o := range m.orders {
 		if o.UserID == userID {
@@ -79,6 +87,8 @@ func (m *inMemOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, 
 }
 
 func (m *inMemOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -89,6 +99,8 @@ func (m *inMemOrderRepo) UpdateOrderStatus(ctx context.Context, id string, order
 }
 
 func (m *inMemOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string) (*model.Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -108,15 +120,26 @@ func (m *inMemOrderRepo) CreateOrderWithOutbox(
 	envelope *events.EventEnvelope,
 	topic string,
 ) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.outbox = append(m.outbox, envelope)
 	return nil
 }
 
+func (m *inMemOrderRepo) getOutboxCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.outbox)
+}
+
 type inMemCartClient struct {
+	mu    sync.RWMutex
 	carts map[string]*cartpb.Cart
 }
 
 func (c *inMemCartClient) GetCart(ctx context.Context, userID string) (*cartpb.Cart, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	cart, ok := c.carts[userID]
 	if !ok {
 		return nil, status.Error(codes.NotFound, "cart not found")
@@ -125,15 +148,26 @@ func (c *inMemCartClient) GetCart(ctx context.Context, userID string) (*cartpb.C
 }
 
 func (c *inMemCartClient) ClearCart(ctx context.Context, userID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	delete(c.carts, userID)
 	return nil
 }
 
+func (c *inMemCartClient) setCart(userID string, cart *cartpb.Cart) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.carts[userID] = cart
+}
+
 type inMemProductClient struct {
+	mu       sync.RWMutex
 	products map[string]*productpb.Product
 }
 
 func (p *inMemProductClient) GetProduct(ctx context.Context, id string) (*productpb.Product, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	prod, ok := p.products[id]
 	if !ok {
 		return nil, status.Error(codes.NotFound, "product not found")
@@ -142,15 +176,26 @@ func (p *inMemProductClient) GetProduct(ctx context.Context, id string) (*produc
 }
 
 type inMemInventoryClient struct {
+	mu     sync.RWMutex
 	stocks map[string]*inventorypb.StockItem
 }
 
 func (i *inMemInventoryClient) GetStock(ctx context.Context, id string) (*inventorypb.StockItem, error) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
 	st, ok := i.stocks[id]
 	if !ok {
 		return nil, status.Error(codes.NotFound, "stock not found")
 	}
 	return st, nil
+}
+
+func (i *inMemInventoryClient) setStockQuantity(id string, qty int32) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if st, ok := i.stocks[id]; ok {
+		st.AvailableQuantity = qty
+	}
 }
 
 func setupInProcessGRPC(
@@ -321,19 +366,19 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	}
 
 	// Verify outbox events were recorded
-	if len(repo.outbox) != 2 {
-		t.Errorf("expected 2 outbox events, got %d", len(repo.outbox))
+	if repo.getOutboxCount() != 2 {
+		t.Errorf("expected 2 outbox events, got %d", repo.getOutboxCount())
 	}
 
 	// 2. Checkout rejection when stock is insufficient
-	invClient.stocks[prod1].AvailableQuantity = 1 // only 1 available, cart needs 2
-	cartClient.carts[userID] = &cartpb.Cart{
+	invClient.setStockQuantity(prod1, 1) // only 1 available, cart needs 2
+	cartClient.setCart(userID, &cartpb.Cart{
 		Id:     "cart-test",
 		UserId: userID,
 		Items: []*cartpb.CartItem{
 			{ProductId: prod1, StoreId: store1, Quantity: 2},
 		},
-	}
+	})
 
 	_, err = client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          userID,
@@ -344,7 +389,11 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	}
 
 	// 3. Checkout rejection on empty cart
-	cartClient.carts[userID].Items = []*cartpb.CartItem{}
+	cartClient.setCart(userID, &cartpb.Cart{
+		Id:     "cart-test",
+		UserId: userID,
+		Items:  []*cartpb.CartItem{},
+	})
 	_, err = client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          userID,
 		ShippingAddress: "100 Innovation Way",

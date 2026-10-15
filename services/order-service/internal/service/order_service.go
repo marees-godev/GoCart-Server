@@ -373,13 +373,11 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 	// 5. Clean up shopping cart after successful checkout
 	if s.cartClient != nil {
-		go func(uid string) {
-			clearCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.cartClient.ClearCart(clearCtx, uid); err != nil {
-				s.log.Warn("Failed to clear cart after order creation", "user_id", uid, "error", err)
-			}
-		}(input.UserID)
+		clearCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.cartClient.ClearCart(clearCtx, input.UserID); err != nil {
+			s.log.Warn("Failed to clear cart after order creation", "user_id", input.UserID, "error", err)
+		}
 	}
 
 	var primaryOrder *model.Order

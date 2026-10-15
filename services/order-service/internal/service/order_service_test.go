@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 
 // Mock Order Repository
 type mockOrderRepo struct {
+	mu              sync.RWMutex
 	orders          map[string]*model.Order
 	outboxEnvelopes []*events.EventEnvelope
 	outboxTopic     string
@@ -40,6 +42,8 @@ func (m *mockOrderRepo) CreateOrdersWithOutbox(
 	envelopes []*events.EventEnvelope,
 	topic string,
 ) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, o := range orders {
 		cp := *o
 		cp.Items = make([]model.OrderItem, len(o.Items))
@@ -52,6 +56,8 @@ func (m *mockOrderRepo) CreateOrdersWithOutbox(
 }
 
 func (m *mockOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -63,6 +69,8 @@ func (m *mockOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Ord
 }
 
 func (m *mockOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit, offset int) ([]*model.Order, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	res := make([]*model.Order, 0)
 	for _, o := range m.orders {
 		if o.UserID == userID {
@@ -84,6 +92,8 @@ func (m *mockOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, l
 }
 
 func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -97,6 +107,8 @@ func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderS
 }
 
 func (m *mockOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string) (*model.Order, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
@@ -120,6 +132,8 @@ func (m *mockOrderRepo) CreateOrderWithOutbox(
 	envelope *events.EventEnvelope,
 	topic string,
 ) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.outboxEnvelopes = append(m.outboxEnvelopes, envelope)
 	m.outboxTopic = topic
 	return nil
@@ -127,12 +141,15 @@ func (m *mockOrderRepo) CreateOrderWithOutbox(
 
 // Mock Cart Client
 type mockCartClient struct {
+	mu         sync.RWMutex
 	carts      map[string]*cartpb.Cart
 	clearCalls []string
 	err        error
 }
 
 func (m *mockCartClient) GetCart(ctx context.Context, userID string) (*cartpb.Cart, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -144,17 +161,22 @@ func (m *mockCartClient) GetCart(ctx context.Context, userID string) (*cartpb.Ca
 }
 
 func (m *mockCartClient) ClearCart(ctx context.Context, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.clearCalls = append(m.clearCalls, userID)
 	return nil
 }
 
 // Mock Product Client
 type mockProductClient struct {
+	mu       sync.RWMutex
 	products map[string]*productpb.Product
 	err      error
 }
 
 func (m *mockProductClient) GetProduct(ctx context.Context, productID string) (*productpb.Product, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -167,11 +189,14 @@ func (m *mockProductClient) GetProduct(ctx context.Context, productID string) (*
 
 // Mock Inventory Client
 type mockInventoryClient struct {
+	mu     sync.RWMutex
 	stocks map[string]*inventorypb.StockItem
 	err    error
 }
 
 func (m *mockInventoryClient) GetStock(ctx context.Context, productID string) (*inventorypb.StockItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.err != nil {
 		return nil, m.err
 	}
