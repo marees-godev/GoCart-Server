@@ -4,20 +4,36 @@ import "time"
 
 // OrderCreatedEvent represents the payload for OrderCreated domain event.
 type OrderCreatedEvent struct {
-	OrderID     string             `json:"order_id"`
-	UserID      string             `json:"user_id"`
-	TotalAmount float64            `json:"total_amount"`
-	Currency    string             `json:"currency"`
-	Status      string             `json:"status"`
-	Items       []OrderItemPayload `json:"items"`
-	CreatedAt   time.Time          `json:"created_at"`
+	OrderID           string             `json:"order_id"`
+	ParentOrderID     string             `json:"parent_order_id,omitempty"`
+	StoreID           string             `json:"store_id,omitempty"`
+	UserID            string             `json:"user_id"`
+	Subtotal          float64            `json:"subtotal,omitempty"`
+	TaxAmount         float64            `json:"tax_amount,omitempty"`
+	ShippingFee       float64            `json:"shipping_fee,omitempty"`
+	DiscountAmount    float64            `json:"discount_amount,omitempty"`
+	TotalAmount       float64            `json:"total_amount"`
+	Currency          string             `json:"currency"`
+	PaymentStatus     string             `json:"payment_status,omitempty"`
+	Status            string             `json:"status"`
+	OrderStatus       string             `json:"order_status,omitempty"`
+	ShippingAddressID string             `json:"shipping_address_id,omitempty"`
+	BillingAddressID  string             `json:"billing_address_id,omitempty"`
+	Items             []OrderItemPayload `json:"items"`
+	CreatedAt         time.Time          `json:"created_at"`
 }
 
 // OrderItemPayload represents an item entry in OrderCreatedEvent.
 type OrderItemPayload struct {
-	ProductID string  `json:"product_id"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unit_price"`
+	ProductID   string  `json:"product_id"`
+	StoreID     string  `json:"store_id,omitempty"`
+	SKU         string  `json:"sku,omitempty"`
+	ProductName string  `json:"product_name,omitempty"`
+	Quantity    int     `json:"quantity"`
+	UnitPrice   float64 `json:"unit_price"`
+	Tax         float64 `json:"tax,omitempty"`
+	Discount    float64 `json:"discount,omitempty"`
+	TotalPrice  float64 `json:"total_price,omitempty"`
 }
 
 // PaymentInitiatedEvent represents the payload for PaymentInitiated domain event.
