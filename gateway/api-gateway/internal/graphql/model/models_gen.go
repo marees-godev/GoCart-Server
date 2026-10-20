@@ -147,9 +147,15 @@ type CreateInventoryInput struct {
 }
 
 type CreateOrderInput struct {
-	UserID          string `json:"userId"`
-	CartID          string `json:"cartId"`
-	ShippingAddress string `json:"shippingAddress"`
+	UserID            *string  `json:"userId,omitempty"`
+	CartID            *string  `json:"cartId,omitempty"`
+	ShippingAddress   *string  `json:"shippingAddress,omitempty"`
+	ShippingAddressID *string  `json:"shippingAddressId,omitempty"`
+	BillingAddressID  *string  `json:"billingAddressId,omitempty"`
+	Currency          *string  `json:"currency,omitempty"`
+	IdempotencyKey    *string  `json:"idempotencyKey,omitempty"`
+	ShippingFee       *float64 `json:"shippingFee,omitempty"`
+	DiscountAmount    *float64 `json:"discountAmount,omitempty"`
 }
 
 type CreateProductInput struct {
@@ -315,20 +321,39 @@ type NotificationList struct {
 }
 
 type Order struct {
-	ID              string       `json:"id"`
-	UserID          string       `json:"userId"`
-	Status          string       `json:"status"`
-	Items           []*OrderItem `json:"items"`
-	TotalAmount     float64      `json:"totalAmount"`
-	ShippingAddress string       `json:"shippingAddress"`
-	CreatedAt       *string      `json:"createdAt,omitempty"`
+	ID                string       `json:"id"`
+	UserID            string       `json:"userId"`
+	StoreID           *string      `json:"storeId,omitempty"`
+	Status            string       `json:"status"`
+	OrderStatus       *string      `json:"orderStatus,omitempty"`
+	PaymentStatus     *string      `json:"paymentStatus,omitempty"`
+	Items             []*OrderItem `json:"items"`
+	Subtotal          *float64     `json:"subtotal,omitempty"`
+	TaxAmount         *float64     `json:"taxAmount,omitempty"`
+	ShippingFee       *float64     `json:"shippingFee,omitempty"`
+	DiscountAmount    *float64     `json:"discountAmount,omitempty"`
+	TotalAmount       float64      `json:"totalAmount"`
+	Currency          *string      `json:"currency,omitempty"`
+	ShippingAddress   string       `json:"shippingAddress"`
+	ShippingAddressID *string      `json:"shippingAddressId,omitempty"`
+	BillingAddressID  *string      `json:"billingAddressId,omitempty"`
+	ParentOrderID     *string      `json:"parentOrderId,omitempty"`
+	OrderNumber       *string      `json:"orderNumber,omitempty"`
+	CreatedAt         *string      `json:"createdAt,omitempty"`
+	UpdatedAt         *string      `json:"updatedAt,omitempty"`
 }
 
 type OrderItem struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ID          string   `json:"id"`
+	ProductID   string   `json:"productId"`
+	StoreID     *string  `json:"storeId,omitempty"`
+	Sku         *string  `json:"sku,omitempty"`
+	ProductName *string  `json:"productName,omitempty"`
+	Quantity    int      `json:"quantity"`
+	UnitPrice   float64  `json:"unitPrice"`
+	Tax         *float64 `json:"tax,omitempty"`
+	Discount    *float64 `json:"discount,omitempty"`
+	TotalPrice  *float64 `json:"totalPrice,omitempty"`
 }
 
 type OrderList struct {

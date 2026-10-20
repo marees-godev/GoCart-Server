@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,7 +11,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -18,8 +24,14 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/order-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/order-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/order-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -96,7 +108,6 @@ func main() {
 	}()
 
 	// 6. Start the outbox publisher as a background goroutine.
-	//    It stops automatically when ctx is cancelled (SIGTERM / SIGINT).
 	outboxStore := outbox.NewStore()
 	outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
 		PollInterval: cfg.Outbox.PollInterval,
@@ -105,7 +116,62 @@ func main() {
 	})
 	go outboxPublisher.Start(ctx)
 
-	// 7. Setup Fiber HTTP server with observability middleware
+	// 7. Initialize downstream service clients
+	var cartClient client.CartClient
+	cartConn, cartErr := grpc.NewClient(cfg.GRPC.CartServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if cartErr == nil {
+		cartClient = client.NewCartClient(cartpb.NewCartServiceClient(cartConn))
+		defer cartConn.Close()
+	} else {
+		log.Warn("Failed to dial Cart Service", "error", cartErr)
+	}
+
+	var prodClient client.ProductClient
+	productConn, prodErr := grpc.NewClient(cfg.GRPC.ProductServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if prodErr == nil {
+		prodClient = client.NewProductClient(productpb.NewProductServiceClient(productConn))
+		defer productConn.Close()
+	} else {
+		log.Warn("Failed to dial Product Service", "error", prodErr)
+	}
+
+	var invClient client.InventoryClient
+	inventoryConn, invErr := grpc.NewClient(cfg.GRPC.InventoryServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if invErr == nil {
+		invClient = client.NewInventoryClient(inventorypb.NewInventoryServiceClient(inventoryConn))
+		defer inventoryConn.Close()
+	} else {
+		log.Warn("Failed to dial Inventory Service", "error", invErr)
+	}
+
+	// 8. Initialize business layers
+	orderRepo := repository.NewOrderRepo(db, outboxStore)
+	orderService := service.NewOrderService(orderRepo, cartClient, prodClient, invClient, cfg.GRPC.TimeoutSeconds, log)
+	orderGRPCHandler := handler.NewOrderGRPCHandler(orderService, log)
+
+	// 9. Setup gRPC Server
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+		),
+	)
+	orderpb.RegisterOrderServiceServer(grpcServer, orderGRPCHandler)
+	reflection.Register(grpcServer)
+
+	grpcLis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "port", cfg.GRPC.Port, "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 10. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -126,7 +192,7 @@ func main() {
 	adminOutboxHandler.Register(app)
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP server listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -135,6 +201,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
+
+	grpcServer.GracefulStop()
 
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
