@@ -22,17 +22,23 @@ import (
 )
 
 type memoryDeliveryRepo struct {
-	mu         sync.RWMutex
-	deliveries map[string]*model.Delivery
-	byOrderID  map[string]string
-	byTracking map[string]string
+	mu                sync.RWMutex
+	deliveries        map[string]*model.Delivery
+	byOrderID         map[string]string
+	byTracking        map[string]string
+	warehouses        map[uuid.UUID]*model.Warehouse
+	partnerProfiles   map[uuid.UUID]*model.DeliveryPartnerProfile
+	partnerWarehouses map[uuid.UUID][]uuid.UUID
 }
 
 func newMemoryDeliveryRepo() repository.DeliveryRepository {
 	return &memoryDeliveryRepo{
-		deliveries: make(map[string]*model.Delivery),
-		byOrderID:  make(map[string]string),
-		byTracking: make(map[string]string),
+		deliveries:        make(map[string]*model.Delivery),
+		byOrderID:         make(map[string]string),
+		byTracking:        make(map[string]string),
+		warehouses:        make(map[uuid.UUID]*model.Warehouse),
+		partnerProfiles:   make(map[uuid.UUID]*model.DeliveryPartnerProfile),
+		partnerWarehouses: make(map[uuid.UUID][]uuid.UUID),
 	}
 }
 
@@ -126,6 +132,87 @@ func (r *memoryDeliveryRepo) UpsertTempOrder(ctx context.Context, order *model.T
 
 func (r *memoryDeliveryRepo) GetTempOrderByID(ctx context.Context, id string) (*model.TempOrder, error) {
 	return nil, appErrors.NotFound("temporary order not found")
+}
+
+func (r *memoryDeliveryRepo) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.Warehouse, 0, len(r.warehouses))
+	for _, w := range r.warehouses {
+		if w.IsActive {
+			cp := *w
+			res = append(res, &cp)
+		}
+	}
+	return res, nil
+}
+
+func (r *memoryDeliveryRepo) GetWarehouseByID(ctx context.Context, id uuid.UUID) (*model.Warehouse, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	w, ok := r.warehouses[id]
+	if !ok {
+		return nil, appErrors.NotFound("warehouse not found")
+	}
+	cp := *w
+	return &cp, nil
+}
+
+func (r *memoryDeliveryRepo) CreateWarehouse(ctx context.Context, w *model.Warehouse) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if w.ID == uuid.Nil {
+		w.ID = uuid.New()
+	}
+	cp := *w
+	r.warehouses[w.ID] = &cp
+	return nil
+}
+
+func (r *memoryDeliveryRepo) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if profile.ID == uuid.Nil {
+		profile.ID = uuid.New()
+	}
+	cp := *profile
+	r.partnerProfiles[profile.PartnerID] = &cp
+	return nil
+}
+
+func (r *memoryDeliveryRepo) GetPartnerProfile(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	p, ok := r.partnerProfiles[partnerID]
+	if !ok {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	cp := *p
+	return &cp, nil
+}
+
+func (r *memoryDeliveryRepo) AssignPartnerWarehouses(ctx context.Context, partnerID uuid.UUID, warehouseIDs []uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.partnerWarehouses[partnerID] = warehouseIDs
+	return nil
+}
+
+func (r *memoryDeliveryRepo) GetPartnerWarehouses(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	wIDs, ok := r.partnerWarehouses[partnerID]
+	if !ok {
+		return make([]*model.Warehouse, 0), nil
+	}
+	res := make([]*model.Warehouse, 0, len(wIDs))
+	for _, id := range wIDs {
+		if w, exists := r.warehouses[id]; exists {
+			cp := *w
+			res = append(res, &cp)
+		}
+	}
+	return res, nil
 }
 
 func setupTestApp(t *testing.T) (*fiber.App, service.DeliveryService) {

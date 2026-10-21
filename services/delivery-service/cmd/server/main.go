@@ -133,6 +133,7 @@ func main() {
 			GroupID: "delivery-service-group",
 			Topics: []string{
 				events.TopicOrderConfirmed,
+				events.TopicPartnerRegistered,
 			},
 		}
 		kafkaConsumer := kafka.NewConsumer(kafka.Config{
@@ -166,8 +167,8 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	// Tracking HTTP routes
-	deliveryHandler := handler.NewDeliveryHandler(deliveryService)
+	// Tracking and Partner HTTP routes
+	deliveryHandler := handler.NewDeliveryHandler(deliveryService, cfg.JWT.Secret)
 	deliveryHandler.RegisterRoutes(app)
 
 	// 10. Setup gRPC server

@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -28,9 +29,9 @@ func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *Auth
 
 func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Login(ctx, &dto.LoginRequest{
-		Email:      req.GetEmail(),
-		Password:   req.GetPassword(),
-		IsMerchant: req.GetIsMerchant(),
+		Email:    req.GetEmail(),
+		Password: req.GetPassword(),
+		Role:     fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -42,21 +43,23 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 		TokenType:     resp.TokenType,
 		ExpiresIn:     int64(resp.ExpiresIn),
 		UserId:        resp.UserID,
-		Role:          resp.Role,
+		Role:          toPBRole(resp.Role),
 		MerchantId:    resp.MerchantID,
 		BusinessEmail: resp.BusinessEmail,
 		FirstName:     resp.FirstName,
 		LastName:      resp.LastName,
+		PartnerId:     resp.PartnerID,
+		CustomerId:    resp.CustomerID,
 	}, nil
 }
 
 func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Register(ctx, &dto.RegisterRequest{
-		Email:      req.GetEmail(),
-		Password:   req.GetPassword(),
-		FirstName:  req.GetFirstName(),
-		LastName:   req.GetLastName(),
-		IsMerchant: req.GetIsMerchant(),
+		Email:     req.GetEmail(),
+		Password:  req.GetPassword(),
+		FirstName: req.GetFirstName(),
+		LastName:  req.GetLastName(),
+		Role:      fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -68,11 +71,13 @@ func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest)
 		TokenType:     resp.TokenType,
 		ExpiresIn:     int64(resp.ExpiresIn),
 		UserId:        resp.UserID,
-		Role:          resp.Role,
+		Role:          toPBRole(resp.Role),
 		MerchantId:    resp.MerchantID,
 		BusinessEmail: resp.BusinessEmail,
 		FirstName:     resp.FirstName,
 		LastName:      resp.LastName,
+		PartnerId:     resp.PartnerID,
+		CustomerId:    resp.CustomerID,
 	}, nil
 }
 
@@ -88,7 +93,7 @@ func (h *AuthGRPCHandler) ValidateToken(ctx context.Context, req *pb.ValidateTok
 		Valid:  resp.Valid,
 		UserId: resp.UserID,
 		Email:  resp.Email,
-		Role:   resp.Role,
+		Role:   toPBRole(resp.Role),
 	}, nil
 }
 
@@ -107,6 +112,10 @@ func (h *AuthGRPCHandler) RefreshToken(ctx context.Context, req *pb.RefreshToken
 		TokenType:    resp.TokenType,
 		ExpiresIn:    int64(resp.ExpiresIn),
 		UserId:       resp.UserID,
+		Role:         toPBRole(resp.Role),
+		MerchantId:   resp.MerchantID,
+		PartnerId:    resp.PartnerID,
+		CustomerId:   resp.CustomerID,
 	}, nil
 }
 
@@ -157,8 +166,8 @@ func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.R
 func (h *AuthGRPCHandler) ForgotPassword(ctx context.Context, req *pb.ForgotPasswordRequest) (*pb.ForgotPasswordResponse, error) {
 	resp, err := h.authService.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
 		Email:    req.GetEmail(),
-		ClientIP:   req.GetClientIp(),
-		IsMerchant: req.GetIsMerchant(),
+		ClientIP: req.GetClientIp(),
+		Role:     fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -175,7 +184,7 @@ func (h *AuthGRPCHandler) ResetPasswordWithOtp(ctx context.Context, req *pb.Rese
 		Email:       req.GetEmail(),
 		OTP:         req.GetOtp(),
 		NewPassword: req.GetNewPassword(),
-		IsMerchant:  req.GetIsMerchant(),
+		Role:        fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -202,5 +211,35 @@ func (h *AuthGRPCHandler) ChangePassword(ctx context.Context, req *pb.ChangePass
 		Success: resp.Success,
 		Message: resp.Message,
 	}, nil
+}
+
+func toPBRole(roleStr string) pb.Role {
+	switch strings.ToUpper(strings.TrimSpace(roleStr)) {
+	case "USER", "CUSTOMER":
+		return pb.Role_USER
+	case "MERCHANT":
+		return pb.Role_MERCHANT
+	case "DELIVERY_PARTNER", "DELIVERYPARTNER", "DELIVERY":
+		return pb.Role_DELIVERY_PARTNER
+	case "ADMIN":
+		return pb.Role_ADMIN
+	default:
+		return pb.Role_ROLE_UNSPECIFIED
+	}
+}
+
+func fromPBRole(r pb.Role) string {
+	switch r {
+	case pb.Role_USER:
+		return "USER"
+	case pb.Role_MERCHANT:
+		return "MERCHANT"
+	case pb.Role_DELIVERY_PARTNER:
+		return "DELIVERY_PARTNER"
+	case pb.Role_ADMIN:
+		return "ADMIN"
+	default:
+		return ""
+	}
 }
 

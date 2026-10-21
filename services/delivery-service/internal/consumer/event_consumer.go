@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
@@ -41,6 +42,8 @@ func (c *DeliveryEventConsumer) HandleEvent(ctx context.Context, envelope *event
 	switch envelope.EventType {
 	case events.EventTypeOrderConfirmed:
 		return c.handleOrderConfirmed(ctx, envelope)
+	case events.EventTypePartnerRegistered:
+		return c.handlePartnerRegistered(ctx, envelope)
 	default:
 		return nil
 	}
@@ -94,3 +97,30 @@ func (c *DeliveryEventConsumer) handleOrderConfirmed(ctx context.Context, envelo
 	_, err := c.deliveryService.HandleOrderConfirmed(ctx, payload)
 	return err
 }
+
+func (c *DeliveryEventConsumer) handlePartnerRegistered(ctx context.Context, envelope *events.EventEnvelope) error {
+	var partnerEvt events.PartnerRegisteredEvent
+	if err := json.Unmarshal(envelope.Data, &partnerEvt); err != nil {
+		return fmt.Errorf("failed to unmarshal PartnerRegistered payload: %w", err)
+	}
+
+	partnerIDStr := strings.TrimSpace(partnerEvt.PartnerID)
+	if partnerIDStr == "" {
+		partnerIDStr = strings.TrimSpace(envelope.AggregateID)
+	}
+	partnerID, err := uuid.Parse(partnerIDStr)
+	if err != nil {
+		return appErrors.BadRequest("invalid partner_id in PartnerRegistered event: " + partnerIDStr)
+	}
+
+	profile := &model.DeliveryPartnerProfile{
+		PartnerID:     partnerID,
+		CompanyName:   strings.TrimSpace(partnerEvt.CompanyName),
+		Email:         strings.TrimSpace(partnerEvt.Email),
+		ContactNumber: strings.TrimSpace(partnerEvt.ContactNumber),
+		IsActive:      true,
+	}
+
+	return c.deliveryService.CreateOrUpdatePartnerProfile(ctx, profile)
+}
+

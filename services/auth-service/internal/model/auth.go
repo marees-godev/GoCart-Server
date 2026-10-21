@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -9,9 +10,11 @@ import (
 type Role string
 
 const (
-	RoleCustomer Role = "CUSTOMER"
-	RoleMerchant Role = "MERCHANT"
-	RoleAdmin    Role = "ADMIN"
+	RoleUser            Role = "USER"
+	RoleCustomer        Role = "CUSTOMER"
+	RoleMerchant        Role = "MERCHANT"
+	RoleDeliveryPartner Role = "DELIVERY_PARTNER"
+	RoleAdmin           Role = "ADMIN"
 )
 
 func (r Role) String() string {
@@ -19,11 +22,26 @@ func (r Role) String() string {
 }
 
 func (r Role) IsValid() bool {
-	switch r {
-	case RoleCustomer, RoleMerchant, RoleAdmin:
+	switch Role(strings.ToUpper(string(r))) {
+	case RoleUser, RoleMerchant, RoleDeliveryPartner, RoleAdmin:
 		return true
 	default:
 		return false
+	}
+}
+
+func NormalizeRole(r string) Role {
+	switch strings.ToUpper(strings.TrimSpace(r)) {
+	case "MERCHANT":
+		return RoleMerchant
+	case "DELIVERY_PARTNER", "DELIVERYPARTNER", "DELIVERY":
+		return RoleDeliveryPartner
+	case "ADMIN":
+		return RoleAdmin
+	case "USER", "CUSTOMER":
+		return RoleUser
+	default:
+		return RoleUser
 	}
 }
 

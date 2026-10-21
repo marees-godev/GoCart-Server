@@ -27,6 +27,14 @@ type DeliveryService interface {
 	UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error)
 	GetTempOrderByID(ctx context.Context, orderID string) (*model.TempOrder, error)
 	UpsertTempOrder(ctx context.Context, order *model.TempOrder) error
+
+	// Warehouse & Partner Management (Tasks 6, 7, 9)
+	GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error)
+	AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error
+	GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error)
+	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
+	GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
+	UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error)
 }
 
 type deliveryService struct {
@@ -84,18 +92,39 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	}
 
 	now := time.Now().UTC()
-	delivery := &model.Delivery{
-		ID:              uuid.NewString(),
-		OrderID:         orderID,
-		DeliveryPartner: partner,
-		TrackingNumber:  trackingNumber,
-		ShippingAddress: addr,
-		Status:          model.StatusCreated,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+
+	// Transit SLA Calculation based on Partner Warehouse (Origin) vs Shipping Address (Destination)
+	var originCity, originState string
+	if partnerID, parseErr := uuid.Parse(partner); parseErr == nil {
+		warehouses, wErr := s.repo.GetPartnerWarehouses(ctx, partnerID)
+		if wErr == nil && len(warehouses) > 0 {
+			originCity = warehouses[0].City
+			originState = warehouses[0].State
+		}
+	}
+	if originCity == "" && originState == "" {
+		if avail, err := s.repo.GetAvailableWarehouses(ctx); err == nil && len(avail) > 0 {
+			originCity = avail[0].City
+			originState = avail[0].State
+		}
 	}
 
-	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partner), slog.String("tracking_number", trackingNumber))
+	transitResult := CalculateTransitDeliveryDate(originCity, originState, addr.City, addr.State, now)
+	targetDate := transitResult.TargetDate
+
+	delivery := &model.Delivery{
+		ID:                uuid.NewString(),
+		OrderID:           orderID,
+		DeliveryPartner:   partner,
+		TrackingNumber:    trackingNumber,
+		ShippingAddress:   addr,
+		Status:            model.StatusCreated,
+		EstimatedDelivery: &targetDate,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partner), slog.String("tracking_number", trackingNumber), slog.Time("estimated_delivery", targetDate))
 	if err := s.repo.Create(ctx, delivery); err != nil {
 		s.logger.Error("Failed to persist delivery record", slog.String("order_id", orderID), slog.Any("error", err))
 		return nil, err
@@ -221,3 +250,82 @@ func (s *deliveryService) generateTrackingNumber(partner string) (string, error)
 	}
 	return fmt.Sprintf("GC-%s-%s", prefix, strings.ToUpper(hex.EncodeToString(b))), nil
 }
+
+func (s *deliveryService) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+	s.logger.Info("Retrieving available warehouses")
+	return s.repo.GetAvailableWarehouses(ctx)
+}
+
+func (s *deliveryService) AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return appErrors.BadRequest("invalid partner_id format")
+	}
+	var wUUIDs []uuid.UUID
+	for _, idStr := range warehouseIDs {
+		wUUID, err := uuid.Parse(strings.TrimSpace(idStr))
+		if err != nil {
+			return appErrors.BadRequest("invalid warehouse_id: " + idStr)
+		}
+		wUUIDs = append(wUUIDs, wUUID)
+	}
+	s.logger.Info("Assigning warehouses to partner", slog.String("partner_id", partnerID), slog.Int("warehouse_count", len(wUUIDs)))
+	return s.repo.AssignPartnerWarehouses(ctx, pUUID, wUUIDs)
+}
+
+func (s *deliveryService) GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	s.logger.Info("Retrieving assigned warehouses for partner", slog.String("partner_id", partnerID))
+	return s.repo.GetPartnerWarehouses(ctx, pUUID)
+}
+
+func (s *deliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
+	if profile == nil || profile.PartnerID == uuid.Nil {
+		return appErrors.BadRequest("valid partner profile with partner_id is required")
+	}
+	s.logger.Info("Creating or updating delivery partner profile", slog.String("partner_id", profile.PartnerID.String()))
+	return s.repo.CreateOrUpdatePartnerProfile(ctx, profile)
+}
+
+func (s *deliveryService) GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	s.logger.Info("Retrieving partner profile", slog.String("partner_id", partnerID))
+	return s.repo.GetPartnerProfile(ctx, pUUID)
+}
+
+func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	existing, err := s.repo.GetPartnerProfile(ctx, pUUID)
+	if err != nil {
+		existing = &model.DeliveryPartnerProfile{
+			ID:        uuid.New(),
+			PartnerID: pUUID,
+			IsActive:  true,
+			CreatedAt: time.Now().UTC(),
+		}
+	}
+	if companyName != nil && strings.TrimSpace(*companyName) != "" {
+		existing.CompanyName = strings.TrimSpace(*companyName)
+	}
+	if email != nil && strings.TrimSpace(*email) != "" {
+		existing.Email = strings.TrimSpace(*email)
+	}
+	if contactNumber != nil && strings.TrimSpace(*contactNumber) != "" {
+		existing.ContactNumber = strings.TrimSpace(*contactNumber)
+	}
+	existing.UpdatedAt = time.Now().UTC()
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+

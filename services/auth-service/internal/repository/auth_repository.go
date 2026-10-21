@@ -88,7 +88,7 @@ func (r *postgresAuthRepository) GetByEmailAndRole(ctx context.Context, email st
 	query := `
 		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
 		FROM auth_credentials
-		WHERE LOWER(email) = LOWER($1) AND UPPER(role) = UPPER($2)
+		WHERE LOWER(email) = LOWER($1) AND (UPPER(role::text) = UPPER($2) OR (UPPER($2) IN ('USER', 'CUSTOMER') AND UPPER(role::text) IN ('USER', 'CUSTOMER')))
 		LIMIT 1
 	`
 	var cred model.AuthCredential

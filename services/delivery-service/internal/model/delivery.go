@@ -125,9 +125,11 @@ type Delivery struct {
 	DeliveryPartner string          `json:"delivery_partner"`
 	TrackingNumber  string          `json:"tracking_number"`
 	ShippingAddress ShippingAddress `json:"shipping_address"`
-	Status          DeliveryStatus  `json:"status"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	Status            DeliveryStatus  `json:"status"`
+	EstimatedDelivery *time.Time      `json:"estimated_delivery,omitempty"`
+	ActualDelivery    *time.Time      `json:"actual_delivery,omitempty"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
 }
 
 func (d *Delivery) TransitionStatus(target DeliveryStatus) error {

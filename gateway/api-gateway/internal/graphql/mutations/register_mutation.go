@@ -20,6 +20,7 @@ func (m *MutationResolver) Register(ctx context.Context, email, password, firstN
 		Password:  password,
 		FirstName: firstName,
 		LastName:  lastName,
+		Role:      auth.Role_USER,
 	})
 	if err != nil {
 		return nil, err

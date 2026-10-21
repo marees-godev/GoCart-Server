@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
@@ -157,6 +158,92 @@ func (s *DeliveryGRPCServer) UpdateDeliveryStatus(ctx context.Context, req *deli
 	}, nil
 }
 
+func (s *DeliveryGRPCServer) CreatePartnerProfile(ctx context.Context, req *deliverypb.CreatePartnerProfileRequest) (*deliverypb.PartnerProfileResponse, error) {
+	if req == nil || strings.TrimSpace(req.PartnerId) == "" {
+		s.logger.Warn("CreatePartnerProfile: partner_id is required")
+		return nil, appErrors.BadRequest("partner_id is required").ToGRPC()
+	}
+
+	pUUID, err := uuid.Parse(strings.TrimSpace(req.PartnerId))
+	if err != nil {
+		s.logger.Warn("CreatePartnerProfile: invalid partner_id", slog.String("partner_id", req.PartnerId))
+		return nil, appErrors.BadRequest("invalid partner_id format").ToGRPC()
+	}
+
+	profile := &model.DeliveryPartnerProfile{
+		ID:            uuid.New(),
+		PartnerID:     pUUID,
+		CompanyName:   strings.TrimSpace(req.CompanyName),
+		Email:         strings.TrimSpace(req.Email),
+		ContactNumber: strings.TrimSpace(req.ContactNumber),
+		IsActive:      true,
+		CreatedAt:     time.Now().UTC(),
+		UpdatedAt:     time.Now().UTC(),
+	}
+
+	if err := s.deliveryService.CreateOrUpdatePartnerProfile(ctx, profile); err != nil {
+		s.logger.Error("CreatePartnerProfile failed", slog.String("partner_id", req.PartnerId), slog.Any("error", err))
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	saved, err := s.deliveryService.GetPartnerProfile(ctx, req.PartnerId)
+	if err == nil && saved != nil {
+		profile = saved
+	}
+
+	return &deliverypb.PartnerProfileResponse{
+		Profile: toProtoPartnerProfile(profile),
+	}, nil
+}
+
+func (s *DeliveryGRPCServer) GetPartnerProfile(ctx context.Context, req *deliverypb.GetPartnerProfileRequest) (*deliverypb.PartnerProfileResponse, error) {
+	if req == nil || strings.TrimSpace(req.PartnerId) == "" {
+		s.logger.Warn("GetPartnerProfile: partner_id is required")
+		return nil, appErrors.BadRequest("partner_id is required").ToGRPC()
+	}
+
+	profile, err := s.deliveryService.GetPartnerProfile(ctx, strings.TrimSpace(req.PartnerId))
+	if err != nil {
+		s.logger.Warn("GetPartnerProfile failed", slog.String("partner_id", req.PartnerId), slog.Any("error", err))
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &deliverypb.PartnerProfileResponse{
+		Profile: toProtoPartnerProfile(profile),
+	}, nil
+}
+
+func (s *DeliveryGRPCServer) UpdatePartnerProfile(ctx context.Context, req *deliverypb.UpdatePartnerProfileRequest) (*deliverypb.PartnerProfileResponse, error) {
+	if req == nil || strings.TrimSpace(req.PartnerId) == "" {
+		s.logger.Warn("UpdatePartnerProfile: partner_id is required")
+		return nil, appErrors.BadRequest("partner_id is required").ToGRPC()
+	}
+
+	var compName, email, contactNum *string
+	if strings.TrimSpace(req.CompanyName) != "" {
+		c := strings.TrimSpace(req.CompanyName)
+		compName = &c
+	}
+	if strings.TrimSpace(req.Email) != "" {
+		e := strings.TrimSpace(req.Email)
+		email = &e
+	}
+	if strings.TrimSpace(req.ContactNumber) != "" {
+		num := strings.TrimSpace(req.ContactNumber)
+		contactNum = &num
+	}
+
+	profile, err := s.deliveryService.UpdatePartnerProfile(ctx, strings.TrimSpace(req.PartnerId), compName, email, contactNum)
+	if err != nil {
+		s.logger.Error("UpdatePartnerProfile failed", slog.String("partner_id", req.PartnerId), slog.Any("error", err))
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &deliverypb.PartnerProfileResponse{
+		Profile: toProtoPartnerProfile(profile),
+	}, nil
+}
+
 func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 	if d == nil {
 		return nil
@@ -180,3 +267,20 @@ func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 		UpdatedAt:       d.UpdatedAt.Format(time.RFC3339),
 	}
 }
+
+func toProtoPartnerProfile(p *model.DeliveryPartnerProfile) *deliverypb.DeliveryPartnerProfile {
+	if p == nil {
+		return nil
+	}
+	return &deliverypb.DeliveryPartnerProfile{
+		Id:            p.ID.String(),
+		PartnerId:     p.PartnerID.String(),
+		CompanyName:   p.CompanyName,
+		Email:         p.Email,
+		ContactNumber: p.ContactNumber,
+		IsActive:      p.IsActive,
+		CreatedAt:     p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:     p.UpdatedAt.Format(time.RFC3339),
+	}
+}
+

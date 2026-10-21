@@ -38,6 +38,7 @@ type SecurityConfig struct {
 
 type ServicesConfig struct {
 	MerchantServiceURL string
+	DeliveryServiceURL string
 }
 
 type AppConfig struct {
@@ -171,6 +172,7 @@ func LoadEnv() *Config {
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{
 			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),
+			DeliveryServiceURL: GetEnv("DELIVERY_SERVICE_GRPC_URL", "localhost:50061"),
 		},
 	}
 }

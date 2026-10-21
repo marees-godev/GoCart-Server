@@ -21,11 +21,66 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Role int32
+
+const (
+	Role_ROLE_UNSPECIFIED Role = 0
+	Role_USER             Role = 1
+	Role_MERCHANT         Role = 2
+	Role_DELIVERY_PARTNER Role = 3
+	Role_ADMIN            Role = 4
+)
+
+// Enum value maps for Role.
+var (
+	Role_name = map[int32]string{
+		0: "ROLE_UNSPECIFIED",
+		1: "USER",
+		2: "MERCHANT",
+		3: "DELIVERY_PARTNER",
+		4: "ADMIN",
+	}
+	Role_value = map[string]int32{
+		"ROLE_UNSPECIFIED": 0,
+		"USER":             1,
+		"MERCHANT":         2,
+		"DELIVERY_PARTNER": 3,
+		"ADMIN":            4,
+	}
+)
+
+func (x Role) Enum() *Role {
+	p := new(Role)
+	*p = x
+	return p
+}
+
+func (x Role) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Role) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_protobuf_auth_auth_proto_enumTypes[0].Descriptor()
+}
+
+func (Role) Type() protoreflect.EnumType {
+	return &file_contracts_protobuf_auth_auth_proto_enumTypes[0]
+}
+
+func (x Role) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Role.Descriptor instead.
+func (Role) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{0}
+}
+
 type LoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	IsMerchant    bool                   `protobuf:"varint,3,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
+	Role          Role                   `protobuf:"varint,3,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -74,11 +129,11 @@ func (x *LoginRequest) GetPassword() string {
 	return ""
 }
 
-func (x *LoginRequest) GetIsMerchant() bool {
+func (x *LoginRequest) GetRole() Role {
 	if x != nil {
-		return x.IsMerchant
+		return x.Role
 	}
-	return false
+	return Role_ROLE_UNSPECIFIED
 }
 
 type RegisterRequest struct {
@@ -87,7 +142,7 @@ type RegisterRequest struct {
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	FirstName     string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName      string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
-	IsMerchant    bool                   `protobuf:"varint,5,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
+	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -150,11 +205,11 @@ func (x *RegisterRequest) GetLastName() string {
 	return ""
 }
 
-func (x *RegisterRequest) GetIsMerchant() bool {
+func (x *RegisterRequest) GetRole() Role {
 	if x != nil {
-		return x.IsMerchant
+		return x.Role
 	}
-	return false
+	return Role_ROLE_UNSPECIFIED
 }
 
 type ValidateTokenRequest struct {
@@ -206,7 +261,7 @@ type ValidateTokenResponse struct {
 	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -262,11 +317,11 @@ func (x *ValidateTokenResponse) GetEmail() string {
 	return ""
 }
 
-func (x *ValidateTokenResponse) GetRole() string {
+func (x *ValidateTokenResponse) GetRole() Role {
 	if x != nil {
 		return x.Role
 	}
-	return ""
+	return Role_ROLE_UNSPECIFIED
 }
 
 type RefreshTokenRequest struct {
@@ -424,11 +479,13 @@ type AuthResponse struct {
 	TokenType     string                 `protobuf:"bytes,3,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
 	ExpiresIn     int64                  `protobuf:"varint,4,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	UserId        string                 `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Role          string                 `protobuf:"bytes,6,opt,name=role,proto3" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,6,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	MerchantId    string                 `protobuf:"bytes,7,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	BusinessEmail string                 `protobuf:"bytes,8,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
 	FirstName     string                 `protobuf:"bytes,9,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName      string                 `protobuf:"bytes,10,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	PartnerId     string                 `protobuf:"bytes,11,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
+	CustomerId    string                 `protobuf:"bytes,12,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -498,11 +555,11 @@ func (x *AuthResponse) GetUserId() string {
 	return ""
 }
 
-func (x *AuthResponse) GetRole() string {
+func (x *AuthResponse) GetRole() Role {
 	if x != nil {
 		return x.Role
 	}
-	return ""
+	return Role_ROLE_UNSPECIFIED
 }
 
 func (x *AuthResponse) GetMerchantId() string {
@@ -529,6 +586,20 @@ func (x *AuthResponse) GetFirstName() string {
 func (x *AuthResponse) GetLastName() string {
 	if x != nil {
 		return x.LastName
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetPartnerId() string {
+	if x != nil {
+		return x.PartnerId
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
 	}
 	return ""
 }
@@ -745,7 +816,7 @@ type ForgotPasswordRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	ClientIp      string                 `protobuf:"bytes,2,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`
-	IsMerchant    bool                   `protobuf:"varint,3,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
+	Role          Role                   `protobuf:"varint,3,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -794,11 +865,11 @@ func (x *ForgotPasswordRequest) GetClientIp() string {
 	return ""
 }
 
-func (x *ForgotPasswordRequest) GetIsMerchant() bool {
+func (x *ForgotPasswordRequest) GetRole() Role {
 	if x != nil {
-		return x.IsMerchant
+		return x.Role
 	}
-	return false
+	return Role_ROLE_UNSPECIFIED
 }
 
 type ForgotPasswordResponse struct {
@@ -858,7 +929,7 @@ type ResetPasswordWithOtpRequest struct {
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Otp           string                 `protobuf:"bytes,2,opt,name=otp,proto3" json:"otp,omitempty"`
 	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
-	IsMerchant    bool                   `protobuf:"varint,4,opt,name=is_merchant,json=isMerchant,proto3" json:"is_merchant,omitempty"`
+	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -914,11 +985,11 @@ func (x *ResetPasswordWithOtpRequest) GetNewPassword() string {
 	return ""
 }
 
-func (x *ResetPasswordWithOtpRequest) GetIsMerchant() bool {
+func (x *ResetPasswordWithOtpRequest) GetRole() Role {
 	if x != nil {
-		return x.IsMerchant
+		return x.Role
 	}
-	return false
+	return Role_ROLE_UNSPECIFIED
 }
 
 type ResetPasswordResponse struct {
@@ -1089,27 +1160,25 @@ var File_contracts_protobuf_auth_auth_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"a\n" +
+	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"j\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1f\n" +
-	"\vis_merchant\x18\x03 \x01(\bR\n" +
-	"isMerchant\"\xa0\x01\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12(\n" +
+	"\x04role\x18\x03 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"\xa9\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
-	"\tlast_name\x18\x04 \x01(\tR\blastName\x12\x1f\n" +
-	"\vis_merchant\x18\x05 \x01(\bR\n" +
-	"isMerchant\",\n" +
+	"\tlast_name\x18\x04 \x01(\tR\blastName\x12(\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\",\n" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"p\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x86\x01\n" +
 	"\x15ValidateTokenResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x12\n" +
-	"\x04role\x18\x04 \x01(\tR\x04role\"]\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12(\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"]\n" +
 	"\x13RefreshTokenRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\x12!\n" +
 	"\faccess_token\x18\x02 \x01(\tR\vaccessToken\"2\n" +
@@ -1117,7 +1186,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"D\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xc5\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x9b\x03\n" +
 	"\fAuthResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -1125,15 +1194,19 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"token_type\x18\x03 \x01(\tR\ttokenType\x12\x1d\n" +
 	"\n" +
 	"expires_in\x18\x04 \x01(\x03R\texpiresIn\x12\x17\n" +
-	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x12\n" +
-	"\x04role\x18\x06 \x01(\tR\x04role\x12\x1f\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12(\n" +
+	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\x12\x1f\n" +
 	"\vmerchant_id\x18\a \x01(\tR\n" +
 	"merchantId\x12%\n" +
 	"\x0ebusiness_email\x18\b \x01(\tR\rbusinessEmail\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\t \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\n" +
-	" \x01(\tR\blastName\"R\n" +
+	" \x01(\tR\blastName\x12\x1d\n" +
+	"\n" +
+	"partner_id\x18\v \x01(\tR\tpartnerId\x12\x1f\n" +
+	"\vcustomer_id\x18\f \x01(\tR\n" +
+	"customerId\"R\n" +
 	"\x12VerifyEmailRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12\x14\n" +
@@ -1145,21 +1218,19 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"U\n" +
 	"\x1fResendVerificationEmailResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"k\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"t\n" +
 	"\x15ForgotPasswordRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1b\n" +
-	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12\x1f\n" +
-	"\vis_merchant\x18\x03 \x01(\bR\n" +
-	"isMerchant\"L\n" +
+	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12(\n" +
+	"\x04role\x18\x03 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"L\n" +
 	"\x16ForgotPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x89\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x92\x01\n" +
 	"\x1bResetPasswordWithOtpRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12!\n" +
-	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12\x1f\n" +
-	"\vis_merchant\x18\x04 \x01(\bR\n" +
-	"isMerchant\"K\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12(\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"K\n" +
 	"\x15ResetPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"v\n" +
@@ -1169,7 +1240,13 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\"L\n" +
 	"\x16ChangePasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\x99\a\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*U\n" +
+	"\x04Role\x12\x14\n" +
+	"\x10ROLE_UNSPECIFIED\x10\x00\x12\b\n" +
+	"\x04USER\x10\x01\x12\f\n" +
+	"\bMERCHANT\x10\x02\x12\x14\n" +
+	"\x10DELIVERY_PARTNER\x10\x03\x12\t\n" +
+	"\x05ADMIN\x10\x042\x99\a\n" +
 	"\vAuthService\x12C\n" +
 	"\x05Login\x12\x1c.gocart.auth.v1.LoginRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12I\n" +
 	"\bRegister\x12\x1f.gocart.auth.v1.RegisterRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12\\\n" +
@@ -1194,53 +1271,61 @@ func file_contracts_protobuf_auth_auth_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_auth_auth_proto_rawDescData
 }
 
+var file_contracts_protobuf_auth_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_contracts_protobuf_auth_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_contracts_protobuf_auth_auth_proto_goTypes = []any{
-	(*LoginRequest)(nil),                    // 0: gocart.auth.v1.LoginRequest
-	(*RegisterRequest)(nil),                 // 1: gocart.auth.v1.RegisterRequest
-	(*ValidateTokenRequest)(nil),            // 2: gocart.auth.v1.ValidateTokenRequest
-	(*ValidateTokenResponse)(nil),           // 3: gocart.auth.v1.ValidateTokenResponse
-	(*RefreshTokenRequest)(nil),             // 4: gocart.auth.v1.RefreshTokenRequest
-	(*LogoutRequest)(nil),                   // 5: gocart.auth.v1.LogoutRequest
-	(*LogoutResponse)(nil),                  // 6: gocart.auth.v1.LogoutResponse
-	(*AuthResponse)(nil),                    // 7: gocart.auth.v1.AuthResponse
-	(*VerifyEmailRequest)(nil),              // 8: gocart.auth.v1.VerifyEmailRequest
-	(*VerifyEmailResponse)(nil),             // 9: gocart.auth.v1.VerifyEmailResponse
-	(*ResendVerificationEmailRequest)(nil),  // 10: gocart.auth.v1.ResendVerificationEmailRequest
-	(*ResendVerificationEmailResponse)(nil), // 11: gocart.auth.v1.ResendVerificationEmailResponse
-	(*ForgotPasswordRequest)(nil),           // 12: gocart.auth.v1.ForgotPasswordRequest
-	(*ForgotPasswordResponse)(nil),          // 13: gocart.auth.v1.ForgotPasswordResponse
-	(*ResetPasswordWithOtpRequest)(nil),     // 14: gocart.auth.v1.ResetPasswordWithOtpRequest
-	(*ResetPasswordResponse)(nil),           // 15: gocart.auth.v1.ResetPasswordResponse
-	(*ChangePasswordRequest)(nil),           // 16: gocart.auth.v1.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil),          // 17: gocart.auth.v1.ChangePasswordResponse
+	(Role)(0),                               // 0: gocart.auth.v1.Role
+	(*LoginRequest)(nil),                    // 1: gocart.auth.v1.LoginRequest
+	(*RegisterRequest)(nil),                 // 2: gocart.auth.v1.RegisterRequest
+	(*ValidateTokenRequest)(nil),            // 3: gocart.auth.v1.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil),           // 4: gocart.auth.v1.ValidateTokenResponse
+	(*RefreshTokenRequest)(nil),             // 5: gocart.auth.v1.RefreshTokenRequest
+	(*LogoutRequest)(nil),                   // 6: gocart.auth.v1.LogoutRequest
+	(*LogoutResponse)(nil),                  // 7: gocart.auth.v1.LogoutResponse
+	(*AuthResponse)(nil),                    // 8: gocart.auth.v1.AuthResponse
+	(*VerifyEmailRequest)(nil),              // 9: gocart.auth.v1.VerifyEmailRequest
+	(*VerifyEmailResponse)(nil),             // 10: gocart.auth.v1.VerifyEmailResponse
+	(*ResendVerificationEmailRequest)(nil),  // 11: gocart.auth.v1.ResendVerificationEmailRequest
+	(*ResendVerificationEmailResponse)(nil), // 12: gocart.auth.v1.ResendVerificationEmailResponse
+	(*ForgotPasswordRequest)(nil),           // 13: gocart.auth.v1.ForgotPasswordRequest
+	(*ForgotPasswordResponse)(nil),          // 14: gocart.auth.v1.ForgotPasswordResponse
+	(*ResetPasswordWithOtpRequest)(nil),     // 15: gocart.auth.v1.ResetPasswordWithOtpRequest
+	(*ResetPasswordResponse)(nil),           // 16: gocart.auth.v1.ResetPasswordResponse
+	(*ChangePasswordRequest)(nil),           // 17: gocart.auth.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),          // 18: gocart.auth.v1.ChangePasswordResponse
 }
 var file_contracts_protobuf_auth_auth_proto_depIdxs = []int32{
-	0,  // 0: gocart.auth.v1.AuthService.Login:input_type -> gocart.auth.v1.LoginRequest
-	1,  // 1: gocart.auth.v1.AuthService.Register:input_type -> gocart.auth.v1.RegisterRequest
-	2,  // 2: gocart.auth.v1.AuthService.ValidateToken:input_type -> gocart.auth.v1.ValidateTokenRequest
-	4,  // 3: gocart.auth.v1.AuthService.RefreshToken:input_type -> gocart.auth.v1.RefreshTokenRequest
-	5,  // 4: gocart.auth.v1.AuthService.Logout:input_type -> gocart.auth.v1.LogoutRequest
-	8,  // 5: gocart.auth.v1.AuthService.VerifyEmail:input_type -> gocart.auth.v1.VerifyEmailRequest
-	10, // 6: gocart.auth.v1.AuthService.ResendVerificationEmail:input_type -> gocart.auth.v1.ResendVerificationEmailRequest
-	12, // 7: gocart.auth.v1.AuthService.ForgotPassword:input_type -> gocart.auth.v1.ForgotPasswordRequest
-	14, // 8: gocart.auth.v1.AuthService.ResetPasswordWithOtp:input_type -> gocart.auth.v1.ResetPasswordWithOtpRequest
-	16, // 9: gocart.auth.v1.AuthService.ChangePassword:input_type -> gocart.auth.v1.ChangePasswordRequest
-	7,  // 10: gocart.auth.v1.AuthService.Login:output_type -> gocart.auth.v1.AuthResponse
-	7,  // 11: gocart.auth.v1.AuthService.Register:output_type -> gocart.auth.v1.AuthResponse
-	3,  // 12: gocart.auth.v1.AuthService.ValidateToken:output_type -> gocart.auth.v1.ValidateTokenResponse
-	7,  // 13: gocart.auth.v1.AuthService.RefreshToken:output_type -> gocart.auth.v1.AuthResponse
-	6,  // 14: gocart.auth.v1.AuthService.Logout:output_type -> gocart.auth.v1.LogoutResponse
-	9,  // 15: gocart.auth.v1.AuthService.VerifyEmail:output_type -> gocart.auth.v1.VerifyEmailResponse
-	11, // 16: gocart.auth.v1.AuthService.ResendVerificationEmail:output_type -> gocart.auth.v1.ResendVerificationEmailResponse
-	13, // 17: gocart.auth.v1.AuthService.ForgotPassword:output_type -> gocart.auth.v1.ForgotPasswordResponse
-	15, // 18: gocart.auth.v1.AuthService.ResetPasswordWithOtp:output_type -> gocart.auth.v1.ResetPasswordResponse
-	17, // 19: gocart.auth.v1.AuthService.ChangePassword:output_type -> gocart.auth.v1.ChangePasswordResponse
-	10, // [10:20] is the sub-list for method output_type
-	0,  // [0:10] is the sub-list for method input_type
-	0,  // [0:0] is the sub-list for extension type_name
-	0,  // [0:0] is the sub-list for extension extendee
-	0,  // [0:0] is the sub-list for field type_name
+	0,  // 0: gocart.auth.v1.LoginRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 1: gocart.auth.v1.RegisterRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 2: gocart.auth.v1.ValidateTokenResponse.role:type_name -> gocart.auth.v1.Role
+	0,  // 3: gocart.auth.v1.AuthResponse.role:type_name -> gocart.auth.v1.Role
+	0,  // 4: gocart.auth.v1.ForgotPasswordRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 5: gocart.auth.v1.ResetPasswordWithOtpRequest.role:type_name -> gocart.auth.v1.Role
+	1,  // 6: gocart.auth.v1.AuthService.Login:input_type -> gocart.auth.v1.LoginRequest
+	2,  // 7: gocart.auth.v1.AuthService.Register:input_type -> gocart.auth.v1.RegisterRequest
+	3,  // 8: gocart.auth.v1.AuthService.ValidateToken:input_type -> gocart.auth.v1.ValidateTokenRequest
+	5,  // 9: gocart.auth.v1.AuthService.RefreshToken:input_type -> gocart.auth.v1.RefreshTokenRequest
+	6,  // 10: gocart.auth.v1.AuthService.Logout:input_type -> gocart.auth.v1.LogoutRequest
+	9,  // 11: gocart.auth.v1.AuthService.VerifyEmail:input_type -> gocart.auth.v1.VerifyEmailRequest
+	11, // 12: gocart.auth.v1.AuthService.ResendVerificationEmail:input_type -> gocart.auth.v1.ResendVerificationEmailRequest
+	13, // 13: gocart.auth.v1.AuthService.ForgotPassword:input_type -> gocart.auth.v1.ForgotPasswordRequest
+	15, // 14: gocart.auth.v1.AuthService.ResetPasswordWithOtp:input_type -> gocart.auth.v1.ResetPasswordWithOtpRequest
+	17, // 15: gocart.auth.v1.AuthService.ChangePassword:input_type -> gocart.auth.v1.ChangePasswordRequest
+	8,  // 16: gocart.auth.v1.AuthService.Login:output_type -> gocart.auth.v1.AuthResponse
+	8,  // 17: gocart.auth.v1.AuthService.Register:output_type -> gocart.auth.v1.AuthResponse
+	4,  // 18: gocart.auth.v1.AuthService.ValidateToken:output_type -> gocart.auth.v1.ValidateTokenResponse
+	8,  // 19: gocart.auth.v1.AuthService.RefreshToken:output_type -> gocart.auth.v1.AuthResponse
+	7,  // 20: gocart.auth.v1.AuthService.Logout:output_type -> gocart.auth.v1.LogoutResponse
+	10, // 21: gocart.auth.v1.AuthService.VerifyEmail:output_type -> gocart.auth.v1.VerifyEmailResponse
+	12, // 22: gocart.auth.v1.AuthService.ResendVerificationEmail:output_type -> gocart.auth.v1.ResendVerificationEmailResponse
+	14, // 23: gocart.auth.v1.AuthService.ForgotPassword:output_type -> gocart.auth.v1.ForgotPasswordResponse
+	16, // 24: gocart.auth.v1.AuthService.ResetPasswordWithOtp:output_type -> gocart.auth.v1.ResetPasswordResponse
+	18, // 25: gocart.auth.v1.AuthService.ChangePassword:output_type -> gocart.auth.v1.ChangePasswordResponse
+	16, // [16:26] is the sub-list for method output_type
+	6,  // [6:16] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_auth_auth_proto_init() }
@@ -1253,13 +1338,14 @@ func file_contracts_protobuf_auth_auth_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_auth_auth_proto_rawDesc), len(file_contracts_protobuf_auth_auth_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_contracts_protobuf_auth_auth_proto_goTypes,
 		DependencyIndexes: file_contracts_protobuf_auth_auth_proto_depIdxs,
+		EnumInfos:         file_contracts_protobuf_auth_auth_proto_enumTypes,
 		MessageInfos:      file_contracts_protobuf_auth_auth_proto_msgTypes,
 	}.Build()
 	File_contracts_protobuf_auth_auth_proto = out.File

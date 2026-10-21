@@ -30,6 +30,7 @@ const (
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
+ 	EventTypePartnerRegistered          = "PartnerRegistered"
 
 	// Store Service Events
 	EventTypeStoreCreated     = "StoreCreated"
@@ -59,6 +60,7 @@ const (
 // Standard Topic Constants
 const (
 	TopicUserRegistered     = "gocart.auth.user-registered"
+	TopicPartnerRegistered  = "gocart.auth.partner-registered"
 	TopicOrderCreated       = "gocart.order.order-created"
 	TopicOrderCancelled     = "gocart.order.order-cancelled"
 	TopicOrderConfirmed     = "gocart.order.order-confirmed"

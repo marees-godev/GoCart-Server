@@ -114,10 +114,6 @@ func main() {
 	gqlHandler := gwGraphQL.NewHandler(gqlSchema, cfg)
 	gqlHandler.RegisterRoutes(app)
 
-	// Additional endpoint aliases for backward compatibility
-	legacyServer := gwGraphQL.NewServer(gqlResolver)
-	app.All("/graphql", adaptor.HTTPHandler(legacyServer))
-
 	if cfg.GraphQL.PlaygroundEnabled {
 		playgroundHandler := gwGraphQL.PlaygroundHandler("GoCart API Gateway GraphQL", "/graphql")
 		app.Get("/playground", adaptor.HTTPHandler(playgroundHandler))

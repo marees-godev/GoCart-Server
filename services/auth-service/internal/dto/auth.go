@@ -4,6 +4,7 @@ type LoginRequest struct {
 	Email      string `json:"email"`
 	Password   string `json:"password"`
 	IsMerchant bool   `json:"is_merchant,omitempty"`
+	Role       string `json:"role,omitempty"`
 }
 
 type LoginResponse struct {
@@ -14,18 +15,23 @@ type LoginResponse struct {
 	UserID        string `json:"user_id,omitempty"`
 	Role          string `json:"role,omitempty"`
 	MerchantID    string `json:"merchant_id,omitempty"`
+	PartnerID     string `json:"partner_id,omitempty"`
+	CustomerID    string `json:"customer_id,omitempty"`
 	BusinessEmail string `json:"business_email,omitempty"`
 	FirstName     string `json:"first_name,omitempty"`
 	LastName      string `json:"last_name,omitempty"`
 }
 
 type RegisterRequest struct {
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	FirstName    string `json:"first_name,omitempty"`
-	LastName     string `json:"last_name,omitempty"`
-	IsMerchant   bool   `json:"is_merchant,omitempty"`
-	BusinessName string `json:"business_name,omitempty"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	FirstName     string `json:"first_name,omitempty"`
+	LastName      string `json:"last_name,omitempty"`
+	IsMerchant    bool   `json:"is_merchant,omitempty"`
+	BusinessName  string `json:"business_name,omitempty"`
+	Role          string `json:"role,omitempty"`
+	Name          string `json:"name,omitempty"`
+	ContactNumber string `json:"contact_number,omitempty"`
 }
 
 type ValidateTokenRequest struct {
@@ -77,6 +83,7 @@ type ForgotPasswordRequest struct {
 	Email      string `json:"email"`
 	ClientIP   string `json:"client_ip,omitempty"`
 	IsMerchant bool   `json:"is_merchant,omitempty"`
+	Role       string `json:"role,omitempty"`
 }
 
 type ForgotPasswordResponse struct {
@@ -89,6 +96,7 @@ type ResetPasswordWithOtpRequest struct {
 	OTP         string `json:"otp"`
 	NewPassword string `json:"new_password"`
 	IsMerchant  bool   `json:"is_merchant,omitempty"`
+	Role        string `json:"role,omitempty"`
 }
 
 type ResetPasswordResponse struct {

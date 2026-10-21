@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
@@ -19,16 +20,18 @@ import (
 )
 
 type mockDeliveryService struct {
-	deliveries map[string]*model.Delivery
-	byOrder    map[string]string
-	byTracking map[string]string
+	deliveries      map[string]*model.Delivery
+	byOrder         map[string]string
+	byTracking      map[string]string
+	partnerProfiles map[string]*model.DeliveryPartnerProfile
 }
 
 func newMockDeliveryService() *mockDeliveryService {
 	return &mockDeliveryService{
-		deliveries: make(map[string]*model.Delivery),
-		byOrder:    make(map[string]string),
-		byTracking: make(map[string]string),
+		deliveries:      make(map[string]*model.Delivery),
+		byOrder:         make(map[string]string),
+		byTracking:      make(map[string]string),
+		partnerProfiles: make(map[string]*model.DeliveryPartnerProfile),
 	}
 }
 
@@ -111,6 +114,69 @@ func (m *mockDeliveryService) GetTempOrderByID(ctx context.Context, orderID stri
 func (m *mockDeliveryService) UpsertTempOrder(ctx context.Context, order *model.TempOrder) error {
 	return nil
 }
+
+func (m *mockDeliveryService) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+	return nil, nil
+}
+
+func (m *mockDeliveryService) AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error {
+	return nil
+}
+
+func (m *mockDeliveryService) GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error) {
+	return nil, nil
+}
+
+func (m *mockDeliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
+	if m.partnerProfiles == nil {
+		m.partnerProfiles = make(map[string]*model.DeliveryPartnerProfile)
+	}
+	m.partnerProfiles[profile.PartnerID.String()] = profile
+	return nil
+}
+
+func (m *mockDeliveryService) GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	if m.partnerProfiles == nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	return p, nil
+}
+
+func (m *mockDeliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
+	if m.partnerProfiles == nil {
+		m.partnerProfiles = make(map[string]*model.DeliveryPartnerProfile)
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok {
+		pUUID, err := uuid.Parse(partnerID)
+		if err != nil {
+			return nil, appErrors.BadRequest("invalid partner_id format")
+		}
+		p = &model.DeliveryPartnerProfile{
+			ID:        uuid.New(),
+			PartnerID: pUUID,
+			IsActive:  true,
+			CreatedAt: time.Now().UTC(),
+		}
+	}
+	if companyName != nil {
+		p.CompanyName = *companyName
+	}
+	if email != nil {
+		p.Email = *email
+	}
+	if contactNumber != nil {
+		p.ContactNumber = *contactNumber
+	}
+	p.UpdatedAt = time.Now().UTC()
+	m.partnerProfiles[partnerID] = p
+	return p, nil
+}
+
 
 func setupTestGRPCServer(t *testing.T, svc *mockDeliveryService) (deliverypb.DeliveryServiceClient, func()) {
 	lis := bufconn.Listen(1024 * 1024)
@@ -250,3 +316,57 @@ func TestGRPC_UpdateDeliveryStatus(t *testing.T) {
 		t.Errorf("expected InvalidArgument code on invalid transition, got %v", status.Code(err))
 	}
 }
+
+func TestGRPC_PartnerProfile(t *testing.T) {
+	svc := newMockDeliveryService()
+	client, cleanup := setupTestGRPCServer(t, svc)
+	defer cleanup()
+
+	ctx := context.Background()
+	partnerID := uuid.New().String()
+
+	// 1. CreatePartnerProfile
+	createResp, err := client.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+		PartnerId:     partnerID,
+		CompanyName:   "Flash Courier",
+		Email:         "flash@example.com",
+		ContactNumber: "+1-555-0199",
+	})
+	if err != nil {
+		t.Fatalf("CreatePartnerProfile failed: %v", err)
+	}
+	if createResp.Profile.PartnerId != partnerID {
+		t.Errorf("expected partner_id %s, got %s", partnerID, createResp.Profile.PartnerId)
+	}
+	if createResp.Profile.CompanyName != "Flash Courier" {
+		t.Errorf("expected company_name 'Flash Courier', got %s", createResp.Profile.CompanyName)
+	}
+
+	// 2. GetPartnerProfile
+	getResp, err := client.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+		PartnerId: partnerID,
+	})
+	if err != nil {
+		t.Fatalf("GetPartnerProfile failed: %v", err)
+	}
+	if getResp.Profile.Email != "flash@example.com" {
+		t.Errorf("expected email 'flash@example.com', got %s", getResp.Profile.Email)
+	}
+
+	// 3. UpdatePartnerProfile
+	updateResp, err := client.UpdatePartnerProfile(ctx, &deliverypb.UpdatePartnerProfileRequest{
+		PartnerId:     partnerID,
+		CompanyName:   "Flash Logistics Worldwide",
+		ContactNumber: "+1-555-9999",
+	})
+	if err != nil {
+		t.Fatalf("UpdatePartnerProfile failed: %v", err)
+	}
+	if updateResp.Profile.CompanyName != "Flash Logistics Worldwide" {
+		t.Errorf("expected updated company_name, got %s", updateResp.Profile.CompanyName)
+	}
+	if updateResp.Profile.ContactNumber != "+1-555-9999" {
+		t.Errorf("expected updated contact_number, got %s", updateResp.Profile.ContactNumber)
+	}
+}
+

@@ -15,15 +15,15 @@ func (m *MutationResolver) Login(ctx context.Context, email, password string, is
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	var isMerch bool
-	if len(isMerchant) > 0 {
-		isMerch = isMerchant[0]
+	pbRole := auth.Role_USER
+	if len(isMerchant) > 0 && isMerchant[0] {
+		pbRole = auth.Role_MERCHANT
 	}
 
 	res, err := m.Clients.AuthClient.Login(ctx, &auth.LoginRequest{
-		Email:      email,
-		Password:   password,
-		IsMerchant: isMerch,
+		Email:    email,
+		Password: password,
+		Role:     pbRole,
 	})
 	if err != nil {
 		return nil, err
