@@ -19,8 +19,9 @@ type mockOrderService struct {
 	createOrderFunc       func(ctx context.Context, input dto.CreateOrderInput) (*dto.CreateOrderResult, error)
 	getOrderFunc          func(ctx context.Context, id string, userID ...string) (*model.Order, error)
 	listOrdersFunc        func(ctx context.Context, input dto.ListOrdersInput) (*dto.ListOrdersResult, error)
-	updateOrderStatusFunc func(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error)
+	updateOrderStatusFunc func(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error)
 	cancelOrderFunc       func(ctx context.Context, id string, userID string, reason string) (*model.Order, error)
+	getOrderStatusHistory func(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error)
 }
 
 func (m *mockOrderService) CreateOrder(ctx context.Context, input dto.CreateOrderInput) (*dto.CreateOrderResult, error) {
@@ -44,9 +45,9 @@ func (m *mockOrderService) ListOrders(ctx context.Context, input dto.ListOrdersI
 	return nil, nil
 }
 
-func (m *mockOrderService) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+func (m *mockOrderService) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error) {
 	if m.updateOrderStatusFunc != nil {
-		return m.updateOrderStatusFunc(ctx, id, orderStatus)
+		return m.updateOrderStatusFunc(ctx, id, orderStatus, reason...)
 	}
 	return nil, nil
 }
@@ -54,6 +55,13 @@ func (m *mockOrderService) UpdateOrderStatus(ctx context.Context, id string, ord
 func (m *mockOrderService) CancelOrder(ctx context.Context, id string, userID string, reason string) (*model.Order, error) {
 	if m.cancelOrderFunc != nil {
 		return m.cancelOrderFunc(ctx, id, userID, reason)
+	}
+	return nil, nil
+}
+
+func (m *mockOrderService) GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error) {
+	if m.getOrderStatusHistory != nil {
+		return m.getOrderStatusHistory(ctx, orderID)
 	}
 	return nil, nil
 }
@@ -224,7 +232,7 @@ func TestOrderGRPCHandler_UpdateOrderStatus(t *testing.T) {
 	orderID := uuid.New().String()
 
 	svc := &mockOrderService{
-		updateOrderStatusFunc: func(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+		updateOrderStatusFunc: func(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error) {
 			return &model.Order{
 				ID:        id,
 				Status:    orderStatus,
