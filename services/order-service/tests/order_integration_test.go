@@ -26,16 +26,18 @@ import (
 )
 
 type inMemOrderRepo struct {
-	mu     sync.RWMutex
-	orders map[string]*model.Order
-	outbox []*events.EventEnvelope
-	topic  string
+	mu      sync.RWMutex
+	orders  map[string]*model.Order
+	history map[string][]*model.OrderStatusHistory
+	outbox  []*events.EventEnvelope
+	topic   string
 }
 
 func newInMemOrderRepo() *inMemOrderRepo {
 	return &inMemOrderRepo{
-		orders: make(map[string]*model.Order),
-		outbox: make([]*events.EventEnvelope, 0),
+		orders:  make(map[string]*model.Order),
+		history: make(map[string][]*model.OrderStatusHistory),
+		outbox:  make([]*events.EventEnvelope, 0),
 	}
 }
 
@@ -52,6 +54,15 @@ func (m *inMemOrderRepo) CreateOrdersWithOutbox(
 		cp.Items = make([]model.OrderItem, len(o.Items))
 		copy(cp.Items, o.Items)
 		m.orders[o.ID] = &cp
+
+		m.history[o.ID] = append(m.history[o.ID], &model.OrderStatusHistory{
+			ID:        uuid.New().String(),
+			OrderID:   o.ID,
+			ToStatus:  o.Status,
+			Reason:    "Order created",
+			ChangedBy: o.UserID,
+			CreatedAt: o.CreatedAt,
+		})
 	}
 	m.outbox = append(m.outbox, envelopes...)
 	m.topic = topic
@@ -71,6 +82,42 @@ func (m *inMemOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Or
 	return &cp, nil
 }
 
+func (m *inMemOrderRepo) GetOrdersByIdempotencyKey(ctx context.Context, idempotencyKey string) ([]*model.Order, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var matchingPrimary *model.Order
+	for _, o := range m.orders {
+		if o.IdempotencyKey != nil && *o.IdempotencyKey == idempotencyKey {
+			matchingPrimary = o
+			break
+		}
+	}
+	if matchingPrimary == nil {
+		return nil, repository.ErrOrderNotFound
+	}
+
+	res := make([]*model.Order, 0)
+	if matchingPrimary.ParentOrderID != nil && *matchingPrimary.ParentOrderID != "" {
+		for _, o := range m.orders {
+			if o.ParentOrderID != nil && *o.ParentOrderID == *matchingPrimary.ParentOrderID {
+				cp := *o
+				cp.Items = make([]model.OrderItem, len(o.Items))
+				copy(cp.Items, o.Items)
+				res = append(res, &cp)
+			}
+		}
+		if len(res) > 0 {
+			return res, nil
+		}
+	}
+
+	cp := *matchingPrimary
+	cp.Items = make([]model.OrderItem, len(matchingPrimary.Items))
+	copy(cp.Items, matchingPrimary.Items)
+	return []*model.Order{&cp}, nil
+}
+
 func (m *inMemOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit, offset int) ([]*model.Order, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -86,31 +133,77 @@ func (m *inMemOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, 
 	return res, len(res), nil
 }
 
-func (m *inMemOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+func (m *inMemOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
 	}
+	prev := o.Status
 	o.Status = orderStatus
+	o.UpdatedAt = time.Now().UTC()
+
+	rText := ""
+	if len(reason) > 0 {
+		rText = reason[0]
+	}
+
+	m.history[id] = append(m.history[id], &model.OrderStatusHistory{
+		ID:         uuid.New().String(),
+		OrderID:    id,
+		FromStatus: &prev,
+		ToStatus:   orderStatus,
+		Reason:     rText,
+		CreatedAt:  o.UpdatedAt,
+	})
+
 	cp := *o
 	return &cp, nil
 }
 
-func (m *inMemOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string) (*model.Order, error) {
+func (m *inMemOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
 	}
+	prev := o.Status
 	o.Status = model.OrderStatusCancelled
+	o.UpdatedAt = time.Now().UTC()
 	if envelope != nil {
 		m.outbox = append(m.outbox, envelope)
 	}
+
+	rText := ""
+	if len(reason) > 0 {
+		rText = reason[0]
+	}
+
+	m.history[id] = append(m.history[id], &model.OrderStatusHistory{
+		ID:         uuid.New().String(),
+		OrderID:    id,
+		FromStatus: &prev,
+		ToStatus:   model.OrderStatusCancelled,
+		Reason:     rText,
+		CreatedAt:  o.UpdatedAt,
+	})
+
 	cp := *o
 	return &cp, nil
+}
+
+func (m *inMemOrderRepo) GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	list, ok := m.history[orderID]
+	if !ok {
+		return []*model.OrderStatusHistory{}, nil
+	}
+	cp := make([]*model.OrderStatusHistory, len(list))
+	copy(cp, list)
+	return cp, nil
 }
 
 func (m *inMemOrderRepo) CreateOrderWithOutbox(
@@ -301,6 +394,7 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	// 1. Successful Multi-Store Checkout
 	resp, err := client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		CartId:          "cart-test",
 		ShippingAddress: "100 Innovation Way, Suite 400",
 		ShippingFee:     10.00,
@@ -382,6 +476,7 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 
 	_, err = client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "100 Innovation Way",
 	})
 	if status.Code(err) != codes.AlreadyExists {
@@ -396,6 +491,7 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	})
 	_, err = client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "100 Innovation Way",
 	})
 	if status.Code(err) != codes.InvalidArgument {
@@ -405,6 +501,7 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	// 4. Checkout rejection on invalid user_id format
 	_, err = client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:          "invalid-user-format",
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "100 Innovation Way",
 	})
 	if status.Code(err) != codes.InvalidArgument {
