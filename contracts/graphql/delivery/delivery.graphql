@@ -29,13 +29,33 @@ input CreateDeliveryInput {
   contactNumber: String!
 }
 
+type DeliveryPartnerProfile {
+  id: ID!
+  partnerId: ID!
+  companyName: String
+  email: String!
+  contactNumber: String
+  isActive: Boolean!
+  createdAt: String
+  updatedAt: String
+}
+
+input UpdateDeliveryPartnerProfileInput {
+  partnerId: ID!
+  companyName: String
+  email: String
+  contactNumber: String
+}
+
 extend type Query {
   delivery(id: ID!): Delivery @auth
   deliveryByTracking(trackingNumber: String!): Delivery @auth
   deliveryByOrder(orderId: String!): Delivery @auth
+  deliveryPartnerProfile(partnerId: ID): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
 
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
+  updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }

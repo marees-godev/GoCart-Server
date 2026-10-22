@@ -48,12 +48,11 @@ type Address struct {
 }
 
 type AuthPayload struct {
-	Token        string    `json:"token"`
-	RefreshToken *string   `json:"refreshToken,omitempty"`
-	TokenType    *string   `json:"tokenType,omitempty"`
-	ExpiresIn    *int      `json:"expiresIn,omitempty"`
-	User         *User     `json:"user"`
-	Merchant     *Merchant `json:"merchant,omitempty"`
+	Token        string  `json:"token"`
+	RefreshToken *string `json:"refreshToken,omitempty"`
+	Role         *Role   `json:"role,omitempty"`
+	TokenType    *string `json:"tokenType,omitempty"`
+	ExpiresIn    *int    `json:"expiresIn,omitempty"`
 }
 
 type BankAccount struct {
@@ -232,9 +231,20 @@ type Delivery struct {
 	UpdatedAt           *string        `json:"updatedAt,omitempty"`
 }
 
+type DeliveryPartnerProfile struct {
+	ID            string  `json:"id"`
+	PartnerID     string  `json:"partnerId"`
+	CompanyName   *string `json:"companyName,omitempty"`
+	Email         string  `json:"email"`
+	ContactNumber *string `json:"contactNumber,omitempty"`
+	IsActive      bool    `json:"isActive"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
 type ForgotPasswordInput struct {
-	Email      string `json:"email"`
-	IsMerchant bool   `json:"isMerchant"`
+	Email string   `json:"email"`
+	Role  AuthRole `json:"role"`
 }
 
 type ForgotPasswordPayload struct {
@@ -261,9 +271,9 @@ type InventoryItem struct {
 }
 
 type LoginInput struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	IsMerchant bool   `json:"isMerchant"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Role     AuthRole `json:"role"`
 }
 
 type LogoutPayload struct {
@@ -456,11 +466,11 @@ type RefundPayload struct {
 }
 
 type RegisterInput struct {
-	Email      string  `json:"email"`
-	Password   string  `json:"password"`
-	FirstName  *string `json:"firstName,omitempty"`
-	LastName   *string `json:"lastName,omitempty"`
-	IsMerchant bool    `json:"isMerchant"`
+	Email     string   `json:"email"`
+	Password  string   `json:"password"`
+	Role      AuthRole `json:"role"`
+	FirstName *string  `json:"firstName,omitempty"`
+	LastName  *string  `json:"lastName,omitempty"`
 }
 
 type RequestReturnInput struct {
@@ -488,10 +498,10 @@ type ResetPasswordPayload struct {
 }
 
 type ResetPasswordWithOtpInput struct {
-	Email       string `json:"email"`
-	Otp         string `json:"otp"`
-	NewPassword string `json:"newPassword"`
-	IsMerchant  bool   `json:"isMerchant"`
+	Email       string   `json:"email"`
+	Otp         string   `json:"otp"`
+	NewPassword string   `json:"newPassword"`
+	Role        AuthRole `json:"role"`
 }
 
 type RestockInventoryInput struct {
@@ -607,6 +617,13 @@ type UpdateCategoryInput struct {
 	IsActive         *bool   `json:"isActive,omitempty"`
 }
 
+type UpdateDeliveryPartnerProfileInput struct {
+	PartnerID     string  `json:"partnerId"`
+	CompanyName   *string `json:"companyName,omitempty"`
+	Email         *string `json:"email,omitempty"`
+	ContactNumber *string `json:"contactNumber,omitempty"`
+}
+
 type UpdateMerchantInput struct {
 	BusinessName  *string `json:"businessName,omitempty"`
 	FirstName     *string `json:"firstName,omitempty"`
@@ -689,6 +706,49 @@ type ValidateCategoryResponse struct {
 	IsValid  bool      `json:"isValid"`
 	Message  string    `json:"message"`
 	Category *Category `json:"category,omitempty"`
+}
+
+type AuthRole string
+
+const (
+	AuthRoleUser            AuthRole = "USER"
+	AuthRoleMerchant        AuthRole = "MERCHANT"
+	AuthRoleDeliveryPartner AuthRole = "DELIVERY_PARTNER"
+)
+
+var AllAuthRole = []AuthRole{
+	AuthRoleUser,
+	AuthRoleMerchant,
+	AuthRoleDeliveryPartner,
+}
+
+func (e AuthRole) IsValid() bool {
+	switch e {
+	case AuthRoleUser, AuthRoleMerchant, AuthRoleDeliveryPartner:
+		return true
+	}
+	return false
+}
+
+func (e AuthRole) String() string {
+	return string(e)
+}
+
+func (e *AuthRole) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AuthRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AuthRole", str)
+	}
+	return nil
+}
+
+func (e AuthRole) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type DeliveryStatus string
@@ -939,20 +999,22 @@ func (e ProductStatus) MarshalGQL(w io.Writer) {
 type Role string
 
 const (
-	RoleAdmin    Role = "ADMIN"
-	RoleMerchant Role = "MERCHANT"
-	RoleCustomer Role = "CUSTOMER"
+	RoleAdmin           Role = "ADMIN"
+	RoleUser            Role = "USER"
+	RoleMerchant        Role = "MERCHANT"
+	RoleDeliveryPartner Role = "DELIVERY_PARTNER"
 )
 
 var AllRole = []Role{
 	RoleAdmin,
+	RoleUser,
 	RoleMerchant,
-	RoleCustomer,
+	RoleDeliveryPartner,
 }
 
 func (e Role) IsValid() bool {
 	switch e {
-	case RoleAdmin, RoleMerchant, RoleCustomer:
+	case RoleAdmin, RoleUser, RoleMerchant, RoleDeliveryPartner:
 		return true
 	}
 	return false

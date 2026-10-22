@@ -29,6 +29,15 @@ type DeliveryRepository interface {
 	UpdateStatus(ctx context.Context, id string, status model.DeliveryStatus) (*model.Delivery, error)
 	UpsertTempOrder(ctx context.Context, order *model.TempOrder) error
 	GetTempOrderByID(ctx context.Context, id string) (*model.TempOrder, error)
+
+	// Warehouse & Partner Profile operations
+	GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error)
+	GetWarehouseByID(ctx context.Context, id uuid.UUID) (*model.Warehouse, error)
+	CreateWarehouse(ctx context.Context, w *model.Warehouse) error
+	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
+	GetPartnerProfile(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error)
+	AssignPartnerWarehouses(ctx context.Context, partnerID uuid.UUID, warehouseIDs []uuid.UUID) error
+	GetPartnerWarehouses(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error)
 }
 
 type pgDeliveryRepository struct {
@@ -129,8 +138,9 @@ func (r *pgDeliveryRepository) Create(ctx context.Context, delivery *model.Deliv
 		INSERT INTO deliveries (
 			id, order_id, delivery_partner, tracking_number, status,
 			street, city, state, postal_code, country, contact_number, shipping_address,
+			estimated_delivery, actual_delivery,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		ON CONFLICT (order_id) DO NOTHING
 		RETURNING id, created_at, updated_at
 	`
@@ -148,6 +158,8 @@ func (r *pgDeliveryRepository) Create(ctx context.Context, delivery *model.Deliv
 		delivery.ShippingAddress.Country,
 		delivery.ShippingAddress.ContactNumber,
 		addrBytes,
+		delivery.EstimatedDelivery,
+		delivery.ActualDelivery,
 		delivery.CreatedAt,
 		delivery.UpdatedAt,
 	).Scan(&delivery.ID, &delivery.CreatedAt, &delivery.UpdatedAt)
@@ -224,6 +236,7 @@ func (r *pgDeliveryRepository) GetByID(ctx context.Context, id string) (*model.D
 		query = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			WHERE id = $1 OR order_id = $1
@@ -232,6 +245,7 @@ func (r *pgDeliveryRepository) GetByID(ctx context.Context, id string) (*model.D
 		query = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			WHERE id::text = $1 OR order_id::text = $1
@@ -253,6 +267,7 @@ func (r *pgDeliveryRepository) GetByOrderID(ctx context.Context, orderID string)
 	query := `
 		SELECT id, order_id, delivery_partner, tracking_number, status,
 		       street, city, state, postal_code, country, contact_number, shipping_address,
+		       estimated_delivery, actual_delivery,
 		       created_at, updated_at
 		FROM deliveries
 		WHERE order_id = $1
@@ -273,6 +288,7 @@ func (r *pgDeliveryRepository) GetByTrackingNumber(ctx context.Context, tracking
 	query := `
 		SELECT id, order_id, delivery_partner, tracking_number, status,
 		       street, city, state, postal_code, country, contact_number, shipping_address,
+		       estimated_delivery, actual_delivery,
 		       created_at, updated_at
 		FROM deliveries
 		WHERE tracking_number = $1
@@ -308,6 +324,7 @@ func (r *pgDeliveryRepository) List(ctx context.Context, limit, offset int, stat
 		listQuery = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			WHERE status::text = $1
@@ -320,6 +337,7 @@ func (r *pgDeliveryRepository) List(ctx context.Context, limit, offset int, stat
 		listQuery = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			ORDER BY created_at DESC
@@ -369,6 +387,7 @@ func (r *pgDeliveryRepository) UpdateStatus(ctx context.Context, id string, stat
 		queryFetch = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			WHERE id = $1 OR order_id = $1
@@ -378,6 +397,7 @@ func (r *pgDeliveryRepository) UpdateStatus(ctx context.Context, id string, stat
 		queryFetch = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
 			WHERE id::text = $1 OR order_id::text = $1
@@ -415,6 +435,7 @@ func (r *pgDeliveryRepository) UpdateStatus(ctx context.Context, id string, stat
 		WHERE id = $1
 		RETURNING id, order_id, delivery_partner, tracking_number, status,
 		          street, city, state, postal_code, country, contact_number, shipping_address,
+		          estimated_delivery, actual_delivery,
 		          created_at, updated_at
 	`
 	updatedDelivery, err := r.scanOne(tx.QueryRow(ctx, queryUpdate, existing.ID, cleanStatus, existing.UpdatedAt))
@@ -488,6 +509,8 @@ func (r *pgDeliveryRepository) scanOne(row pgx.Row) (*model.Delivery, error) {
 		&country,
 		&contactNumber,
 		&addrBytes,
+		&d.EstimatedDelivery,
+		&d.ActualDelivery,
 		&d.CreatedAt,
 		&d.UpdatedAt,
 	)
@@ -658,3 +681,244 @@ func (r *pgDeliveryRepository) GetTempOrderByID(ctx context.Context, id string) 
 
 	return &o, nil
 }
+
+func (r *pgDeliveryRepository) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+	query := `
+		SELECT id, name, code, street, city, state, postal_code, is_active, created_at, updated_at
+		FROM warehouses
+		WHERE is_active = TRUE
+		ORDER BY name ASC
+	`
+	rows, err := r.db.Pool.Query(ctx, query)
+	if err != nil {
+		r.logger.Error("Repository: failed to query available warehouses", slog.Any("error", err))
+		return nil, appErrors.Internal(err, "failed to query available warehouses")
+	}
+	defer rows.Close()
+
+	var warehouses []*model.Warehouse
+	for rows.Next() {
+		var w model.Warehouse
+		if err := rows.Scan(
+			&w.ID,
+			&w.Name,
+			&w.Code,
+			&w.Street,
+			&w.City,
+			&w.State,
+			&w.PostalCode,
+			&w.IsActive,
+			&w.CreatedAt,
+			&w.UpdatedAt,
+		); err != nil {
+			r.logger.Error("Repository: failed to scan warehouse", slog.Any("error", err))
+			return nil, appErrors.Internal(err, "failed to scan warehouse")
+		}
+		warehouses = append(warehouses, &w)
+	}
+	if warehouses == nil {
+		warehouses = make([]*model.Warehouse, 0)
+	}
+	return warehouses, nil
+}
+
+func (r *pgDeliveryRepository) GetWarehouseByID(ctx context.Context, id uuid.UUID) (*model.Warehouse, error) {
+	query := `
+		SELECT id, name, code, street, city, state, postal_code, is_active, created_at, updated_at
+		FROM warehouses
+		WHERE id = $1
+	`
+	var w model.Warehouse
+	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
+		&w.ID,
+		&w.Name,
+		&w.Code,
+		&w.Street,
+		&w.City,
+		&w.State,
+		&w.PostalCode,
+		&w.IsActive,
+		&w.CreatedAt,
+		&w.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("warehouse not found")
+		}
+		return nil, appErrors.Internal(err, "failed to get warehouse")
+	}
+	return &w, nil
+}
+
+func (r *pgDeliveryRepository) CreateWarehouse(ctx context.Context, w *model.Warehouse) error {
+	if w.ID == uuid.Nil {
+		w.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	if w.CreatedAt.IsZero() {
+		w.CreatedAt = now
+	}
+	if w.UpdatedAt.IsZero() {
+		w.UpdatedAt = now
+	}
+	query := `
+		INSERT INTO warehouses (id, name, code, street, city, state, postal_code, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (code) DO UPDATE SET
+			name = EXCLUDED.name,
+			street = EXCLUDED.street,
+			city = EXCLUDED.city,
+			state = EXCLUDED.state,
+			postal_code = EXCLUDED.postal_code,
+			is_active = EXCLUDED.is_active,
+			updated_at = EXCLUDED.updated_at
+	`
+	_, err := r.db.Pool.Exec(ctx, query, w.ID, w.Name, w.Code, w.Street, w.City, w.State, w.PostalCode, w.IsActive, w.CreatedAt, w.UpdatedAt)
+	if err != nil {
+		r.logger.Error("Repository: failed to create warehouse", slog.Any("error", err))
+		return appErrors.Internal(err, "failed to create warehouse")
+	}
+	return nil
+}
+
+func (r *pgDeliveryRepository) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
+	if profile.ID == uuid.Nil {
+		profile.ID = uuid.New()
+	}
+	now := time.Now().UTC()
+	if profile.CreatedAt.IsZero() {
+		profile.CreatedAt = now
+	}
+	if profile.UpdatedAt.IsZero() {
+		profile.UpdatedAt = now
+	}
+	query := `
+		INSERT INTO delivery_partner_profiles (id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (partner_id) DO UPDATE SET
+			company_name = EXCLUDED.company_name,
+			email = CASE WHEN EXCLUDED.email <> '' THEN EXCLUDED.email ELSE delivery_partner_profiles.email END,
+			contact_number = EXCLUDED.contact_number,
+			is_active = EXCLUDED.is_active,
+			updated_at = EXCLUDED.updated_at
+	`
+	_, err := r.db.Pool.Exec(ctx, query, profile.ID, profile.PartnerID, profile.CompanyName, profile.Email, profile.ContactNumber, profile.IsActive, profile.CreatedAt, profile.UpdatedAt)
+	if err != nil {
+		r.logger.Error("Repository: failed to upsert delivery partner profile", slog.String("partner_id", profile.PartnerID.String()), slog.Any("error", err))
+		return appErrors.Internal(err, "failed to upsert partner profile")
+	}
+	return nil
+}
+
+func (r *pgDeliveryRepository) GetPartnerProfile(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+	query := `
+		SELECT id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at
+		FROM delivery_partner_profiles
+		WHERE partner_id = $1
+	`
+	var p model.DeliveryPartnerProfile
+	err := r.db.Pool.QueryRow(ctx, query, partnerID).Scan(
+		&p.ID,
+		&p.PartnerID,
+		&p.CompanyName,
+		&p.Email,
+		&p.ContactNumber,
+		&p.IsActive,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("partner profile not found")
+		}
+		return nil, appErrors.Internal(err, "failed to get partner profile")
+	}
+	return &p, nil
+}
+
+func (r *pgDeliveryRepository) AssignPartnerWarehouses(ctx context.Context, partnerID uuid.UUID, warehouseIDs []uuid.UUID) error {
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Ensure partner profile exists (create shell profile if not yet created via event)
+	var exists bool
+	if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_partner_profiles WHERE partner_id = $1)", partnerID).Scan(&exists); err != nil {
+		return appErrors.Internal(err, "failed to check partner profile existence")
+	}
+	if !exists {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO delivery_partner_profiles (id, partner_id, company_name, is_active, created_at, updated_at)
+			VALUES ($1, $2, 'Partner', true, NOW(), NOW())
+			ON CONFLICT (partner_id) DO NOTHING
+		`, uuid.New(), partnerID)
+		if err != nil {
+			return appErrors.Internal(err, "failed to create partner profile shell")
+		}
+	}
+
+	// Delete old mappings
+	if _, err := tx.Exec(ctx, "DELETE FROM partner_warehouses WHERE partner_id = $1", partnerID); err != nil {
+		return appErrors.Internal(err, "failed to clear existing warehouse associations")
+	}
+
+	// Insert new mappings
+	for _, wID := range warehouseIDs {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO partner_warehouses (id, partner_id, warehouse_id, created_at)
+			VALUES ($1, $2, $3, NOW())
+			ON CONFLICT (partner_id, warehouse_id) DO NOTHING
+		`, uuid.New(), partnerID, wID)
+		if err != nil {
+			return appErrors.Internal(err, "failed to associate warehouse with partner")
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit warehouse assignment")
+	}
+	return nil
+}
+
+func (r *pgDeliveryRepository) GetPartnerWarehouses(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error) {
+	query := `
+		SELECT w.id, w.name, w.code, w.street, w.city, w.state, w.postal_code, w.is_active, w.created_at, w.updated_at
+		FROM warehouses w
+		JOIN partner_warehouses pw ON w.id = pw.warehouse_id
+		WHERE pw.partner_id = $1 AND w.is_active = TRUE
+		ORDER BY w.name ASC
+	`
+	rows, err := r.db.Pool.Query(ctx, query, partnerID)
+	if err != nil {
+		r.logger.Error("Repository: failed to query partner warehouses", slog.String("partner_id", partnerID.String()), slog.Any("error", err))
+		return nil, appErrors.Internal(err, "failed to query partner warehouses")
+	}
+	defer rows.Close()
+
+	var warehouses []*model.Warehouse
+	for rows.Next() {
+		var w model.Warehouse
+		if err := rows.Scan(
+			&w.ID,
+			&w.Name,
+			&w.Code,
+			&w.Street,
+			&w.City,
+			&w.State,
+			&w.PostalCode,
+			&w.IsActive,
+			&w.CreatedAt,
+			&w.UpdatedAt,
+		); err != nil {
+			return nil, appErrors.Internal(err, "failed to scan partner warehouse")
+		}
+		warehouses = append(warehouses, &w)
+	}
+	if warehouses == nil {
+		warehouses = make([]*model.Warehouse, 0)
+	}
+	return warehouses, nil
+}
+

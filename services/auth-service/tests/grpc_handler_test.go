@@ -57,6 +57,17 @@ func (m *mockMerchantClient) CreateMerchant(ctx context.Context, in *merchantpb.
 	}, nil
 }
 
+func (m *mockMerchantClient) GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error) {
+	return &merchantpb.GetMerchantResponse{
+		Merchant: &merchantpb.MerchantResponseData{
+			Id:            in.Id,
+			BusinessEmail: "merchant@example.com",
+			FirstName:     "Merchant",
+			LastName:      "User",
+		},
+	}, nil
+}
+
 type inMemoryAuthRepo struct {
 	byEmailRole  map[string]*model.AuthCredential
 	outboxEvents []*outbox.Event
@@ -81,6 +92,11 @@ func (r *inMemoryAuthRepo) GetByEmail(ctx context.Context, email string) (*model
 func (r *inMemoryAuthRepo) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
 	key := strings.ToLower(email) + ":" + strings.ToUpper(role.String())
 	cred, ok := r.byEmailRole[key]
+	if !ok && strings.EqualFold(role.String(), "USER") {
+		cred, ok = r.byEmailRole[strings.ToLower(email)+":CUSTOMER"]
+	} else if !ok && strings.EqualFold(role.String(), "CUSTOMER") {
+		cred, ok = r.byEmailRole[strings.ToLower(email)+":USER"]
+	}
 	if !ok {
 		return nil, repository.ErrNotFound
 	}
@@ -193,7 +209,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		Password:   testPassword,
 		FirstName:  "John",
 		LastName:   "Customer",
-		IsMerchant: false,
+		Role:       pb.Role_USER,
 	})
 	if err != nil {
 		t.Fatalf("expected customer registration to succeed, got error: %v", err)
@@ -203,7 +219,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 	}
 
 	custCred, _ := repo.GetByEmailAndRole(ctx, testEmail, model.RoleCustomer)
-	if custCred == nil || custCred.Role != model.RoleCustomer {
+	if custCred == nil || (custCred.Role != model.RoleCustomer && custCred.Role != model.RoleUser) {
 		t.Fatalf("expected CUSTOMER credential to be saved in repository")
 	}
 
@@ -213,7 +229,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		Password:   testPassword,
 		FirstName:  "John",
 		LastName:   "Merchant",
-		IsMerchant: true,
+		Role:       pb.Role_MERCHANT,
 	})
 	if err != nil {
 		t.Fatalf("expected merchant registration with same email to succeed, got error: %v", err)
@@ -246,7 +262,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		Password:   testPassword,
 		FirstName:  "Duplicate",
 		LastName:   "Customer",
-		IsMerchant: false,
+		Role:       pb.Role_USER,
 	})
 	if err == nil {
 		t.Fatalf("expected conflict error when re-registering as customer, got nil")
@@ -262,7 +278,7 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		Password:   testPassword,
 		FirstName:  "Duplicate",
 		LastName:   "Merchant",
-		IsMerchant: true,
+		Role:       pb.Role_MERCHANT,
 	})
 	if err == nil {
 		t.Fatalf("expected conflict error when re-registering as merchant, got nil")
@@ -400,15 +416,15 @@ func TestGRPCLogin_MerchantSuccess(t *testing.T) {
 	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
 
 	loginResp, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
-		Email:      "merchant@example.com",
-		Password:   rawPassword,
-		IsMerchant: true,
+		Email:    "merchant@example.com",
+		Password: rawPassword,
+		Role:     pb.Role_MERCHANT,
 	})
 	if err != nil {
 		t.Fatalf("expected successful merchant gRPC login, got: %v", err)
 	}
 
-	if loginResp.Role != "MERCHANT" {
+	if loginResp.Role != pb.Role_MERCHANT {
 		t.Errorf("expected role MERCHANT, got %s", loginResp.Role)
 	}
 
@@ -447,9 +463,9 @@ func TestGRPCLogin_RoleMismatch(t *testing.T) {
 	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
 
 	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
-		Email:      "merchant@example.com",
-		Password:   rawPassword,
-		IsMerchant: false,
+		Email:    "merchant@example.com",
+		Password: rawPassword,
+		Role:     pb.Role_USER,
 	})
 	if err == nil {
 		t.Fatal("expected error due to role mismatch, got nil")
@@ -481,9 +497,9 @@ func TestGRPCLogin_UnverifiedEmail_Fails(t *testing.T) {
 	grpcHandler := authGRPC.NewAuthGRPCHandler(svc, nil)
 
 	_, err := grpcHandler.Login(context.Background(), &pb.LoginRequest{
-		Email:      "unverified@example.com",
-		Password:   rawPassword,
-		IsMerchant: false,
+		Email:    "unverified@example.com",
+		Password: rawPassword,
+		Role:     pb.Role_USER,
 	})
 	if err == nil {
 		t.Fatal("expected error for unverified email, got nil")

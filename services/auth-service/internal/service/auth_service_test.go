@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -72,8 +73,13 @@ func (m *mockAuthRepository) GetByEmailAndRole(ctx context.Context, email string
 	}
 	key := email + ":" + role.String()
 	cred, ok := m.byEmailRole[key]
+	if !ok && strings.EqualFold(role.String(), "USER") {
+		cred, ok = m.byEmailRole[email+":CUSTOMER"]
+	} else if !ok && strings.EqualFold(role.String(), "CUSTOMER") {
+		cred, ok = m.byEmailRole[email+":USER"]
+	}
 	if !ok {
-		if c, found := m.byEmail[email]; found && (c.Role == role || c.Role == "") {
+		if c, found := m.byEmail[email]; found && (strings.EqualFold(c.Role.String(), role.String()) || (strings.EqualFold(role.String(), "USER") && strings.EqualFold(c.Role.String(), "CUSTOMER")) || c.Role == "") {
 			cred = c
 		} else {
 			return nil, repository.ErrNotFound
@@ -671,8 +677,8 @@ func TestRegister_Customer_Success(t *testing.T) {
 	if cred == nil {
 		t.Fatal("expected credential stored in repository")
 	}
-	if cred.Role != model.RoleCustomer {
-		t.Errorf("expected role %s, got %s", model.RoleCustomer, cred.Role)
+	if cred.Role != model.RoleCustomer && cred.Role != model.RoleUser {
+		t.Errorf("expected role %s or %s, got %s", model.RoleCustomer, model.RoleUser, cred.Role)
 	}
 
 	// Verify outbox event
@@ -2394,8 +2400,8 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 
 	// 3. Request password reset for MERCHANT
 	respMerch, err := svc.ForgotPassword(ctx, &dto.ForgotPasswordRequest{
-		Email:      sharedEmail,
-		IsMerchant: true,
+		Email: sharedEmail,
+		Role:  "MERCHANT",
 	})
 	if err != nil || !respMerch.Success {
 		t.Fatalf("forgot password for merchant failed: %v", err)
@@ -2411,7 +2417,7 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 		Email:       sharedEmail,
 		OTP:         merchOTP,
 		NewPassword: newMerchPassword,
-		IsMerchant:  true,
+		Role:        "MERCHANT",
 	})
 	if err != nil || !resetMerchResp.Success {
 		t.Fatalf("reset password for merchant failed: %v", err)
@@ -2419,9 +2425,9 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 
 	// 5. Merchant login with new password succeeds
 	loginMerchResp, err := svc.Login(ctx, &dto.LoginRequest{
-		Email:      sharedEmail,
-		Password:   newMerchPassword,
-		IsMerchant: true,
+		Email:    sharedEmail,
+		Password: newMerchPassword,
+		Role:     "MERCHANT",
 	})
 	if err != nil {
 		t.Fatalf("merchant login with new password failed: %v", err)
@@ -2432,9 +2438,9 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 
 	// 6. Merchant login with old password fails
 	_, errOldMerch := svc.Login(ctx, &dto.LoginRequest{
-		Email:      sharedEmail,
-		Password:   merchPassword,
-		IsMerchant: true,
+		Email:    sharedEmail,
+		Password: merchPassword,
+		Role:     "MERCHANT",
 	})
 	if errOldMerch == nil {
 		t.Fatal("expected old merchant password to fail")
@@ -2442,9 +2448,9 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 
 	// 7. CUSTOMER password must NOT be affected - Customer login with original password still succeeds!
 	loginCustResp, errCust := svc.Login(ctx, &dto.LoginRequest{
-		Email:      sharedEmail,
-		Password:   custPassword,
-		IsMerchant: false,
+		Email:    sharedEmail,
+		Password: custPassword,
+		Role:     "CUSTOMER",
 	})
 	if errCust != nil {
 		t.Fatalf("customer login with original password should succeed, got error: %v", errCust)

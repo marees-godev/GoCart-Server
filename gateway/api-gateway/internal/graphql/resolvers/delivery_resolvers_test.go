@@ -18,6 +18,21 @@ type mockDeliveryClient struct {
 	lastGetReq          *deliverypb.GetDeliveryRequest
 	lastGetTrackingReq  *deliverypb.GetDeliveryByTrackingRequest
 	lastGetOrderReq     *deliverypb.GetDeliveryByOrderRequest
+	lastCreatePartnerReq *deliverypb.CreatePartnerProfileRequest
+}
+
+func (m *mockDeliveryClient) CreatePartnerProfile(ctx context.Context, in *deliverypb.CreatePartnerProfileRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	m.lastCreatePartnerReq = in
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:            "prof-1",
+			PartnerId:     in.PartnerId,
+			CompanyName:   in.CompanyName,
+			Email:         in.Email,
+			ContactNumber: in.ContactNumber,
+			IsActive:      true,
+		},
+	}, nil
 }
 
 func (m *mockDeliveryClient) CreateDelivery(ctx context.Context, in *deliverypb.CreateDeliveryRequest, opts ...grpcPkg.CallOption) (*deliverypb.CreateDeliveryResponse, error) {

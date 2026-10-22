@@ -1,7 +1,14 @@
 enum Role {
   ADMIN
+  USER
   MERCHANT
-  CUSTOMER
+  DELIVERY_PARTNER
+}
+
+enum AuthRole {
+  USER
+  MERCHANT
+  DELIVERY_PARTNER
 }
 
 scalar Upload

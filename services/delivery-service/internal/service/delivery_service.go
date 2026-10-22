@@ -27,6 +27,14 @@ type DeliveryService interface {
 	UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error)
 	GetTempOrderByID(ctx context.Context, orderID string) (*model.TempOrder, error)
 	UpsertTempOrder(ctx context.Context, order *model.TempOrder) error
+
+	// Warehouse & Partner Management (Tasks 6, 7, 9)
+	GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error)
+	AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error
+	GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error)
+	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
+	GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
+	UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error)
 }
 
 type deliveryService struct {
@@ -84,18 +92,40 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	}
 
 	now := time.Now().UTC()
-	delivery := &model.Delivery{
-		ID:              uuid.NewString(),
-		OrderID:         orderID,
-		DeliveryPartner: partner,
-		TrackingNumber:  trackingNumber,
-		ShippingAddress: addr,
-		Status:          model.StatusCreated,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+
+	// Transit SLA Calculation (Provisional Rough Estimate for MVP):
+	// NOTE: The chosen origin warehouse serves as a provisional fulfillment origin for initial SLA calculation.
+	// This represents a rough estimate and should not be presented as a finalized location-specific ETA
+	// until the actual fulfillment origin warehouse is selected and confirmed by the fulfillment workflow.
+	var originCity, originState string
+	if partnerID, parseErr := uuid.Parse(partner); parseErr == nil {
+		warehouses, wErr := s.repo.GetPartnerWarehouses(ctx, partnerID)
+		if wErr == nil && len(warehouses) > 0 {
+			originCity, originState = resolveProvisionalOrigin(warehouses, addr.City, addr.State)
+		}
+	}
+	if originCity == "" && originState == "" {
+		if avail, err := s.repo.GetAvailableWarehouses(ctx); err == nil && len(avail) > 0 {
+			originCity, originState = resolveProvisionalOrigin(avail, addr.City, addr.State)
+		}
 	}
 
-	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partner), slog.String("tracking_number", trackingNumber))
+	transitResult := CalculateTransitDeliveryDate(originCity, originState, addr.City, addr.State, now)
+	targetDate := transitResult.TargetDate
+
+	delivery := &model.Delivery{
+		ID:                uuid.NewString(),
+		OrderID:           orderID,
+		DeliveryPartner:   partner,
+		TrackingNumber:    trackingNumber,
+		ShippingAddress:   addr,
+		Status:            model.StatusCreated,
+		EstimatedDelivery: &targetDate,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partner), slog.String("tracking_number", trackingNumber), slog.Time("estimated_delivery", targetDate))
 	if err := s.repo.Create(ctx, delivery); err != nil {
 		s.logger.Error("Failed to persist delivery record", slog.String("order_id", orderID), slog.Any("error", err))
 		return nil, err
@@ -221,3 +251,116 @@ func (s *deliveryService) generateTrackingNumber(partner string) (string, error)
 	}
 	return fmt.Sprintf("GC-%s-%s", prefix, strings.ToUpper(hex.EncodeToString(b))), nil
 }
+
+func (s *deliveryService) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+	s.logger.Info("Retrieving available warehouses")
+	return s.repo.GetAvailableWarehouses(ctx)
+}
+
+func (s *deliveryService) AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return appErrors.BadRequest("invalid partner_id format")
+	}
+	var wUUIDs []uuid.UUID
+	for _, idStr := range warehouseIDs {
+		wUUID, err := uuid.Parse(strings.TrimSpace(idStr))
+		if err != nil {
+			return appErrors.BadRequest("invalid warehouse_id: " + idStr)
+		}
+		wUUIDs = append(wUUIDs, wUUID)
+	}
+	s.logger.Info("Assigning warehouses to partner", slog.String("partner_id", partnerID), slog.Int("warehouse_count", len(wUUIDs)))
+	return s.repo.AssignPartnerWarehouses(ctx, pUUID, wUUIDs)
+}
+
+func (s *deliveryService) GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	s.logger.Info("Retrieving assigned warehouses for partner", slog.String("partner_id", partnerID))
+	return s.repo.GetPartnerWarehouses(ctx, pUUID)
+}
+
+func (s *deliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
+	if profile == nil || profile.PartnerID == uuid.Nil {
+		return appErrors.BadRequest("valid partner profile with partner_id is required")
+	}
+	s.logger.Info("Creating or updating delivery partner profile", slog.String("partner_id", profile.PartnerID.String()))
+	return s.repo.CreateOrUpdatePartnerProfile(ctx, profile)
+}
+
+func (s *deliveryService) GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	s.logger.Info("Retrieving partner profile", slog.String("partner_id", partnerID))
+	return s.repo.GetPartnerProfile(ctx, pUUID)
+}
+
+func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
+	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id format")
+	}
+	existing, err := s.repo.GetPartnerProfile(ctx, pUUID)
+	if err != nil {
+		if !appErrors.IsNotFound(err) {
+			return nil, err
+		}
+		existing = &model.DeliveryPartnerProfile{
+			ID:        uuid.New(),
+			PartnerID: pUUID,
+			IsActive:  true,
+			CreatedAt: time.Now().UTC(),
+		}
+	}
+	if companyName != nil {
+		existing.CompanyName = strings.TrimSpace(*companyName)
+	}
+	if email != nil {
+		trimmedEmail := strings.TrimSpace(*email)
+		if trimmedEmail == "" {
+			return nil, appErrors.BadRequest("email cannot be empty")
+		}
+		existing.Email = trimmedEmail
+	}
+	if contactNumber != nil {
+		existing.ContactNumber = strings.TrimSpace(*contactNumber)
+	}
+	existing.UpdatedAt = time.Now().UTC()
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+// resolveProvisionalOrigin selects a provisional origin warehouse for preliminary transit calculation.
+// In the current MVP, this produces an initial rough estimate. It prioritizes warehouse proximity (same city or state)
+// when multiple warehouses are associated with a partner, falling back to the primary warehouse.
+func resolveProvisionalOrigin(warehouses []*model.Warehouse, destCity, destState string) (string, string) {
+	if len(warehouses) == 0 {
+		return "", ""
+	}
+	dCity := strings.TrimSpace(strings.ToLower(destCity))
+	dState := strings.TrimSpace(strings.ToLower(destState))
+
+	if dCity != "" {
+		for _, w := range warehouses {
+			if strings.TrimSpace(strings.ToLower(w.City)) == dCity {
+				return w.City, w.State
+			}
+		}
+	}
+	if dState != "" {
+		for _, w := range warehouses {
+			if strings.TrimSpace(strings.ToLower(w.State)) == dState {
+				return w.City, w.State
+			}
+		}
+	}
+	return warehouses[0].City, warehouses[0].State
+}
+
