@@ -27,7 +27,9 @@ enum Role {
 
 message LoginRequest {
   string email = 1;
-  string password = 2;
+  string password = 2; 
+  reserved 3;
+  reserved "is_merchant";
   Role role = 4;
 }
 
@@ -36,6 +38,8 @@ message RegisterRequest {
   string password = 2;
   string first_name = 3;
   string last_name = 4;
+  reserved 5;
+  reserved "is_merchant";
   Role role = 6;
 }
 
@@ -47,6 +51,8 @@ message ValidateTokenResponse {
   bool valid = 1;
   string user_id = 2;
   string email = 3;
+  reserved 4;
+  reserved "is_merchant";
   Role role = 5;
 }
 
@@ -76,6 +82,8 @@ message AuthResponse {
   string last_name = 10;
   string partner_id = 11;
   string customer_id = 12;
+  reserved 6;
+  reserved "is_merchant";
   Role role = 13;
 }
 
@@ -102,6 +110,8 @@ message ResendVerificationEmailResponse {
 message ForgotPasswordRequest {
   string email = 1;
   string client_ip = 2;
+  reserved 3;
+  reserved "is_merchant";
   Role role = 4;
 }
 
@@ -114,6 +124,8 @@ message ResetPasswordWithOtpRequest {
   string email = 1;
   string otp = 2;
   string new_password = 3;
+  reserved 4;
+  reserved "is_merchant";
   Role role = 5;
 }
 

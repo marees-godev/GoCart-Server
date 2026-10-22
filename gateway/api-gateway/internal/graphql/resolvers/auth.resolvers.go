@@ -18,19 +18,13 @@ import (
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
-	}
-
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
 	}
 
 	res, err := authClient.Login(ctx, &authpb.LoginRequest{
@@ -73,6 +67,11 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
@@ -90,17 +89,6 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		fn = "User"
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
-	}
-
 	res, err := authClient.Register(ctx, &authpb.RegisterRequest{
 		Email:     input.Email,
 		Password:  input.Password,
@@ -114,9 +102,9 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 
 	if input.Role == model.AuthRoleDeliveryPartner && res.UserId != "" {
 		var deliveryClient deliverypb.DeliveryServiceClient
-		if r.Clients != nil && r.Clients.DeliveryClient != nil {
+		if r != nil && r.Clients != nil && r.Clients.DeliveryClient != nil {
 			deliveryClient = r.Clients.DeliveryClient
-		} else if r.ClientMgr != nil && r.ClientMgr.DeliveryClient != nil {
+		} else if r != nil && r.ClientMgr != nil && r.ClientMgr.DeliveryClient != nil {
 			deliveryClient = r.ClientMgr.DeliveryClient
 		}
 
@@ -163,15 +151,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 		return nil, appErrors.BadRequest("refresh_token is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.RefreshToken(ctx, &authpb.RefreshTokenRequest{
@@ -201,15 +183,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 
 // Logout is the resolver for the logout field.
 func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	userCtx, authenticated := auth.FromContext(ctx)
@@ -240,15 +216,9 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return false, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return false, err
 	}
 	if email == "" || otp == "" {
 		return false, appErrors.BadRequest("email and otp are required")
@@ -266,15 +236,9 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp st
 
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
 func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return false, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return false, err
 	}
 	if email == "" {
 		return false, appErrors.BadRequest("email is required")
@@ -294,15 +258,9 @@ func (r *mutationResolver) ForgotPassword(ctx context.Context, input model.Forgo
 		return nil, appErrors.BadRequest("email is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	var clientIP string
@@ -337,15 +295,9 @@ func (r *mutationResolver) ResetPasswordWithOtp(ctx context.Context, input model
 		return nil, appErrors.BadRequest("newPassword is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.ResetPasswordWithOtp(ctx, &authpb.ResetPasswordWithOtpRequest{
@@ -378,15 +330,9 @@ func (r *mutationResolver) ChangePassword(ctx context.Context, input model.Chang
 		return nil, appErrors.BadRequest("newPassword is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.ChangePassword(ctx, &authpb.ChangePasswordRequest{
@@ -402,4 +348,24 @@ func (r *mutationResolver) ChangePassword(ctx context.Context, input model.Chang
 		Success: res.GetSuccess(),
 		Message: res.GetMessage(),
 	}, nil
+}
+
+func (r *Resolver) getAuthClient() (authpb.AuthServiceClient, error) {
+	if r == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+	if r.Clients != nil && r.Clients.AuthClient != nil {
+		return r.Clients.AuthClient, nil
+	}
+	if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
+		return r.ClientMgr.AuthClient, nil
+	}
+	return nil, appErrors.Internal(nil, "auth client unavailable")
+}
+
+func (r *mutationResolver) getAuthClient() (authpb.AuthServiceClient, error) {
+	if r == nil || r.Resolver == nil {
+		return nil, appErrors.Internal(nil, "auth client unavailable")
+	}
+	return r.Resolver.getAuthClient()
 }

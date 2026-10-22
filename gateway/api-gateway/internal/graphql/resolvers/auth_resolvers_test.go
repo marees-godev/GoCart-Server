@@ -541,3 +541,61 @@ func TestRegisterResolver_DeliveryPartner_Alone(t *testing.T) {
 		t.Errorf("expected email deliverypartner@example.com, got %s", deliveryMock.lastCreatePartnerReq.Email)
 	}
 }
+
+func TestAuthResolvers_ClientUnavailable(t *testing.T) {
+	rNilClients := &mutationResolver{
+		Resolver: &Resolver{},
+	}
+
+	loginInput := model.LoginInput{
+		Email:    "test@example.com",
+		Password: "Password123!",
+		Role:     model.AuthRoleUser,
+	}
+
+	_, errLogin := rNilClients.Login(context.Background(), loginInput)
+	if errLogin == nil || !strings.Contains(errLogin.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil clients, got: %v", errLogin)
+	}
+
+	fn := "John"
+	registerInput := model.RegisterInput{
+		Email:     "test@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleUser,
+		FirstName: &fn,
+	}
+
+	_, errRegister := rNilClients.Register(context.Background(), registerInput)
+	if errRegister == nil || !strings.Contains(errRegister.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil clients, got: %v", errRegister)
+	}
+
+	rNilAuth := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{},
+		},
+	}
+
+	_, errLogin2 := rNilAuth.Login(context.Background(), loginInput)
+	if errLogin2 == nil || !strings.Contains(errLogin2.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil AuthClient, got: %v", errLogin2)
+	}
+
+	_, errRegister2 := rNilAuth.Register(context.Background(), registerInput)
+	if errRegister2 == nil || !strings.Contains(errRegister2.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil AuthClient, got: %v", errRegister2)
+	}
+
+	var rNilResolver *mutationResolver
+	_, errLogin3 := rNilResolver.Login(context.Background(), loginInput)
+	if errLogin3 == nil || !strings.Contains(errLogin3.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil resolver, got: %v", errLogin3)
+	}
+
+	_, errRegister3 := rNilResolver.Register(context.Background(), registerInput)
+	if errRegister3 == nil || !strings.Contains(errRegister3.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil resolver, got: %v", errRegister3)
+	}
+}
+

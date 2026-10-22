@@ -1160,25 +1160,25 @@ var File_contracts_protobuf_auth_auth_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"j\n" +
+	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"}\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12(\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"\xa9\x01\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x03\x10\x04R\vis_merchant\"\xbc\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12(\n" +
-	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\",\n" +
+	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x05\x10\x06R\vis_merchant\",\n" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\x86\x01\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x99\x01\n" +
 	"\x15ValidateTokenResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12(\n" +
-	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"]\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x04\x10\x05R\vis_merchant\"]\n" +
 	"\x13RefreshTokenRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\x12!\n" +
 	"\faccess_token\x18\x02 \x01(\tR\vaccessToken\"2\n" +
@@ -1186,7 +1186,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\"D\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x9b\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xae\x03\n" +
 	"\fAuthResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -1206,7 +1206,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"partner_id\x18\v \x01(\tR\tpartnerId\x12\x1f\n" +
 	"\vcustomer_id\x18\f \x01(\tR\n" +
 	"customerId\x12(\n" +
-	"\x04role\x18\r \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"R\n" +
+	"\x04role\x18\r \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x06\x10\aR\vis_merchant\"R\n" +
 	"\x12VerifyEmailRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12\x14\n" +
@@ -1218,19 +1218,19 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"U\n" +
 	"\x1fResendVerificationEmailResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"t\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x87\x01\n" +
 	"\x15ForgotPasswordRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1b\n" +
 	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12(\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"L\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x03\x10\x04R\vis_merchant\"L\n" +
 	"\x16ForgotPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x92\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa5\x01\n" +
 	"\x1bResetPasswordWithOtpRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12!\n" +
 	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12(\n" +
-	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"K\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x04\x10\x05R\vis_merchant\"K\n" +
 	"\x15ResetPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"v\n" +
