@@ -18,6 +18,11 @@ type Config struct {
 	Tracing  TracingConfig
 	Kafka    KafkaConfig
 	Outbox   OutboxConfig
+	JWT      JWTConfig
+}
+
+type JWTConfig struct {
+	Secret string
 }
 
 type GRPCConfig struct {
@@ -116,6 +121,9 @@ func LoadEnv() *Config {
 			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 1000)) * time.Millisecond,
 			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
 			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.delivery.dlq"),
+		},
+		JWT: JWTConfig{
+			Secret: GetEnv("JWT_SECRET", "super-secret-key-change-in-production"),
 		},
 	}
 }

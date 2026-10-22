@@ -1,6 +1,7 @@
 package resolvers
 
 import (
+	"strings"
 	"time"
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
@@ -243,3 +244,35 @@ func toModelDelivery(d *deliverypb.Delivery) *model.Delivery {
 	}
 	return res
 }
+
+func toModelDeliveryPartnerProfile(p *deliverypb.DeliveryPartnerProfile) *model.DeliveryPartnerProfile {
+	if p == nil {
+		return nil
+	}
+	var companyName *string
+	if strings.TrimSpace(p.CompanyName) != "" {
+		cn := strings.TrimSpace(p.CompanyName)
+		companyName = &cn
+	}
+	var contactNumber *string
+	if strings.TrimSpace(p.ContactNumber) != "" {
+		c := strings.TrimSpace(p.ContactNumber)
+		contactNumber = &c
+	}
+	res := &model.DeliveryPartnerProfile{
+		ID:            p.Id,
+		PartnerID:     p.PartnerId,
+		CompanyName:   companyName,
+		Email:         p.Email,
+		ContactNumber: contactNumber,
+		IsActive:      p.IsActive,
+	}
+	if p.CreatedAt != "" {
+		res.CreatedAt = &p.CreatedAt
+	}
+	if p.UpdatedAt != "" {
+		res.UpdatedAt = &p.UpdatedAt
+	}
+	return res
+}
+

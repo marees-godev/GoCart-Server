@@ -7,72 +7,47 @@ package resolvers
 import (
 	"context"
 	"strings"
-	"time"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
-	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
-	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
-	"google.golang.org/grpc/metadata"
 )
 
 // Login is the resolver for the login field.
 func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
-	isMerchant := input.IsMerchant
-
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
-	}
-
 	res, err := authClient.Login(ctx, &authpb.LoginRequest{
-		Email:      input.Email,
-		Password:   input.Password,
-		IsMerchant: isMerchant,
+		Email:    input.Email,
+		Password: input.Password,
+		Role:     authRoleToAuthPBRole(input.Role),
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	var userClient userpb.UserServiceClient
-	if r.Clients != nil && r.Clients.UserClient != nil {
-		userClient = r.Clients.UserClient
-	} else if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
-		userClient = r.ClientMgr.UserClient
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED && fromAuthPBRole(res.Role) != model.Role(input.Role) {
+		return nil, appErrors.Unauthorized("role mismatch: account role does not match requested role")
 	}
 
-	var user *model.User
-	if res.UserId != "" && !isMerchant && userClient != nil {
-		uRes, _ := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
-		if uRes != nil {
-			user = toModelUser(uRes.User)
-		}
-	}
-	if user == nil && res.UserId != "" {
-		now := time.Now().UTC().Format(time.RFC3339)
-		user = &model.User{
-			ID:        res.UserId,
-			Email:     input.Email,
-			CreatedAt: &now,
-		}
+	resRole := model.Role(input.Role)
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
 	}
 
 	payload := &model.AuthPayload{
 		Token: res.AccessToken,
-		User:  user,
+		Role:  &resRole,
 	}
 	if res.RefreshToken != "" {
 		refToken := res.RefreshToken
@@ -85,103 +60,6 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	if res.ExpiresIn > 0 {
 		exp := int(res.ExpiresIn)
 		payload.ExpiresIn = &exp
-	}
-	role := string(model.RoleCustomer)
-	if isMerchant {
-		role = string(model.RoleMerchant)
-	}
-	if res.Role != "" {
-		role = res.Role
-	}
-	if user != nil {
-		user.Role = &role
-		if res.FirstName != "" && user.FirstName == nil {
-			fnStr := res.FirstName
-			user.FirstName = &fnStr
-		}
-		if res.LastName != "" && user.LastName == nil {
-			lnStr := res.LastName
-			user.LastName = &lnStr
-		}
-	}
-
-	if isMerchant {
-		mID := res.MerchantId
-		bEmail := input.Email
-		if res.BusinessEmail != "" {
-			bEmail = res.BusinessEmail
-		}
-		var firstName *string
-		if res.FirstName != "" {
-			fnStr := res.FirstName
-			firstName = &fnStr
-		} else if user != nil && user.FirstName != nil {
-			firstName = user.FirstName
-		}
-
-		var lastName *string
-		if res.LastName != "" {
-			lnStr := res.LastName
-			lastName = &lnStr
-		} else if user != nil && user.LastName != nil {
-			lastName = user.LastName
-		}
-
-		bName := ""
-		if firstName != nil && lastName != nil {
-			bName = strings.TrimSpace(*firstName + " " + *lastName)
-		}
-		if bName == "" {
-			bName = input.Email
-		}
-		status := model.MerchantStatusPending
-
-		var merchantClient merchantpb.MerchantServiceClient
-		if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
-			merchantClient = r.ClientMgr.MerchantClient
-		}
-
-		if merchantClient != nil && res.UserId != "" {
-			mCtx := auth.WithUser(ctx, &auth.UserContext{
-				UserID: res.UserId,
-				Role:   string(model.RoleMerchant),
-				Email:  input.Email,
-			})
-			mCtx = metadata.NewOutgoingContext(mCtx, metadata.Pairs(
-				"x-user-id", res.UserId,
-				"x-user-role", string(model.RoleMerchant),
-			))
-			mRes, _ := merchantClient.GetMerchant(mCtx, &merchantpb.GetMerchantRequest{Id: res.UserId})
-			if mRes != nil && mRes.Merchant != nil {
-				if mRes.Merchant.Id != "" {
-					mID = mRes.Merchant.Id
-				}
-				if mRes.Merchant.BusinessEmail != "" {
-					bEmail = mRes.Merchant.BusinessEmail
-				}
-				if mRes.Merchant.BusinessName != "" {
-					bName = mRes.Merchant.BusinessName
-				}
-				status = model.MerchantStatus(mRes.Merchant.Status.String())
-				if mRes.Merchant.FirstName != "" && firstName == nil {
-					fn := mRes.Merchant.FirstName
-					firstName = &fn
-				}
-				if mRes.Merchant.LastName != "" && lastName == nil {
-					ln := mRes.Merchant.LastName
-					lastName = &ln
-				}
-			}
-		}
-
-		payload.Merchant = &model.Merchant{
-			ID:            mID,
-			BusinessName:  bName,
-			FirstName:     firstName,
-			LastName:      lastName,
-			BusinessEmail: &bEmail,
-			Status:        status,
-		}
 	}
 
 	return payload, nil
@@ -189,75 +67,63 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
 	if input.Email == "" || input.Password == "" {
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
 	fn := ""
 	if input.FirstName != nil {
-		fn = *input.FirstName
+		fn = strings.TrimSpace(*input.FirstName)
 	}
 	ln := ""
 	if input.LastName != nil {
-		ln = *input.LastName
+		ln = strings.TrimSpace(*input.LastName)
 	}
 
-	if fn == "" || ln == "" {
-		return nil, appErrors.BadRequest("first_name and last_name are required")
-	}
-
-	isMerchant := input.IsMerchant
-
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	if fn == "" && input.Role != model.AuthRoleDeliveryPartner {
+		fn = "User"
 	}
 
 	res, err := authClient.Register(ctx, &authpb.RegisterRequest{
-		Email:      input.Email,
-		Password:   input.Password,
-		FirstName:  fn,
-		LastName:   ln,
-		IsMerchant: isMerchant,
+		Email:     input.Email,
+		Password:  input.Password,
+		FirstName: fn,
+		LastName:  ln,
+		Role:      authRoleToAuthPBRole(input.Role),
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	var userClient userpb.UserServiceClient
-	if r.Clients != nil && r.Clients.UserClient != nil {
-		userClient = r.Clients.UserClient
-	} else if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
-		userClient = r.ClientMgr.UserClient
+	if input.Role == model.AuthRoleDeliveryPartner && res.UserId != "" {
+		deliveryClient, dErr := r.getDeliveryClient()
+		if dErr != nil {
+			return nil, appErrors.ServiceUnavailable("delivery service unavailable: unable to create partner profile")
+		}
+
+		_, err = deliveryClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+			PartnerId:   res.UserId,
+			CompanyName: "",
+			Email:       input.Email,
+		})
+		if err != nil {
+			return nil, grpcclient.TranslateGRPCError(err)
+		}
 	}
 
-	var user *model.User
-	if res.UserId != "" && !isMerchant && userClient != nil {
-		uRes, _ := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: res.UserId})
-		if uRes != nil {
-			user = toModelUser(uRes.User)
-		}
-	}
-	if user == nil && res.UserId != "" {
-		now := time.Now().UTC().Format(time.RFC3339)
-		user = &model.User{
-			ID:        res.UserId,
-			Email:     input.Email,
-			FirstName: &fn,
-			LastName:  &ln,
-			CreatedAt: &now,
-		}
+	resRole := model.Role(input.Role)
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
 	}
 
 	payload := &model.AuthPayload{
 		Token: res.AccessToken,
-		User:  user,
+		Role:  &resRole,
 	}
 	if res.RefreshToken != "" {
 		refToken := res.RefreshToken
@@ -270,54 +136,6 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	if res.ExpiresIn > 0 {
 		exp := int(res.ExpiresIn)
 		payload.ExpiresIn = &exp
-	}
-
-	role := string(model.RoleCustomer)
-	if isMerchant {
-		role = string(model.RoleMerchant)
-	}
-	if res.Role != "" {
-		role = res.Role
-	}
-	if user != nil {
-		user.Role = &role
-	}
-
-	if isMerchant {
-		mID := res.MerchantId
-		bEmail := input.Email
-		if res.BusinessEmail != "" {
-			bEmail = res.BusinessEmail
-		}
-		var firstName *string
-		if res.FirstName != "" {
-			fnStr := res.FirstName
-			firstName = &fnStr
-		} else if fn != "" {
-			firstName = &fn
-		}
-
-		var lastName *string
-		if res.LastName != "" {
-			lnStr := res.LastName
-			lastName = &lnStr
-		} else if ln != "" {
-			lastName = &ln
-		}
-
-		bName := strings.TrimSpace(fn + " " + ln)
-		if bName == "" {
-			bName = input.Email
-		}
-		status := model.MerchantStatusPending
-		payload.Merchant = &model.Merchant{
-			ID:            mID,
-			BusinessName:  bName,
-			FirstName:     firstName,
-			LastName:      lastName,
-			BusinessEmail: &bEmail,
-			Status:        status,
-		}
 	}
 
 	return payload, nil
@@ -329,15 +147,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 		return nil, appErrors.BadRequest("refresh_token is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.RefreshToken(ctx, &authpb.RefreshTokenRequest{
@@ -357,43 +169,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 		TokenType:    &tokenType,
 		ExpiresIn:    &expiresIn,
 	}
-	if res.GetUserId() != "" {
-		payload.User = &model.User{
-			ID: res.GetUserId(),
-		}
-	}
-	if payload.User != nil {
-		if res.GetRole() != "" {
-			roleStr := res.GetRole()
-			payload.User.Role = &roleStr
-		}
-		if res.GetFirstName() != "" {
-			fn := res.GetFirstName()
-			payload.User.FirstName = &fn
-		}
-		if res.GetLastName() != "" {
-			ln := res.GetLastName()
-			payload.User.LastName = &ln
-		}
-	}
-	if res.GetMerchantId() != "" {
-		mID := res.GetMerchantId()
-		var fnPtr, lnPtr *string
-		if res.GetFirstName() != "" {
-			fn := res.GetFirstName()
-			fnPtr = &fn
-		}
-		if res.GetLastName() != "" {
-			ln := res.GetLastName()
-			lnPtr = &ln
-		}
-		bEmail := res.GetBusinessEmail()
-		payload.Merchant = &model.Merchant{
-			ID:            mID,
-			FirstName:     fnPtr,
-			LastName:      lnPtr,
-			BusinessEmail: &bEmail,
-		}
+	if res.GetRole() != authpb.Role_ROLE_UNSPECIFIED {
+		r := fromAuthPBRole(res.GetRole())
+		payload.Role = &r
 	}
 
 	return payload, nil
@@ -401,15 +179,9 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, input model.Refresh
 
 // Logout is the resolver for the logout field.
 func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	userCtx, authenticated := auth.FromContext(ctx)
@@ -440,15 +212,9 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 
 // VerifyEmail is the resolver for the verifyEmail field.
 func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return false, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return false, err
 	}
 	if email == "" || otp == "" {
 		return false, appErrors.BadRequest("email and otp are required")
@@ -466,15 +232,9 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp st
 
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
 func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return false, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return false, err
 	}
 	if email == "" {
 		return false, appErrors.BadRequest("email is required")
@@ -494,15 +254,9 @@ func (r *mutationResolver) ForgotPassword(ctx context.Context, input model.Forgo
 		return nil, appErrors.BadRequest("email is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	var clientIP string
@@ -511,9 +265,9 @@ func (r *mutationResolver) ForgotPassword(ctx context.Context, input model.Forgo
 	}
 
 	res, err := authClient.ForgotPassword(ctx, &authpb.ForgotPasswordRequest{
-		Email:      input.Email,
-		ClientIp:   clientIP,
-		IsMerchant: input.IsMerchant,
+		Email:    input.Email,
+		ClientIp: clientIP,
+		Role:     authRoleToAuthPBRole(input.Role),
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -537,22 +291,16 @@ func (r *mutationResolver) ResetPasswordWithOtp(ctx context.Context, input model
 		return nil, appErrors.BadRequest("newPassword is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.ResetPasswordWithOtp(ctx, &authpb.ResetPasswordWithOtpRequest{
 		Email:       input.Email,
 		Otp:         input.Otp,
 		NewPassword: input.NewPassword,
-		IsMerchant:  input.IsMerchant,
+		Role:        authRoleToAuthPBRole(input.Role),
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -578,15 +326,9 @@ func (r *mutationResolver) ChangePassword(ctx context.Context, input model.Chang
 		return nil, appErrors.BadRequest("newPassword is required")
 	}
 
-	var authClient authpb.AuthServiceClient
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		authClient = r.Clients.AuthClient
-	} else if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		authClient = r.ClientMgr.AuthClient
-	}
-
-	if authClient == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := authClient.ChangePassword(ctx, &authpb.ChangePasswordRequest{

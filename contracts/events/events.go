@@ -353,3 +353,11 @@ type ProductDeletedEvent struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+// PartnerRegisteredEvent represents the payload for PartnerRegistered domain event.
+type PartnerRegisteredEvent struct {
+	PartnerID     string `json:"partner_id"`
+	CompanyName   string `json:"company_name"`
+	Email         string `json:"email"`
+	ContactNumber string `json:"contact_number"`
+}
+

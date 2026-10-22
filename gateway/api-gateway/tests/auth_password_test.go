@@ -105,7 +105,7 @@ func TestGraphQL_ForgotPassword(t *testing.T) {
 
 	mutation := `
 		mutation ForgotPassword {
-			forgotPassword(input: { email: "user@example.com", isMerchant: false }) {
+			forgotPassword(input: { email: "user@example.com", role: USER }) {
 				success
 				message
 			}
@@ -157,7 +157,7 @@ func TestGraphQL_ResetPasswordWithOtp_Success(t *testing.T) {
 				email: "user@example.com"
 				otp: "123456"
 				newPassword: "NewSecurePassword123!"
-				isMerchant: false
+				role: USER
 			}) {
 				success
 				message
@@ -207,7 +207,7 @@ func TestGraphQL_ResetPasswordWithOtp_InvalidOtp(t *testing.T) {
 				email: "user@example.com"
 				otp: "999999"
 				newPassword: "NewSecurePassword123!"
-				isMerchant: false
+				role: USER
 			}) {
 				success
 				message

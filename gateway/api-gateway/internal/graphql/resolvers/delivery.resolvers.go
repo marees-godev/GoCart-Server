@@ -10,6 +10,7 @@ import (
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -83,6 +84,52 @@ func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, 
 	return toModelDelivery(res.Delivery), nil
 }
 
+// UpdateDeliveryPartnerProfile is the resolver for the updateDeliveryPartnerProfile field.
+func (r *mutationResolver) UpdateDeliveryPartnerProfile(ctx context.Context, input model.UpdateDeliveryPartnerProfileInput) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	partnerID := strings.TrimSpace(input.PartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	userPartnerID := userCtx.PartnerID
+	if userPartnerID == "" {
+		userPartnerID = userCtx.UserID
+	}
+
+	if role != "ADMIN" && (role != "DELIVERY_PARTNER" || (!strings.EqualFold(userCtx.UserID, partnerID) && !strings.EqualFold(userPartnerID, partnerID))) {
+		return nil, appErrors.Forbidden("you can only update your own delivery partner profile")
+	}
+
+	req := &deliverypb.UpdatePartnerProfileRequest{
+		PartnerId:     partnerID,
+		CompanyName:   input.CompanyName,
+		Email:         input.Email,
+		ContactNumber: input.ContactNumber,
+	}
+
+	res, err := r.Clients.DeliveryClient.UpdatePartnerProfile(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
+}
+
 // Delivery is the resolver for the delivery field.
 func (r *queryResolver) Delivery(ctx context.Context, id string) (*model.Delivery, error) {
 	if r.Clients == nil || r.Clients.DeliveryClient == nil {
@@ -123,4 +170,46 @@ func (r *queryResolver) DeliveryByOrder(ctx context.Context, orderID string) (*m
 	}
 
 	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryPartnerProfile is the resolver for the deliveryPartnerProfile field.
+func (r *queryResolver) DeliveryPartnerProfile(ctx context.Context, partnerID *string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+			ok = true
+		}
+	}
+	if !ok || userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	targetPartnerID := userCtx.PartnerID
+	if targetPartnerID == "" && strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
+		targetPartnerID = userCtx.UserID
+	}
+
+	if partnerID != nil && strings.TrimSpace(*partnerID) != "" {
+		if strings.EqualFold(userCtx.Role, auth.RoleAdmin) || targetPartnerID == "" || strings.EqualFold(targetPartnerID, strings.TrimSpace(*partnerID)) {
+			targetPartnerID = strings.TrimSpace(*partnerID)
+		}
+	}
+
+	if strings.TrimSpace(targetPartnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+		PartnerId: targetPartnerID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
 }

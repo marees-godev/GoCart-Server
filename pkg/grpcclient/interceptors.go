@@ -316,6 +316,10 @@ func UnaryRoleAuthInterceptor(methodRoles map[string][]string) grpc.UnaryServerI
 			return nil, status.Error(codes.Unauthenticated, "authentication required: missing user role in request context")
 		}
 
+		if userRole == "ADMIN" {
+			return handler(ctx, req)
+		}
+
 		for _, allowed := range requiredRoles {
 			if userRole == strings.ToUpper(strings.TrimSpace(allowed)) {
 				return handler(ctx, req)

@@ -10,6 +10,10 @@ service DeliveryService {
   rpc GetDeliveryByTracking (GetDeliveryByTrackingRequest) returns (GetDeliveryResponse);
   rpc GetDeliveryByOrder (GetDeliveryByOrderRequest) returns (GetDeliveryResponse);
   rpc UpdateDeliveryStatus (UpdateDeliveryStatusRequest) returns (UpdateDeliveryStatusResponse);
+
+  rpc CreatePartnerProfile (CreatePartnerProfileRequest) returns (PartnerProfileResponse);
+  rpc GetPartnerProfile (GetPartnerProfileRequest) returns (PartnerProfileResponse);
+  rpc UpdatePartnerProfile (UpdatePartnerProfileRequest) returns (PartnerProfileResponse);
 }
 
 message Delivery {
@@ -61,4 +65,37 @@ message UpdateDeliveryStatusRequest {
 
 message UpdateDeliveryStatusResponse {
   Delivery delivery = 1;
+}
+
+message DeliveryPartnerProfile {
+  string id = 1;
+  string partner_id = 2;
+  string company_name = 3;
+  string email = 4;
+  string contact_number = 5;
+  bool is_active = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message CreatePartnerProfileRequest {
+  string partner_id = 1;
+  string company_name = 2;
+  string email = 3;
+  string contact_number = 4;
+}
+
+message GetPartnerProfileRequest {
+  string partner_id = 1;
+}
+
+message UpdatePartnerProfileRequest {
+  string partner_id = 1;
+  optional string company_name = 2;
+  optional string email = 3;
+  optional string contact_number = 4;
+}
+
+message PartnerProfileResponse {
+  DeliveryPartnerProfile profile = 1;
 }

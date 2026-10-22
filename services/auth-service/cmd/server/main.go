@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -123,6 +124,17 @@ func main() {
 		}
 	}
 
+	var deliveryClient deliverypb.DeliveryServiceClient
+	if cfg.Services.DeliveryServiceURL != "" {
+		dClient, conn, err := grpcclient.NewDeliveryClient(cfg.Services.DeliveryServiceURL, 5*time.Second)
+		if err != nil {
+			log.Warn("Failed to initialize delivery service gRPC client", "error", err)
+		} else {
+			defer conn.Close()
+			deliveryClient = dClient
+		}
+	}
+
 	var otpStore otp.Store
 	redisClient, err := redis.New(ctx, cfg.Redis)
 	if err != nil {
@@ -134,7 +146,7 @@ func main() {
 	}
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, otpStore, redisClient)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, deliveryClient, otpStore, redisClient)
 
 	// 7. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
