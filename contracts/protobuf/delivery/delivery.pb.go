@@ -752,9 +752,9 @@ func (x *GetPartnerProfileRequest) GetPartnerId() string {
 type UpdatePartnerProfileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PartnerId     string                 `protobuf:"bytes,1,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
-	CompanyName   string                 `protobuf:"bytes,2,opt,name=company_name,json=companyName,proto3" json:"company_name,omitempty"`
-	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	ContactNumber string                 `protobuf:"bytes,4,opt,name=contact_number,json=contactNumber,proto3" json:"contact_number,omitempty"`
+	CompanyName   *string                `protobuf:"bytes,2,opt,name=company_name,json=companyName,proto3,oneof" json:"company_name,omitempty"`
+	Email         *string                `protobuf:"bytes,3,opt,name=email,proto3,oneof" json:"email,omitempty"`
+	ContactNumber *string                `protobuf:"bytes,4,opt,name=contact_number,json=contactNumber,proto3,oneof" json:"contact_number,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -797,22 +797,22 @@ func (x *UpdatePartnerProfileRequest) GetPartnerId() string {
 }
 
 func (x *UpdatePartnerProfileRequest) GetCompanyName() string {
-	if x != nil {
-		return x.CompanyName
+	if x != nil && x.CompanyName != nil {
+		return *x.CompanyName
 	}
 	return ""
 }
 
 func (x *UpdatePartnerProfileRequest) GetEmail() string {
-	if x != nil {
-		return x.Email
+	if x != nil && x.Email != nil {
+		return *x.Email
 	}
 	return ""
 }
 
 func (x *UpdatePartnerProfileRequest) GetContactNumber() string {
-	if x != nil {
-		return x.ContactNumber
+	if x != nil && x.ContactNumber != nil {
+		return *x.ContactNumber
 	}
 	return ""
 }
@@ -922,13 +922,16 @@ const file_contracts_protobuf_delivery_delivery_proto_rawDesc = "" +
 	"\x0econtact_number\x18\x04 \x01(\tR\rcontactNumber\"9\n" +
 	"\x18GetPartnerProfileRequest\x12\x1d\n" +
 	"\n" +
-	"partner_id\x18\x01 \x01(\tR\tpartnerId\"\x9c\x01\n" +
+	"partner_id\x18\x01 \x01(\tR\tpartnerId\"\xd9\x01\n" +
 	"\x1bUpdatePartnerProfileRequest\x12\x1d\n" +
 	"\n" +
-	"partner_id\x18\x01 \x01(\tR\tpartnerId\x12!\n" +
-	"\fcompany_name\x18\x02 \x01(\tR\vcompanyName\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12%\n" +
-	"\x0econtact_number\x18\x04 \x01(\tR\rcontactNumber\"^\n" +
+	"partner_id\x18\x01 \x01(\tR\tpartnerId\x12&\n" +
+	"\fcompany_name\x18\x02 \x01(\tH\x00R\vcompanyName\x88\x01\x01\x12\x19\n" +
+	"\x05email\x18\x03 \x01(\tH\x01R\x05email\x88\x01\x01\x12*\n" +
+	"\x0econtact_number\x18\x04 \x01(\tH\x02R\rcontactNumber\x88\x01\x01B\x0f\n" +
+	"\r_company_nameB\b\n" +
+	"\x06_emailB\x11\n" +
+	"\x0f_contact_number\"^\n" +
 	"\x16PartnerProfileResponse\x12D\n" +
 	"\aprofile\x18\x01 \x01(\v2*.gocart.delivery.v1.DeliveryPartnerProfileR\aprofile2\x90\a\n" +
 	"\x0fDeliveryService\x12g\n" +
@@ -1003,6 +1006,7 @@ func file_contracts_protobuf_delivery_delivery_proto_init() {
 	if File_contracts_protobuf_delivery_delivery_proto != nil {
 		return
 	}
+	file_contracts_protobuf_delivery_delivery_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

@@ -796,9 +796,9 @@ func (r *pgDeliveryRepository) CreateOrUpdatePartnerProfile(ctx context.Context,
 		INSERT INTO delivery_partner_profiles (id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (partner_id) DO UPDATE SET
-			company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE delivery_partner_profiles.company_name END,
+			company_name = EXCLUDED.company_name,
 			email = CASE WHEN EXCLUDED.email <> '' THEN EXCLUDED.email ELSE delivery_partner_profiles.email END,
-			contact_number = CASE WHEN EXCLUDED.contact_number <> '' THEN EXCLUDED.contact_number ELSE delivery_partner_profiles.contact_number END,
+			contact_number = EXCLUDED.contact_number,
 			is_active = EXCLUDED.is_active,
 			updated_at = EXCLUDED.updated_at
 	`

@@ -80,7 +80,7 @@ type LoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
-	Role          Role                   `protobuf:"varint,3,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -142,7 +142,7 @@ type RegisterRequest struct {
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	FirstName     string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName      string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
-	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,6,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -261,7 +261,7 @@ type ValidateTokenResponse struct {
 	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -479,13 +479,13 @@ type AuthResponse struct {
 	TokenType     string                 `protobuf:"bytes,3,opt,name=token_type,json=tokenType,proto3" json:"token_type,omitempty"`
 	ExpiresIn     int64                  `protobuf:"varint,4,opt,name=expires_in,json=expiresIn,proto3" json:"expires_in,omitempty"`
 	UserId        string                 `protobuf:"bytes,5,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Role          Role                   `protobuf:"varint,6,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	MerchantId    string                 `protobuf:"bytes,7,opt,name=merchant_id,json=merchantId,proto3" json:"merchant_id,omitempty"`
 	BusinessEmail string                 `protobuf:"bytes,8,opt,name=business_email,json=businessEmail,proto3" json:"business_email,omitempty"`
 	FirstName     string                 `protobuf:"bytes,9,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName      string                 `protobuf:"bytes,10,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
 	PartnerId     string                 `protobuf:"bytes,11,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
 	CustomerId    string                 `protobuf:"bytes,12,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	Role          Role                   `protobuf:"varint,13,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -555,13 +555,6 @@ func (x *AuthResponse) GetUserId() string {
 	return ""
 }
 
-func (x *AuthResponse) GetRole() Role {
-	if x != nil {
-		return x.Role
-	}
-	return Role_ROLE_UNSPECIFIED
-}
-
 func (x *AuthResponse) GetMerchantId() string {
 	if x != nil {
 		return x.MerchantId
@@ -602,6 +595,13 @@ func (x *AuthResponse) GetCustomerId() string {
 		return x.CustomerId
 	}
 	return ""
+}
+
+func (x *AuthResponse) GetRole() Role {
+	if x != nil {
+		return x.Role
+	}
+	return Role_ROLE_UNSPECIFIED
 }
 
 type VerifyEmailRequest struct {
@@ -816,7 +816,7 @@ type ForgotPasswordRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	ClientIp      string                 `protobuf:"bytes,2,opt,name=client_ip,json=clientIp,proto3" json:"client_ip,omitempty"`
-	Role          Role                   `protobuf:"varint,3,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -929,7 +929,7 @@ type ResetPasswordWithOtpRequest struct {
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Otp           string                 `protobuf:"bytes,2,opt,name=otp,proto3" json:"otp,omitempty"`
 	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
-	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Role          Role                   `protobuf:"varint,5,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1164,21 +1164,21 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12(\n" +
-	"\x04role\x18\x03 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"\xa9\x01\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"\xa9\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12(\n" +
-	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\",\n" +
+	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\",\n" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\x86\x01\n" +
 	"\x15ValidateTokenResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12(\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"]\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"]\n" +
 	"\x13RefreshTokenRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\x12!\n" +
 	"\faccess_token\x18\x02 \x01(\tR\vaccessToken\"2\n" +
@@ -1194,8 +1194,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"token_type\x18\x03 \x01(\tR\ttokenType\x12\x1d\n" +
 	"\n" +
 	"expires_in\x18\x04 \x01(\x03R\texpiresIn\x12\x17\n" +
-	"\auser_id\x18\x05 \x01(\tR\x06userId\x12(\n" +
-	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\x12\x1f\n" +
+	"\auser_id\x18\x05 \x01(\tR\x06userId\x12\x1f\n" +
 	"\vmerchant_id\x18\a \x01(\tR\n" +
 	"merchantId\x12%\n" +
 	"\x0ebusiness_email\x18\b \x01(\tR\rbusinessEmail\x12\x1d\n" +
@@ -1206,7 +1205,8 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
 	"partner_id\x18\v \x01(\tR\tpartnerId\x12\x1f\n" +
 	"\vcustomer_id\x18\f \x01(\tR\n" +
-	"customerId\"R\n" +
+	"customerId\x12(\n" +
+	"\x04role\x18\r \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"R\n" +
 	"\x12VerifyEmailRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12\x14\n" +
@@ -1222,7 +1222,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x15ForgotPasswordRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1b\n" +
 	"\tclient_ip\x18\x02 \x01(\tR\bclientIp\x12(\n" +
-	"\x04role\x18\x03 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"L\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"L\n" +
 	"\x16ForgotPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\x92\x01\n" +
@@ -1230,7 +1230,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x10\n" +
 	"\x03otp\x18\x02 \x01(\tR\x03otp\x12!\n" +
 	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12(\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"K\n" +
+	"\x04role\x18\x05 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"K\n" +
 	"\x15ResetPasswordResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"v\n" +

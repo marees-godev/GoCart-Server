@@ -121,11 +121,14 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 		}
 
 		if deliveryClient != nil {
-			_, _ = deliveryClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+			_, err = deliveryClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
 				PartnerId:   res.UserId,
 				CompanyName: "",
 				Email:       input.Email,
 			})
+			if err != nil {
+				return nil, grpcclient.TranslateGRPCError(err)
+			}
 		}
 	}
 

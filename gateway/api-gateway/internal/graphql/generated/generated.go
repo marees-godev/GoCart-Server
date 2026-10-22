@@ -4123,7 +4123,7 @@ type DeliveryPartnerProfile {
 }
 
 input UpdateDeliveryPartnerProfileInput {
-  partnerId: ID
+  partnerId: ID!
   companyName: String
   email: String
   contactNumber: String
@@ -31107,7 +31107,7 @@ func (ec *executionContext) unmarshalInputUpdateDeliveryPartnerProfileInput(ctx 
 		switch k {
 		case "partnerId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("partnerId"))
-			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			data, err := ec.unmarshalNID2string(ctx, v)
 			if err != nil {
 				return it, err
 			}

@@ -354,10 +354,12 @@ func TestGRPC_PartnerProfile(t *testing.T) {
 	}
 
 	// 3. UpdatePartnerProfile
+	newCompany := "Flash Logistics Worldwide"
+	newContact := "+1-555-9999"
 	updateResp, err := client.UpdatePartnerProfile(ctx, &deliverypb.UpdatePartnerProfileRequest{
 		PartnerId:     partnerID,
-		CompanyName:   "Flash Logistics Worldwide",
-		ContactNumber: "+1-555-9999",
+		CompanyName:   &newCompany,
+		ContactNumber: &newContact,
 	})
 	if err != nil {
 		t.Fatalf("UpdatePartnerProfile failed: %v", err)

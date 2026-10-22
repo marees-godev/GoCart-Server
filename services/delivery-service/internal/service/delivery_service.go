@@ -306,6 +306,9 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 	}
 	existing, err := s.repo.GetPartnerProfile(ctx, pUUID)
 	if err != nil {
+		if !appErrors.IsNotFound(err) {
+			return nil, err
+		}
 		existing = &model.DeliveryPartnerProfile{
 			ID:        uuid.New(),
 			PartnerID: pUUID,
@@ -313,13 +316,17 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 			CreatedAt: time.Now().UTC(),
 		}
 	}
-	if companyName != nil && strings.TrimSpace(*companyName) != "" {
+	if companyName != nil {
 		existing.CompanyName = strings.TrimSpace(*companyName)
 	}
-	if email != nil && strings.TrimSpace(*email) != "" {
-		existing.Email = strings.TrimSpace(*email)
+	if email != nil {
+		trimmedEmail := strings.TrimSpace(*email)
+		if trimmedEmail == "" {
+			return nil, appErrors.BadRequest("email cannot be empty")
+		}
+		existing.Email = trimmedEmail
 	}
-	if contactNumber != nil && strings.TrimSpace(*contactNumber) != "" {
+	if contactNumber != nil {
 		existing.ContactNumber = strings.TrimSpace(*contactNumber)
 	}
 	existing.UpdatedAt = time.Now().UTC()

@@ -618,7 +618,7 @@ type UpdateCategoryInput struct {
 }
 
 type UpdateDeliveryPartnerProfileInput struct {
-	PartnerID     *string `json:"partnerId,omitempty"`
+	PartnerID     string  `json:"partnerId"`
 	CompanyName   *string `json:"companyName,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	ContactNumber *string `json:"contactNumber,omitempty"`

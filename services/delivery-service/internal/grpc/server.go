@@ -219,21 +219,7 @@ func (s *DeliveryGRPCServer) UpdatePartnerProfile(ctx context.Context, req *deli
 		return nil, appErrors.BadRequest("partner_id is required").ToGRPC()
 	}
 
-	var compName, email, contactNum *string
-	if strings.TrimSpace(req.CompanyName) != "" {
-		c := strings.TrimSpace(req.CompanyName)
-		compName = &c
-	}
-	if strings.TrimSpace(req.Email) != "" {
-		e := strings.TrimSpace(req.Email)
-		email = &e
-	}
-	if strings.TrimSpace(req.ContactNumber) != "" {
-		num := strings.TrimSpace(req.ContactNumber)
-		contactNum = &num
-	}
-
-	profile, err := s.deliveryService.UpdatePartnerProfile(ctx, strings.TrimSpace(req.PartnerId), compName, email, contactNum)
+	profile, err := s.deliveryService.UpdatePartnerProfile(ctx, strings.TrimSpace(req.PartnerId), req.CompanyName, req.Email, req.ContactNumber)
 	if err != nil {
 		s.logger.Error("UpdatePartnerProfile failed", slog.String("partner_id", req.PartnerId), slog.Any("error", err))
 		return nil, appErrors.ToGRPC(err)

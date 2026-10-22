@@ -90,41 +90,36 @@ func (r *mutationResolver) UpdateDeliveryPartnerProfile(ctx context.Context, inp
 		return nil, appErrors.Internal(nil, "delivery service client unavailable")
 	}
 
+	partnerID := strings.TrimSpace(input.PartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
 	userCtx, ok := auth.UserFromContext(ctx)
 	if !ok || userCtx == nil {
 		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
 			userCtx = u
-			ok = true
 		}
 	}
-	if !ok || userCtx == nil {
+	if userCtx == nil {
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
-	partnerID := userCtx.PartnerID
-	if partnerID == "" && strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
-		partnerID = userCtx.UserID
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	userPartnerID := userCtx.PartnerID
+	if userPartnerID == "" {
+		userPartnerID = userCtx.UserID
 	}
 
-	if strings.EqualFold(userCtx.Role, auth.RoleAdmin) && input.PartnerID != nil && strings.TrimSpace(*input.PartnerID) != "" {
-		partnerID = strings.TrimSpace(*input.PartnerID)
-	}
-
-	if strings.TrimSpace(partnerID) == "" {
-		return nil, appErrors.BadRequest("partner id is required")
+	if role != "ADMIN" && (role != "DELIVERY_PARTNER" || (!strings.EqualFold(userCtx.UserID, partnerID) && !strings.EqualFold(userPartnerID, partnerID))) {
+		return nil, appErrors.Forbidden("you can only update your own delivery partner profile")
 	}
 
 	req := &deliverypb.UpdatePartnerProfileRequest{
-		PartnerId: partnerID,
-	}
-	if input.CompanyName != nil {
-		req.CompanyName = *input.CompanyName
-	}
-	if input.Email != nil {
-		req.Email = *input.Email
-	}
-	if input.ContactNumber != nil {
-		req.ContactNumber = *input.ContactNumber
+		PartnerId:     partnerID,
+		CompanyName:   input.CompanyName,
+		Email:         input.Email,
+		ContactNumber: input.ContactNumber,
 	}
 
 	res, err := r.Clients.DeliveryClient.UpdatePartnerProfile(ctx, req)

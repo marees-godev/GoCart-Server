@@ -68,14 +68,14 @@ func (m *mockDeliveryClientForResolvers) UpdatePartnerProfile(ctx context.Contex
 			IsActive:  true,
 		}
 	}
-	if in.CompanyName != "" {
-		p.CompanyName = in.CompanyName
+	if in.CompanyName != nil {
+		p.CompanyName = *in.CompanyName
 	}
-	if in.Email != "" {
-		p.Email = in.Email
+	if in.Email != nil {
+		p.Email = *in.Email
 	}
-	if in.ContactNumber != "" {
-		p.ContactNumber = in.ContactNumber
+	if in.ContactNumber != nil {
+		p.ContactNumber = *in.ContactNumber
 	}
 	p.UpdatedAt = "2026-10-21T12:00:00Z"
 	m.profiles[in.PartnerId] = p
@@ -151,6 +151,7 @@ func TestDeliveryResolver_UpdatePartnerProfile(t *testing.T) {
 	newCompany := "Speedy Deliveries Ltd"
 	newContact := "+1-555-4321"
 	res, err := resolver.Mutation().UpdateDeliveryPartnerProfile(ctx, model.UpdateDeliveryPartnerProfileInput{
+		PartnerID:     partnerID,
 		CompanyName:   &newCompany,
 		ContactNumber: &newContact,
 	})
@@ -166,12 +167,42 @@ func TestDeliveryResolver_UpdatePartnerProfile(t *testing.T) {
 	if deliveryMock.lastUpdateProfileReq.PartnerId != partnerID {
 		t.Errorf("expected partnerId %s in gRPC request, got %s", partnerID, deliveryMock.lastUpdateProfileReq.PartnerId)
 	}
-	if deliveryMock.lastUpdateProfileReq.CompanyName != newCompany {
-		t.Errorf("expected companyName %s in gRPC request, got %s", newCompany, deliveryMock.lastUpdateProfileReq.CompanyName)
+	if deliveryMock.lastUpdateProfileReq.CompanyName == nil || *deliveryMock.lastUpdateProfileReq.CompanyName != newCompany {
+		t.Errorf("expected companyName %s in gRPC request, got %v", newCompany, deliveryMock.lastUpdateProfileReq.CompanyName)
+	}
+
+	// Test cross-partner profile update rejection for delivery partner
+	_, err = resolver.Mutation().UpdateDeliveryPartnerProfile(ctx, model.UpdateDeliveryPartnerProfileInput{
+		PartnerID: "different-partner-id",
+	})
+	if err == nil {
+		t.Fatal("expected error when delivery partner modifies another profile, got nil")
+	}
+
+	// Test admin updating another partner profile
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+	adminCompany := "Admin Updated Deliveries"
+	targetID := "target-partner-777"
+	adminRes, err := resolver.Mutation().UpdateDeliveryPartnerProfile(adminCtx, model.UpdateDeliveryPartnerProfileInput{
+		PartnerID:   targetID,
+		CompanyName: &adminCompany,
+	})
+	if err != nil {
+		t.Fatalf("Admin UpdateDeliveryPartnerProfile failed: %v", err)
+	}
+	if adminRes.CompanyName == nil || *adminRes.CompanyName != adminCompany {
+		t.Errorf("expected companyName %s, got %v", adminCompany, adminRes.CompanyName)
+	}
+	if deliveryMock.lastUpdateProfileReq.PartnerId != targetID {
+		t.Errorf("expected partnerId %s in gRPC request, got %s", targetID, deliveryMock.lastUpdateProfileReq.PartnerId)
 	}
 
 	// Test unauthenticated error
 	_, err = resolver.Mutation().UpdateDeliveryPartnerProfile(context.Background(), model.UpdateDeliveryPartnerProfileInput{
+		PartnerID:   partnerID,
 		CompanyName: &newCompany,
 	})
 	if err == nil {
