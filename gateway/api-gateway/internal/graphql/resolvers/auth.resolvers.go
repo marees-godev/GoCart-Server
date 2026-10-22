@@ -349,23 +349,3 @@ func (r *mutationResolver) ChangePassword(ctx context.Context, input model.Chang
 		Message: res.GetMessage(),
 	}, nil
 }
-
-func (r *Resolver) getAuthClient() (authpb.AuthServiceClient, error) {
-	if r == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
-	}
-	if r.Clients != nil && r.Clients.AuthClient != nil {
-		return r.Clients.AuthClient, nil
-	}
-	if r.ClientMgr != nil && r.ClientMgr.AuthClient != nil {
-		return r.ClientMgr.AuthClient, nil
-	}
-	return nil, appErrors.Internal(nil, "auth client unavailable")
-}
-
-func (r *mutationResolver) getAuthClient() (authpb.AuthServiceClient, error) {
-	if r == nil || r.Resolver == nil {
-		return nil, appErrors.Internal(nil, "auth client unavailable")
-	}
-	return r.Resolver.getAuthClient()
-}
