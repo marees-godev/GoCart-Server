@@ -845,7 +845,9 @@ func (r *pgDeliveryRepository) AssignPartnerWarehouses(ctx context.Context, part
 
 	// Ensure partner profile exists (create shell profile if not yet created via event)
 	var exists bool
-	_ = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_partner_profiles WHERE partner_id = $1)", partnerID).Scan(&exists)
+	if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_partner_profiles WHERE partner_id = $1)", partnerID).Scan(&exists); err != nil {
+		return appErrors.Internal(err, "failed to check partner profile existence")
+	}
 	if !exists {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO delivery_partner_profiles (id, partner_id, company_name, is_active, created_at, updated_at)

@@ -93,19 +93,20 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 
 	now := time.Now().UTC()
 
-	// Transit SLA Calculation based on Partner Warehouse (Origin) vs Shipping Address (Destination)
+	// Transit SLA Calculation (Provisional Rough Estimate for MVP):
+	// NOTE: The chosen origin warehouse serves as a provisional fulfillment origin for initial SLA calculation.
+	// This represents a rough estimate and should not be presented as a finalized location-specific ETA
+	// until the actual fulfillment origin warehouse is selected and confirmed by the fulfillment workflow.
 	var originCity, originState string
 	if partnerID, parseErr := uuid.Parse(partner); parseErr == nil {
 		warehouses, wErr := s.repo.GetPartnerWarehouses(ctx, partnerID)
 		if wErr == nil && len(warehouses) > 0 {
-			originCity = warehouses[0].City
-			originState = warehouses[0].State
+			originCity, originState = resolveProvisionalOrigin(warehouses, addr.City, addr.State)
 		}
 	}
 	if originCity == "" && originState == "" {
 		if avail, err := s.repo.GetAvailableWarehouses(ctx); err == nil && len(avail) > 0 {
-			originCity = avail[0].City
-			originState = avail[0].State
+			originCity, originState = resolveProvisionalOrigin(avail, addr.City, addr.State)
 		}
 	}
 
@@ -334,5 +335,32 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 		return nil, err
 	}
 	return existing, nil
+}
+
+// resolveProvisionalOrigin selects a provisional origin warehouse for preliminary transit calculation.
+// In the current MVP, this produces an initial rough estimate. It prioritizes warehouse proximity (same city or state)
+// when multiple warehouses are associated with a partner, falling back to the primary warehouse.
+func resolveProvisionalOrigin(warehouses []*model.Warehouse, destCity, destState string) (string, string) {
+	if len(warehouses) == 0 {
+		return "", ""
+	}
+	dCity := strings.TrimSpace(strings.ToLower(destCity))
+	dState := strings.TrimSpace(strings.ToLower(destState))
+
+	if dCity != "" {
+		for _, w := range warehouses {
+			if strings.TrimSpace(strings.ToLower(w.City)) == dCity {
+				return w.City, w.State
+			}
+		}
+	}
+	if dState != "" {
+		for _, w := range warehouses {
+			if strings.TrimSpace(strings.ToLower(w.State)) == dState {
+				return w.City, w.State
+			}
+		}
+	}
+	return warehouses[0].City, warehouses[0].State
 }
 

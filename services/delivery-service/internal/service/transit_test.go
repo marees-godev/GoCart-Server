@@ -3,6 +3,8 @@ package service
 import (
 	"testing"
 	"time"
+
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 )
 
 func TestCalculateTransitDeliveryDate(t *testing.T) {
@@ -67,4 +69,40 @@ func TestCalculateTransitDeliveryDate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestResolveProvisionalOrigin(t *testing.T) {
+	warehouses := []*model.Warehouse{
+		{City: "Seattle", State: "WA"},
+		{City: "Los Angeles", State: "CA"},
+		{City: "Dallas", State: "TX"},
+	}
+
+	t.Run("empty list returns empty strings", func(t *testing.T) {
+		city, state := resolveProvisionalOrigin(nil, "Seattle", "WA")
+		if city != "" || state != "" {
+			t.Errorf("expected empty origin, got %s, %s", city, state)
+		}
+	})
+
+	t.Run("city match selects specific warehouse", func(t *testing.T) {
+		city, state := resolveProvisionalOrigin(warehouses, "los angeles", "ca")
+		if city != "Los Angeles" || state != "CA" {
+			t.Errorf("expected Los Angeles, CA, got %s, %s", city, state)
+		}
+	})
+
+	t.Run("state match selects warehouse in same state", func(t *testing.T) {
+		city, state := resolveProvisionalOrigin(warehouses, "Houston", "TX")
+		if city != "Dallas" || state != "TX" {
+			t.Errorf("expected Dallas, TX, got %s, %s", city, state)
+		}
+	})
+
+	t.Run("no proximity match defaults to first warehouse as provisional origin", func(t *testing.T) {
+		city, state := resolveProvisionalOrigin(warehouses, "Miami", "FL")
+		if city != "Seattle" || state != "WA" {
+			t.Errorf("expected Seattle, WA, got %s, %s", city, state)
+		}
+	})
 }

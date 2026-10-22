@@ -542,6 +542,46 @@ func TestRegisterResolver_DeliveryPartner_Alone(t *testing.T) {
 	}
 }
 
+func TestRegisterResolver_DeliveryPartner_DeliveryClientUnavailable(t *testing.T) {
+	authMock := &mockAuthClient{}
+	userMock := &mockUserClient{}
+
+	// DeliveryClient is nil
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	fn := "Fast"
+	ln := "Logistics"
+	input := model.RegisterInput{
+		Email:     "deliverypartner@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleDeliveryPartner,
+		FirstName: &fn,
+		LastName:  &ln,
+	}
+
+	_, err := r.Register(context.Background(), input)
+	if err == nil {
+		t.Fatalf("expected error when delivery client is unavailable for delivery partner registration, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Errorf("expected ServiceUnavailable error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "delivery service unavailable") {
+		t.Errorf("expected 'delivery service unavailable' in error message, got: %s", err.Error())
+	}
+}
+
 func TestAuthResolvers_ClientUnavailable(t *testing.T) {
 	rNilClients := &mutationResolver{
 		Resolver: &Resolver{},

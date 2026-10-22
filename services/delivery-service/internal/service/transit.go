@@ -16,6 +16,9 @@ type TransitRuleResult struct {
 // - Same-City: 1-2 days
 // - Same-State: 2-4 days
 // - Inter-State: 4-7 days
+//
+// Note (MVP): Estimates based on provisional warehouse origins serve as rough estimates
+// until the fulfillment workflow confirms the actual dispatch origin warehouse.
 func CalculateTransitDeliveryDate(originCity, originState, destCity, destState string, baseTime time.Time) TransitRuleResult {
 	if baseTime.IsZero() {
 		baseTime = time.Now().UTC()

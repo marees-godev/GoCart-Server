@@ -101,22 +101,18 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	}
 
 	if input.Role == model.AuthRoleDeliveryPartner && res.UserId != "" {
-		var deliveryClient deliverypb.DeliveryServiceClient
-		if r != nil && r.Clients != nil && r.Clients.DeliveryClient != nil {
-			deliveryClient = r.Clients.DeliveryClient
-		} else if r != nil && r.ClientMgr != nil && r.ClientMgr.DeliveryClient != nil {
-			deliveryClient = r.ClientMgr.DeliveryClient
+		deliveryClient, dErr := r.getDeliveryClient()
+		if dErr != nil {
+			return nil, appErrors.ServiceUnavailable("delivery service unavailable: unable to create partner profile")
 		}
 
-		if deliveryClient != nil {
-			_, err = deliveryClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
-				PartnerId:   res.UserId,
-				CompanyName: "",
-				Email:       input.Email,
-			})
-			if err != nil {
-				return nil, grpcclient.TranslateGRPCError(err)
-			}
+		_, err = deliveryClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+			PartnerId:   res.UserId,
+			CompanyName: "",
+			Email:       input.Email,
+		})
+		if err != nil {
+			return nil, grpcclient.TranslateGRPCError(err)
 		}
 	}
 
