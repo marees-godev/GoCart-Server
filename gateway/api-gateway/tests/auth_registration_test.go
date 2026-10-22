@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	gwGraphQL "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	gwGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
@@ -20,6 +21,22 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 )
+
+type mockDeliveryBackend struct {
+	deliverypb.UnimplementedDeliveryServiceServer
+}
+
+func (m *mockDeliveryBackend) CreatePartnerProfile(ctx context.Context, req *deliverypb.CreatePartnerProfileRequest) (*deliverypb.PartnerProfileResponse, error) {
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:          "profile-uuid-1",
+			PartnerId:   req.PartnerId,
+			CompanyName: req.CompanyName,
+			Email:       req.Email,
+			IsActive:    true,
+		},
+	}, nil
+}
 
 type mockAuthBackend struct {
 	authpb.UnimplementedAuthServiceServer
@@ -152,6 +169,7 @@ func TestDeliveryPartnerRegistration_EmailPasswordRoleAlone(t *testing.T) {
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer()
 	authpb.RegisterAuthServiceServer(srv, &mockAuthBackend{})
+	deliverypb.RegisterDeliveryServiceServer(srv, &mockDeliveryBackend{})
 	go func() { _ = srv.Serve(lis) }()
 	defer srv.Stop()
 
@@ -168,7 +186,8 @@ func TestDeliveryPartnerRegistration_EmailPasswordRoleAlone(t *testing.T) {
 
 	authClient := authpb.NewAuthServiceClient(conn)
 	clients := &gwGRPC.Clients{
-		AuthClient: authClient,
+		AuthClient:     authClient,
+		DeliveryClient: deliverypb.NewDeliveryServiceClient(conn),
 	}
 
 	resolver := gwResolver.NewResolver(clients, "1.0.0")
