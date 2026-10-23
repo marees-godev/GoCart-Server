@@ -60,11 +60,13 @@ COPY --from=builder /app/gateway/ /app/gateway/
 COPY infrastructure/docker/supervisord.conf /etc/supervisor/supervisord.conf
 
 # Render dynamically sets PORT env variable (default to 8080 if not set)
-ENV PORT=8080 \
+ENV PORT=10000 \
     APP_ENV=production \
     LOG_LEVEL=info \
-    LOG_FORMAT=json
+    LOG_FORMAT=json \
+    GOMEMLIMIT=25MiB \
+    GOGC=50
 
-EXPOSE 8080
+EXPOSE 10000
 
 CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
