@@ -24,12 +24,16 @@ services:
         value: info
       - key: LOG_FORMAT
         value: json
+      - key: GOMEMLIMIT
+        value: 25MiB
+      - key: GOGC
+        value: "50"
       - key: DB_AUTO_MIGRATE
         value: "true"
       - key: DB_MAX_CONNS
-        value: "25"
+        value: "5"
       - key: DB_MIN_CONNS
-        value: "2"
+        value: "1"
 
       # ==============================================================================
       # 14 Microservice Databases (PostgreSQL / Aiven)
