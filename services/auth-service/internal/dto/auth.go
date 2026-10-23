@@ -63,6 +63,7 @@ type VerifyEmailRequest struct {
 	Email string `json:"email,omitempty"`
 	OTP   string `json:"otp,omitempty"`
 	Token string `json:"token,omitempty"`
+	Role  string `json:"role,omitempty"`
 }
 
 type VerifyEmailResponse struct {
@@ -72,6 +73,7 @@ type VerifyEmailResponse struct {
 
 type ResendVerificationEmailRequest struct {
 	Email string `json:"email"`
+	Role  string `json:"role,omitempty"`
 }
 
 type ResendVerificationEmailResponse struct {

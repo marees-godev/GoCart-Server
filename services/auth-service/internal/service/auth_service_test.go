@@ -216,6 +216,11 @@ func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.
 			cred.EmailVerified = true
 		}
 	}
+	for _, cred := range m.byEmailRole {
+		if cred.UserID == userID {
+			cred.EmailVerified = true
+		}
+	}
 	return nil
 }
 
@@ -915,6 +920,157 @@ func TestResendVerificationEmail(t *testing.T) {
 	}
 }
 
+func TestVerifyEmail_WithRole_DualAccounts(t *testing.T) {
+	svc, mockRepo, _, otpStore := setupTestServiceWithOTPStore()
+
+	sharedEmail := "shared@example.com"
+	userCred := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         sharedEmail,
+		Role:          model.RoleUser,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+	merchCred := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         sharedEmail,
+		Role:          model.RoleMerchant,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	mockRepo.byEmailRole[sharedEmail+":USER"] = userCred
+	mockRepo.byEmailRole[sharedEmail+":MERCHANT"] = merchCred
+
+	userOTP := "111111"
+	merchOTP := "222222"
+	_ = otpStore.SetOTP(context.Background(), emailVerificationKey(sharedEmail, model.RoleUser), hashToken(userOTP), 5*time.Minute)
+	_ = otpStore.SetOTP(context.Background(), emailVerificationKey(sharedEmail, model.RoleMerchant), hashToken(merchOTP), 5*time.Minute)
+
+	// 1. Verify User with userOTP and Role=USER -> should succeed and only verify userCred
+	resUser, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: sharedEmail,
+		OTP:   userOTP,
+		Role:  "USER",
+	})
+	if err != nil {
+		t.Fatalf("expected user verification to succeed, got: %v", err)
+	}
+	if !resUser.Success {
+		t.Error("expected resUser.Success to be true")
+	}
+	if !userCred.EmailVerified {
+		t.Error("expected userCred to be verified")
+	}
+	if merchCred.EmailVerified {
+		t.Error("expected merchCred to remain unverified")
+	}
+
+	// 2. Verify Merchant with merchOTP and Role=MERCHANT -> should succeed
+	resMerch, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: sharedEmail,
+		OTP:   merchOTP,
+		Role:  "MERCHANT",
+	})
+	if err != nil {
+		t.Fatalf("expected merchant verification to succeed, got: %v", err)
+	}
+	if !resMerch.Success {
+		t.Error("expected resMerch.Success to be true")
+	}
+	if !merchCred.EmailVerified {
+		t.Error("expected merchCred to be verified")
+	}
+
+	// 3. New unverified user + merchant account: OTP sent for merchant MUST NOT verify user
+	emailCross := "cross@example.com"
+	crossUserCred := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         emailCross,
+		Role:          model.RoleUser,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+	crossMerchCred := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         emailCross,
+		Role:          model.RoleMerchant,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+	mockRepo.byEmailRole[emailCross+":USER"] = crossUserCred
+	mockRepo.byEmailRole[emailCross+":MERCHANT"] = crossMerchCred
+
+	// Store OTP ONLY for Merchant
+	crossMerchOTP := "555555"
+	_ = otpStore.SetOTP(context.Background(), emailVerificationKey(emailCross, model.RoleMerchant), hashToken(crossMerchOTP), 5*time.Minute)
+
+	// Attempt to verify USER using the merchant's OTP -> MUST FAIL
+	_, err = svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: emailCross,
+		OTP:   crossMerchOTP,
+		Role:  "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error when verifying user with OTP that was sent for merchant")
+	}
+	if crossUserCred.EmailVerified {
+		t.Error("expected crossUserCred to remain unverified")
+	}
+
+	// Now verify MERCHANT using that OTP -> MUST SUCCEED
+	resCrossMerch, err := svc.VerifyEmail(context.Background(), &dto.VerifyEmailRequest{
+		Email: emailCross,
+		OTP:   crossMerchOTP,
+		Role:  "MERCHANT",
+	})
+	if err != nil {
+		t.Fatalf("expected merchant verification to succeed, got: %v", err)
+	}
+	if !resCrossMerch.Success {
+		t.Error("expected resCrossMerch.Success to be true")
+	}
+	if !crossMerchCred.EmailVerified {
+		t.Error("expected crossMerchCred to be verified")
+	}
+}
+
+func TestResendVerificationEmail_WithRole(t *testing.T) {
+	svc, mockRepo, _, otpStore := setupTestServiceWithOTPStore()
+
+	sharedEmail := "merchant.resend@example.com"
+	merchCred := &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         sharedEmail,
+		Role:          model.RoleMerchant,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+	mockRepo.byEmailRole[sharedEmail+":MERCHANT"] = merchCred
+
+	res, err := svc.ResendVerificationEmail(context.Background(), &dto.ResendVerificationEmailRequest{
+		Email: sharedEmail,
+		Role:  "MERCHANT",
+	})
+	if err != nil {
+		t.Fatalf("expected resend with role to succeed, got: %v", err)
+	}
+	if !res.Success {
+		t.Error("expected res.Success to be true")
+	}
+
+	key := emailVerificationKey(sharedEmail, model.RoleMerchant)
+	storedHash, err := otpStore.GetOTP(context.Background(), key)
+	if err != nil || storedHash == "" {
+		t.Errorf("expected OTP to be stored for %s, got: %v", key, err)
+	}
+}
+
 
 
 type mockUserServiceClient struct {
@@ -1195,8 +1351,8 @@ func TestResendVerificationEmail_Cooldown(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for already verified user")
 	}
-	if appErr := appErrors.AsAppError(err); appErr.HTTPStatus != 400 {
-		t.Errorf("expected 400 Bad Request, got %d", appErr.HTTPStatus)
+	if appErr := appErrors.AsAppError(err); appErr.HTTPStatus != 409 {
+		t.Errorf("expected 409 Conflict, got %d", appErr.HTTPStatus)
 	}
 
 	// 3. Unverified user - first resend request -> should succeed

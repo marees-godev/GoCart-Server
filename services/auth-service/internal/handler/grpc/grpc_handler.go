@@ -138,6 +138,7 @@ func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRe
 		Email: req.GetEmail(),
 		OTP:   req.GetOtp(),
 		Token: req.GetToken(),
+		Role:  fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -152,6 +153,7 @@ func (h *AuthGRPCHandler) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRe
 func (h *AuthGRPCHandler) ResendVerificationEmail(ctx context.Context, req *pb.ResendVerificationEmailRequest) (*pb.ResendVerificationEmailResponse, error) {
 	resp, err := h.authService.ResendVerificationEmail(ctx, &dto.ResendVerificationEmailRequest{
 		Email: req.GetEmail(),
+		Role:  fromPBRole(req.GetRole()),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
