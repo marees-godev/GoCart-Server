@@ -112,7 +112,7 @@ func LoadEnv() *Config {
 			Port:                 GetEnv("GRPC_PORT", "50059"),
 			CartServiceAddr:      GetEnv("CART_SERVICE_GRPC_ADDR", "localhost:50057"),
 			ProductServiceAddr:   GetEnv("PRODUCT_SERVICE_GRPC_ADDR", "localhost:50053"),
-			InventoryServiceAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50056"),
+			InventoryServiceAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
 			TimeoutSeconds:       GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 5),
 		},
 	}

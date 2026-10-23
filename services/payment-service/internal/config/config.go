@@ -126,7 +126,7 @@ func LoadEnv() *Config {
 			Timeout:               GetEnvAsInt("PAYMENT_GATEWAY_TIMEOUT_SECONDS", 10),
 		},
 		Services: ServicesConfig{
-			OrderServiceURL: GetEnv("ORDER_SERVICE_URL", "localhost:50054"),
+			OrderServiceURL: GetEnv("ORDER_SERVICE_URL", "localhost:50059"),
 		},
 		Kafka: KafkaConfig{
 			Brokers: strings.Split(GetEnv("KAFKA_BROKERS", "localhost:9092"), ","),
