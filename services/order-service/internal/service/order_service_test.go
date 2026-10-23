@@ -25,6 +25,7 @@ import (
 type mockOrderRepo struct {
 	mu              sync.RWMutex
 	orders          map[string]*model.Order
+	history         map[string][]*model.OrderStatusHistory
 	outboxEnvelopes []*events.EventEnvelope
 	outboxTopic     string
 }
@@ -32,6 +33,7 @@ type mockOrderRepo struct {
 func newMockOrderRepo() *mockOrderRepo {
 	return &mockOrderRepo{
 		orders:          make(map[string]*model.Order),
+		history:         make(map[string][]*model.OrderStatusHistory),
 		outboxEnvelopes: make([]*events.EventEnvelope, 0),
 	}
 }
@@ -49,6 +51,15 @@ func (m *mockOrderRepo) CreateOrdersWithOutbox(
 		cp.Items = make([]model.OrderItem, len(o.Items))
 		copy(cp.Items, o.Items)
 		m.orders[o.ID] = &cp
+
+		m.history[o.ID] = append(m.history[o.ID], &model.OrderStatusHistory{
+			ID:        uuid.New().String(),
+			OrderID:   o.ID,
+			ToStatus:  o.Status,
+			Reason:    "Order created",
+			ChangedBy: o.UserID,
+			CreatedAt: o.CreatedAt,
+		})
 	}
 	m.outboxEnvelopes = append(m.outboxEnvelopes, envelopes...)
 	m.outboxTopic = topic
@@ -66,6 +77,42 @@ func (m *mockOrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Ord
 	cp.Items = make([]model.OrderItem, len(o.Items))
 	copy(cp.Items, o.Items)
 	return &cp, nil
+}
+
+func (m *mockOrderRepo) GetOrdersByIdempotencyKey(ctx context.Context, idempotencyKey string) ([]*model.Order, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var matchingPrimary *model.Order
+	for _, o := range m.orders {
+		if o.IdempotencyKey != nil && *o.IdempotencyKey == idempotencyKey {
+			matchingPrimary = o
+			break
+		}
+	}
+	if matchingPrimary == nil {
+		return nil, repository.ErrOrderNotFound
+	}
+
+	res := make([]*model.Order, 0)
+	if matchingPrimary.ParentOrderID != nil && *matchingPrimary.ParentOrderID != "" {
+		for _, o := range m.orders {
+			if o.ParentOrderID != nil && *o.ParentOrderID == *matchingPrimary.ParentOrderID {
+				cp := *o
+				cp.Items = make([]model.OrderItem, len(o.Items))
+				copy(cp.Items, o.Items)
+				res = append(res, &cp)
+			}
+		}
+		if len(res) > 0 {
+			return res, nil
+		}
+	}
+
+	cp := *matchingPrimary
+	cp.Items = make([]model.OrderItem, len(matchingPrimary.Items))
+	copy(cp.Items, matchingPrimary.Items)
+	return []*model.Order{&cp}, nil
 }
 
 func (m *mockOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit, offset int) ([]*model.Order, int, error) {
@@ -91,38 +138,82 @@ func (m *mockOrderRepo) ListOrdersByUserID(ctx context.Context, userID string, l
 	return res[offset:end], total, nil
 }
 
-func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
 	}
+	prev := o.Status
 	o.Status = orderStatus
 	o.UpdatedAt = time.Now().UTC()
+
+	rText := ""
+	if len(reason) > 0 {
+		rText = reason[0]
+	}
+
+	m.history[id] = append(m.history[id], &model.OrderStatusHistory{
+		ID:         uuid.New().String(),
+		OrderID:    id,
+		FromStatus: &prev,
+		ToStatus:   orderStatus,
+		Reason:     rText,
+		CreatedAt:  o.UpdatedAt,
+	})
+
 	cp := *o
 	cp.Items = make([]model.OrderItem, len(o.Items))
 	copy(cp.Items, o.Items)
 	return &cp, nil
 }
 
-func (m *mockOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string) (*model.Order, error) {
+func (m *mockOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	o, ok := m.orders[id]
 	if !ok {
 		return nil, repository.ErrOrderNotFound
 	}
+	prev := o.Status
 	o.Status = model.OrderStatusCancelled
 	o.UpdatedAt = time.Now().UTC()
 	if envelope != nil {
 		m.outboxEnvelopes = append(m.outboxEnvelopes, envelope)
 		m.outboxTopic = topic
 	}
+
+	rText := ""
+	if len(reason) > 0 {
+		rText = reason[0]
+	}
+
+	m.history[id] = append(m.history[id], &model.OrderStatusHistory{
+		ID:         uuid.New().String(),
+		OrderID:    id,
+		FromStatus: &prev,
+		ToStatus:   model.OrderStatusCancelled,
+		Reason:     rText,
+		CreatedAt:  o.UpdatedAt,
+	})
+
 	cp := *o
 	cp.Items = make([]model.OrderItem, len(o.Items))
 	copy(cp.Items, o.Items)
 	return &cp, nil
+}
+
+func (m *mockOrderRepo) GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	list, ok := m.history[orderID]
+	if !ok {
+		return []*model.OrderStatusHistory{}, nil
+	}
+	cp := make([]*model.OrderStatusHistory, len(list))
+	copy(cp, list)
+	return cp, nil
 }
 
 func (m *mockOrderRepo) CreateOrderWithOutbox(
@@ -279,6 +370,7 @@ func TestOrderService_CreateOrder_SingleStore_Success(t *testing.T) {
 
 	result, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:            userID,
+		IdempotencyKey:    uuid.New().String(),
 		ShippingAddress:   shippingAddr,
 		ShippingAddressID: shipAddrID,
 		BillingAddressID:  billAddrID,
@@ -417,6 +509,7 @@ func TestOrderService_CreateOrder_MultiStoreSplit(t *testing.T) {
 
 	result, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "456 Market St, San Francisco, CA",
 		ShippingFee:     20.00, // $10 per store
 	})
@@ -493,6 +586,7 @@ func TestOrderService_CreateOrder_AuthoritativePriceEnforced(t *testing.T) {
 	// Client passes item with forged price of 1.00
 	input := dto.CreateOrderInput{
 		UserID:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "789 Broadway, NYC",
 		Items: []dto.CreateOrderItemInput{
 			{
@@ -555,6 +649,7 @@ func TestOrderService_CreateOrder_EmptyCartRejected(t *testing.T) {
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Street",
 	})
 
@@ -575,6 +670,7 @@ func TestOrderService_CreateOrder_InvalidUserRejected(t *testing.T) {
 	// Missing user_id
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          "",
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Street",
 	})
 	if err == nil {
@@ -584,6 +680,7 @@ func TestOrderService_CreateOrder_InvalidUserRejected(t *testing.T) {
 	// Non-UUID user_id
 	_, err = svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          "not-a-valid-uuid",
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Street",
 	})
 	if err == nil {
@@ -597,7 +694,8 @@ func TestOrderService_CreateOrder_MissingAddressRejected(t *testing.T) {
 	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
-		UserID: uuid.New().String(),
+		UserID:         uuid.New().String(),
+		IdempotencyKey: uuid.New().String(),
 	})
 	if err == nil {
 		t.Fatalf("expected missing address to fail")
@@ -628,6 +726,7 @@ func TestOrderService_CreateOrder_InsufficientStockRejected(t *testing.T) {
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Main St",
 		Items: []dto.CreateOrderItemInput{
 			{ProductID: prodID, StoreID: storeID, Quantity: 5}, // requesting 5
@@ -666,6 +765,7 @@ func TestOrderService_CreateOrder_InactiveProductRejected(t *testing.T) {
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Main St",
 		Items: []dto.CreateOrderItemInput{
 			{ProductID: prodID, StoreID: storeID, Quantity: 1},
@@ -702,19 +802,25 @@ func TestOrderService_GetOrder_And_UpdateStatus(t *testing.T) {
 		t.Errorf("expected order id %s, got %s", orderID, order.ID)
 	}
 
-	// 2. UpdateOrderStatus
-	updated, err := svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusConfirmed)
+	// 2. Valid UpdateOrderStatus: CREATED -> PENDING_PAYMENT
+	updated, err := svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusPendingPayment)
 	if err != nil {
 		t.Fatalf("failed to update order status: %v", err)
 	}
-	if updated.Status != model.OrderStatusConfirmed {
-		t.Errorf("expected CONFIRMED status, got %s", updated.Status)
+	if updated.Status != model.OrderStatusPendingPayment {
+		t.Errorf("expected PENDING_PAYMENT status, got %s", updated.Status)
 	}
 
-	// 3. Update with invalid status
+	// 3. Invalid transition: PENDING_PAYMENT -> DELIVERED (skipping states is rejected)
+	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusDelivered)
+	if err == nil {
+		t.Fatalf("expected invalid transition to DELIVERED to be rejected")
+	}
+
+	// 4. Update with unknown status
 	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatus("UNKNOWN_STATUS"))
 	if err == nil {
-		t.Fatalf("expected error on invalid status")
+		t.Fatalf("expected error on unknown status")
 	}
 }
 
@@ -810,4 +916,385 @@ func TestOrderService_CancelOrder(t *testing.T) {
 		t.Fatalf("expected cancelling shipped order to fail")
 	}
 }
+
+func TestOrderService_CreateOrder_MissingIdempotencyKey(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+
+	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+		UserID:          uuid.New().String(),
+		ShippingAddress: "123 Main St",
+		// IdempotencyKey omitted
+	})
+	if err == nil {
+		t.Fatalf("expected missing idempotency key to be rejected")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BAD_REQUEST code for missing idempotency key, got %v", err)
+	}
+}
+
+func TestOrderService_CreateOrder_Idempotency_DuplicateRequest(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+
+	userID := uuid.New().String()
+	otherUserID := uuid.New().String()
+	prodID := uuid.New().String()
+	storeID := uuid.New().String()
+	idempKey := "idemp-key-" + uuid.New().String()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			prodID: {Id: prodID, StoreId: storeID, Price: 25.00, Status: "PUBLISHED"},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			prodID: {ProductId: prodID, AvailableQuantity: 20},
+		},
+	}
+
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, 5, nil)
+
+	input := dto.CreateOrderInput{
+		UserID:          userID,
+		IdempotencyKey:  idempKey,
+		ShippingAddress: "100 Pine St, Seattle, WA",
+		Items: []dto.CreateOrderItemInput{
+			{ProductID: prodID, StoreID: storeID, Quantity: 2},
+		},
+	}
+
+	// 1. First order creation request: succeeds
+	res1, err := svc.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("expected first CreateOrder to succeed, got %v", err)
+	}
+	if res1 == nil || res1.PrimaryOrder == nil {
+		t.Fatalf("expected non-nil primary order on first request")
+	}
+	firstOrderID := res1.PrimaryOrder.ID
+
+	// Verify exactly 1 order in repository
+	if len(repo.orders) != 1 {
+		t.Fatalf("expected 1 order in repo, got %d", len(repo.orders))
+	}
+
+	// 2. Duplicate order creation request with same idempotency key: succeeds idempotently
+	res2, err := svc.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("expected duplicate CreateOrder to succeed idempotently, got %v", err)
+	}
+	if res2 == nil || res2.PrimaryOrder == nil {
+		t.Fatalf("expected non-nil primary order on duplicate request")
+	}
+	if res2.PrimaryOrder.ID != firstOrderID {
+		t.Errorf("expected duplicate request to return original order id %s, got %s", firstOrderID, res2.PrimaryOrder.ID)
+	}
+
+	// Crucial check: verify NO duplicate orders were created
+	if len(repo.orders) != 1 {
+		t.Errorf("expected still exactly 1 order in repository after duplicate request, got %d", len(repo.orders))
+	}
+
+	// 3. Duplicate idempotency key used by a different user: rejected with Conflict
+	inputDiffUser := input
+	inputDiffUser.UserID = otherUserID
+	_, err = svc.CreateOrder(ctx, inputDiffUser)
+	if err == nil {
+		t.Fatalf("expected duplicate idempotency key by different user to fail with Conflict")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeConflict {
+		t.Errorf("expected Conflict error code, got %v", err)
+	}
+}
+
+func TestOrderService_OrderStateMachine_Transitions(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+
+	orderID := uuid.New().String()
+	repo.orders[orderID] = &model.Order{
+		ID:          orderID,
+		OrderNumber: "ORD-STATE-001",
+		UserID:      uuid.New().String(),
+		StoreID:     uuid.New().String(),
+		Status:      model.OrderStatusCreated,
+		TotalAmount: 150.00,
+	}
+
+	// 1. CREATED -> PENDING_PAYMENT
+	o, err := svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusPendingPayment)
+	if err != nil {
+		t.Fatalf("expected transition CREATED -> PENDING_PAYMENT to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusPendingPayment {
+		t.Errorf("expected PENDING_PAYMENT, got %s", o.Status)
+	}
+
+	// 2. Invalid backward or skipping transition: PENDING_PAYMENT -> SHIPPED (rejected!)
+	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusShipped)
+	if err == nil {
+		t.Fatalf("expected PENDING_PAYMENT -> SHIPPED to be rejected as invalid transition")
+	}
+
+	// 3. PENDING_PAYMENT -> PAID
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusPaid)
+	if err != nil {
+		t.Fatalf("expected transition PENDING_PAYMENT -> PAID to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusPaid {
+		t.Errorf("expected PAID, got %s", o.Status)
+	}
+
+	// 4. PAID -> CONFIRMED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusConfirmed)
+	if err != nil {
+		t.Fatalf("expected transition PAID -> CONFIRMED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusConfirmed {
+		t.Errorf("expected CONFIRMED, got %s", o.Status)
+	}
+
+	// 5. CONFIRMED -> PROCESSING
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusProcessing)
+	if err != nil {
+		t.Fatalf("expected transition CONFIRMED -> PROCESSING to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusProcessing {
+		t.Errorf("expected PROCESSING, got %s", o.Status)
+	}
+
+	// 6. PROCESSING -> SHIPPED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusShipped)
+	if err != nil {
+		t.Fatalf("expected transition PROCESSING -> SHIPPED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusShipped {
+		t.Errorf("expected SHIPPED, got %s", o.Status)
+	}
+
+	// 7. SHIPPED -> OUT_FOR_DELIVERY
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusOutForDelivery)
+	if err != nil {
+		t.Fatalf("expected transition SHIPPED -> OUT_FOR_DELIVERY to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusOutForDelivery {
+		t.Errorf("expected OUT_FOR_DELIVERY, got %s", o.Status)
+	}
+
+	// 8. OUT_FOR_DELIVERY -> DELIVERED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusDelivered)
+	if err != nil {
+		t.Fatalf("expected transition OUT_FOR_DELIVERY -> DELIVERED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusDelivered {
+		t.Errorf("expected DELIVERED, got %s", o.Status)
+	}
+
+	// 9. DELIVERED -> RETURN_REQUESTED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusReturnRequested)
+	if err != nil {
+		t.Fatalf("expected transition DELIVERED -> RETURN_REQUESTED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusReturnRequested {
+		t.Errorf("expected RETURN_REQUESTED, got %s", o.Status)
+	}
+
+	// 10. RETURN_REQUESTED -> RETURNED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusReturned)
+	if err != nil {
+		t.Fatalf("expected transition RETURN_REQUESTED -> RETURNED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusReturned {
+		t.Errorf("expected RETURNED, got %s", o.Status)
+	}
+
+	// 11. RETURNED -> REFUNDED
+	o, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusRefunded)
+	if err != nil {
+		t.Fatalf("expected transition RETURNED -> REFUNDED to succeed: %v", err)
+	}
+	if o.Status != model.OrderStatusRefunded {
+		t.Errorf("expected REFUNDED, got %s", o.Status)
+	}
+
+	// 12. Terminal state: REFUNDED cannot transition to anything
+	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusDelivered)
+	if err == nil {
+		t.Fatalf("expected transition from terminal REFUNDED to be rejected")
+	}
+
+	// 13. Test failure path: PENDING_PAYMENT -> PAYMENT_FAILED
+	failedOrderID := uuid.New().String()
+	repo.orders[failedOrderID] = &model.Order{
+		ID:          failedOrderID,
+		Status:      model.OrderStatusPendingPayment,
+		TotalAmount: 80.00,
+	}
+	failedOrd, err := svc.UpdateOrderStatus(ctx, failedOrderID, model.OrderStatusPaymentFailed)
+	if err != nil {
+		t.Fatalf("expected PENDING_PAYMENT -> PAYMENT_FAILED to succeed: %v", err)
+	}
+	if failedOrd.Status != model.OrderStatusPaymentFailed {
+		t.Errorf("expected PAYMENT_FAILED, got %s", failedOrd.Status)
+	}
+}
+
+func TestOrderService_Cancellation_BeforeAndAfterShipment(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+
+	userID := uuid.New().String()
+
+	// 1. Cancellation before shipment must succeed for all pre-shipment states
+	preShipmentStates := []model.OrderStatus{
+		model.OrderStatusCreated,
+		model.OrderStatusPendingPayment,
+		model.OrderStatusPaid,
+		model.OrderStatusConfirmed,
+		model.OrderStatusProcessing,
+	}
+
+	for _, st := range preShipmentStates {
+		ordID := uuid.New().String()
+		repo.orders[ordID] = &model.Order{
+			ID:          ordID,
+			UserID:      userID,
+			Status:      st,
+			TotalAmount: 50.00,
+		}
+
+		cancelled, err := svc.CancelOrder(ctx, ordID, userID, "Customer request before shipment")
+		if err != nil {
+			t.Errorf("expected cancellation from %s to succeed, got %v", st, err)
+			continue
+		}
+		if cancelled.Status != model.OrderStatusCancelled {
+			t.Errorf("expected CANCELLED status, got %s", cancelled.Status)
+		}
+	}
+
+	// 2. Cancellation at or after shipment must be REJECTED
+	postShipmentStates := []model.OrderStatus{
+		model.OrderStatusShipped,
+		model.OrderStatusOutForDelivery,
+		model.OrderStatusDelivered,
+		model.OrderStatusReturnRequested,
+		model.OrderStatusReturned,
+		model.OrderStatusRefunded,
+	}
+
+	for _, st := range postShipmentStates {
+		ordID := uuid.New().String()
+		repo.orders[ordID] = &model.Order{
+			ID:          ordID,
+			UserID:      userID,
+			Status:      st,
+			TotalAmount: 50.00,
+		}
+
+		_, err := svc.CancelOrder(ctx, ordID, userID, "Customer cancel attempt")
+		if err == nil {
+			t.Errorf("expected cancellation from %s to be rejected, but it succeeded", st)
+		}
+		appErr := appErrors.AsAppError(err)
+		if appErr == nil || appErr.Code != appErrors.CodeBadRequest {
+			t.Errorf("expected BAD_REQUEST for cancellation from %s, got %v", st, err)
+		}
+	}
+}
+
+func TestOrderService_OrderStatusHistory_Traceable(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+
+	userID := uuid.New().String()
+	orderID := uuid.New().String()
+
+	repo.orders[orderID] = &model.Order{
+		ID:          orderID,
+		UserID:      userID,
+		Status:      model.OrderStatusCreated,
+		TotalAmount: 75.00,
+		CreatedAt:   time.Now().UTC(),
+	}
+
+	// Record initial CREATED history
+	repo.history[orderID] = append(repo.history[orderID], &model.OrderStatusHistory{
+		ID:        uuid.New().String(),
+		OrderID:   orderID,
+		ToStatus:  model.OrderStatusCreated,
+		Reason:    "Order created",
+		ChangedBy: userID,
+		CreatedAt: time.Now().UTC(),
+	})
+
+	// Transition 1: CREATED -> PENDING_PAYMENT
+	_, err := svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusPendingPayment, "Payment pending redirect")
+	if err != nil {
+		t.Fatalf("failed transition to PENDING_PAYMENT: %v", err)
+	}
+
+	// Transition 2: PENDING_PAYMENT -> PAID
+	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusPaid, "Gateway webhook payment success")
+	if err != nil {
+		t.Fatalf("failed transition to PAID: %v", err)
+	}
+
+	// Transition 3: PAID -> CONFIRMED
+	_, err = svc.UpdateOrderStatus(ctx, orderID, model.OrderStatusConfirmed, "Merchant accepted order")
+	if err != nil {
+		t.Fatalf("failed transition to CONFIRMED: %v", err)
+	}
+
+	// Fetch status history
+	history, err := svc.GetOrderStatusHistory(ctx, orderID)
+	if err != nil {
+		t.Fatalf("failed to retrieve status history: %v", err)
+	}
+
+	// Verify all transitions are traceable
+	if len(history) != 4 {
+		t.Fatalf("expected 4 status history entries, got %d", len(history))
+	}
+
+	expectedTransitions := []struct {
+		from *model.OrderStatus
+		to   model.OrderStatus
+	}{
+		{from: nil, to: model.OrderStatusCreated},
+		{from: ptr(model.OrderStatusCreated), to: model.OrderStatusPendingPayment},
+		{from: ptr(model.OrderStatusPendingPayment), to: model.OrderStatusPaid},
+		{from: ptr(model.OrderStatusPaid), to: model.OrderStatusConfirmed},
+	}
+
+	for i, exp := range expectedTransitions {
+		entry := history[i]
+		if entry.ToStatus != exp.to {
+			t.Errorf("entry %d: expected to_status %s, got %s", i, exp.to, entry.ToStatus)
+		}
+		if exp.from == nil {
+			if entry.FromStatus != nil {
+				t.Errorf("entry %d: expected nil from_status, got %s", i, *entry.FromStatus)
+			}
+		} else {
+			if entry.FromStatus == nil || *entry.FromStatus != *exp.from {
+				t.Errorf("entry %d: expected from_status %v, got %v", i, exp.from, entry.FromStatus)
+			}
+		}
+	}
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
+
 
