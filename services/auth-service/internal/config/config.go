@@ -52,7 +52,8 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Port string
+	Port          string
+	ClientTimeout time.Duration
 }
 
 type DatabaseConfig struct {
@@ -123,7 +124,8 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "9451"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50051"),
+			Port:          GetEnv("GRPC_PORT", "50051"),
+			ClientTimeout: GetEnvAsDuration("GRPC_DEFAULT_TIMEOUT", 30*time.Second),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("AUTH_SERVICE_DATABASE_URL", ""),

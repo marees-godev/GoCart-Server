@@ -296,7 +296,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		mClient := s.merchantClient
 		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
 			var err error
-			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 30*time.Second)
 			if err == nil {
 				s.merchantClient = mClient
 			}
@@ -498,7 +498,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		mClient := s.merchantClient
 		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
 			var err error
-			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 30*time.Second)
 			if err != nil {
 				s.logger.Error("Failed to connect to merchant service", "error", err)
 				_ = s.repo.DeleteCredential(ctx, credID)
@@ -575,7 +575,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 		dClient := s.deliveryClient
 		if dClient == nil && s.cfg != nil && s.cfg.Services.DeliveryServiceURL != "" {
-			if c, _, err := grpcclient.NewDeliveryClient(s.cfg.Services.DeliveryServiceURL, 5*time.Second); err == nil {
+			if c, _, err := grpcclient.NewDeliveryClient(s.cfg.Services.DeliveryServiceURL, 30*time.Second); err == nil {
 				s.deliveryClient = c
 				dClient = c
 			}
