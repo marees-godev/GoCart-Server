@@ -91,6 +91,7 @@ message VerifyEmailRequest {
   string email = 1;
   string otp = 2;
   string token = 3;
+  Role role = 4;
 }
 
 message VerifyEmailResponse {
@@ -100,6 +101,7 @@ message VerifyEmailResponse {
 
 message ResendVerificationEmailRequest {
   string email = 1;
+  Role role = 2;
 }
 
 message ResendVerificationEmailResponse {

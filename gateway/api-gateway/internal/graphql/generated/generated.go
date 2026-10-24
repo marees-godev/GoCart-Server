@@ -254,7 +254,7 @@ type ComplexityRoot struct {
 		ReleaseStock                 func(childComplexity int, reservationID string) int
 		RemoveFromCart               func(childComplexity int, userID string, productID string) int
 		RequestReturn                func(childComplexity int, input model.RequestReturnInput) int
-		ResendVerificationEmail      func(childComplexity int, email string) int
+		ResendVerificationEmail      func(childComplexity int, email string, role model.AuthRole) int
 		ReserveStock                 func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
 		ResetPasswordWithOtp         func(childComplexity int, input model.ResetPasswordWithOtpInput) int
 		RestockInventory             func(childComplexity int, input model.RestockInventoryInput) int
@@ -277,7 +277,7 @@ type ComplexityRoot struct {
 		UpdateStore                  func(childComplexity int, input model.UpdateStoreInput) int
 		UpdateUser                   func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress            func(childComplexity int, id string, input model.UpdateAddressInput) int
-		VerifyEmail                  func(childComplexity int, email string, otp string) int
+		VerifyEmail                  func(childComplexity int, email string, otp string, role model.AuthRole) int
 	}
 
 	Notification struct {
@@ -562,8 +562,8 @@ type MutationResolver interface {
 	Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error)
 	RefreshToken(ctx context.Context, input model.RefreshTokenInput) (*model.AuthPayload, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
-	VerifyEmail(ctx context.Context, email string, otp string) (bool, error)
-	ResendVerificationEmail(ctx context.Context, email string) (bool, error)
+	VerifyEmail(ctx context.Context, email string, otp string, role model.AuthRole) (bool, error)
+	ResendVerificationEmail(ctx context.Context, email string, role model.AuthRole) (bool, error)
 	ForgotPassword(ctx context.Context, input model.ForgotPasswordInput) (*model.ForgotPasswordPayload, error)
 	ResetPasswordWithOtp(ctx context.Context, input model.ResetPasswordWithOtpInput) (*model.ResetPasswordPayload, error)
 	ChangePassword(ctx context.Context, input model.ChangePasswordInput) (*model.ChangePasswordPayload, error)
@@ -1896,7 +1896,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ResendVerificationEmail(childComplexity, args["email"].(string)), true
+		return e.complexity.Mutation.ResendVerificationEmail(childComplexity, args["email"].(string), args["role"].(model.AuthRole)), true
 
 	case "Mutation.reserveStock":
 		if e.complexity.Mutation.ReserveStock == nil {
@@ -2172,7 +2172,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string)), true
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string), args["role"].(model.AuthRole)), true
 
 	case "Notification.channel":
 		if e.complexity.Notification.Channel == nil {
@@ -3959,8 +3959,8 @@ extend type Mutation {
   register(input: RegisterInput!): AuthPayload!
   refreshToken(input: RefreshTokenInput!): AuthPayload!
   logout: LogoutPayload!
-  verifyEmail(email: String!, otp: String!): Boolean!
-  resendVerificationEmail(email: String!): Boolean!
+  verifyEmail(email: String!, otp: String!, role: AuthRole!): Boolean!
+  resendVerificationEmail(email: String!, role: AuthRole!): Boolean!
   forgotPassword(input: ForgotPasswordInput!): ForgotPasswordPayload!
   resetPasswordWithOtp(input: ResetPasswordWithOtpInput!): ResetPasswordPayload!
   changePassword(input: ChangePasswordInput!): ChangePasswordPayload!
@@ -5541,6 +5541,15 @@ func (ec *executionContext) field_Mutation_resendVerificationEmail_args(ctx cont
 		}
 	}
 	args["email"] = arg0
+	var arg1 model.AuthRole
+	if tmp, ok := rawArgs["role"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+		arg1, err = ec.unmarshalNAuthRole2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["role"] = arg1
 	return args, nil
 }
 
@@ -6048,6 +6057,15 @@ func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context,
 		}
 	}
 	args["otp"] = arg1
+	var arg2 model.AuthRole
+	if tmp, ok := rawArgs["role"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+		arg2, err = ec.unmarshalNAuthRole2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["role"] = arg2
 	return args, nil
 }
 
@@ -11675,7 +11693,7 @@ func (ec *executionContext) _Mutation_verifyEmail(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().VerifyEmail(rctx, fc.Args["email"].(string), fc.Args["otp"].(string))
+		return ec.resolvers.Mutation().VerifyEmail(rctx, fc.Args["email"].(string), fc.Args["otp"].(string), fc.Args["role"].(model.AuthRole))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -11730,7 +11748,7 @@ func (ec *executionContext) _Mutation_resendVerificationEmail(ctx context.Contex
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ResendVerificationEmail(rctx, fc.Args["email"].(string))
+		return ec.resolvers.Mutation().ResendVerificationEmail(rctx, fc.Args["email"].(string), fc.Args["role"].(model.AuthRole))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

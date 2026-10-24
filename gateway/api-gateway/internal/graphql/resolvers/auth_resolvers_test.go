@@ -16,8 +16,10 @@ import (
 
 type mockAuthClient struct {
 	authpb.AuthServiceClient
-	lastRegisterReq *authpb.RegisterRequest
-	lastLoginReq    *authpb.LoginRequest
+	lastRegisterReq    *authpb.RegisterRequest
+	lastLoginReq       *authpb.LoginRequest
+	lastVerifyEmailReq *authpb.VerifyEmailRequest
+	lastResendReq      *authpb.ResendVerificationEmailRequest
 }
 
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
@@ -64,6 +66,22 @@ func (m *mockAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, o
 	return &authpb.LogoutResponse{
 		Success: true,
 		Message: "Logged out successfully",
+	}, nil
+}
+
+func (m *mockAuthClient) VerifyEmail(ctx context.Context, in *authpb.VerifyEmailRequest, opts ...grpcPkg.CallOption) (*authpb.VerifyEmailResponse, error) {
+	m.lastVerifyEmailReq = in
+	return &authpb.VerifyEmailResponse{
+		Success: true,
+		Message: "Email verified",
+	}, nil
+}
+
+func (m *mockAuthClient) ResendVerificationEmail(ctx context.Context, in *authpb.ResendVerificationEmailRequest, opts ...grpcPkg.CallOption) (*authpb.ResendVerificationEmailResponse, error) {
+	m.lastResendReq = in
+	return &authpb.ResendVerificationEmailResponse{
+		Success: true,
+		Message: "Verification sent",
 	}, nil
 }
 
@@ -636,6 +654,65 @@ func TestAuthResolvers_ClientUnavailable(t *testing.T) {
 	_, errRegister3 := rNilResolver.Register(context.Background(), registerInput)
 	if errRegister3 == nil || !strings.Contains(errRegister3.Error(), "auth client unavailable") {
 		t.Errorf("expected 'auth client unavailable' error on Register with nil resolver, got: %v", errRegister3)
+	}
+}
+
+func TestVerifyEmail_Resolver(t *testing.T) {
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+		},
+	}
+
+	success, err := r.VerifyEmail(context.Background(), "user@example.com", "123456", model.AuthRoleMerchant)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !success {
+		t.Errorf("expected success to be true")
+	}
+	if authCli.lastVerifyEmailReq == nil {
+		t.Fatal("expected lastVerifyEmailReq to not be nil")
+	}
+	if authCli.lastVerifyEmailReq.Email != "user@example.com" {
+		t.Errorf("expected email 'user@example.com', got '%s'", authCli.lastVerifyEmailReq.Email)
+	}
+	if authCli.lastVerifyEmailReq.Otp != "123456" {
+		t.Errorf("expected otp '123456', got '%s'", authCli.lastVerifyEmailReq.Otp)
+	}
+	if authCli.lastVerifyEmailReq.Role != authpb.Role_MERCHANT {
+		t.Errorf("expected role MERCHANT, got %v", authCli.lastVerifyEmailReq.Role)
+	}
+}
+
+func TestResendVerificationEmail_Resolver(t *testing.T) {
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+		},
+	}
+
+	success, err := r.ResendVerificationEmail(context.Background(), "delivery@example.com", model.AuthRoleDeliveryPartner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !success {
+		t.Errorf("expected success to be true")
+	}
+	if authCli.lastResendReq == nil {
+		t.Fatal("expected lastResendReq to not be nil")
+	}
+	if authCli.lastResendReq.Email != "delivery@example.com" {
+		t.Errorf("expected email 'delivery@example.com', got '%s'", authCli.lastResendReq.Email)
+	}
+	if authCli.lastResendReq.Role != authpb.Role_DELIVERY_PARTNER {
+		t.Errorf("expected role DELIVERY_PARTNER, got %v", authCli.lastResendReq.Role)
 	}
 }
 

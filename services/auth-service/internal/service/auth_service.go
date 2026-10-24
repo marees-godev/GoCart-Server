@@ -479,7 +479,8 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 		otpHash := hashToken(rawOTP)
 		ttl := time.Duration(ttlMinutes) * time.Minute
-		if err := s.otpStore.SetOTP(ctx, email, otpHash, ttl); err == nil {
+		otpKey := emailVerificationKey(email, role)
+		if err := s.otpStore.SetOTP(ctx, otpKey, otpHash, ttl); err == nil {
 			go func(toEmail, otp string) {
 				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
 			}(email, rawOTP)
@@ -866,10 +867,22 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		return nil, appErrors.BadRequest("email is required")
 	}
 
-	cred, err := s.repo.GetByEmail(ctx, email)
+	var cred *model.AuthCredential
+	var err error
+	var otpKey string
+
+	if req.Role != "" {
+		role := model.NormalizeRole(req.Role)
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		otpKey = emailVerificationKey(email, role)
+	} else {
+		cred, err = s.repo.GetByEmail(ctx, email)
+		otpKey = email
+	}
+
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Verify email failed: user not found", "email", email)
+			s.logger.Warn("Verify email failed: user not found", "email", email, "role", req.Role)
 			return nil, appErrors.NotFound("user not found")
 		}
 		s.logger.Error("Verify email failed: database query error", "error", err)
@@ -883,9 +896,9 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		}, nil
 	}
 
-	storedHash, err := s.otpStore.GetOTP(ctx, email)
+	storedHash, err := s.otpStore.GetOTP(ctx, otpKey)
 	if err != nil {
-		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email)
+		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email, "role", req.Role)
 		return nil, appErrors.BadRequest("verification code has expired or is invalid")
 	}
 
@@ -895,14 +908,14 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 	}
 
 	// Delete from Redis so OTP cannot be reused
-	_ = s.otpStore.DeleteOTP(ctx, email)
+	_ = s.otpStore.DeleteOTP(ctx, otpKey)
 
 	// Update user in PostgreSQL
 	if err := s.repo.MarkEmailVerified(ctx, cred.UserID); err != nil {
 		return nil, appErrors.Internal(err, "failed to update email verification status")
 	}
 
-	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email)
+	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email, "role", cred.Role)
 	return &dto.VerifyEmailResponse{
 		Success: true,
 		Message: "Email address verified successfully",
@@ -916,18 +929,30 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	}
 
 	email := cleanEmail(req.Email)
-	cred, err := s.repo.GetByEmail(ctx, email)
+	var cred *model.AuthCredential
+	var err error
+	var otpKey string
+
+	if req.Role != "" {
+		role := model.NormalizeRole(req.Role)
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		otpKey = emailVerificationKey(email, role)
+	} else {
+		cred, err = s.repo.GetByEmail(ctx, email)
+		otpKey = email
+	}
+
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Resend verification email failed: user not found", "email", email)
+			s.logger.Warn("Resend verification email failed: user not found", "email", email, "role", req.Role)
 			return nil, appErrors.NotFound("user not found")
 		}
 		return nil, appErrors.Internal(err, "failed to query user credentials")
 	}
 
 	if cred.EmailVerified {
-		s.logger.Warn("Resend verification email failed: email already verified", "email", email)
-		return nil, appErrors.BadRequest("email is already verified")
+		s.logger.Warn("Resend verification email failed: email already verified", "email", email, "role", cred.Role)
+		return nil, appErrors.Conflict("email is already verified")
 	}
 
 	ttlMinutes := s.cfg.Email.TokenTTLMinutes
@@ -943,7 +968,9 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	cooldown := time.Duration(cooldownSec) * time.Second
 
 	// Enforce minimum cooldown period by checking remaining TTL in store before issuing a new OTP
-	if remainingTTL, err := s.otpStore.GetTTL(ctx, email); err == nil && remainingTTL > 0 {
+	remainingTTL, err := s.otpStore.GetTTL(ctx, otpKey)
+
+	if err == nil && remainingTTL > 0 {
 		timeElapsed := totalTTL - remainingTTL
 		if timeElapsed < cooldown {
 			waitSec := int((cooldown - timeElapsed + time.Second - 1) / time.Second)
@@ -952,6 +979,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 			}
 			s.logger.Warn("Resend verification email rate limited: cooldown active",
 				"email", email,
+				"role", cred.Role,
 				"wait_seconds", waitSec,
 			)
 			return nil, appErrors.TooManyRequests(fmt.Sprintf("please wait %d seconds before requesting a new verification code", waitSec))
@@ -966,7 +994,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	}
 
 	otpHash := hashToken(rawOTP)
-	if err := s.otpStore.SetOTP(ctx, email, otpHash, totalTTL); err != nil {
+	if err := s.otpStore.SetOTP(ctx, otpKey, otpHash, totalTTL); err != nil {
 		return nil, appErrors.Internal(err, "failed to store verification OTP in store")
 	}
 
@@ -1044,6 +1072,15 @@ func (s *authService) Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.
 
 func cleanEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func emailVerificationKey(email string, role model.Role) string {
+	normalizedRole := model.NormalizeRole(role.String())
+	r := strings.ToLower(strings.TrimSpace(normalizedRole.String()))
+	if r == "" {
+		return cleanEmail(email)
+	}
+	return fmt.Sprintf("%s:%s", cleanEmail(email), r)
 }
 
 func generateOTP() (string, error) {
