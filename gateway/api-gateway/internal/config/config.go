@@ -137,7 +137,7 @@ func LoadEnv() *Config {
 			IntrospectionEnabled: introEnabled,
 		},
 		GRPC: GRPCConfig{
-			DefaultTimeout:          GetEnvAsDuration("GRPC_DEFAULT_TIMEOUT", 5*time.Second),
+			DefaultTimeout:          GetEnvAsDuration("GRPC_DEFAULT_TIMEOUT", 30*time.Second),
 			AuthServiceAddr:         GetEnv("AUTH_SERVICE_GRPC_ADDR", "localhost:50051"),
 			UserServiceAddr:         GetEnv("USER_SERVICE_GRPC_ADDR", "localhost:50052"),
 			ProductServiceAddr:      GetEnv("PRODUCT_SERVICE_GRPC_ADDR", "localhost:50053"),

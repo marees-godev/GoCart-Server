@@ -106,7 +106,11 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	// 6. Initialize business logic layers & gRPC handler
-	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, 5*time.Second)
+	clientTimeout := cfg.GRPC.ClientTimeout
+	if clientTimeout <= 0 {
+		clientTimeout = 30 * time.Second
+	}
+	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, clientTimeout)
 	if err != nil {
 		log.Error("Failed to initialize required user service client", "addr", cfg.UserServiceAddr, "error", err)
 		os.Exit(1)
@@ -115,7 +119,7 @@ func main() {
 
 	var merchantClient merchantpb.MerchantServiceClient
 	if cfg.Services.MerchantServiceURL != "" {
-		mClient, conn, err := grpcclient.NewMerchantClient(cfg.Services.MerchantServiceURL, 5*time.Second)
+		mClient, conn, err := grpcclient.NewMerchantClient(cfg.Services.MerchantServiceURL, clientTimeout)
 		if err != nil {
 			log.Warn("Failed to initialize merchant service gRPC client", "error", err)
 		} else {
@@ -126,7 +130,7 @@ func main() {
 
 	var deliveryClient deliverypb.DeliveryServiceClient
 	if cfg.Services.DeliveryServiceURL != "" {
-		dClient, conn, err := grpcclient.NewDeliveryClient(cfg.Services.DeliveryServiceURL, 5*time.Second)
+		dClient, conn, err := grpcclient.NewDeliveryClient(cfg.Services.DeliveryServiceURL, clientTimeout)
 		if err != nil {
 			log.Warn("Failed to initialize delivery service gRPC client", "error", err)
 		} else {
