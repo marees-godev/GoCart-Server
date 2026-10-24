@@ -298,7 +298,7 @@ services:
       # Internal Microservice Inter-Communication (gRPC inside container)
       # ==============================================================================
       - key: GRPC_DEFAULT_TIMEOUT
-        value: 5s
+        value: 30s
       - key: AUTH_SERVICE_GRPC_ADDR
         value: localhost:50051
       - key: USER_SERVICE_GRPC_ADDR
