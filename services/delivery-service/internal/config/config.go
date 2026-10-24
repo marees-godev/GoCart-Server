@@ -90,7 +90,7 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "9050"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50069"),
+			Port: GetEnv("GRPC_PORT", "50061"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("DELIVERY_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),

@@ -88,6 +88,9 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	if fn == "" && input.Role != model.AuthRoleDeliveryPartner {
 		fn = "User"
 	}
+	if ln == "" && input.Role != model.AuthRoleDeliveryPartner {
+		ln = "User"
+	}
 
 	res, err := authClient.Register(ctx, &authpb.RegisterRequest{
 		Email:     input.Email,
