@@ -68,8 +68,8 @@ extend type Mutation {
   register(input: RegisterInput!): AuthPayload!
   refreshToken(input: RefreshTokenInput!): AuthPayload!
   logout: LogoutPayload!
-  verifyEmail(email: String!, otp: String!): Boolean!
-  resendVerificationEmail(email: String!): Boolean!
+  verifyEmail(email: String!, otp: String!, role: AuthRole!): Boolean!
+  resendVerificationEmail(email: String!, role: AuthRole!): Boolean!
   forgotPassword(input: ForgotPasswordInput!): ForgotPasswordPayload!
   resetPasswordWithOtp(input: ResetPasswordWithOtpInput!): ResetPasswordPayload!
   changePassword(input: ChangePasswordInput!): ChangePasswordPayload!

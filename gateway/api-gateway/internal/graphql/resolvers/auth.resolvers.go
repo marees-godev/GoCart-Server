@@ -214,7 +214,7 @@ func (r *mutationResolver) Logout(ctx context.Context) (*model.LogoutPayload, er
 }
 
 // VerifyEmail is the resolver for the verifyEmail field.
-func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string) (bool, error) {
+func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp string, role model.AuthRole) (bool, error) {
 	authClient, err := r.getAuthClient()
 	if err != nil {
 		return false, err
@@ -226,6 +226,7 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp st
 		Email: email,
 		Otp:   otp,
 		Token: otp,
+		Role:  authRoleToAuthPBRole(role),
 	})
 	if err != nil {
 		return false, grpcclient.TranslateGRPCError(err)
@@ -234,7 +235,7 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, email string, otp st
 }
 
 // ResendVerificationEmail is the resolver for the resendVerificationEmail field.
-func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string) (bool, error) {
+func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email string, role model.AuthRole) (bool, error) {
 	authClient, err := r.getAuthClient()
 	if err != nil {
 		return false, err
@@ -244,6 +245,7 @@ func (r *mutationResolver) ResendVerificationEmail(ctx context.Context, email st
 	}
 	res, err := authClient.ResendVerificationEmail(ctx, &authpb.ResendVerificationEmailRequest{
 		Email: email,
+		Role:  authRoleToAuthPBRole(role),
 	})
 	if err != nil {
 		return false, grpcclient.TranslateGRPCError(err)
