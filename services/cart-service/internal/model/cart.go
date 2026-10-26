@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type Cart struct {
 	ID          string     `json:"id"`
@@ -28,5 +31,5 @@ func (c *Cart) CalculateTotal() {
 	for _, item := range c.Items {
 		total += float64(item.Quantity) * item.UnitPrice
 	}
-	c.TotalAmount = total
+	c.TotalAmount = math.Round(total*100) / 100
 }

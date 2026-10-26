@@ -90,14 +90,16 @@ type ComplexityRoot struct {
 		ID          func(childComplexity int) int
 		Items       func(childComplexity int) int
 		TotalAmount func(childComplexity int) int
+		TotalItems  func(childComplexity int) int
 		UserID      func(childComplexity int) int
 	}
 
 	CartItem struct {
-		ID        func(childComplexity int) int
-		ProductID func(childComplexity int) int
-		Quantity  func(childComplexity int) int
-		UnitPrice func(childComplexity int) int
+		ID         func(childComplexity int) int
+		ProductID  func(childComplexity int) int
+		Quantity   func(childComplexity int) int
+		TotalPrice func(childComplexity int) int
+		UnitPrice  func(childComplexity int) int
 	}
 
 	Category struct {
@@ -222,7 +224,7 @@ type ComplexityRoot struct {
 		CancelPayment                func(childComplexity int, paymentID *string, orderID *string, reason *string) int
 		ChangePassword               func(childComplexity int, input model.ChangePasswordInput) int
 		Checkout                     func(childComplexity int, input model.CreateOrderInput) int
-		ClearCart                    func(childComplexity int, userID string) int
+		ClearCart                    func(childComplexity int, userID *string) int
 		CloseStore                   func(childComplexity int, id string, reason *string) int
 		CreateCategory               func(childComplexity int, input model.CreateCategoryInput) int
 		CreateDelivery               func(childComplexity int, input model.CreateDeliveryInput) int
@@ -252,7 +254,7 @@ type ComplexityRoot struct {
 		Register                     func(childComplexity int, input model.RegisterInput) int
 		RejectStore                  func(childComplexity int, id string, reason string) int
 		ReleaseStock                 func(childComplexity int, reservationID string) int
-		RemoveFromCart               func(childComplexity int, userID string, productID string) int
+		RemoveFromCart               func(childComplexity int, userID *string, productID string) int
 		RequestReturn                func(childComplexity int, input model.RequestReturnInput) int
 		ResendVerificationEmail      func(childComplexity int, email string, role model.AuthRole) int
 		ReserveStock                 func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
@@ -399,7 +401,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Cart                          func(childComplexity int, userID string) int
+		Cart                          func(childComplexity int, userID *string) int
 		Categories                    func(childComplexity int, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) int
 		Category                      func(childComplexity int, id string) int
 		ChildCategories               func(childComplexity int, parentCategoryID string, limit *int, offset *int) int
@@ -568,8 +570,8 @@ type MutationResolver interface {
 	ResetPasswordWithOtp(ctx context.Context, input model.ResetPasswordWithOtpInput) (*model.ResetPasswordPayload, error)
 	ChangePassword(ctx context.Context, input model.ChangePasswordInput) (*model.ChangePasswordPayload, error)
 	AddToCart(ctx context.Context, input model.AddToCartInput) (*model.Cart, error)
-	RemoveFromCart(ctx context.Context, userID string, productID string) (*model.Cart, error)
-	ClearCart(ctx context.Context, userID string) (bool, error)
+	RemoveFromCart(ctx context.Context, userID *string, productID string) (*model.Cart, error)
+	ClearCart(ctx context.Context, userID *string) (bool, error)
 	CreateCategory(ctx context.Context, input model.CreateCategoryInput) (*model.Category, error)
 	UpdateCategory(ctx context.Context, id string, input model.UpdateCategoryInput) (*model.Category, error)
 	DeleteCategory(ctx context.Context, id string) (*model.DeleteCategoryResponse, error)
@@ -625,7 +627,7 @@ type MutationResolver interface {
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
 	Version(ctx context.Context) (string, error)
-	Cart(ctx context.Context, userID string) (*model.Cart, error)
+	Cart(ctx context.Context, userID *string) (*model.Cart, error)
 	Category(ctx context.Context, id string) (*model.Category, error)
 	Categories(ctx context.Context, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) (*model.CategoryList, error)
 	ChildCategories(ctx context.Context, parentCategoryID string, limit *int, offset *int) (*model.CategoryList, error)
@@ -889,6 +891,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Cart.TotalAmount(childComplexity), true
 
+	case "Cart.totalItems":
+		if e.complexity.Cart.TotalItems == nil {
+			break
+		}
+
+		return e.complexity.Cart.TotalItems(childComplexity), true
+
 	case "Cart.userId":
 		if e.complexity.Cart.UserID == nil {
 			break
@@ -916,6 +925,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CartItem.Quantity(childComplexity), true
+
+	case "CartItem.totalPrice":
+		if e.complexity.CartItem.TotalPrice == nil {
+			break
+		}
+
+		return e.complexity.CartItem.TotalPrice(childComplexity), true
 
 	case "CartItem.unitPrice":
 		if e.complexity.CartItem.UnitPrice == nil {
@@ -1527,7 +1543,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.ClearCart(childComplexity, args["userId"].(string)), true
+		return e.complexity.Mutation.ClearCart(childComplexity, args["userId"].(*string)), true
 
 	case "Mutation.closeStore":
 		if e.complexity.Mutation.CloseStore == nil {
@@ -1872,7 +1888,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveFromCart(childComplexity, args["userId"].(string), args["productId"].(string)), true
+		return e.complexity.Mutation.RemoveFromCart(childComplexity, args["userId"].(*string), args["productId"].(string)), true
 
 	case "Mutation.requestReturn":
 		if e.complexity.Mutation.RequestReturn == nil {
@@ -2800,7 +2816,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Cart(childComplexity, args["userId"].(string)), true
+		return e.complexity.Query.Cart(childComplexity, args["userId"].(*string)), true
 
 	case "Query.categories":
 		if e.complexity.Query.Categories == nil {
@@ -3973,6 +3989,7 @@ extend type Mutation {
   productId: String!
   quantity: Int!
   unitPrice: Float!
+  totalPrice: Float!
 }
 
 type Cart {
@@ -3980,23 +3997,22 @@ type Cart {
   userId: String!
   items: [CartItem!]!
   totalAmount: Float!
+  totalItems: Int!
 }
 
 input AddToCartInput {
-  userId: String!
   productId: String!
   quantity: Int!
-  unitPrice: Float!
 }
 
 extend type Query {
-  cart(userId: ID!): Cart @auth
+  cart(userId: ID): Cart @auth
 }
 
 extend type Mutation {
   addToCart(input: AddToCartInput!): Cart @auth
-  removeFromCart(userId: ID!, productId: ID!): Cart @auth
-  clearCart(userId: ID!): Boolean! @auth
+  removeFromCart(userId: ID, productId: ID!): Cart @auth
+  clearCart(userId: ID): Boolean! @auth
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/category/category.graphql", Input: `type Category {
@@ -5016,10 +5032,10 @@ func (ec *executionContext) field_Mutation_checkout_args(ctx context.Context, ra
 func (ec *executionContext) field_Mutation_clearCart_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 *string
 	if tmp, ok := rawArgs["userId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalOID2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -5493,10 +5509,10 @@ func (ec *executionContext) field_Mutation_releaseStock_args(ctx context.Context
 func (ec *executionContext) field_Mutation_removeFromCart_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 *string
 	if tmp, ok := rawArgs["userId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalOID2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -6087,10 +6103,10 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_cart_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 *string
 	if tmp, ok := rawArgs["userId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalOID2ᚖstring(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -8081,6 +8097,8 @@ func (ec *executionContext) fieldContext_Cart_items(_ context.Context, field gra
 				return ec.fieldContext_CartItem_quantity(ctx, field)
 			case "unitPrice":
 				return ec.fieldContext_CartItem_unitPrice(ctx, field)
+			case "totalPrice":
+				return ec.fieldContext_CartItem_totalPrice(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CartItem", field.Name)
 		},
@@ -8127,6 +8145,50 @@ func (ec *executionContext) fieldContext_Cart_totalAmount(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Cart_totalItems(ctx context.Context, field graphql.CollectedField, obj *model.Cart) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Cart_totalItems(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalItems, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Cart_totalItems(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Cart",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -8296,6 +8358,50 @@ func (ec *executionContext) _CartItem_unitPrice(ctx context.Context, field graph
 }
 
 func (ec *executionContext) fieldContext_CartItem_unitPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CartItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CartItem_totalPrice(ctx context.Context, field graphql.CollectedField, obj *model.CartItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CartItem_totalPrice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalPrice, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CartItem_totalPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CartItem",
 		Field:      field,
@@ -12036,6 +12142,8 @@ func (ec *executionContext) fieldContext_Mutation_addToCart(ctx context.Context,
 				return ec.fieldContext_Cart_items(ctx, field)
 			case "totalAmount":
 				return ec.fieldContext_Cart_totalAmount(ctx, field)
+			case "totalItems":
+				return ec.fieldContext_Cart_totalItems(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Cart", field.Name)
 		},
@@ -12069,7 +12177,7 @@ func (ec *executionContext) _Mutation_removeFromCart(ctx context.Context, field 
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveFromCart(rctx, fc.Args["userId"].(string), fc.Args["productId"].(string))
+			return ec.resolvers.Mutation().RemoveFromCart(rctx, fc.Args["userId"].(*string), fc.Args["productId"].(string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Auth == nil {
@@ -12118,6 +12226,8 @@ func (ec *executionContext) fieldContext_Mutation_removeFromCart(ctx context.Con
 				return ec.fieldContext_Cart_items(ctx, field)
 			case "totalAmount":
 				return ec.fieldContext_Cart_totalAmount(ctx, field)
+			case "totalItems":
+				return ec.fieldContext_Cart_totalItems(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Cart", field.Name)
 		},
@@ -12151,7 +12261,7 @@ func (ec *executionContext) _Mutation_clearCart(ctx context.Context, field graph
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().ClearCart(rctx, fc.Args["userId"].(string))
+			return ec.resolvers.Mutation().ClearCart(rctx, fc.Args["userId"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Auth == nil {
@@ -21288,7 +21398,7 @@ func (ec *executionContext) _Query_cart(ctx context.Context, field graphql.Colle
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().Cart(rctx, fc.Args["userId"].(string))
+			return ec.resolvers.Query().Cart(rctx, fc.Args["userId"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Auth == nil {
@@ -21337,6 +21447,8 @@ func (ec *executionContext) fieldContext_Query_cart(ctx context.Context, field g
 				return ec.fieldContext_Cart_items(ctx, field)
 			case "totalAmount":
 				return ec.fieldContext_Cart_totalAmount(ctx, field)
+			case "totalItems":
+				return ec.fieldContext_Cart_totalItems(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Cart", field.Name)
 		},
@@ -29638,20 +29750,13 @@ func (ec *executionContext) unmarshalInputAddToCartInput(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userId", "productId", "quantity", "unitPrice"}
+	fieldsInOrder := [...]string{"productId", "quantity"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "userId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.UserID = data
 		case "productId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -29666,13 +29771,6 @@ func (ec *executionContext) unmarshalInputAddToCartInput(ctx context.Context, ob
 				return it, err
 			}
 			it.Quantity = data
-		case "unitPrice":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("unitPrice"))
-			data, err := ec.unmarshalNFloat2float64(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.UnitPrice = data
 		}
 	}
 
@@ -31837,6 +31935,11 @@ func (ec *executionContext) _Cart(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "totalItems":
+			out.Values[i] = ec._Cart_totalItems(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -31888,6 +31991,11 @@ func (ec *executionContext) _CartItem(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "unitPrice":
 			out.Values[i] = ec._CartItem_unitPrice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPrice":
+			out.Values[i] = ec._CartItem_totalPrice(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

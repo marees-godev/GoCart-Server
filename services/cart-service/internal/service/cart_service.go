@@ -81,10 +81,16 @@ func (s *cartService) GetCart(ctx context.Context, userID string) (*model.Cart, 
 		if errors.Is(err, repository.ErrCartNotFound) {
 			created, createErr := s.repo.CreateCart(ctx, userID)
 			if createErr != nil {
+				if s.log != nil {
+					s.log.Error("failed to create cart for user", "user_id", userID, "error", createErr)
+				}
 				return nil, appErrors.Internal(createErr, "failed to create cart for user")
 			}
 			cart = created
 		} else {
+			if s.log != nil {
+				s.log.Error("failed to get cart", "user_id", userID, "error", err)
+			}
 			return nil, appErrors.Internal(err, "failed to get cart")
 		}
 	}
@@ -109,11 +115,49 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 		if errors.Is(err, repository.ErrCartNotFound) {
 			created, createErr := s.repo.CreateCart(ctx, req.UserID)
 			if createErr != nil {
+				if s.log != nil {
+					s.log.Error("failed to create cart", "user_id", req.UserID, "error", createErr)
+				}
 				return nil, appErrors.Internal(createErr, "failed to create cart")
 			}
 			cart = created
 		} else {
+			if s.log != nil {
+				s.log.Error("failed to retrieve cart", "user_id", req.UserID, "error", err)
+			}
 			return nil, appErrors.Internal(err, "failed to retrieve cart")
+		}
+	}
+
+	unitPrice := req.UnitPrice
+	storeID := req.StoreID
+
+	if unitPrice <= 0 && s.productClient != nil {
+		callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+		product, prodErr := s.productClient.GetProduct(callCtx, req.ProductID)
+		cancel()
+
+		if prodErr != nil {
+			st, ok := status.FromError(prodErr)
+			if ok && st.Code() == codes.NotFound {
+				return nil, appErrors.NotFound("product not found")
+			}
+			return nil, appErrors.Internal(prodErr, "failed to fetch product from product service")
+		}
+		if product == nil {
+			return nil, appErrors.NotFound("product not found")
+		}
+		unitPrice = product.GetPrice()
+		if req.VariantID != "" {
+			for _, v := range product.GetVariants() {
+				if v.GetId() == req.VariantID && v.GetPrice() > 0 {
+					unitPrice = v.GetPrice()
+					break
+				}
+			}
+		}
+		if storeID == "" {
+			storeID = product.GetStoreId()
 		}
 	}
 
@@ -121,9 +165,9 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 		CartID:    cart.ID,
 		ProductID: req.ProductID,
 		VariantID: req.VariantID,
-		StoreID:   req.StoreID,
+		StoreID:   storeID,
 		Quantity:  req.Quantity,
-		UnitPrice: req.UnitPrice,
+		UnitPrice: unitPrice,
 	}
 
 	updatedCart, err := s.repo.AddOrUpdateItem(ctx, cart.ID, item)

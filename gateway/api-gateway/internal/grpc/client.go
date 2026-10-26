@@ -210,6 +210,9 @@ func NewClientsWithServices(
 		if d, ok := svc.(deliverypb.DeliveryServiceClient); ok {
 			c.DeliveryClient = d
 		}
+		if cart, ok := svc.(cartpb.CartServiceClient); ok {
+			c.CartClient = cart
+		}
 	}
 	return c
 }
