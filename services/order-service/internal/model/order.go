@@ -7,23 +7,119 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusCreated    OrderStatus = "CREATED"
-	OrderStatusConfirmed  OrderStatus = "CONFIRMED"
-	OrderStatusProcessing OrderStatus = "PROCESSING"
-	OrderStatusShipped    OrderStatus = "SHIPPED"
-	OrderStatusDelivered  OrderStatus = "DELIVERED"
-	OrderStatusCancelled  OrderStatus = "CANCELLED"
-	OrderStatusReturned   OrderStatus = "RETURNED"
+	OrderStatusCreated         OrderStatus = "CREATED"
+	OrderStatusPendingPayment  OrderStatus = "PENDING_PAYMENT"
+	OrderStatusPaid            OrderStatus = "PAID"
+	OrderStatusConfirmed       OrderStatus = "CONFIRMED"
+	OrderStatusProcessing      OrderStatus = "PROCESSING"
+	OrderStatusShipped         OrderStatus = "SHIPPED"
+	OrderStatusOutForDelivery  OrderStatus = "OUT_FOR_DELIVERY"
+	OrderStatusDelivered       OrderStatus = "DELIVERED"
+	OrderStatusPaymentFailed   OrderStatus = "PAYMENT_FAILED"
+	OrderStatusCancelled       OrderStatus = "CANCELLED"
+	OrderStatusReturnRequested OrderStatus = "RETURN_REQUESTED"
+	OrderStatusReturned        OrderStatus = "RETURNED"
+	OrderStatusRefunded        OrderStatus = "REFUNDED"
 )
 
 func (s OrderStatus) IsValid() bool {
 	switch s {
-	case OrderStatusCreated, OrderStatusConfirmed, OrderStatusProcessing,
-		OrderStatusShipped, OrderStatusDelivered, OrderStatusCancelled, OrderStatusReturned:
+	case OrderStatusCreated,
+		OrderStatusPendingPayment,
+		OrderStatusPaid,
+		OrderStatusConfirmed,
+		OrderStatusProcessing,
+		OrderStatusShipped,
+		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
+		OrderStatusPaymentFailed,
+		OrderStatusCancelled,
+		OrderStatusReturnRequested,
+		OrderStatusReturned,
+		OrderStatusRefunded:
 		return true
 	default:
 		return false
 	}
+}
+
+var ValidStateTransitions = map[OrderStatus][]OrderStatus{
+	OrderStatusCreated: {
+		OrderStatusPendingPayment,
+		OrderStatusCancelled,
+	},
+	OrderStatusPendingPayment: {
+		OrderStatusPaid,
+		OrderStatusPaymentFailed,
+		OrderStatusCancelled,
+	},
+	OrderStatusPaid: {
+		OrderStatusConfirmed,
+		OrderStatusCancelled,
+	},
+	OrderStatusConfirmed: {
+		OrderStatusProcessing,
+		OrderStatusCancelled,
+	},
+	OrderStatusProcessing: {
+		OrderStatusShipped,
+		OrderStatusCancelled,
+	},
+	OrderStatusShipped: {
+		OrderStatusOutForDelivery,
+	},
+	OrderStatusOutForDelivery: {
+		OrderStatusDelivered,
+	},
+	OrderStatusDelivered: {
+		OrderStatusReturnRequested,
+	},
+	OrderStatusReturnRequested: {
+		OrderStatusReturned,
+		OrderStatusRefunded,
+	},
+	OrderStatusReturned: {
+		OrderStatusRefunded,
+	},
+}
+
+func IsValidTransition(current, next OrderStatus) bool {
+	if !current.IsValid() || !next.IsValid() {
+		return false
+	}
+	allowed, exists := ValidStateTransitions[current]
+	if !exists {
+		return false
+	}
+	for _, s := range allowed {
+		if s == next {
+			return true
+		}
+	}
+	return false
+}
+
+func CanCancel(current OrderStatus) bool {
+	switch current {
+	case OrderStatusCreated,
+		OrderStatusPendingPayment,
+		OrderStatusPaid,
+		OrderStatusConfirmed,
+		OrderStatusProcessing:
+		return true
+	default:
+		return false
+	}
+}
+
+type OrderStatusHistory struct {
+	ID         string       `json:"id" db:"id"`
+	OrderID    string       `json:"order_id" db:"order_id"`
+	FromStatus *OrderStatus `json:"from_status,omitempty" db:"from_status"`
+	ToStatus   OrderStatus  `json:"to_status" db:"to_status"`
+	Reason     string       `json:"reason,omitempty" db:"reason"`
+	ChangedBy  string       `json:"changed_by,omitempty" db:"changed_by"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
 }
 
 type PaymentStatus string
