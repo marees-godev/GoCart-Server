@@ -24,10 +24,8 @@ type AddRatingInput struct {
 }
 
 type AddToCartInput struct {
-	UserID    string  `json:"userId"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ProductID string `json:"productId"`
+	Quantity  int    `json:"quantity"`
 }
 
 type Address struct {
@@ -76,13 +74,15 @@ type Cart struct {
 	UserID      string      `json:"userId"`
 	Items       []*CartItem `json:"items"`
 	TotalAmount float64     `json:"totalAmount"`
+	TotalItems  int         `json:"totalItems"`
 }
 
 type CartItem struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ID         string  `json:"id"`
+	ProductID  string  `json:"productId"`
+	Quantity   int     `json:"quantity"`
+	UnitPrice  float64 `json:"unitPrice"`
+	TotalPrice float64 `json:"totalPrice"`
 }
 
 type Category struct {

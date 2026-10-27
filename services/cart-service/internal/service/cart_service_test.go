@@ -53,6 +53,23 @@ func (m *mockCartRepo) CreateCart(ctx context.Context, userID string) (*model.Ca
 	return deepCopyCart(c), nil
 }
 
+func strPtr(s string) *string {
+	if s == "" || s == "00000000-0000-0000-0000-000000000000" {
+		return nil
+	}
+	return &s
+}
+
+func matchVariantPtr(a *string, b *string) bool {
+	if a == nil || *a == "" || *a == "00000000-0000-0000-0000-000000000000" {
+		return b == nil || *b == "" || *b == "00000000-0000-0000-0000-000000000000"
+	}
+	if b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item *model.CartItem) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
@@ -61,7 +78,7 @@ func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item 
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == item.ProductID && c.Items[i].VariantID == item.VariantID {
+		if c.Items[i].ProductID == item.ProductID && matchVariantPtr(c.Items[i].VariantID, item.VariantID) {
 			c.Items[i].Quantity += item.Quantity
 			c.Items[i].UnitPrice = item.UnitPrice
 			c.Items[i].UpdatedAt = time.Now()
@@ -84,7 +101,7 @@ func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item 
 	return deepCopyCart(c), nil
 }
 
-func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID, variantID string, quantity int32) (*model.Cart, error) {
+func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID string, variantID *string, quantity int32) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -92,7 +109,7 @@ func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, pr
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			c.Items[i].Quantity = quantity
 			c.Items[i].UpdatedAt = time.Now()
 			found = true
@@ -109,7 +126,7 @@ func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, pr
 	return deepCopyCart(c), nil
 }
 
-func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID, variantID string) (*model.Cart, error) {
+func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID string, variantID *string) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -117,7 +134,7 @@ func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID,
 
 	foundIdx := -1
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			foundIdx = i
 			break
 		}
@@ -178,12 +195,28 @@ func deepCopyCart(c *model.Cart) *model.Cart {
 func TestCartService_Operations(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockCartRepo()
-	svc := service.NewCartService(repo, 3600, nil)
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"prod-001": {
+				Id:      "prod-001",
+				StoreId: "store-001",
+				Price:   49.99,
+				Variants: []*productpb.ProductVariant{
+					{Id: "var-001", Price: 49.99},
+				},
+			},
+			"prod-002": {
+				Id:    "prod-002",
+				Price: 15.00,
+			},
+		},
+	}
+	svc := service.NewCartServiceWithClients(repo, prodClient, nil, 5, 3600, nil)
 
 	userID := "user-123"
 	prodID1 := "prod-001"
-	varID1 := "var-001"
-	storeID := "store-001"
+	varID1 := strPtr("var-001")
+	storeID := strPtr("store-001")
 
 	// 1. GetCart for non-existent cart creates a new cart
 	cart, err := svc.GetCart(ctx, userID)
@@ -318,7 +351,12 @@ func TestCartService_Operations(t *testing.T) {
 func TestCartService_RedisCaching(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockCartRepo()
-	svc := service.NewCartService(repo, 604800, nil)
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"p1": {Id: "p1", Price: 10.0},
+		},
+	}
+	svc := service.NewCartServiceWithClients(repo, prodClient, nil, 5, 604800, nil)
 
 	userID := "user-cache-test"
 	cart, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
@@ -429,7 +467,7 @@ func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
 	_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p1",
-		StoreID:   "store-1",
+		StoreID:   strPtr("store-1"),
 		UnitPrice: 10.00,
 		Quantity:  2,
 	})
@@ -511,7 +549,9 @@ func TestCartService_ValidateCart_DownstreamFailureControlledError(t *testing.T)
 	repo := newMockCartRepo()
 
 	prodClient := &mockProductClient{
-		err: status.Error(codes.Unavailable, "product service unavailable"),
+		products: map[string]*productpb.Product{
+			"p1": {Id: "p1", Price: 10.0, Status: string(productpb.StatusInStock)},
+		},
 	}
 	invClient := &mockInventoryClient{
 		stocks: map[string]*inventorypb.StockItem{},
@@ -520,14 +560,19 @@ func TestCartService_ValidateCart_DownstreamFailureControlledError(t *testing.T)
 	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
 	userID := "user-downstream-err"
 
-	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
+	_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p1",
 		UnitPrice: 10.0,
 		Quantity:  1,
 	})
+	if err != nil {
+		t.Fatalf("failed to add item: %v", err)
+	}
 
-	_, err := svc.ValidateCart(ctx, userID)
+	prodClient.err = status.Error(codes.Unavailable, "product service unavailable")
+
+	_, err = svc.ValidateCart(ctx, userID)
 	if err == nil {
 		t.Fatal("expected controlled error on downstream service failure")
 	}
@@ -556,14 +601,14 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p1",
-		StoreID:   "store-A",
+		StoreID:   strPtr("store-A"),
 		UnitPrice: 100.0,
 		Quantity:  2,
 	})
 	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p2",
-		StoreID:   "store-B",
+		StoreID:   strPtr("store-B"),
 		UnitPrice: 50.0,
 		Quantity:  1,
 	})
@@ -655,5 +700,172 @@ func TestCartService_ValidateCart_UnpublishedAndSuspendedProducts(t *testing.T) 
 			t.Fatalf("expected published product to pass cart validation, got errors: %+v", res.Errors)
 		}
 	})
+}
+
+func TestCartService_AddCartItem_AuthoritativePricingAndVariantValidation(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"prod-catalog": {
+				Id:      "prod-catalog",
+				StoreId: "store-catalog",
+				Price:   99.99,
+				Variants: []*productpb.ProductVariant{
+					{Id: "var-premium", Price: 149.99},
+					{Id: "var-standard", Price: 99.99},
+				},
+			},
+		},
+	}
+
+	t.Run("rejects request when product client is unavailable", func(t *testing.T) {
+		svcNoClient := service.NewCartService(repo, 3600, nil)
+		_, err := svcNoClient.AddCartItem(ctx, dto.AddCartItemRequest{
+			UserID:    "user-1",
+			ProductID: "prod-catalog",
+			Quantity:  1,
+		})
+		if err == nil {
+			t.Fatal("expected error when product client is nil")
+		}
+		appErr := appErrors.AsAppError(err)
+		if appErr == nil || appErr.Code != appErrors.CodeServiceUnavailable {
+			t.Errorf("expected SERVICE_UNAVAILABLE error, got %v", err)
+		}
+	})
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, nil, 5, 3600, nil)
+
+	t.Run("rejects non-existent product with not-found", func(t *testing.T) {
+		_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+			UserID:    "user-1",
+			ProductID: "non-existent-product",
+			Quantity:  1,
+		})
+		if err == nil {
+			t.Fatal("expected not-found error for non-existent product")
+		}
+		appErr := appErrors.AsAppError(err)
+		if appErr == nil || appErr.Code != appErrors.CodeNotFound {
+			t.Errorf("expected NOT_FOUND, got %v", err)
+		}
+	})
+
+	t.Run("authoritative base pricing overrides untrusted client price", func(t *testing.T) {
+		cart, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+			UserID:    "user-auth-price",
+			ProductID: "prod-catalog",
+			UnitPrice: 0.01,
+			Quantity:  2,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(cart.Items) != 1 {
+			t.Fatalf("expected 1 item, got %d", len(cart.Items))
+		}
+		if cart.Items[0].UnitPrice != 99.99 {
+			t.Errorf("expected authoritative price 99.99, got %.2f", cart.Items[0].UnitPrice)
+		}
+		if cart.TotalAmount != 199.98 {
+			t.Errorf("expected total 199.98, got %.2f", cart.TotalAmount)
+		}
+	})
+
+	t.Run("uses variant price when valid variant is provided", func(t *testing.T) {
+		cart, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+			UserID:    "user-variant-valid",
+			ProductID: "prod-catalog",
+			VariantID: strPtr("var-premium"),
+			UnitPrice: 10.00,
+			Quantity:  1,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cart.Items[0].UnitPrice != 149.99 {
+			t.Errorf("expected variant price 149.99, got %.2f", cart.Items[0].UnitPrice)
+		}
+	})
+
+	t.Run("rejects request when variant id does not exist in catalog without falling back to base price", func(t *testing.T) {
+		_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+			UserID:    "user-variant-invalid",
+			ProductID: "prod-catalog",
+			VariantID: strPtr("var-nonexistent"),
+			Quantity:  1,
+		})
+		if err == nil {
+			t.Fatal("expected error when variant does not exist")
+		}
+		appErr := appErrors.AsAppError(err)
+		if appErr == nil || appErr.Code != appErrors.CodeNotFound {
+			t.Errorf("expected NOT_FOUND for invalid variant, got %v", err)
+		}
+	})
+}
+
+func TestCartService_ValidateCart_VariantValidation(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockCartRepo()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			"prod-v": {
+				Id:      "prod-v",
+				StoreId: "store-v",
+				Price:   50.0,
+				Status:  string(productpb.StatusInStock),
+				Variants: []*productpb.ProductVariant{
+					{Id: "var-1", Price: 75.0},
+				},
+			},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			"prod-v": {ProductId: "prod-v", AvailableQuantity: 10},
+		},
+	}
+
+	svc := service.NewCartServiceWithClients(repo, prodClient, invClient, 5, 3600, nil)
+	userID := "user-val-variant"
+
+	cart, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
+		UserID:    userID,
+		ProductID: "prod-v",
+		VariantID: strPtr("var-1"),
+		Quantity:  1,
+	})
+	if err != nil {
+		t.Fatalf("failed to add item: %v", err)
+	}
+	if cart.Items[0].UnitPrice != 75.0 {
+		t.Errorf("expected variant price 75.0, got %v", cart.Items[0].UnitPrice)
+	}
+
+	// 1. Valid variant passes validation
+	res, err := svc.ValidateCart(ctx, userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res.IsValid {
+		t.Fatalf("expected cart to be valid, got errors: %+v", res.Errors)
+	}
+
+	// 2. If variant is removed from catalog, ValidateCart flags it with error
+	prodClient.products["prod-v"].Variants = []*productpb.ProductVariant{}
+	res, err = svc.ValidateCart(ctx, userID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IsValid {
+		t.Fatal("expected cart validation to fail when variant no longer exists")
+	}
+	if len(res.Errors) == 0 || res.Errors[0].Code != dto.ErrCodeProductNotFound {
+		t.Errorf("expected product variant not found error, got %+v", res.Errors)
+	}
 }
 

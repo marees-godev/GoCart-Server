@@ -44,6 +44,16 @@ func (m *mockCartService) GetCart(ctx context.Context, userID string) (*model.Ca
 	return c, nil
 }
 
+func matchVariantPtr(a *string, b *string) bool {
+	if a == nil || *a == "" || *a == "00000000-0000-0000-0000-000000000000" {
+		return b == nil || *b == "" || *b == "00000000-0000-0000-0000-000000000000"
+	}
+	if b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func (m *mockCartService) AddCartItem(ctx context.Context, req dto.AddCartItemRequest) (*model.Cart, error) {
 	if req.UserID == "" {
 		return nil, appErrors.BadRequest("user_id is required")
@@ -58,7 +68,7 @@ func (m *mockCartService) AddCartItem(ctx context.Context, req dto.AddCartItemRe
 	cart, _ := m.GetCart(ctx, req.UserID)
 	found := false
 	for i := range cart.Items {
-		if cart.Items[i].ProductID == req.ProductID && cart.Items[i].VariantID == req.VariantID {
+		if cart.Items[i].ProductID == req.ProductID && matchVariantPtr(cart.Items[i].VariantID, req.VariantID) {
 			cart.Items[i].Quantity += req.Quantity
 			cart.Items[i].UnitPrice = req.UnitPrice
 			found = true
@@ -95,7 +105,7 @@ func (m *mockCartService) UpdateCartItem(ctx context.Context, req dto.UpdateCart
 	cart, _ := m.GetCart(ctx, req.UserID)
 	found := false
 	for i := range cart.Items {
-		if cart.Items[i].ProductID == req.ProductID && cart.Items[i].VariantID == req.VariantID {
+		if cart.Items[i].ProductID == req.ProductID && matchVariantPtr(cart.Items[i].VariantID, req.VariantID) {
 			cart.Items[i].Quantity = req.Quantity
 			found = true
 			break
@@ -120,7 +130,7 @@ func (m *mockCartService) RemoveCartItem(ctx context.Context, req dto.RemoveCart
 	cart, _ := m.GetCart(ctx, req.UserID)
 	foundIdx := -1
 	for i := range cart.Items {
-		if cart.Items[i].ProductID == req.ProductID && cart.Items[i].VariantID == req.VariantID {
+		if cart.Items[i].ProductID == req.ProductID && matchVariantPtr(cart.Items[i].VariantID, req.VariantID) {
 			foundIdx = i
 			break
 		}
@@ -152,9 +162,9 @@ func (m *mockCartService) ValidateCart(ctx context.Context, userID string) (*dto
 	cart, _ := m.GetCart(ctx, userID)
 	storeMap := make(map[string][]model.CartItem)
 	for _, item := range cart.Items {
-		stID := item.StoreID
-		if stID == "" {
-			stID = "default"
+		stID := "default"
+		if item.StoreID != nil && *item.StoreID != "" {
+			stID = *item.StoreID
 		}
 		storeMap[stID] = append(storeMap[stID], item)
 	}

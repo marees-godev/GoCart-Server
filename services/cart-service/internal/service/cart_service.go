@@ -81,10 +81,16 @@ func (s *cartService) GetCart(ctx context.Context, userID string) (*model.Cart, 
 		if errors.Is(err, repository.ErrCartNotFound) {
 			created, createErr := s.repo.CreateCart(ctx, userID)
 			if createErr != nil {
+				if s.log != nil {
+					s.log.Error("failed to create cart for user", "user_id", userID, "error", createErr)
+				}
 				return nil, appErrors.Internal(createErr, "failed to create cart for user")
 			}
 			cart = created
 		} else {
+			if s.log != nil {
+				s.log.Error("failed to get cart", "user_id", userID, "error", err)
+			}
 			return nil, appErrors.Internal(err, "failed to get cart")
 		}
 	}
@@ -109,21 +115,80 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 		if errors.Is(err, repository.ErrCartNotFound) {
 			created, createErr := s.repo.CreateCart(ctx, req.UserID)
 			if createErr != nil {
+				if s.log != nil {
+					s.log.Error("failed to create cart", "user_id", req.UserID, "error", createErr)
+				}
 				return nil, appErrors.Internal(createErr, "failed to create cart")
 			}
 			cart = created
 		} else {
+			if s.log != nil {
+				s.log.Error("failed to retrieve cart", "user_id", req.UserID, "error", err)
+			}
 			return nil, appErrors.Internal(err, "failed to retrieve cart")
 		}
+	}
+
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
+	var storeID *string = req.StoreID
+	if storeID != nil && (*storeID == "" || *storeID == "00000000-0000-0000-0000-000000000000") {
+		storeID = nil
+	}
+
+	if s.productClient == nil {
+		return nil, appErrors.ServiceUnavailable("product service unavailable")
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+	product, prodErr := s.productClient.GetProduct(callCtx, req.ProductID)
+	cancel()
+
+	if prodErr != nil {
+		st, ok := status.FromError(prodErr)
+		if ok && st.Code() == codes.NotFound {
+			return nil, appErrors.NotFound("product not found")
+		}
+		if ok && st.Code() == codes.Unavailable {
+			return nil, appErrors.ServiceUnavailable("product service unavailable")
+		}
+		return nil, appErrors.Internal(prodErr, "failed to fetch product from product service")
+	}
+	if product == nil {
+		return nil, appErrors.NotFound("product not found")
+	}
+
+	unitPrice := product.GetPrice()
+	if variantID != nil {
+		var matchedVariant *productpb.ProductVariant
+		for _, v := range product.GetVariants() {
+			if v.GetId() == *variantID {
+				matchedVariant = v
+				break
+			}
+		}
+		if matchedVariant == nil {
+			return nil, appErrors.NotFound("product variant not found")
+		}
+		if matchedVariant.GetPrice() > 0 {
+			unitPrice = matchedVariant.GetPrice()
+		}
+	}
+
+	if storeID == nil && product.GetStoreId() != "" {
+		prodStore := product.GetStoreId()
+		storeID = &prodStore
 	}
 
 	item := &model.CartItem{
 		CartID:    cart.ID,
 		ProductID: req.ProductID,
-		VariantID: req.VariantID,
-		StoreID:   req.StoreID,
+		VariantID: variantID,
+		StoreID:   storeID,
 		Quantity:  req.Quantity,
-		UnitPrice: req.UnitPrice,
+		UnitPrice: unitPrice,
 	}
 
 	updatedCart, err := s.repo.AddOrUpdateItem(ctx, cart.ID, item)
@@ -146,6 +211,11 @@ func (s *cartService) UpdateCartItem(ctx context.Context, req dto.UpdateCartItem
 		return nil, appErrors.BadRequest("quantity must be greater than zero")
 	}
 
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
+
 	cart, err := s.repo.GetCartByUserID(ctx, req.UserID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCartNotFound) {
@@ -154,7 +224,7 @@ func (s *cartService) UpdateCartItem(ctx context.Context, req dto.UpdateCartItem
 		return nil, appErrors.Internal(err, "failed to retrieve cart")
 	}
 
-	updatedCart, err := s.repo.UpdateItemQuantity(ctx, cart.ID, req.ProductID, req.VariantID, req.Quantity)
+	updatedCart, err := s.repo.UpdateItemQuantity(ctx, cart.ID, req.ProductID, variantID, req.Quantity)
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			return nil, appErrors.NotFound("item not found in cart")
@@ -173,6 +243,10 @@ func (s *cartService) RemoveCartItem(ctx context.Context, req dto.RemoveCartItem
 	if req.ProductID == "" {
 		return nil, appErrors.BadRequest("product_id is required")
 	}
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
 
 	cart, err := s.repo.GetCartByUserID(ctx, req.UserID)
 	if err != nil {
@@ -182,7 +256,7 @@ func (s *cartService) RemoveCartItem(ctx context.Context, req dto.RemoveCartItem
 		return nil, appErrors.Internal(err, "failed to retrieve cart")
 	}
 
-	updatedCart, err := s.repo.RemoveItem(ctx, cart.ID, req.ProductID, req.VariantID)
+	updatedCart, err := s.repo.RemoveItem(ctx, cart.ID, req.ProductID, variantID)
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			return nil, appErrors.NotFound("item not found in cart")
@@ -255,42 +329,67 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 	for i := range cart.Items {
 		item := &cart.Items[i]
 
-		if s.productClient != nil {
-			callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			product, prodErr := s.productClient.GetProduct(callCtx, item.ProductID)
-			cancel()
+		if s.productClient == nil {
+			return nil, appErrors.ServiceUnavailable("product service unavailable")
+		}
 
-			if prodErr != nil {
-				st, ok := status.FromError(prodErr)
-				if ok && st.Code() == codes.NotFound {
-					isValid = false
-					validationErrors = append(validationErrors, dto.ValidationError{
-						ProductID: item.ProductID,
-						Message:   "product not found",
-						Code:      dto.ErrCodeProductNotFound,
-					})
-				} else {
-					return nil, appErrors.Internal(prodErr, fmt.Sprintf("failed to fetch product %s from product service", item.ProductID))
-				}
-			} else if product == nil {
+		callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+		product, prodErr := s.productClient.GetProduct(callCtx, item.ProductID)
+		cancel()
+
+		if prodErr != nil {
+			st, ok := status.FromError(prodErr)
+			if ok && st.Code() == codes.NotFound {
 				isValid = false
 				validationErrors = append(validationErrors, dto.ValidationError{
 					ProductID: item.ProductID,
 					Message:   "product not found",
 					Code:      dto.ErrCodeProductNotFound,
 				})
-			} else if prodStatus := productpb.ProductStatus(strings.ToUpper(strings.TrimSpace(product.GetStatus()))); prodStatus != productpb.StatusPublished && prodStatus != productpb.StatusInStock {
-				isValid = false
-				validationErrors = append(validationErrors, dto.ValidationError{
-					ProductID: item.ProductID,
-					Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
-					Code:      dto.ErrCodeProductInactive,
-				})
+			} else if ok && st.Code() == codes.Unavailable {
+				return nil, appErrors.ServiceUnavailable("product service unavailable")
 			} else {
-				item.UnitPrice = product.GetPrice()
-				if item.StoreID == "" && product.GetStoreId() != "" {
-					item.StoreID = product.GetStoreId()
+				return nil, appErrors.Internal(prodErr, fmt.Sprintf("failed to fetch product %s from product service", item.ProductID))
+			}
+		} else if product == nil {
+			isValid = false
+			validationErrors = append(validationErrors, dto.ValidationError{
+				ProductID: item.ProductID,
+				Message:   "product not found",
+				Code:      dto.ErrCodeProductNotFound,
+			})
+		} else if prodStatus := productpb.ProductStatus(strings.ToUpper(strings.TrimSpace(product.GetStatus()))); prodStatus != productpb.StatusPublished && prodStatus != productpb.StatusInStock {
+			isValid = false
+			validationErrors = append(validationErrors, dto.ValidationError{
+				ProductID: item.ProductID,
+				Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
+				Code:      dto.ErrCodeProductInactive,
+			})
+		} else {
+			unitPrice := product.GetPrice()
+			if item.VariantID != nil {
+				var matchedVariant *productpb.ProductVariant
+				for _, v := range product.GetVariants() {
+					if v.GetId() == *item.VariantID {
+						matchedVariant = v
+						break
+					}
 				}
+				if matchedVariant == nil {
+					isValid = false
+					validationErrors = append(validationErrors, dto.ValidationError{
+						ProductID: item.ProductID,
+						Message:   "product variant not found",
+						Code:      dto.ErrCodeProductNotFound,
+					})
+				} else if matchedVariant.GetPrice() > 0 {
+					unitPrice = matchedVariant.GetPrice()
+				}
+			}
+			item.UnitPrice = unitPrice
+			if (item.StoreID == nil || *item.StoreID == "") && product.GetStoreId() != "" {
+				prodStore := product.GetStoreId()
+				item.StoreID = &prodStore
 			}
 		}
 
@@ -325,9 +424,9 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 			}
 		}
 
-		storeID := item.StoreID
-		if storeID == "" {
-			storeID = "default"
+		storeID := "default"
+		if item.StoreID != nil && *item.StoreID != "" {
+			storeID = *item.StoreID
 		}
 		storeMap[storeID] = append(storeMap[storeID], *item)
 	}
