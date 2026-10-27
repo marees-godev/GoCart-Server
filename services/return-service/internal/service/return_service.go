@@ -236,17 +236,17 @@ func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestRetur
 		return nil, ErrDuplicateReturnRequest
 	}
 
-	// 6. Return window validation: 7 days of delivery -----> Todo , will work on the actual time for now commeting this code 
-	// deliveryTime := parseDeliveryTime(order)
-	// returnWindow := time.Duration(s.returnWindowDays) * 24 * time.Hour
-	// if time.Since(deliveryTime) > returnWindow {
-	// 	s.logger.WarnContext(ctx, "return request rejected: return window expired",
-	// 		slog.String("order_id", req.OrderID),
-	// 		slog.Time("delivery_time", deliveryTime),
-	// 		slog.Int("return_window_days", s.returnWindowDays),
-	// 	)
-	// 	return nil, ErrReturnWindowExpired
-	// }
+	// 6. Return window validation: 7 days of delivery ----> Todo will work on actual time for return window
+	deliveryTime := parseDeliveryTime(order)
+	returnWindow := time.Duration(s.returnWindowDays) * 24 * time.Hour
+	if time.Since(deliveryTime) > returnWindow {
+		s.logger.WarnContext(ctx, "return request rejected: return window expired",
+			slog.String("order_id", req.OrderID),
+			slog.Time("delivery_time", deliveryTime),
+			slog.Int("return_window_days", s.returnWindowDays),
+		)
+		return nil, ErrReturnWindowExpired
+	}
 
 	// 7. Product returnability check
 	if s.productClient != nil {
