@@ -138,36 +138,48 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 		storeID = nil
 	}
 
-	unitPrice := req.UnitPrice
+	if s.productClient == nil {
+		return nil, appErrors.ServiceUnavailable("product service unavailable")
+	}
 
-	if unitPrice <= 0 && s.productClient != nil {
-		callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-		product, prodErr := s.productClient.GetProduct(callCtx, req.ProductID)
-		cancel()
+	callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+	product, prodErr := s.productClient.GetProduct(callCtx, req.ProductID)
+	cancel()
 
-		if prodErr != nil {
-			st, ok := status.FromError(prodErr)
-			if ok && st.Code() == codes.NotFound {
-				return nil, appErrors.NotFound("product not found")
-			}
-			return nil, appErrors.Internal(prodErr, "failed to fetch product from product service")
-		}
-		if product == nil {
+	if prodErr != nil {
+		st, ok := status.FromError(prodErr)
+		if ok && st.Code() == codes.NotFound {
 			return nil, appErrors.NotFound("product not found")
 		}
-		unitPrice = product.GetPrice()
-		if variantID != nil {
-			for _, v := range product.GetVariants() {
-				if v.GetId() == *variantID && v.GetPrice() > 0 {
-					unitPrice = v.GetPrice()
-					break
-				}
+		if ok && st.Code() == codes.Unavailable {
+			return nil, appErrors.ServiceUnavailable("product service unavailable")
+		}
+		return nil, appErrors.Internal(prodErr, "failed to fetch product from product service")
+	}
+	if product == nil {
+		return nil, appErrors.NotFound("product not found")
+	}
+
+	unitPrice := product.GetPrice()
+	if variantID != nil {
+		var matchedVariant *productpb.ProductVariant
+		for _, v := range product.GetVariants() {
+			if v.GetId() == *variantID {
+				matchedVariant = v
+				break
 			}
 		}
-		if storeID == nil && product.GetStoreId() != "" {
-			prodStore := product.GetStoreId()
-			storeID = &prodStore
+		if matchedVariant == nil {
+			return nil, appErrors.NotFound("product variant not found")
 		}
+		if matchedVariant.GetPrice() > 0 {
+			unitPrice = matchedVariant.GetPrice()
+		}
+	}
+
+	if storeID == nil && product.GetStoreId() != "" {
+		prodStore := product.GetStoreId()
+		storeID = &prodStore
 	}
 
 	item := &model.CartItem{
@@ -317,43 +329,67 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 	for i := range cart.Items {
 		item := &cart.Items[i]
 
-		if s.productClient != nil {
-			callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			product, prodErr := s.productClient.GetProduct(callCtx, item.ProductID)
-			cancel()
+		if s.productClient == nil {
+			return nil, appErrors.ServiceUnavailable("product service unavailable")
+		}
 
-			if prodErr != nil {
-				st, ok := status.FromError(prodErr)
-				if ok && st.Code() == codes.NotFound {
-					isValid = false
-					validationErrors = append(validationErrors, dto.ValidationError{
-						ProductID: item.ProductID,
-						Message:   "product not found",
-						Code:      dto.ErrCodeProductNotFound,
-					})
-				} else {
-					return nil, appErrors.Internal(prodErr, fmt.Sprintf("failed to fetch product %s from product service", item.ProductID))
-				}
-			} else if product == nil {
+		callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+		product, prodErr := s.productClient.GetProduct(callCtx, item.ProductID)
+		cancel()
+
+		if prodErr != nil {
+			st, ok := status.FromError(prodErr)
+			if ok && st.Code() == codes.NotFound {
 				isValid = false
 				validationErrors = append(validationErrors, dto.ValidationError{
 					ProductID: item.ProductID,
 					Message:   "product not found",
 					Code:      dto.ErrCodeProductNotFound,
 				})
-			} else if prodStatus := productpb.ProductStatus(strings.ToUpper(strings.TrimSpace(product.GetStatus()))); prodStatus != productpb.StatusPublished && prodStatus != productpb.StatusInStock {
-				isValid = false
-				validationErrors = append(validationErrors, dto.ValidationError{
-					ProductID: item.ProductID,
-					Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
-					Code:      dto.ErrCodeProductInactive,
-				})
+			} else if ok && st.Code() == codes.Unavailable {
+				return nil, appErrors.ServiceUnavailable("product service unavailable")
 			} else {
-				item.UnitPrice = product.GetPrice()
-				if (item.StoreID == nil || *item.StoreID == "") && product.GetStoreId() != "" {
-					prodStore := product.GetStoreId()
-					item.StoreID = &prodStore
+				return nil, appErrors.Internal(prodErr, fmt.Sprintf("failed to fetch product %s from product service", item.ProductID))
+			}
+		} else if product == nil {
+			isValid = false
+			validationErrors = append(validationErrors, dto.ValidationError{
+				ProductID: item.ProductID,
+				Message:   "product not found",
+				Code:      dto.ErrCodeProductNotFound,
+			})
+		} else if prodStatus := productpb.ProductStatus(strings.ToUpper(strings.TrimSpace(product.GetStatus()))); prodStatus != productpb.StatusPublished && prodStatus != productpb.StatusInStock {
+			isValid = false
+			validationErrors = append(validationErrors, dto.ValidationError{
+				ProductID: item.ProductID,
+				Message:   fmt.Sprintf("product is not published (status: %s)", product.GetStatus()),
+				Code:      dto.ErrCodeProductInactive,
+			})
+		} else {
+			unitPrice := product.GetPrice()
+			if item.VariantID != nil {
+				var matchedVariant *productpb.ProductVariant
+				for _, v := range product.GetVariants() {
+					if v.GetId() == *item.VariantID {
+						matchedVariant = v
+						break
+					}
 				}
+				if matchedVariant == nil {
+					isValid = false
+					validationErrors = append(validationErrors, dto.ValidationError{
+						ProductID: item.ProductID,
+						Message:   "product variant not found",
+						Code:      dto.ErrCodeProductNotFound,
+					})
+				} else if matchedVariant.GetPrice() > 0 {
+					unitPrice = matchedVariant.GetPrice()
+				}
+			}
+			item.UnitPrice = unitPrice
+			if (item.StoreID == nil || *item.StoreID == "") && product.GetStoreId() != "" {
+				prodStore := product.GetStoreId()
+				item.StoreID = &prodStore
 			}
 		}
 
