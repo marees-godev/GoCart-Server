@@ -8,6 +8,9 @@ service ReturnService {
   rpc RequestReturn (RequestReturnRequest) returns (RequestReturnResponse);
   rpc GetReturn (GetReturnRequest) returns (GetReturnResponse);
   rpc UpdateReturnStatus (UpdateReturnStatusRequest) returns (UpdateReturnStatusResponse);
+  rpc VerifyProduct (VerifyProductRequest) returns (VerifyProductResponse);
+  rpc ListReturns (ListReturnsRequest) returns (ListReturnsResponse);
+  rpc GetReturnsByOrder (GetReturnsByOrderRequest) returns (GetReturnsByOrderResponse);
 }
 
 message ReturnOrder {
@@ -18,6 +21,26 @@ message ReturnOrder {
   string status = 5;
   double refund_amount = 6;
   string created_at = 7;
+  string order_item_id = 8;
+  string requested_at = 9;
+  string updated_at = 10;
+  string type = 11;
+  ProductVerification verification = 12;
+  string approved_at = 13;
+  string completed_at = 14;
+}
+
+message ProductVerification {
+  string id = 1;
+  string return_id = 2;
+  string verified_by = 3;
+  string condition = 4;
+  bool is_approved = 5;
+  repeated string proof_images = 6;
+  string notes = 7;
+  string verified_at = 8;
+  string created_at = 9;
+  string updated_at = 10;
 }
 
 message RequestReturnRequest {
@@ -25,6 +48,8 @@ message RequestReturnRequest {
   string user_id = 2;
   string reason = 3;
   repeated string item_ids = 4;
+  string order_item_id = 5;
+  string type = 6;
 }
 
 message RequestReturnResponse {
@@ -47,3 +72,39 @@ message UpdateReturnStatusRequest {
 message UpdateReturnStatusResponse {
   ReturnOrder return_order = 1;
 }
+
+message VerifyProductRequest {
+  string return_id = 1;
+  string verified_by = 2;
+  string condition = 3;
+  bool is_approved = 4;
+  repeated string proof_images = 5;
+  string notes = 6;
+}
+
+message VerifyProductResponse {
+  ReturnOrder return_order = 1;
+  ProductVerification verification = 2;
+}
+
+message ListReturnsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  string status = 3;
+  string user_id = 4;
+  string type = 5;
+}
+
+message ListReturnsResponse {
+  repeated ReturnOrder returns = 1;
+  int32 total = 2;
+}
+
+message GetReturnsByOrderRequest {
+  string order_id = 1;
+}
+
+message GetReturnsByOrderResponse {
+  repeated ReturnOrder returns = 1;
+}
+

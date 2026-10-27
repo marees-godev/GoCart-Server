@@ -6,22 +6,452 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"strings"
 
+	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // RequestReturn is the resolver for the requestReturn field.
 func (r *mutationResolver) RequestReturn(ctx context.Context, input model.RequestReturnInput) (*model.ReturnOrder, error) {
-	panic(fmt.Errorf("not implemented: RequestReturn - requestReturn"))
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" && input.UserID != nil {
+		userID = *input.UserID
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	reason := strings.TrimSpace(input.Reason)
+	if reason == "" {
+		return nil, appErrors.BadRequest("reason is required")
+	}
+
+	if len(input.ItemIds) > 1 {
+		return nil, appErrors.BadRequest("only one item per return request is supported; please submit separate requests for multiple items")
+	}
+
+	orderItemID := ""
+	if input.OrderItemID != nil {
+		orderItemID = strings.TrimSpace(*input.OrderItemID)
+	}
+
+	if len(input.ItemIds) == 1 {
+		firstItemID := strings.TrimSpace(input.ItemIds[0])
+		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
+			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
+		}
+		if orderItemID == "" {
+			orderItemID = firstItemID
+		}
+	}
+
+	if orderItemID == "" {
+		return nil, appErrors.BadRequest("orderItemId is required")
+	}
+
+	reqType := "RETURN"
+	if input.Type != nil && string(*input.Type) != "" {
+		reqType = string(*input.Type)
+	}
+
+	res, err := client.RequestReturn(ctx, &returnpb.RequestReturnRequest{
+		OrderId:     orderID,
+		UserId:      userID,
+		OrderItemId: orderItemID,
+		Reason:      reason,
+		ItemIds:     []string{orderItemID},
+		Type:        reqType,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// RequestReplacement is the resolver for the requestReplacement field.
+func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.RequestReplacementInput) (*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" && input.UserID != nil {
+		userID = *input.UserID
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	reason := strings.TrimSpace(input.Reason)
+	if reason == "" {
+		return nil, appErrors.BadRequest("reason is required")
+	}
+
+	if len(input.ItemIds) > 1 {
+		return nil, appErrors.BadRequest("only one item per replacement request is supported; please submit separate requests for multiple items")
+	}
+
+	orderItemID := ""
+	if input.OrderItemID != nil {
+		orderItemID = strings.TrimSpace(*input.OrderItemID)
+	}
+
+	if len(input.ItemIds) == 1 {
+		firstItemID := strings.TrimSpace(input.ItemIds[0])
+		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
+			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
+		}
+		if orderItemID == "" {
+			orderItemID = firstItemID
+		}
+	}
+
+	if orderItemID == "" {
+		return nil, appErrors.BadRequest("orderItemId is required")
+	}
+
+	res, err := client.RequestReturn(ctx, &returnpb.RequestReturnRequest{
+		OrderId:     orderID,
+		UserId:      userID,
+		OrderItemId: orderItemID,
+		Reason:      reason,
+		ItemIds:     []string{orderItemID},
+		Type:        "REPLACEMENT",
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// VerifyProduct is the resolver for the verifyProduct field.
+func (r *mutationResolver) VerifyProduct(ctx context.Context, input model.VerifyProductInput) (*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" {
+		return nil, appErrors.Forbidden("only delivery partners or admins can verify products")
+	}
+
+	returnID := strings.TrimSpace(input.ReturnID)
+	if returnID == "" {
+		return nil, appErrors.BadRequest("returnId is required")
+	}
+
+	condition := strings.TrimSpace(input.Condition)
+	if condition == "" {
+		return nil, appErrors.BadRequest("condition is required")
+	}
+
+	verifiedBy := userCtx.PartnerID
+	if verifiedBy == "" {
+		verifiedBy = userCtx.UserID
+	}
+
+	notes := ""
+	if input.Notes != nil {
+		notes = *input.Notes
+	}
+
+	var images []string
+	if len(input.ProofImages) > 0 {
+		images = append(images, input.ProofImages...)
+	}
+
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process image upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
+	res, err := client.VerifyProduct(ctx, &returnpb.VerifyProductRequest{
+		ReturnId:    returnID,
+		VerifiedBy:  verifiedBy,
+		Condition:   condition,
+		IsApproved:  input.IsApproved,
+		ProofImages: images,
+		Notes:       notes,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
 }
 
 // UpdateReturnStatus is the resolver for the updateReturnStatus field.
 func (r *mutationResolver) UpdateReturnStatus(ctx context.Context, id string, status string) (*model.ReturnOrder, error) {
-	panic(fmt.Errorf("not implemented: UpdateReturnStatus - updateReturnStatus"))
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" {
+		return nil, appErrors.Forbidden("permission denied to update return status")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("return id is required")
+	}
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return nil, appErrors.BadRequest("status is required")
+	}
+
+	res, err := client.UpdateReturnStatus(ctx, &returnpb.UpdateReturnStatusRequest{
+		Id:     id,
+		Status: status,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
 }
 
 // ReturnOrder is the resolver for the returnOrder field.
 func (r *queryResolver) ReturnOrder(ctx context.Context, id string) (*model.ReturnOrder, error) {
-	panic(fmt.Errorf("not implemented: ReturnOrder - returnOrder"))
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("return id is required")
+	}
+
+	res, err := client.GetReturn(ctx, &returnpb.GetReturnRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" && role != "MERCHANT" {
+		if res.ReturnOrder != nil && res.ReturnOrder.UserId != userCtx.UserID {
+			return nil, appErrors.Forbidden("you do not have permission to view this return")
+		}
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// ReturnOrdersByOrder is the resolver for the returnOrdersByOrder field.
+func (r *queryResolver) ReturnOrdersByOrder(ctx context.Context, orderID string) ([]*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	res, err := client.GetReturnsByOrder(ctx, &returnpb.GetReturnsByOrderRequest{OrderId: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	isElevated := role == "ADMIN" || role == "DELIVERY_PARTNER" || role == "MERCHANT"
+
+	result := make([]*model.ReturnOrder, 0, len(res.Returns))
+	for _, ret := range res.Returns {
+		if !isElevated && ret.UserId != userCtx.UserID {
+			continue
+		}
+		result = append(result, toModelReturnOrder(ret))
+	}
+	return result, nil
+}
+
+// ListReturns is the resolver for the listReturns field.
+func (r *queryResolver) ListReturns(ctx context.Context, limit *int, offset *int, status *string) ([]*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	req := &returnpb.ListReturnsRequest{}
+	if limit != nil {
+		req.Limit = int32(*limit)
+	}
+	if offset != nil {
+		req.Offset = int32(*offset)
+	}
+	if status != nil {
+		req.Status = *status
+	}
+
+	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
+		role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+		if role != "ADMIN" && role != "DELIVERY_PARTNER" {
+			req.UserId = userCtx.UserID
+		}
+	}
+
+	res, err := client.ListReturns(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := make([]*model.ReturnOrder, 0, len(res.Returns))
+	for _, ret := range res.Returns {
+		result = append(result, toModelReturnOrder(ret))
+	}
+	return result, nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *Resolver) getReturnClient() (returnpb.ReturnServiceClient, error) {
+	if r.Clients != nil && r.Clients.ReturnClient != nil {
+		return r.Clients.ReturnClient, nil
+	}
+	if r.ClientMgr != nil && r.ClientMgr.ReturnClient != nil {
+		return r.ClientMgr.ReturnClient, nil
+	}
+	return nil, appErrors.Internal(nil, "return service client unavailable")
+}
+func toModelReturnOrder(protoReturn *returnpb.ReturnOrder) *model.ReturnOrder {
+	if protoReturn == nil {
+		return nil
+	}
+
+	res := &model.ReturnOrder{
+		ID:           protoReturn.Id,
+		OrderID:      protoReturn.OrderId,
+		UserID:       protoReturn.UserId,
+		Reason:       protoReturn.Reason,
+		Status:       protoReturn.Status,
+		Type:         protoReturn.Type,
+		RefundAmount: protoReturn.RefundAmount,
+	}
+
+	if protoReturn.OrderItemId != "" {
+		res.OrderItemID = &protoReturn.OrderItemId
+	}
+	if protoReturn.RequestedAt != "" {
+		res.RequestedAt = &protoReturn.RequestedAt
+	}
+	if protoReturn.ApprovedAt != "" {
+		res.ApprovedAt = &protoReturn.ApprovedAt
+	}
+	if protoReturn.CompletedAt != "" {
+		res.CompletedAt = &protoReturn.CompletedAt
+	}
+	if protoReturn.CreatedAt != "" {
+		res.CreatedAt = &protoReturn.CreatedAt
+	}
+	if protoReturn.UpdatedAt != "" {
+		res.UpdatedAt = &protoReturn.UpdatedAt
+	}
+
+	if protoReturn.Verification != nil {
+		var notes *string
+		if protoReturn.Verification.Notes != "" {
+			notes = &protoReturn.Verification.Notes
+		}
+		var createdAt *string
+		if protoReturn.Verification.CreatedAt != "" {
+			createdAt = &protoReturn.Verification.CreatedAt
+		}
+		var updatedAt *string
+		if protoReturn.Verification.UpdatedAt != "" {
+			updatedAt = &protoReturn.Verification.UpdatedAt
+		}
+
+		res.Verification = &model.ProductVerification{
+			ID:          protoReturn.Verification.Id,
+			ReturnID:    protoReturn.Verification.ReturnId,
+			VerifiedBy:  protoReturn.Verification.VerifiedBy,
+			Condition:   protoReturn.Verification.Condition,
+			IsApproved:  protoReturn.Verification.IsApproved,
+			ProofImages: protoReturn.Verification.ProofImages,
+			Notes:       notes,
+			VerifiedAt:  protoReturn.Verification.VerifiedAt,
+			CreatedAt:   createdAt,
+			UpdatedAt:   updatedAt,
+		}
+	}
+
+	return res
 }
