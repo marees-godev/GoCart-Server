@@ -281,7 +281,7 @@ type ComplexityRoot struct {
 		UpdateStore                  func(childComplexity int, input model.UpdateStoreInput) int
 		UpdateUser                   func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress            func(childComplexity int, id string, input model.UpdateAddressInput) int
-		VerifyEmail                  func(childComplexity int, email string, otp string) int
+		VerifyEmail                  func(childComplexity int, email string, otp string, role model.AuthRole) int
 		VerifyProduct                func(childComplexity int, input model.VerifyProductInput) int
 	}
 
@@ -2229,7 +2229,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string)), true
+		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string), args["role"].(model.AuthRole)), true
 
 	case "Mutation.verifyProduct":
 		if e.complexity.Mutation.VerifyProduct == nil {
@@ -6356,6 +6356,15 @@ func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context,
 		}
 	}
 	args["otp"] = arg1
+	var arg2 model.AuthRole
+	if tmp, ok := rawArgs["role"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+		arg2, err = ec.unmarshalNAuthRole2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthRole(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["role"] = arg2
 	return args, nil
 }
 

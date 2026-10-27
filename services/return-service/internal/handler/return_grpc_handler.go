@@ -215,6 +215,8 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrUserIDRequired),
 		errors.Is(err, service.ErrInvalidReturnStatus),
 		errors.Is(err, service.ErrInvalidReturnType),
+		errors.Is(err, service.ErrMultipleItemsNotSupported),
+		errors.Is(err, service.ErrOrderItemMismatch),
 		errors.Is(err, service.ErrProofImagesRequired),
 		errors.Is(err, service.ErrVerifiedByRequired),
 		errors.Is(err, service.ErrInvalidVerificationCondition):
@@ -224,7 +226,8 @@ func mapErrorToGRPC(err error) error {
 	case errors.Is(err, service.ErrOrderNotDelivered),
 		errors.Is(err, service.ErrReturnWindowExpired),
 		errors.Is(err, service.ErrProductNotReturnable),
-		errors.Is(err, service.ErrReturnNotVerifiable):
+		errors.Is(err, service.ErrReturnNotVerifiable),
+		errors.Is(err, service.ErrInvalidStateTransition):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, service.ErrOrderItemNotFound),
 		errors.Is(err, service.ErrOrderNotFound),

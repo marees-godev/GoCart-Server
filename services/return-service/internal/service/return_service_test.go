@@ -606,6 +606,43 @@ func TestReturnService_RequestReturn_FallbackToItemIDs(t *testing.T) {
 	}
 }
 
+func TestReturnService_RequestReturn_MultipleItemIDsRejected(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+
+	svc := service.NewReturnService(repo, nil, nil, 14, nil)
+	req := &dto.RequestReturnDTO{
+		OrderID: "order-123",
+		UserID:  "user-456",
+		Reason:  "Defective",
+		ItemIDs: []string{"item-1", "item-2"},
+	}
+
+	_, err := svc.RequestReturn(ctx, req)
+	if !errors.Is(err, service.ErrMultipleItemsNotSupported) {
+		t.Fatalf("expected ErrMultipleItemsNotSupported, got: %v", err)
+	}
+}
+
+func TestReturnService_RequestReturn_ItemIDsMismatchRejected(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+
+	svc := service.NewReturnService(repo, nil, nil, 14, nil)
+	req := &dto.RequestReturnDTO{
+		OrderID:     "order-123",
+		OrderItemID: "item-1",
+		UserID:      "user-456",
+		Reason:      "Defective",
+		ItemIDs:     []string{"item-2"},
+	}
+
+	_, err := svc.RequestReturn(ctx, req)
+	if !errors.Is(err, service.ErrOrderItemMismatch) {
+		t.Fatalf("expected ErrOrderItemMismatch, got: %v", err)
+	}
+}
+
 func TestReturnService_GetReturn_AndUpdateReturnStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockReturnRepo()
@@ -655,6 +692,110 @@ func TestReturnService_GetReturn_AndUpdateReturnStatus(t *testing.T) {
 	if !errors.Is(err, service.ErrInvalidReturnStatus) {
 		t.Errorf("expected ErrInvalidReturnStatus, got: %v", err)
 	}
+}
+
+func TestReturnService_UpdateReturnStatus_AllowedAndInvalidTransitions(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("ValidAndInvalidFromRequested", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := &model.Return{
+			ID:          "ret-req",
+			OrderID:     "order-1",
+			OrderItemID: "item-1",
+			UserID:      "user-1",
+			Status:      model.ReturnStatusRequested,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+		// Invalid: jumping from REQUESTED directly to COMPLETED or REFUND_INITIATED
+		_, err := svc.UpdateReturnStatus(ctx, "ret-req", model.ReturnStatusCompleted)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for REQUESTED -> COMPLETED, got: %v", err)
+		}
+
+		_, err = svc.UpdateReturnStatus(ctx, "ret-req", model.ReturnStatusRefundInitiated)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for REQUESTED -> REFUND_INITIATED, got: %v", err)
+		}
+
+		// Valid: REQUESTED -> APPROVED
+		updated, err := svc.UpdateReturnStatus(ctx, "ret-req", model.ReturnStatusApproved)
+		if err != nil {
+			t.Fatalf("expected REQUESTED -> APPROVED to succeed, got: %v", err)
+		}
+		if updated.Status != model.ReturnStatusApproved {
+			t.Errorf("expected status %s, got %s", model.ReturnStatusApproved, updated.Status)
+		}
+	})
+
+	t.Run("TransitionsFromVerified", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := &model.Return{
+			ID:          "ret-ver",
+			OrderID:     "order-1",
+			OrderItemID: "item-1",
+			UserID:      "user-1",
+			Status:      model.ReturnStatusVerified,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+		// Invalid: backward transition VERIFIED -> RETURN_REQUESTED or APPROVED
+		_, err := svc.UpdateReturnStatus(ctx, "ret-ver", model.ReturnStatusRequested)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for VERIFIED -> RETURN_REQUESTED, got: %v", err)
+		}
+
+		_, err = svc.UpdateReturnStatus(ctx, "ret-ver", model.ReturnStatusApproved)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for VERIFIED -> APPROVED, got: %v", err)
+		}
+
+		// Valid: VERIFIED -> REFUND_INITIATED
+		updated, err := svc.UpdateReturnStatus(ctx, "ret-ver", model.ReturnStatusRefundInitiated)
+		if err != nil {
+			t.Fatalf("expected VERIFIED -> REFUND_INITIATED to succeed, got: %v", err)
+		}
+		if updated.Status != model.ReturnStatusRefundInitiated {
+			t.Errorf("expected status %s, got %s", model.ReturnStatusRefundInitiated, updated.Status)
+		}
+	})
+
+	t.Run("TransitionsFromRefundInitiated", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := &model.Return{
+			ID:          "ret-ref",
+			OrderID:     "order-1",
+			OrderItemID: "item-1",
+			UserID:      "user-1",
+			Status:      model.ReturnStatusRefundInitiated,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+		// Invalid: backward transition REFUND_INITIATED -> VERIFIED
+		_, err := svc.UpdateReturnStatus(ctx, "ret-ref", model.ReturnStatusVerified)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for REFUND_INITIATED -> VERIFIED, got: %v", err)
+		}
+
+		// Valid: REFUND_INITIATED -> COMPLETED
+		updated, err := svc.UpdateReturnStatus(ctx, "ret-ref", model.ReturnStatusCompleted)
+		if err != nil {
+			t.Fatalf("expected REFUND_INITIATED -> COMPLETED to succeed, got: %v", err)
+		}
+		if updated.Status != model.ReturnStatusCompleted {
+			t.Errorf("expected status %s, got %s", model.ReturnStatusCompleted, updated.Status)
+		}
+
+		// Terminal: COMPLETED cannot transition to anything
+		_, err = svc.UpdateReturnStatus(ctx, "ret-ref", model.ReturnStatusApproved)
+		if !errors.Is(err, service.ErrInvalidStateTransition) {
+			t.Errorf("expected ErrInvalidStateTransition for COMPLETED -> APPROVED, got: %v", err)
+		}
+	})
 }
 
 func TestReturnService_7DayEligibility_DefaultWindow(t *testing.T) {

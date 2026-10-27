@@ -44,6 +44,67 @@ func (s ReturnStatus) IsValid() bool {
 	}
 }
 
+// AllowedStatusTransitions defines permitted state transitions for ReturnStatus.
+var AllowedStatusTransitions = map[ReturnStatus][]ReturnStatus{
+	ReturnStatusRequested: {
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusReplacementRequested: {
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusApproved: {
+		ReturnStatusVerified,
+		ReturnStatusItemReceived,
+		ReturnStatusRejected,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusVerified: {
+		ReturnStatusItemReceived,
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusRejected,
+	},
+	ReturnStatusItemReceived: {
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusRefundInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusReplacementInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusCompleted: {},
+	ReturnStatusRejected:  {},
+	ReturnStatusCancelled: {},
+}
+
+func (s ReturnStatus) CanTransitionTo(target ReturnStatus) bool {
+	if s == target {
+		return true
+	}
+	allowed, ok := AllowedStatusTransitions[s]
+	if !ok {
+		return false
+	}
+	for _, a := range allowed {
+		if a == target {
+			return true
+		}
+	}
+	return false
+}
+
 type VerificationCondition string
 
 const (

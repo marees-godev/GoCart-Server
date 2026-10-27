@@ -36,6 +36,9 @@ var (
 	ErrInvalidVerificationCondition = errors.New("invalid product verification condition")
 	ErrReturnNotFound               = errors.New("return not found")
 	ErrReturnNotVerifiable          = errors.New("return cannot be verified in current status")
+	ErrMultipleItemsNotSupported    = errors.New("only one item per return request is supported")
+	ErrOrderItemMismatch            = errors.New("order item id and item ids mismatch")
+	ErrInvalidStateTransition       = errors.New("invalid return status transition")
 )
 
 type ReturnService interface {
@@ -98,9 +101,27 @@ func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestRetur
 		return nil, ErrOrderIDRequired
 	}
 
+	if len(req.ItemIDs) > 1 {
+		s.logger.WarnContext(ctx, "return request rejected: multiple item IDs not supported",
+			slog.String("order_id", req.OrderID),
+			slog.Int("item_count", len(req.ItemIDs)),
+		)
+		return nil, ErrMultipleItemsNotSupported
+	}
+
 	orderItemID := strings.TrimSpace(req.OrderItemID)
-	if orderItemID == "" && len(req.ItemIDs) > 0 {
-		orderItemID = strings.TrimSpace(req.ItemIDs[0])
+	if len(req.ItemIDs) == 1 {
+		firstItemID := strings.TrimSpace(req.ItemIDs[0])
+		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
+			s.logger.WarnContext(ctx, "return request rejected: order_item_id and item_ids mismatch",
+				slog.String("order_item_id", orderItemID),
+				slog.String("item_id", firstItemID),
+			)
+			return nil, ErrOrderItemMismatch
+		}
+		if orderItemID == "" {
+			orderItemID = firstItemID
+		}
 	}
 	if orderItemID == "" {
 		s.logger.WarnContext(ctx, "return request rejected: order_item_id is required",
@@ -349,6 +370,29 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 		)
 		return nil, ErrInvalidReturnStatus
 	}
+
+	current, err := s.repo.GetReturnByID(ctx, id)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to retrieve return for status update",
+			slog.String("return_id", id),
+			slog.String("target_status", string(status)),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+	if current == nil {
+		return nil, ErrReturnNotFound
+	}
+
+	if !current.Status.CanTransitionTo(status) {
+		s.logger.WarnContext(ctx, "invalid return status transition rejected",
+			slog.String("return_id", id),
+			slog.String("current_status", string(current.Status)),
+			slog.String("target_status", string(status)),
+		)
+		return nil, ErrInvalidStateTransition
+	}
+
 	ret, err := s.repo.UpdateReturnStatus(ctx, id, status)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to update return status",

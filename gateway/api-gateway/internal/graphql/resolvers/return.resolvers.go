@@ -41,9 +41,27 @@ func (r *mutationResolver) RequestReturn(ctx context.Context, input model.Reques
 		return nil, appErrors.BadRequest("reason is required")
 	}
 
+	if len(input.ItemIds) > 1 {
+		return nil, appErrors.BadRequest("only one item per return request is supported; please submit separate requests for multiple items")
+	}
+
 	orderItemID := ""
 	if input.OrderItemID != nil {
 		orderItemID = strings.TrimSpace(*input.OrderItemID)
+	}
+
+	if len(input.ItemIds) == 1 {
+		firstItemID := strings.TrimSpace(input.ItemIds[0])
+		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
+			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
+		}
+		if orderItemID == "" {
+			orderItemID = firstItemID
+		}
+	}
+
+	if orderItemID == "" {
+		return nil, appErrors.BadRequest("orderItemId is required")
 	}
 
 	reqType := "RETURN"
@@ -56,7 +74,7 @@ func (r *mutationResolver) RequestReturn(ctx context.Context, input model.Reques
 		UserId:      userID,
 		OrderItemId: orderItemID,
 		Reason:      reason,
-		ItemIds:     input.ItemIds,
+		ItemIds:     []string{orderItemID},
 		Type:        reqType,
 	})
 	if err != nil {
@@ -92,9 +110,27 @@ func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.R
 		return nil, appErrors.BadRequest("reason is required")
 	}
 
+	if len(input.ItemIds) > 1 {
+		return nil, appErrors.BadRequest("only one item per replacement request is supported; please submit separate requests for multiple items")
+	}
+
 	orderItemID := ""
 	if input.OrderItemID != nil {
 		orderItemID = strings.TrimSpace(*input.OrderItemID)
+	}
+
+	if len(input.ItemIds) == 1 {
+		firstItemID := strings.TrimSpace(input.ItemIds[0])
+		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
+			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
+		}
+		if orderItemID == "" {
+			orderItemID = firstItemID
+		}
+	}
+
+	if orderItemID == "" {
+		return nil, appErrors.BadRequest("orderItemId is required")
 	}
 
 	res, err := client.RequestReturn(ctx, &returnpb.RequestReturnRequest{
@@ -102,7 +138,7 @@ func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.R
 		UserId:      userID,
 		OrderItemId: orderItemID,
 		Reason:      reason,
-		ItemIds:     input.ItemIds,
+		ItemIds:     []string{orderItemID},
 		Type:        "REPLACEMENT",
 	})
 	if err != nil {
@@ -233,6 +269,16 @@ func (r *queryResolver) ReturnOrder(ctx context.Context, id string) (*model.Retu
 		return nil, err
 	}
 
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, appErrors.BadRequest("return id is required")
@@ -241,6 +287,13 @@ func (r *queryResolver) ReturnOrder(ctx context.Context, id string) (*model.Retu
 	res, err := client.GetReturn(ctx, &returnpb.GetReturnRequest{Id: id})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" && role != "MERCHANT" {
+		if res.ReturnOrder != nil && res.ReturnOrder.UserId != userCtx.UserID {
+			return nil, appErrors.Forbidden("you do not have permission to view this return")
+		}
 	}
 
 	return toModelReturnOrder(res.ReturnOrder), nil
@@ -253,6 +306,16 @@ func (r *queryResolver) ReturnOrdersByOrder(ctx context.Context, orderID string)
 		return nil, err
 	}
 
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
 	orderID = strings.TrimSpace(orderID)
 	if orderID == "" {
 		return nil, appErrors.BadRequest("orderId is required")
@@ -263,8 +326,14 @@ func (r *queryResolver) ReturnOrdersByOrder(ctx context.Context, orderID string)
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	isElevated := role == "ADMIN" || role == "DELIVERY_PARTNER" || role == "MERCHANT"
+
 	result := make([]*model.ReturnOrder, 0, len(res.Returns))
 	for _, ret := range res.Returns {
+		if !isElevated && ret.UserId != userCtx.UserID {
+			continue
+		}
 		result = append(result, toModelReturnOrder(ret))
 	}
 	return result, nil

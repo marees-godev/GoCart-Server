@@ -121,10 +121,13 @@ func TestReturnGRPCHandler_RequestReturn_ErrorMapping(t *testing.T) {
 	}{
 		{"ReasonMandatory", service.ErrReturnReasonRequired, codes.InvalidArgument},
 		{"OrderItemRequired", service.ErrOrderItemRequired, codes.InvalidArgument},
+		{"MultipleItemsNotSupported", service.ErrMultipleItemsNotSupported, codes.InvalidArgument},
+		{"OrderItemMismatch", service.ErrOrderItemMismatch, codes.InvalidArgument},
 		{"DuplicateReturn", service.ErrDuplicateReturnRequest, codes.AlreadyExists},
 		{"OrderNotDelivered", service.ErrOrderNotDelivered, codes.FailedPrecondition},
 		{"WindowExpired", service.ErrReturnWindowExpired, codes.FailedPrecondition},
 		{"ProductNotReturnable", service.ErrProductNotReturnable, codes.FailedPrecondition},
+		{"InvalidStateTransition", service.ErrInvalidStateTransition, codes.FailedPrecondition},
 		{"ItemNotFound", service.ErrOrderItemNotFound, codes.NotFound},
 		{"OrderNotFound", service.ErrOrderNotFound, codes.NotFound},
 		{"UnauthorizedUser", service.ErrUnauthorizedReturnRequest, codes.PermissionDenied},

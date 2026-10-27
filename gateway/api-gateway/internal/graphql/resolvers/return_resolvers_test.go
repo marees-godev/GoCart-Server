@@ -8,6 +8,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	grpcPkg "google.golang.org/grpc"
 )
 
@@ -109,6 +110,7 @@ func (m *mockReturnClient) GetReturnsByOrder(ctx context.Context, in *returnpb.G
 			{
 				Id:      "ret-1",
 				OrderId: in.OrderId,
+				UserId:  "user-1",
 				Status:  "REQUESTED",
 			},
 		},
@@ -208,6 +210,91 @@ func TestRequestReturn_Unauthorized(t *testing.T) {
 	_, err := resolver.Mutation().RequestReturn(ctx, input)
 	if err == nil {
 		t.Fatal("expected unauthorized error, got nil")
+	}
+}
+
+func TestRequestReturn_MultipleItemIDs_BadRequest(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+	input := model.RequestReturnInput{
+		OrderID: "order-456",
+		Reason:  "Defective",
+		ItemIds: []string{"item-1", "item-2"},
+	}
+
+	_, err := resolver.Mutation().RequestReturn(ctx, input)
+	if err == nil {
+		t.Fatal("expected bad request error for multiple items, got nil")
+	}
+}
+
+func TestRequestReturn_ItemIDsMismatch_BadRequest(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+	orderItemID := "item-1"
+	input := model.RequestReturnInput{
+		OrderID:     "order-456",
+		OrderItemID: &orderItemID,
+		ItemIds:     []string{"item-2"},
+		Reason:      "Defective",
+	}
+
+	_, err := resolver.Mutation().RequestReturn(ctx, input)
+	if err == nil {
+		t.Fatal("expected bad request error for mismatched item IDs, got nil")
+	}
+}
+
+func TestRequestReturn_MissingOrderItemID_BadRequest(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+	input := model.RequestReturnInput{
+		OrderID: "order-456",
+		Reason:  "Defective",
+	}
+
+	_, err := resolver.Mutation().RequestReturn(ctx, input)
+	if err == nil {
+		t.Fatal("expected bad request error for missing order item ID, got nil")
+	}
+}
+
+func TestRequestReplacement_MultipleItemIDs_BadRequest(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+	input := model.RequestReplacementInput{
+		OrderID: "order-456",
+		Reason:  "Defective",
+		ItemIds: []string{"item-1", "item-2"},
+	}
+
+	_, err := resolver.Mutation().RequestReplacement(ctx, input)
+	if err == nil {
+		t.Fatal("expected bad request error for multiple items, got nil")
 	}
 }
 
@@ -361,7 +448,10 @@ func TestReturnOrder_Success(t *testing.T) {
 	clients := &grpc.Clients{ReturnClient: mockClient}
 	resolver := NewResolver(clients)
 
-	ctx := context.Background()
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-1",
+		Role:   "USER",
+	})
 	res, err := resolver.Query().ReturnOrder(ctx, "ret-100")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -372,12 +462,63 @@ func TestReturnOrder_Success(t *testing.T) {
 	}
 }
 
+func TestReturnOrder_Unauthenticated(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	_, err := resolver.Query().ReturnOrder(context.Background(), "ret-100")
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+}
+
+func TestReturnOrder_NonOwner_Forbidden(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-other",
+		Role:   "USER",
+	})
+	_, err := resolver.Query().ReturnOrder(ctx, "ret-100")
+	if err == nil {
+		t.Fatal("expected forbidden error for non-owner, got nil")
+	}
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN error, got: %v", err)
+	}
+}
+
+func TestReturnOrder_Admin_Bypass(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+	res, err := resolver.Query().ReturnOrder(ctx, "ret-100")
+	if err != nil {
+		t.Fatalf("admin should bypass ownership check, got error: %v", err)
+	}
+	if res.ID != "ret-100" {
+		t.Errorf("expected ID 'ret-100', got '%s'", res.ID)
+	}
+}
+
 func TestReturnOrdersByOrder_Success(t *testing.T) {
 	mockClient := &mockReturnClient{}
 	clients := &grpc.Clients{ReturnClient: mockClient}
 	resolver := NewResolver(clients)
 
-	ctx := context.Background()
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-1",
+		Role:   "USER",
+	})
 	res, err := resolver.Query().ReturnOrdersByOrder(ctx, "order-123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -388,6 +529,53 @@ func TestReturnOrdersByOrder_Success(t *testing.T) {
 	}
 	if res[0].OrderID != "order-123" {
 		t.Errorf("expected OrderID 'order-123', got '%s'", res[0].OrderID)
+	}
+}
+
+func TestReturnOrdersByOrder_Unauthenticated(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	_, err := resolver.Query().ReturnOrdersByOrder(context.Background(), "order-123")
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+}
+
+func TestReturnOrdersByOrder_NonOwner_Filtered(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-other",
+		Role:   "USER",
+	})
+	res, err := resolver.Query().ReturnOrdersByOrder(ctx, "order-123")
+	if err != nil {
+		t.Fatalf("expected no error (filtered result), got: %v", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("expected 0 returns for non-owner, got %d", len(res))
+	}
+}
+
+func TestReturnOrdersByOrder_Admin_SeesAll(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+	res, err := resolver.Query().ReturnOrdersByOrder(ctx, "order-123")
+	if err != nil {
+		t.Fatalf("admin should see all returns, got error: %v", err)
+	}
+	if len(res) != 1 {
+		t.Errorf("expected 1 return for admin, got %d", len(res))
 	}
 }
 
