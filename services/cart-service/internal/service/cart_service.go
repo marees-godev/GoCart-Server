@@ -129,8 +129,16 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 		}
 	}
 
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
+	var storeID *string = req.StoreID
+	if storeID != nil && (*storeID == "" || *storeID == "00000000-0000-0000-0000-000000000000") {
+		storeID = nil
+	}
+
 	unitPrice := req.UnitPrice
-	storeID := req.StoreID
 
 	if unitPrice <= 0 && s.productClient != nil {
 		callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
@@ -148,23 +156,24 @@ func (s *cartService) AddCartItem(ctx context.Context, req dto.AddCartItemReques
 			return nil, appErrors.NotFound("product not found")
 		}
 		unitPrice = product.GetPrice()
-		if req.VariantID != "" {
+		if variantID != nil {
 			for _, v := range product.GetVariants() {
-				if v.GetId() == req.VariantID && v.GetPrice() > 0 {
+				if v.GetId() == *variantID && v.GetPrice() > 0 {
 					unitPrice = v.GetPrice()
 					break
 				}
 			}
 		}
-		if storeID == "" {
-			storeID = product.GetStoreId()
+		if storeID == nil && product.GetStoreId() != "" {
+			prodStore := product.GetStoreId()
+			storeID = &prodStore
 		}
 	}
 
 	item := &model.CartItem{
 		CartID:    cart.ID,
 		ProductID: req.ProductID,
-		VariantID: req.VariantID,
+		VariantID: variantID,
 		StoreID:   storeID,
 		Quantity:  req.Quantity,
 		UnitPrice: unitPrice,
@@ -190,6 +199,11 @@ func (s *cartService) UpdateCartItem(ctx context.Context, req dto.UpdateCartItem
 		return nil, appErrors.BadRequest("quantity must be greater than zero")
 	}
 
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
+
 	cart, err := s.repo.GetCartByUserID(ctx, req.UserID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCartNotFound) {
@@ -198,7 +212,7 @@ func (s *cartService) UpdateCartItem(ctx context.Context, req dto.UpdateCartItem
 		return nil, appErrors.Internal(err, "failed to retrieve cart")
 	}
 
-	updatedCart, err := s.repo.UpdateItemQuantity(ctx, cart.ID, req.ProductID, req.VariantID, req.Quantity)
+	updatedCart, err := s.repo.UpdateItemQuantity(ctx, cart.ID, req.ProductID, variantID, req.Quantity)
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			return nil, appErrors.NotFound("item not found in cart")
@@ -217,6 +231,10 @@ func (s *cartService) RemoveCartItem(ctx context.Context, req dto.RemoveCartItem
 	if req.ProductID == "" {
 		return nil, appErrors.BadRequest("product_id is required")
 	}
+	var variantID *string = req.VariantID
+	if variantID != nil && (*variantID == "" || *variantID == "00000000-0000-0000-0000-000000000000") {
+		variantID = nil
+	}
 
 	cart, err := s.repo.GetCartByUserID(ctx, req.UserID)
 	if err != nil {
@@ -226,7 +244,7 @@ func (s *cartService) RemoveCartItem(ctx context.Context, req dto.RemoveCartItem
 		return nil, appErrors.Internal(err, "failed to retrieve cart")
 	}
 
-	updatedCart, err := s.repo.RemoveItem(ctx, cart.ID, req.ProductID, req.VariantID)
+	updatedCart, err := s.repo.RemoveItem(ctx, cart.ID, req.ProductID, variantID)
 	if err != nil {
 		if errors.Is(err, repository.ErrItemNotFound) {
 			return nil, appErrors.NotFound("item not found in cart")
@@ -332,8 +350,9 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 				})
 			} else {
 				item.UnitPrice = product.GetPrice()
-				if item.StoreID == "" && product.GetStoreId() != "" {
-					item.StoreID = product.GetStoreId()
+				if (item.StoreID == nil || *item.StoreID == "") && product.GetStoreId() != "" {
+					prodStore := product.GetStoreId()
+					item.StoreID = &prodStore
 				}
 			}
 		}
@@ -369,9 +388,9 @@ func (s *cartService) ValidateCart(ctx context.Context, userID string) (*dto.Val
 			}
 		}
 
-		storeID := item.StoreID
-		if storeID == "" {
-			storeID = "default"
+		storeID := "default"
+		if item.StoreID != nil && *item.StoreID != "" {
+			storeID = *item.StoreID
 		}
 		storeMap[storeID] = append(storeMap[storeID], *item)
 	}

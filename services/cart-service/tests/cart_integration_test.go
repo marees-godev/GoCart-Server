@@ -55,6 +55,16 @@ func (m *inMemoryCartRepo) CreateCart(ctx context.Context, userID string) (*mode
 	return deepCopyCart(c), nil
 }
 
+func matchVariantPtr(a *string, b *string) bool {
+	if a == nil || *a == "" || *a == "00000000-0000-0000-0000-000000000000" {
+		return b == nil || *b == "" || *b == "00000000-0000-0000-0000-000000000000"
+	}
+	if b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func (m *inMemoryCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item *model.CartItem) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
@@ -63,7 +73,7 @@ func (m *inMemoryCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, i
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == item.ProductID && c.Items[i].VariantID == item.VariantID {
+		if c.Items[i].ProductID == item.ProductID && matchVariantPtr(c.Items[i].VariantID, item.VariantID) {
 			c.Items[i].Quantity += item.Quantity
 			c.Items[i].UnitPrice = item.UnitPrice
 			c.Items[i].UpdatedAt = time.Now()
@@ -86,7 +96,7 @@ func (m *inMemoryCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, i
 	return deepCopyCart(c), nil
 }
 
-func (m *inMemoryCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID, variantID string, quantity int32) (*model.Cart, error) {
+func (m *inMemoryCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID string, variantID *string, quantity int32) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -94,7 +104,7 @@ func (m *inMemoryCartRepo) UpdateItemQuantity(ctx context.Context, cartID string
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			c.Items[i].Quantity = quantity
 			c.Items[i].UpdatedAt = time.Now()
 			found = true
@@ -111,7 +121,7 @@ func (m *inMemoryCartRepo) UpdateItemQuantity(ctx context.Context, cartID string
 	return deepCopyCart(c), nil
 }
 
-func (m *inMemoryCartRepo) RemoveItem(ctx context.Context, cartID string, productID, variantID string) (*model.Cart, error) {
+func (m *inMemoryCartRepo) RemoveItem(ctx context.Context, cartID string, productID string, variantID *string) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -119,7 +129,7 @@ func (m *inMemoryCartRepo) RemoveItem(ctx context.Context, cartID string, produc
 
 	foundIdx := -1
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			foundIdx = i
 			break
 		}

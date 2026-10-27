@@ -5,23 +5,23 @@ import "github.com/marees-godev/GoCart-Server/services/cart-service/internal/mod
 type AddCartItemRequest struct {
 	UserID    string  `json:"user_id"`
 	ProductID string  `json:"product_id"`
-	VariantID string  `json:"variant_id,omitempty"`
-	StoreID   string  `json:"store_id,omitempty"`
+	VariantID *string `json:"variant_id,omitempty"`
+	StoreID   *string `json:"store_id,omitempty"`
 	UnitPrice float64 `json:"unit_price"`
 	Quantity  int32   `json:"quantity"`
 }
 
 type UpdateCartItemRequest struct {
-	UserID    string `json:"user_id"`
-	ProductID string `json:"product_id"`
-	VariantID string `json:"variant_id,omitempty"`
-	Quantity  int32  `json:"quantity"`
+	UserID    string  `json:"user_id"`
+	ProductID string  `json:"product_id"`
+	VariantID *string `json:"variant_id,omitempty"`
+	Quantity  int32   `json:"quantity"`
 }
 
 type RemoveCartItemRequest struct {
-	UserID    string `json:"user_id"`
-	ProductID string `json:"product_id"`
-	VariantID string `json:"variant_id,omitempty"`
+	UserID    string  `json:"user_id"`
+	ProductID string  `json:"product_id"`
+	VariantID *string `json:"variant_id,omitempty"`
 }
 
 type ClearCartRequest struct {

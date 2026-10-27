@@ -53,6 +53,23 @@ func (m *mockCartRepo) CreateCart(ctx context.Context, userID string) (*model.Ca
 	return deepCopyCart(c), nil
 }
 
+func strPtr(s string) *string {
+	if s == "" || s == "00000000-0000-0000-0000-000000000000" {
+		return nil
+	}
+	return &s
+}
+
+func matchVariantPtr(a *string, b *string) bool {
+	if a == nil || *a == "" || *a == "00000000-0000-0000-0000-000000000000" {
+		return b == nil || *b == "" || *b == "00000000-0000-0000-0000-000000000000"
+	}
+	if b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item *model.CartItem) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
@@ -61,7 +78,7 @@ func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item 
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == item.ProductID && c.Items[i].VariantID == item.VariantID {
+		if c.Items[i].ProductID == item.ProductID && matchVariantPtr(c.Items[i].VariantID, item.VariantID) {
 			c.Items[i].Quantity += item.Quantity
 			c.Items[i].UnitPrice = item.UnitPrice
 			c.Items[i].UpdatedAt = time.Now()
@@ -84,7 +101,7 @@ func (m *mockCartRepo) AddOrUpdateItem(ctx context.Context, cartID string, item 
 	return deepCopyCart(c), nil
 }
 
-func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID, variantID string, quantity int32) (*model.Cart, error) {
+func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, productID string, variantID *string, quantity int32) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -92,7 +109,7 @@ func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, pr
 
 	found := false
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			c.Items[i].Quantity = quantity
 			c.Items[i].UpdatedAt = time.Now()
 			found = true
@@ -109,7 +126,7 @@ func (m *mockCartRepo) UpdateItemQuantity(ctx context.Context, cartID string, pr
 	return deepCopyCart(c), nil
 }
 
-func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID, variantID string) (*model.Cart, error) {
+func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID string, variantID *string) (*model.Cart, error) {
 	c, ok := m.carts[cartID]
 	if !ok {
 		return nil, repository.ErrCartNotFound
@@ -117,7 +134,7 @@ func (m *mockCartRepo) RemoveItem(ctx context.Context, cartID string, productID,
 
 	foundIdx := -1
 	for i := range c.Items {
-		if c.Items[i].ProductID == productID && c.Items[i].VariantID == variantID {
+		if c.Items[i].ProductID == productID && matchVariantPtr(c.Items[i].VariantID, variantID) {
 			foundIdx = i
 			break
 		}
@@ -182,8 +199,8 @@ func TestCartService_Operations(t *testing.T) {
 
 	userID := "user-123"
 	prodID1 := "prod-001"
-	varID1 := "var-001"
-	storeID := "store-001"
+	varID1 := strPtr("var-001")
+	storeID := strPtr("store-001")
 
 	// 1. GetCart for non-existent cart creates a new cart
 	cart, err := svc.GetCart(ctx, userID)
@@ -429,7 +446,7 @@ func TestCartService_ValidateCart_SuccessAndPriceUpdate(t *testing.T) {
 	_, err := svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p1",
-		StoreID:   "store-1",
+		StoreID:   strPtr("store-1"),
 		UnitPrice: 10.00,
 		Quantity:  2,
 	})
@@ -556,14 +573,14 @@ func TestCartService_PrepareCheckout_MultiStoreGrouping(t *testing.T) {
 	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p1",
-		StoreID:   "store-A",
+		StoreID:   strPtr("store-A"),
 		UnitPrice: 100.0,
 		Quantity:  2,
 	})
 	_, _ = svc.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: "p2",
-		StoreID:   "store-B",
+		StoreID:   strPtr("store-B"),
 		UnitPrice: 50.0,
 		Quantity:  1,
 	})

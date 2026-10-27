@@ -18,8 +18,8 @@ type CartItem struct {
 	ID        string    `json:"id"`
 	CartID    string    `json:"cart_id"`
 	ProductID string    `json:"product_id"`
-	VariantID string    `json:"variant_id,omitempty"`
-	StoreID   string    `json:"store_id,omitempty"`
+	VariantID *string   `json:"variant_id,omitempty"`
+	StoreID   *string   `json:"store_id,omitempty"`
 	Quantity  int32     `json:"quantity"`
 	UnitPrice float64   `json:"unit_price"`
 	CreatedAt time.Time `json:"created_at"`
