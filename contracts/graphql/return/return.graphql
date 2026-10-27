@@ -1,25 +1,95 @@
+enum ReturnStatus {
+  RETURN_REQUESTED
+  REPLACEMENT_REQUESTED
+  APPROVED
+  REJECTED
+  VERIFIED
+  ITEM_RECEIVED
+  REFUND_INITIATED
+  REPLACEMENT_INITIATED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReturnType {
+  RETURN
+  REPLACEMENT
+}
+
+enum VerificationCondition {
+  GOOD
+  DEFECTIVE
+  DAMAGED
+  WRONG_ITEM
+  OPEN_BOX
+}
+
+type ProductVerification {
+  id: ID!
+  returnId: ID!
+  verifiedBy: String!
+  condition: String!
+  isApproved: Boolean!
+  proofImages: [String!]
+  notes: String
+  verifiedAt: String!
+  createdAt: String
+  updatedAt: String
+}
+
 type ReturnOrder {
   id: ID!
   orderId: String!
+  orderItemId: String
   userId: String!
   reason: String!
   status: String!
+  type: String!
   refundAmount: Float!
+  verification: ProductVerification
+  requestedAt: String
+  approvedAt: String
+  completedAt: String
   createdAt: String
+  updatedAt: String
 }
 
 input RequestReturnInput {
   orderId: String!
-  userId: String!
+  userId: String
+  orderItemId: String
   reason: String!
-  itemIds: [String!]!
+  itemIds: [String!]
+  type: ReturnType
+}
+
+input RequestReplacementInput {
+  orderId: String!
+  userId: String
+  orderItemId: String
+  reason: String!
+  itemIds: [String!]
+}
+
+input VerifyProductInput {
+  returnId: ID!
+  condition: String!
+  isApproved: Boolean!
+  proofImages: [String!]
+  imagesUpload: [Upload!]
+  notes: String
 }
 
 extend type Query {
   returnOrder(id: ID!): ReturnOrder @auth
+  returnOrdersByOrder(orderId: String!): [ReturnOrder!]! @auth
+  listReturns(limit: Int, offset: Int, status: String): [ReturnOrder!]! @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
 }
 
 extend type Mutation {
   requestReturn(input: RequestReturnInput!): ReturnOrder @auth
-  updateReturnStatus(id: ID!, status: String!): ReturnOrder @auth(requires: [ADMIN, MERCHANT])
+  requestReplacement(input: RequestReplacementInput!): ReturnOrder @auth
+  verifyProduct(input: VerifyProductInput!): ReturnOrder @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  updateReturnStatus(id: ID!, status: String!): ReturnOrder @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
 }
+

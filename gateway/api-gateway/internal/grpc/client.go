@@ -10,6 +10,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"google.golang.org/grpc"
@@ -26,6 +27,7 @@ type Clients struct {
 	InventoryClient inventorypb.InventoryServiceClient
 	OrderClient     orderpb.OrderServiceClient
 	DeliveryClient  deliverypb.DeliveryServiceClient
+	ReturnClient    returnpb.ReturnServiceClient
 	conns           []*grpc.ClientConn
 }
 
@@ -165,6 +167,22 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
+	returnAddr := cfg.GRPC.ReturnServiceAddr
+	if returnAddr == "" {
+		returnAddr = "localhost:50062"
+	}
+	returnConn, err := grpc.NewClient(returnAddr, opts...)
+	if err != nil {
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		storeConn.Close()
+		invConn.Close()
+		deliveryConn.Close()
+		return nil, err
+	}
+
 	return &Clients{
 		AuthClient:      auth.NewAuthServiceClient(authConn),
 		UserClient:      userpb.NewUserServiceClient(userConn),
@@ -175,8 +193,9 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		InventoryClient: inventorypb.NewInventoryServiceClient(invConn),
 		OrderClient:     orderpb.NewOrderServiceClient(orderConn),
 		DeliveryClient:  deliverypb.NewDeliveryServiceClient(deliveryConn),
+		ReturnClient:    returnpb.NewReturnServiceClient(returnConn),
 		conns: []*grpc.ClientConn{
-			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn, deliveryConn,
+			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn, deliveryConn, returnConn,
 		},
 	}, nil
 }
@@ -212,6 +231,9 @@ func NewClientsWithServices(
 		}
 		if cart, ok := svc.(cartpb.CartServiceClient); ok {
 			c.CartClient = cart
+		}
+		if ret, ok := svc.(returnpb.ReturnServiceClient); ok {
+			c.ReturnClient = ret
 		}
 	}
 	return c

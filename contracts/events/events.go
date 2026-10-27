@@ -353,6 +353,44 @@ type ProductDeletedEvent struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+// ReturnRequestedEvent represents the payload for ReturnRequested domain event.
+type ReturnRequestedEvent struct {
+	ReturnID     string    `json:"return_id"`
+	OrderID      string    `json:"order_id"`
+	OrderItemID  string    `json:"order_item_id"`
+	ProductID    string    `json:"product_id"`
+	UserID       string    `json:"user_id"`
+	Reason       string    `json:"reason"`
+	Status       string    `json:"status"`
+	Type         string    `json:"type,omitempty"`
+	RefundAmount float64   `json:"refund_amount"`
+	RequestedAt  time.Time `json:"requested_at"`
+}
+
+// ReturnVerifiedEvent represents the payload for ReturnVerified domain event.
+type ReturnVerifiedEvent struct {
+	ReturnID    string    `json:"return_id"`
+	OrderID     string    `json:"order_id"`
+	OrderItemID string    `json:"order_item_id"`
+	VerifiedBy  string    `json:"verified_by"`
+	Condition   string    `json:"condition"`
+	IsApproved  bool      `json:"is_approved"`
+	ProofImages []string  `json:"proof_images"`
+	Notes       string    `json:"notes,omitempty"`
+	VerifiedAt  time.Time `json:"verified_at"`
+}
+
+// ReturnStatusUpdatedEvent represents the payload for ReturnStatusUpdated domain event.
+type ReturnStatusUpdatedEvent struct {
+	ReturnID       string    `json:"return_id"`
+	OrderID        string    `json:"order_id"`
+	OrderItemID    string    `json:"order_item_id"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+
 // PartnerRegisteredEvent represents the payload for PartnerRegistered domain event.
 type PartnerRegisteredEvent struct {
 	PartnerID     string `json:"partner_id"`
