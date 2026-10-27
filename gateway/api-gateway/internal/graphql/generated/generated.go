@@ -255,7 +255,6 @@ type ComplexityRoot struct {
 		RejectStore                  func(childComplexity int, id string, reason string) int
 		ReleaseStock                 func(childComplexity int, reservationID string) int
 		RemoveFromCart               func(childComplexity int, userID *string, productID string) int
-		RemoveFromCart               func(childComplexity int, userID string, productID string) int
 		RequestReplacement           func(childComplexity int, input model.RequestReplacementInput) int
 		RequestReturn                func(childComplexity int, input model.RequestReturnInput) int
 		ResendVerificationEmail      func(childComplexity int, email string, role model.AuthRole) int
