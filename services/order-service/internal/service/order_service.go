@@ -32,8 +32,9 @@ type OrderService interface {
 	CreateOrder(ctx context.Context, input dto.CreateOrderInput) (*dto.CreateOrderResult, error)
 	GetOrder(ctx context.Context, id string, userID ...string) (*model.Order, error)
 	ListOrders(ctx context.Context, input dto.ListOrdersInput) (*dto.ListOrdersResult, error)
-	UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error)
+	UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error)
 	CancelOrder(ctx context.Context, id string, userID string, reason string) (*model.Order, error)
+	GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error)
 }
 
 type orderService struct {
@@ -81,6 +82,35 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	}
 	if _, err := uuid.Parse(strings.TrimSpace(input.UserID)); err != nil {
 		return nil, appErrors.BadRequest("invalid user_id format: must be valid UUID")
+	}
+
+	if strings.TrimSpace(input.IdempotencyKey) == "" {
+		return nil, appErrors.BadRequest("idempotency_key is required")
+	}
+
+	// Check if orders for this idempotency key already exist
+	existingOrders, err := s.repo.GetOrdersByIdempotencyKey(ctx, strings.TrimSpace(input.IdempotencyKey))
+	if err != nil && !errorsIs(err, repository.ErrOrderNotFound) {
+		return nil, appErrors.Internal(err, "failed to check idempotency key")
+	}
+	if len(existingOrders) > 0 {
+		first := existingOrders[0]
+		if first.UserID != strings.TrimSpace(input.UserID) {
+			return nil, appErrors.Conflict("idempotency key already used for another user")
+		}
+		parentID := first.ID
+		if first.ParentOrderID != nil && *first.ParentOrderID != "" {
+			parentID = *first.ParentOrderID
+		}
+		s.log.Info("Returning existing order(s) for duplicate idempotency key",
+			"idempotency_key", input.IdempotencyKey,
+			"order_count", len(existingOrders),
+		)
+		return &dto.CreateOrderResult{
+			PrimaryOrder:  first,
+			Orders:        existingOrders,
+			ParentOrderID: parentID,
+		}, nil
 	}
 
 	if strings.TrimSpace(input.ShippingAddress) == "" && strings.TrimSpace(input.ShippingAddressID) == "" {
@@ -247,6 +277,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		storeDiscount = math.Round((input.DiscountAmount/numStores)*100) / 100
 	}
 
+	firstStore := true
 	for storeID, items := range storeMap {
 		orderID := uuid.New().String()
 		orderNumber := generateOrderNumber()
@@ -304,8 +335,10 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			billAddrIDPtr = &input.BillingAddressID
 		}
 		var idempKeyPtr *string
-		if input.IdempotencyKey != "" {
-			idempKeyPtr = &input.IdempotencyKey
+		if firstStore && strings.TrimSpace(input.IdempotencyKey) != "" {
+			k := strings.TrimSpace(input.IdempotencyKey)
+			idempKeyPtr = &k
+			firstStore = false
 		}
 
 		ord := &model.Order{
@@ -484,7 +517,7 @@ func (s *orderService) ListOrders(ctx context.Context, input dto.ListOrdersInput
 	}, nil
 }
 
-func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus) (*model.Order, error) {
+func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, appErrors.BadRequest("order id is required")
 	}
@@ -492,14 +525,26 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status: %s", orderStatus))
 	}
 
-	order, err := s.repo.UpdateOrderStatus(ctx, id, orderStatus)
+	order, err := s.repo.GetOrderByID(ctx, id)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
 		}
-		return nil, appErrors.Internal(err, "failed to update order status")
+		return nil, appErrors.Internal(err, "failed to get order")
 	}
-	return order, nil
+
+	if !model.IsValidTransition(order.Status, orderStatus) {
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", order.Status, orderStatus))
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatus(ctx, id, orderStatus, reason...)
+	if err != nil {
+		if errorsIs(err, repository.ErrOrderNotFound) {
+			return nil, appErrors.NotFound("order not found")
+		}
+		return nil, err
+	}
+	return updatedOrder, nil
 }
 
 func (s *orderService) CancelOrder(ctx context.Context, id string, userID string, reason string) (*model.Order, error) {
@@ -535,9 +580,7 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 	if order.Status == model.OrderStatusCancelled {
 		return nil, appErrors.BadRequest("order is already cancelled")
 	}
-	if order.Status == model.OrderStatusShipped ||
-		order.Status == model.OrderStatusDelivered ||
-		order.Status == model.OrderStatusReturned {
+	if !model.CanCancel(order.Status) {
 		return nil, appErrors.BadRequest(fmt.Sprintf("cannot cancel order in %s status", order.Status))
 	}
 
@@ -554,15 +597,35 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 		envelope = env
 	}
 
-	updatedOrder, err := s.repo.CancelOrder(ctx, id, envelope, OrderCancelledTopic)
+	updatedOrder, err := s.repo.CancelOrder(ctx, id, envelope, OrderCancelledTopic, reason)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
 		}
-		return nil, appErrors.Internal(err, "failed to cancel order")
+		return nil, err
 	}
 
 	return updatedOrder, nil
+}
+
+func (s *orderService) GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error) {
+	if strings.TrimSpace(orderID) == "" {
+		return nil, appErrors.BadRequest("order id is required")
+	}
+
+	if _, err := s.repo.GetOrderByID(ctx, orderID); err != nil {
+		if errorsIs(err, repository.ErrOrderNotFound) {
+			return nil, appErrors.NotFound("order not found")
+		}
+		return nil, appErrors.Internal(err, "failed to get order")
+	}
+
+	history, err := s.repo.GetOrderStatusHistory(ctx, orderID)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to get order status history")
+	}
+
+	return history, nil
 }
 
 func generateOrderNumber() string {

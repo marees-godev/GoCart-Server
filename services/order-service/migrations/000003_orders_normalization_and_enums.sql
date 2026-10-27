@@ -2,12 +2,18 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
         CREATE TYPE order_status AS ENUM (
             'CREATED',
+            'PENDING_PAYMENT',
+            'PAID',
             'CONFIRMED',
             'PROCESSING',
             'SHIPPED',
+            'OUT_FOR_DELIVERY',
             'DELIVERED',
+            'PAYMENT_FAILED',
             'CANCELLED',
-            'RETURNED'
+            'RETURNED',
+            'RETURN_REQUESTED',
+            'REFUNDED'
         );
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_payment_status') THEN
