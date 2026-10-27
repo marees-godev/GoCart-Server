@@ -441,6 +441,19 @@ type ProductVariant struct {
 	DeletedAt      *string       `json:"deletedAt,omitempty"`
 }
 
+type ProductVerification struct {
+	ID          string   `json:"id"`
+	ReturnID    string   `json:"returnId"`
+	VerifiedBy  string   `json:"verifiedBy"`
+	Condition   string   `json:"condition"`
+	IsApproved  bool     `json:"isApproved"`
+	ProofImages []string `json:"proofImages,omitempty"`
+	Notes       *string  `json:"notes,omitempty"`
+	VerifiedAt  string   `json:"verifiedAt"`
+	CreatedAt   *string  `json:"createdAt,omitempty"`
+	UpdatedAt   *string  `json:"updatedAt,omitempty"`
+}
+
 type Query struct {
 }
 
@@ -473,11 +486,21 @@ type RegisterInput struct {
 	LastName  *string  `json:"lastName,omitempty"`
 }
 
+type RequestReplacementInput struct {
+	OrderID     string   `json:"orderId"`
+	UserID      *string  `json:"userId,omitempty"`
+	OrderItemID *string  `json:"orderItemId,omitempty"`
+	Reason      string   `json:"reason"`
+	ItemIds     []string `json:"itemIds,omitempty"`
+}
+
 type RequestReturnInput struct {
-	OrderID string   `json:"orderId"`
-	UserID  string   `json:"userId"`
-	Reason  string   `json:"reason"`
-	ItemIds []string `json:"itemIds"`
+	OrderID     string      `json:"orderId"`
+	UserID      *string     `json:"userId,omitempty"`
+	OrderItemID *string     `json:"orderItemId,omitempty"`
+	Reason      string      `json:"reason"`
+	ItemIds     []string    `json:"itemIds,omitempty"`
+	Type        *ReturnType `json:"type,omitempty"`
 }
 
 type ReservationItemInput struct {
@@ -519,13 +542,20 @@ type RestockInventoryPayload struct {
 }
 
 type ReturnOrder struct {
-	ID           string  `json:"id"`
-	OrderID      string  `json:"orderId"`
-	UserID       string  `json:"userId"`
-	Reason       string  `json:"reason"`
-	Status       string  `json:"status"`
-	RefundAmount float64 `json:"refundAmount"`
-	CreatedAt    *string `json:"createdAt,omitempty"`
+	ID           string               `json:"id"`
+	OrderID      string               `json:"orderId"`
+	OrderItemID  *string              `json:"orderItemId,omitempty"`
+	UserID       string               `json:"userId"`
+	Reason       string               `json:"reason"`
+	Status       string               `json:"status"`
+	Type         string               `json:"type"`
+	RefundAmount float64              `json:"refundAmount"`
+	Verification *ProductVerification `json:"verification,omitempty"`
+	RequestedAt  *string              `json:"requestedAt,omitempty"`
+	ApprovedAt   *string              `json:"approvedAt,omitempty"`
+	CompletedAt  *string              `json:"completedAt,omitempty"`
+	CreatedAt    *string              `json:"createdAt,omitempty"`
+	UpdatedAt    *string              `json:"updatedAt,omitempty"`
 }
 
 type SendNotificationInput struct {
@@ -706,6 +736,15 @@ type ValidateCategoryResponse struct {
 	IsValid  bool      `json:"isValid"`
 	Message  string    `json:"message"`
 	Category *Category `json:"category,omitempty"`
+}
+
+type VerifyProductInput struct {
+	ReturnID     string            `json:"returnId"`
+	Condition    string            `json:"condition"`
+	IsApproved   bool              `json:"isApproved"`
+	ProofImages  []string          `json:"proofImages,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
+	Notes        *string           `json:"notes,omitempty"`
 }
 
 type AuthRole string
@@ -996,6 +1035,104 @@ func (e ProductStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type ReturnStatus string
+
+const (
+	ReturnStatusReturnRequested      ReturnStatus = "RETURN_REQUESTED"
+	ReturnStatusReplacementRequested ReturnStatus = "REPLACEMENT_REQUESTED"
+	ReturnStatusApproved             ReturnStatus = "APPROVED"
+	ReturnStatusRejected             ReturnStatus = "REJECTED"
+	ReturnStatusVerified             ReturnStatus = "VERIFIED"
+	ReturnStatusItemReceived         ReturnStatus = "ITEM_RECEIVED"
+	ReturnStatusRefundInitiated      ReturnStatus = "REFUND_INITIATED"
+	ReturnStatusReplacementInitiated ReturnStatus = "REPLACEMENT_INITIATED"
+	ReturnStatusCompleted            ReturnStatus = "COMPLETED"
+	ReturnStatusCancelled            ReturnStatus = "CANCELLED"
+)
+
+var AllReturnStatus = []ReturnStatus{
+	ReturnStatusReturnRequested,
+	ReturnStatusReplacementRequested,
+	ReturnStatusApproved,
+	ReturnStatusRejected,
+	ReturnStatusVerified,
+	ReturnStatusItemReceived,
+	ReturnStatusRefundInitiated,
+	ReturnStatusReplacementInitiated,
+	ReturnStatusCompleted,
+	ReturnStatusCancelled,
+}
+
+func (e ReturnStatus) IsValid() bool {
+	switch e {
+	case ReturnStatusReturnRequested, ReturnStatusReplacementRequested, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusVerified, ReturnStatusItemReceived, ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusCompleted, ReturnStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e ReturnStatus) String() string {
+	return string(e)
+}
+
+func (e *ReturnStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReturnStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReturnStatus", str)
+	}
+	return nil
+}
+
+func (e ReturnStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ReturnType string
+
+const (
+	ReturnTypeReturn      ReturnType = "RETURN"
+	ReturnTypeReplacement ReturnType = "REPLACEMENT"
+)
+
+var AllReturnType = []ReturnType{
+	ReturnTypeReturn,
+	ReturnTypeReplacement,
+}
+
+func (e ReturnType) IsValid() bool {
+	switch e {
+	case ReturnTypeReturn, ReturnTypeReplacement:
+		return true
+	}
+	return false
+}
+
+func (e ReturnType) String() string {
+	return string(e)
+}
+
+func (e *ReturnType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReturnType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReturnType", str)
+	}
+	return nil
+}
+
+func (e ReturnType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type Role string
 
 const (
@@ -1038,5 +1175,52 @@ func (e *Role) UnmarshalGQL(v interface{}) error {
 }
 
 func (e Role) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type VerificationCondition string
+
+const (
+	VerificationConditionGood      VerificationCondition = "GOOD"
+	VerificationConditionDefective VerificationCondition = "DEFECTIVE"
+	VerificationConditionDamaged   VerificationCondition = "DAMAGED"
+	VerificationConditionWrongItem VerificationCondition = "WRONG_ITEM"
+	VerificationConditionOpenBox   VerificationCondition = "OPEN_BOX"
+)
+
+var AllVerificationCondition = []VerificationCondition{
+	VerificationConditionGood,
+	VerificationConditionDefective,
+	VerificationConditionDamaged,
+	VerificationConditionWrongItem,
+	VerificationConditionOpenBox,
+}
+
+func (e VerificationCondition) IsValid() bool {
+	switch e {
+	case VerificationConditionGood, VerificationConditionDefective, VerificationConditionDamaged, VerificationConditionWrongItem, VerificationConditionOpenBox:
+		return true
+	}
+	return false
+}
+
+func (e VerificationCondition) String() string {
+	return string(e)
+}
+
+func (e *VerificationCondition) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = VerificationCondition(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid VerificationCondition", str)
+	}
+	return nil
+}
+
+func (e VerificationCondition) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

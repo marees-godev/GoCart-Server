@@ -56,6 +56,7 @@ message Product {
   string productname = 16;
   string deleted_at = 17;
   string image_url = 18;
+  bool is_returnable = 19;
 }
 
 message GetProductRequest {
