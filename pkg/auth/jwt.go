@@ -97,9 +97,7 @@ func ValidateToken(tokenStr, secret string) (*UserContext, error) {
 		return nil, appErrors.Internal(nil, "jwt secret not configured")
 	}
 
-	if len(tokenStr) >= 7 && strings.EqualFold(tokenStr[:7], "bearer ") {
-		tokenStr = tokenStr[7:]
-	}
+	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 	tokenStr = strings.TrimSpace(tokenStr)
 
 	token, err := jwt.ParseWithClaims(tokenStr, &UserClaims{}, func(t *jwt.Token) (interface{}, error) {
@@ -142,9 +140,7 @@ func ExtractClaimsWithoutExpiry(tokenStr, secret string) (*UserContext, error) {
 	if tokenStr == "" {
 		return nil, errors.New("token is empty")
 	}
-	if len(tokenStr) >= 7 && strings.EqualFold(tokenStr[:7], "bearer ") {
-		tokenStr = tokenStr[7:]
-	}
+	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 	tokenStr = strings.TrimSpace(tokenStr)
 
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())

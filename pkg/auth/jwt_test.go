@@ -58,12 +58,9 @@ func TestValidateToken_WithBearerPrefix(t *testing.T) {
 		t.Errorf("validated user context mismatched")
 	}
 
-	validatedLower, err := ValidateToken("bearer "+tokenStr, secret)
-	if err != nil {
-		t.Fatalf("unexpected error validating token with lowercase bearer prefix: %v", err)
-	}
-	if validatedLower.UserID != user.UserID {
-		t.Errorf("expected UserID %s, got %s", user.UserID, validatedLower.UserID)
+	_, err = ValidateToken("bearer "+tokenStr, secret)
+	if err == nil {
+		t.Fatalf("expected error validating token with lowercase bearer prefix, got nil")
 	}
 }
 
