@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 type Cart struct {
 	ID          string     `json:"id"`
@@ -15,8 +18,8 @@ type CartItem struct {
 	ID        string    `json:"id"`
 	CartID    string    `json:"cart_id"`
 	ProductID string    `json:"product_id"`
-	VariantID string    `json:"variant_id,omitempty"`
-	StoreID   string    `json:"store_id,omitempty"`
+	VariantID *string   `json:"variant_id,omitempty"`
+	StoreID   *string   `json:"store_id,omitempty"`
 	Quantity  int32     `json:"quantity"`
 	UnitPrice float64   `json:"unit_price"`
 	CreatedAt time.Time `json:"created_at"`
@@ -28,5 +31,5 @@ func (c *Cart) CalculateTotal() {
 	for _, item := range c.Items {
 		total += float64(item.Quantity) * item.UnitPrice
 	}
-	c.TotalAmount = total
+	c.TotalAmount = math.Round(total*100) / 100
 }

@@ -57,6 +57,11 @@ func TestValidateToken_WithBearerPrefix(t *testing.T) {
 	if validated.UserID != user.UserID || validated.Role != user.Role {
 		t.Errorf("validated user context mismatched")
 	}
+
+	_, err = ValidateToken("bearer "+tokenStr, secret)
+	if err == nil {
+		t.Fatalf("expected error validating token with lowercase bearer prefix, got nil")
+	}
 }
 
 func TestValidateToken_ExpiredToken(t *testing.T) {
