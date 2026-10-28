@@ -39,7 +39,7 @@ input UpdateRatingInput {
 
 extend type Query {
   productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
-  getRating(id: ID!): Rating
+  getRating(id: ID!): Rating @auth
 }
 
 extend type Mutation {

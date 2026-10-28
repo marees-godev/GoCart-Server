@@ -584,6 +584,21 @@ func TestRatingResolvers_ProductRatings_GRPCError(t *testing.T) {
 	}
 }
 
+func TestRatingResolvers_GetRating_Unauthenticated(t *testing.T) {
+	mock := &mockRatingClientForResolvers{}
+	_, query := newTestRatingResolver(mock)
+
+	_, err := query.GetRating(context.Background(), "rate-101")
+	if err == nil {
+		t.Fatal("expected error for unauthenticated user, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeUnauthorized {
+		t.Fatalf("expected UNAUTHORIZED, got %v", err)
+	}
+}
+
 func TestRatingResolvers_GetRating_NilClient(t *testing.T) {
 	r := &queryResolver{
 		Resolver: &Resolver{
@@ -591,7 +606,12 @@ func TestRatingResolvers_GetRating_NilClient(t *testing.T) {
 		},
 	}
 
-	_, err := r.GetRating(context.Background(), "rate-101")
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	_, err := r.GetRating(ctx, "rate-101")
 	if err == nil {
 		t.Fatal("expected error for nil client, got nil")
 	}
@@ -616,7 +636,12 @@ func TestRatingResolvers_GetRating_Success(t *testing.T) {
 	}
 	_, query := newTestRatingResolver(mock)
 
-	res, err := query.GetRating(context.Background(), "rate-101")
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	res, err := query.GetRating(ctx, "rate-101")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -635,7 +660,12 @@ func TestRatingResolvers_GetRating_NotFound(t *testing.T) {
 	}
 	_, query := newTestRatingResolver(mock)
 
-	_, err := query.GetRating(context.Background(), "rate-unknown")
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	_, err := query.GetRating(ctx, "rate-unknown")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

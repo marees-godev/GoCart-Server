@@ -113,7 +113,6 @@ func (s *ratingService) CreateRating(ctx context.Context, input dto.CreateRating
 		Rating:             input.Rating,
 		Review:             strings.TrimSpace(input.Review),
 		IsVerifiedPurchase: true,
-		Status:             "APPROVED",
 		IsFlagged:          false,
 		IsHidden:           false,
 	}

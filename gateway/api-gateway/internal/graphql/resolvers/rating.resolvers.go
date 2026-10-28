@@ -143,6 +143,11 @@ func (r *queryResolver) ProductRatings(ctx context.Context, productID string, li
 
 // GetRating is the resolver for the getRating field.
 func (r *queryResolver) GetRating(ctx context.Context, id string) (*model.Rating, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
 	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
 		return nil, appErrors.Internal(nil, "rating service client unavailable")
 	}

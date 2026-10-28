@@ -43,12 +43,12 @@ func (r *RatingRepo) CreateRating(ctx context.Context, rating *model.Rating) (*m
 	query := `
 		INSERT INTO ratings (
 			user_id, product_id, order_id, order_item_id,
-			rating, review, is_verified_purchase, status,
+			rating, review, is_verified_purchase,
 			is_flagged, is_hidden, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4,
-			$5, $6, $7, $8,
-			$9, $10, $11, $12
+			$5, $6, $7,
+			$8, $9, $10, $11
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -63,7 +63,6 @@ func (r *RatingRepo) CreateRating(ctx context.Context, rating *model.Rating) (*m
 		rating.Rating,
 		rating.Review,
 		rating.IsVerifiedPurchase,
-		rating.Status,
 		rating.IsFlagged,
 		rating.IsHidden,
 		rating.CreatedAt,
@@ -85,7 +84,7 @@ func (r *RatingRepo) GetRatingByID(ctx context.Context, id string) (*model.Ratin
 
 	query := `
 		SELECT id, user_id, product_id, order_id, order_item_id,
-		       rating, review, is_verified_purchase, status,
+		       rating, review, is_verified_purchase,
 		       is_flagged, is_hidden, created_at, updated_at
 		FROM ratings
 		WHERE id = $1 AND deleted_at IS NULL
@@ -101,7 +100,6 @@ func (r *RatingRepo) GetRatingByID(ctx context.Context, id string) (*model.Ratin
 		&rt.Rating,
 		&rt.Review,
 		&rt.IsVerifiedPurchase,
-		&rt.Status,
 		&rt.IsFlagged,
 		&rt.IsHidden,
 		&rt.CreatedAt,
@@ -137,7 +135,7 @@ func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, li
 
 	listQuery := `
 		SELECT id, user_id, product_id, order_id, order_item_id,
-		       rating, review, is_verified_purchase, status,
+		       rating, review, is_verified_purchase,
 		       is_flagged, is_hidden, created_at, updated_at
 		FROM ratings
 		WHERE product_id = $1 AND is_hidden = false AND deleted_at IS NULL
@@ -155,7 +153,7 @@ func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, li
 		var rt model.Rating
 		if err := rows.Scan(
 			&rt.ID, &rt.UserID, &rt.ProductID, &rt.OrderID, &rt.OrderItemID,
-			&rt.Rating, &rt.Review, &rt.IsVerifiedPurchase, &rt.Status,
+			&rt.Rating, &rt.Review, &rt.IsVerifiedPurchase,
 			&rt.IsFlagged, &rt.IsHidden, &rt.CreatedAt, &rt.UpdatedAt,
 		); err != nil {
 			return nil, 0, 0, fmt.Errorf("failed to scan rating: %w", err)
@@ -178,7 +176,7 @@ func (r *RatingRepo) UpdateRating(ctx context.Context, id string, rating int, re
 		WHERE id = $1 AND deleted_at IS NULL
 		RETURNING 
 			id, user_id, product_id, order_id, order_item_id, rating, review, 
-			is_verified_purchase, status,is_flagged, is_hidden, created_at, updated_at`
+			is_verified_purchase, is_flagged, is_hidden, created_at, updated_at`
 
 	var rt model.Rating
 	err := r.db.Pool.QueryRow(ctx, updateQuery, id, rating, review).Scan(
@@ -190,7 +188,6 @@ func (r *RatingRepo) UpdateRating(ctx context.Context, id string, rating int, re
 		&rt.Rating,
 		&rt.Review,
 		&rt.IsVerifiedPurchase,
-		&rt.Status,
 		&rt.IsFlagged,
 		&rt.IsHidden,
 		&rt.CreatedAt,

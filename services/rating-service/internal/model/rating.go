@@ -11,7 +11,6 @@ type Rating struct {
 	Rating             int       `json:"rating" db:"rating"`
 	Review             string    `json:"review" db:"review"`
 	IsVerifiedPurchase bool      `json:"is_verified_purchase" db:"is_verified_purchase"`
-	Status             string    `json:"status" db:"status"`
 	IsFlagged          bool      `json:"is_flagged" db:"is_flagged"`
 	IsHidden           bool      `json:"is_hidden" db:"is_hidden"`
 	CreatedAt          time.Time  `json:"created_at" db:"created_at"`

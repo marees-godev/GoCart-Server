@@ -42,7 +42,6 @@ func (m *mockRatingService) CreateRating(ctx context.Context, input dto.CreateRa
 		Rating:             input.Rating,
 		Review:             input.Review,
 		IsVerifiedPurchase: true,
-		Status:             "ACTIVE",
 		IsFlagged:          false,
 		IsHidden:           false,
 		CreatedAt:          now,

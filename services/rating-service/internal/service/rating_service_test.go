@@ -178,8 +178,8 @@ func TestRatingService_Operations(t *testing.T) {
 	if rating.Rating != 5 || rating.Review != "Excellent product!" {
 		t.Errorf("unexpected rating or review: %+v", rating)
 	}
-	if !rating.IsVerifiedPurchase || rating.Status != "APPROVED" {
-		t.Errorf("expected verified purchase and approved status: %+v", rating)
+	if !rating.IsVerifiedPurchase {
+		t.Errorf("expected verified purchase : %+v", rating)
 	}
 
 	// 2. Get rating by ID (should succeed and match created data)
@@ -477,10 +477,18 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 		Rating:    1,
 	}
 
-	repo.CreateRating(ctx, r1)
-	repo.CreateRating(ctx, r2)
-	repo.CreateRating(ctx, r3)
-	repo.CreateRating(ctx, rOther)
+	if _, err := repo.CreateRating(ctx, r1); err != nil {
+		t.Fatalf("failed to seed r1: %v", err)
+	}
+	if _, err := repo.CreateRating(ctx, r2); err != nil {
+		t.Fatalf("failed to seed r2: %v", err)
+	}
+	if _, err := repo.CreateRating(ctx, r3); err != nil {
+		t.Fatalf("failed to seed r3: %v", err)
+	}
+	if _, err := repo.CreateRating(ctx, rOther); err != nil {
+		t.Fatalf("failed to seed rOther: %v", err)
+	}
 
 	// 2. Fetch ratings with default pagination
 	ratings, avg, total, err := svc.GetProductRatings(ctx, targetProductID, 10, 0)
