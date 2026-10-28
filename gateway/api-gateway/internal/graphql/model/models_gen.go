@@ -16,13 +16,6 @@ type AccountActionResponse struct {
 	Status  string `json:"status"`
 }
 
-type AddRatingInput struct {
-	ProductID string  `json:"productId"`
-	UserID    string  `json:"userId"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment,omitempty"`
-}
-
 type AddToCartInput struct {
 	ProductID string `json:"productId"`
 	Quantity  int    `json:"quantity"`
@@ -182,6 +175,14 @@ type CreateProductVariantInput struct {
 	AttributesJSON *string `json:"attributesJson,omitempty"`
 }
 
+type CreateRatingInput struct {
+	ProductID   string  `json:"productId"`
+	OrderID     string  `json:"orderId"`
+	OrderItemID string  `json:"orderItemId"`
+	Rating      int     `json:"rating"`
+	Review      *string `json:"review,omitempty"`
+}
+
 type CreateStoreInput struct {
 	Name          string            `json:"name"`
 	Slug          *string           `json:"slug,omitempty"`
@@ -213,6 +214,11 @@ type DeleteProductResponse struct {
 }
 
 type DeleteProductVariantResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type DeleteRatingResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
@@ -458,12 +464,17 @@ type Query struct {
 }
 
 type Rating struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	UserID    string  `json:"userId"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID          string  `json:"id"`
+	ProductID   string  `json:"productId"`
+	UserID      string  `json:"userId"`
+	OrderID     string  `json:"orderId"`
+	OrderItemID string  `json:"orderItemId"`
+	Rating      int     `json:"rating"`
+	Review      string  `json:"review"`
+	IsFlagged   bool    `json:"isFlagged"`
+	IsHidden    bool    `json:"isHidden"`
+	CreatedAt   *string `json:"createdAt,omitempty"`
+	UpdatedAt   *string `json:"updatedAt,omitempty"`
 }
 
 type RefreshTokenInput struct {
@@ -685,6 +696,12 @@ type UpdateProductVariantInput struct {
 	Stock          *int           `json:"stock,omitempty"`
 	AttributesJSON *string        `json:"attributesJson,omitempty"`
 	Status         *ProductStatus `json:"status,omitempty"`
+}
+
+type UpdateRatingInput struct {
+	ID     string  `json:"id"`
+	Rating int     `json:"rating"`
+	Review *string `json:"review,omitempty"`
 }
 
 type UpdateStoreInput struct {

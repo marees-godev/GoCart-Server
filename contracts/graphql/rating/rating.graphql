@@ -2,9 +2,14 @@ type Rating {
   id: ID!
   productId: String!
   userId: String!
+  orderId: String!
+  orderItemId: String!
   rating: Int!
-  comment: String
+  review: String!
+  isFlagged: Boolean!
+  isHidden: Boolean!
   createdAt: String
+  updatedAt: String
 }
 
 type ProductRatings {
@@ -13,17 +18,32 @@ type ProductRatings {
   total: Int!
 }
 
-input AddRatingInput {
+type DeleteRatingResponse {
+  success: Boolean!
+  message: String!
+}
+
+input CreateRatingInput {
   productId: String!
-  userId: String!
+  orderId: String!
+  orderItemId: String!
   rating: Int!
-  comment: String
+  review: String
+}
+
+input UpdateRatingInput {
+  id: ID!
+  rating: Int!
+  review: String
 }
 
 extend type Query {
   productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
+  getRating(id: ID!): Rating @auth
 }
 
 extend type Mutation {
-  addRating(input: AddRatingInput!): Rating @auth
+  createRating(input: CreateRatingInput!): Rating @auth
+  updateRating(input: UpdateRatingInput!): Rating @auth
+  deleteRating(id: ID!): DeleteRatingResponse @auth
 }
