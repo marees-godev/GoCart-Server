@@ -8,7 +8,6 @@ import (
 
 var (
 	postalCodeRegex = regexp.MustCompile(`^\d{5,6}(-\d{4})?$`)
-	trailingPinRegex = regexp.MustCompile(`(?i)\b(\d{5,6})\b$`)
 
 	knownStates = map[string]string{
 		"tamil nadu":     "Tamil Nadu",
@@ -63,8 +62,9 @@ func ParseShippingAddress(raw string) ShippingAddress {
 	}
 
 	// 1. Try direct JSON unmarshal
-	if err := json.Unmarshal([]byte(trimmed), &addr); err == nil && (addr.City != "" || addr.Street != "") {
-		// Valid direct struct match
+	if err := json.Unmarshal([]byte(trimmed), &addr); err == nil && addr.City != "" {
+		NormalizeAddressFromTokens(&addr)
+		return addr
 	}
 
 	// 2. Check JSON map for common aliases
