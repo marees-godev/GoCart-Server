@@ -14,6 +14,12 @@ service InventoryService {
   rpc ReleaseExpiredReservations (ReleaseExpiredReservationsRequest) returns (ReleaseExpiredReservationsResponse);
   rpc UpdateStock (UpdateStockRequest) returns (UpdateStockResponse);
   rpc CommitStock (CommitStockRequest) returns (CommitStockResponse);
+
+  rpc CreateWarehouse (CreateWarehouseRequest) returns (WarehouseResponse);
+  rpc UpdateWarehouse (UpdateWarehouseRequest) returns (WarehouseResponse);
+  rpc DeleteWarehouse (DeleteWarehouseRequest) returns (DeleteWarehouseResponse);
+  rpc GetWarehouse (GetWarehouseRequest) returns (WarehouseResponse);
+  rpc ListWarehouses (ListWarehousesRequest) returns (ListWarehousesResponse);
 }
 
 message InventoryItem {
@@ -26,6 +32,7 @@ message InventoryItem {
   int32 low_stock_threshold = 7;
   string updated_at = 8;
   string created_at = 9;
+  string warehouse_id = 10;
 }
 
 message GetInventoryRequest {
@@ -33,6 +40,7 @@ message GetInventoryRequest {
   string variant_id = 2;
   string merchant_id = 3;
   string inventory_id = 4;
+  string warehouse_id = 5;
 }
 
 message GetInventoryResponse {
@@ -46,6 +54,7 @@ message CreateInventoryRequest {
   string sku = 4;
   int32 initial_quantity = 5;
   int32 low_stock_threshold = 6;
+  string warehouse_id = 7;
 }
 
 message CreateInventoryResponse {
@@ -135,4 +144,66 @@ message CommitStockResponse {
   bool success = 1;
 }
 
+message Warehouse {
+  string id = 1;
+  string delivery_partner_id = 2;
+  string name = 3;
+  string code = 4;
+  string street = 5;
+  string city = 6;
+  string state = 7;
+  string postal_code = 8;
+  bool is_active = 9;
+  string created_at = 10;
+  string updated_at = 11;
+}
 
+message CreateWarehouseRequest {
+  string delivery_partner_id = 1;
+  string name = 2;
+  string code = 3;
+  string street = 4;
+  string city = 5;
+  string state = 6;
+  string postal_code = 7;
+  bool is_active = 8;
+}
+
+message UpdateWarehouseRequest {
+  string delivery_partner_id = 1;
+  string id = 2;
+  optional string name = 3;
+  optional string code = 4;
+  optional string street = 5;
+  optional string city = 6;
+  optional string state = 7;
+  optional string postal_code = 8;
+  optional bool is_active = 9;
+}
+
+message DeleteWarehouseRequest {
+  string delivery_partner_id = 1;
+  string id = 2;
+}
+
+message DeleteWarehouseResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetWarehouseRequest {
+  string delivery_partner_id = 1;
+  string id = 2;
+}
+
+message ListWarehousesRequest {
+  string delivery_partner_id = 1;
+}
+
+message ListWarehousesResponse {
+  repeated Warehouse warehouses = 1;
+}
+
+message WarehouseResponse {
+  Warehouse warehouse = 1;
+}

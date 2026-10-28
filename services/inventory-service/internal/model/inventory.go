@@ -25,6 +25,7 @@ const (
 
 type Inventory struct {
 	ID                string    `json:"id" db:"id"`
+	WarehouseID       *string   `json:"warehouse_id,omitempty" db:"warehouse_id"`
 	ProductID         string    `json:"product_id" db:"product_id"`
 	VariantID         *string   `json:"variant_id,omitempty" db:"variant_id"`
 	SKU               string    `json:"sku" db:"sku"`

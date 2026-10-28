@@ -19,6 +19,12 @@ type Config struct {
 	Kafka    KafkaConfig
 	Outbox   OutboxConfig
 	JWT      JWTConfig
+	Services ServicesConfig
+}
+
+type ServicesConfig struct {
+	OrderServiceURL          string
+	InventoryServiceGRPCAddr string
 }
 
 type JWTConfig struct {
@@ -124,6 +130,10 @@ func LoadEnv() *Config {
 		},
 		JWT: JWTConfig{
 			Secret: GetEnv("JWT_SECRET", "super-secret-key-change-in-production"),
+		},
+		Services: ServicesConfig{
+			OrderServiceURL:          GetEnv("ORDER_SERVICE_GRPC_URL", GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059")),
+			InventoryServiceGRPCAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
 		},
 	}
 }

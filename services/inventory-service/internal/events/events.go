@@ -16,6 +16,7 @@ const (
 type InventoryCreatedEvent struct {
 	EventType         string    `json:"event_type"`
 	InventoryID       string    `json:"inventory_id"`
+	WarehouseID       *string   `json:"warehouse_id,omitempty"`
 	ProductID         string    `json:"product_id"`
 	VariantID         *string   `json:"variant_id,omitempty"`
 	SKU               string    `json:"sku"`

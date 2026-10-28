@@ -23,6 +23,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/consumer"
 	deliveryGRPC "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/grpc"
@@ -106,10 +107,20 @@ func main() {
 		}
 	}()
 
-	// 6. Initialize outbox store, repository & service
+	// 6. Initialize outbox store, repository, order client & service
 	outboxStore := outbox.NewStore()
 	deliveryRepo := repository.NewDeliveryRepositoryWithOutbox(db, outboxStore, log)
-	deliveryService := service.NewDeliveryService(deliveryRepo, log)
+	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
+	var inventoryClient client.InventoryClient
+	if invGRPC, invConn, err := grpcclient.NewInventoryClient(cfg.Services.InventoryServiceGRPCAddr, 5*time.Second); err == nil && invGRPC != nil {
+		if invConn != nil {
+			defer func() { _ = invConn.Close() }()
+		}
+		inventoryClient = client.NewGRPCInventoryClient(invGRPC)
+	} else if err != nil {
+		log.Warn("Failed to initialize inventory service gRPC client", "error", err)
+	}
+	deliveryService := service.NewDeliveryService(deliveryRepo, orderClient, inventoryClient, log)
 
 	// 7. Start transactional outbox publisher as a background worker
 	if cfg.Outbox.Enabled {

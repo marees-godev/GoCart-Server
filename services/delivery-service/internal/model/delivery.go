@@ -33,6 +33,16 @@ var AllowedTransitions = map[DeliveryStatus][]DeliveryStatus{
 	StatusCancelled:      {},
 }
 
+func IsValidStatus(status DeliveryStatus) bool {
+	clean := DeliveryStatus(strings.ToUpper(strings.TrimSpace(string(status))))
+	switch clean {
+	case StatusCreated, StatusPickedUp, StatusInTransit, StatusOutForDelivery, StatusDelivered, StatusFailed, StatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
 type InvalidStateTransitionError struct {
 	CurrentStatus DeliveryStatus `json:"current_status"`
 	TargetStatus  DeliveryStatus `json:"target_status"`

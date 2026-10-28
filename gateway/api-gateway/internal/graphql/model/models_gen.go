@@ -124,13 +124,14 @@ type CreateCategoryInput struct {
 }
 
 type CreateDeliveryInput struct {
-	OrderID         string `json:"orderId"`
-	DeliveryPartner string `json:"deliveryPartner"`
-	ShippingAddress string `json:"shippingAddress"`
-	ContactNumber   string `json:"contactNumber"`
+	OrderID           string  `json:"orderId"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	ShippingAddressID string  `json:"shippingAddressId"`
+	ContactNumber     *string `json:"contactNumber,omitempty"`
 }
 
 type CreateInventoryInput struct {
+	WarehouseID       *string `json:"warehouseId,omitempty"`
 	ProductID         string  `json:"productId"`
 	VariantID         *string `json:"variantId,omitempty"`
 	Sku               *string `json:"sku,omitempty"`
@@ -193,6 +194,17 @@ type CreateStoreInput struct {
 	LogoURL       *string           `json:"logoUrl,omitempty"`
 	Address       *string           `json:"address,omitempty"`
 	BankAccount   *BankAccountInput `json:"bankAccount,omitempty"`
+}
+
+type CreateWarehouseInput struct {
+	DeliveryPartnerID string `json:"deliveryPartnerId"`
+	Name              string `json:"name"`
+	Code              string `json:"code"`
+	Street            string `json:"street"`
+	City              string `json:"city"`
+	State             string `json:"state"`
+	PostalCode        string `json:"postalCode"`
+	IsActive          *bool  `json:"isActive,omitempty"`
 }
 
 type DeactivateAccountInput struct {
@@ -266,6 +278,7 @@ type GenerateStoreUploadURLInput struct {
 
 type InventoryItem struct {
 	InventoryID       string  `json:"inventoryId"`
+	WarehouseID       *string `json:"warehouseId,omitempty"`
 	ProductID         string  `json:"productId"`
 	VariantID         *string `json:"variantId,omitempty"`
 	Sku               string  `json:"sku"`
@@ -731,6 +744,18 @@ type UpdateUserInput struct {
 	Avatar         *graphql.Upload `json:"avatar,omitempty"`
 }
 
+type UpdateWarehouseInput struct {
+	ID                string  `json:"id"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	Name              *string `json:"name,omitempty"`
+	Code              *string `json:"code,omitempty"`
+	Street            *string `json:"street,omitempty"`
+	City              *string `json:"city,omitempty"`
+	State             *string `json:"state,omitempty"`
+	PostalCode        *string `json:"postalCode,omitempty"`
+	IsActive          *bool   `json:"isActive,omitempty"`
+}
+
 type User struct {
 	ID             string  `json:"id"`
 	Email          string  `json:"email"`
@@ -762,6 +787,20 @@ type VerifyProductInput struct {
 	ProofImages  []string          `json:"proofImages,omitempty"`
 	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
 	Notes        *string           `json:"notes,omitempty"`
+}
+
+type Warehouse struct {
+	ID                string  `json:"id"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	Name              string  `json:"name"`
+	Code              string  `json:"code"`
+	Street            string  `json:"street"`
+	City              string  `json:"city"`
+	State             string  `json:"state"`
+	PostalCode        string  `json:"postalCode"`
+	IsActive          bool    `json:"isActive"`
+	CreatedAt         *string `json:"createdAt,omitempty"`
+	UpdatedAt         *string `json:"updatedAt,omitempty"`
 }
 
 type AuthRole string

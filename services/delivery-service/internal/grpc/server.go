@@ -42,9 +42,7 @@ func (s *DeliveryGRPCServer) CreateDelivery(ctx context.Context, req *deliverypb
 
 	var addr model.ShippingAddress
 	if req.ShippingAddress != "" {
-		if err := json.Unmarshal([]byte(req.ShippingAddress), &addr); err != nil {
-			addr.Street = req.ShippingAddress
-		}
+		addr = model.ParseShippingAddress(req.ShippingAddress)
 	}
 
 	if addr.ContactNumber == "" && req.ContactNumber != "" {
@@ -142,7 +140,11 @@ func (s *DeliveryGRPCServer) UpdateDeliveryStatus(ctx context.Context, req *deli
 	}
 
 	s.logger.Info("UpdateDeliveryStatus: updating status", slog.String("id", req.Id), slog.String("target_status", req.Status))
-	delivery, err := s.deliveryService.UpdateStatus(ctx, strings.TrimSpace(req.Id), model.DeliveryStatus(req.Status))
+	delivery, err := s.deliveryService.ProcessStatusUpdate(ctx, &dto.DeliveryStatusUpdateRequest{
+		DeliveryID: strings.TrimSpace(req.Id),
+		Status:     model.DeliveryStatus(req.Status),
+		Location:   strings.TrimSpace(req.Location),
+	})
 	if err != nil {
 		appErr := appErrors.AsAppError(err)
 		if appErr != nil && appErr.HTTPStatus < 500 {
@@ -230,6 +232,8 @@ func (s *DeliveryGRPCServer) UpdatePartnerProfile(ctx context.Context, req *deli
 	}, nil
 }
 
+
+
 func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 	if d == nil {
 		return nil
@@ -241,7 +245,7 @@ func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 			shippingAddr = string(addrBytes)
 		}
 	}
-	return &deliverypb.Delivery{
+	res := &deliverypb.Delivery{
 		Id:              d.ID,
 		OrderId:         d.OrderID,
 		TrackingNumber:  d.TrackingNumber,
@@ -252,6 +256,13 @@ func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 		CreatedAt:       d.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:       d.UpdatedAt.Format(time.RFC3339),
 	}
+	if d.EstimatedDelivery != nil {
+		res.EstimatedDeliveryAt = d.EstimatedDelivery.Format(time.RFC3339)
+	}
+	if d.ActualDelivery != nil {
+		res.DeliveredAt = d.ActualDelivery.Format(time.RFC3339)
+	}
+	return res
 }
 
 func toProtoPartnerProfile(p *model.DeliveryPartnerProfile) *deliverypb.DeliveryPartnerProfile {
@@ -269,4 +280,5 @@ func toProtoPartnerProfile(p *model.DeliveryPartnerProfile) *deliverypb.Delivery
 		UpdatedAt:     p.UpdatedAt.Format(time.RFC3339),
 	}
 }
+
 

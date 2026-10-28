@@ -1,6 +1,7 @@
 package resolvers
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
 func toModelUser(u *userpb.User) *model.User {
@@ -193,6 +196,11 @@ func mapInventoryItem(inv *inventorypb.InventoryItem) *model.InventoryItem {
 		v := inv.VariantId
 		variantID = &v
 	}
+	var warehouseID *string
+	if inv.WarehouseId != "" {
+		w := inv.WarehouseId
+		warehouseID = &w
+	}
 	var createdAt *string
 	if inv.CreatedAt != "" {
 		c := inv.CreatedAt
@@ -200,6 +208,7 @@ func mapInventoryItem(inv *inventorypb.InventoryItem) *model.InventoryItem {
 	}
 	return &model.InventoryItem{
 		InventoryID:       inv.InventoryId,
+		WarehouseID:       warehouseID,
 		ProductID:         inv.ProductId,
 		VariantID:         variantID,
 		Sku:               inv.Sku,
@@ -275,4 +284,61 @@ func toModelDeliveryPartnerProfile(p *deliverypb.DeliveryPartnerProfile) *model.
 	}
 	return res
 }
+
+func toModelWarehouse(w *inventorypb.Warehouse) *model.Warehouse {
+	if w == nil {
+		return nil
+	}
+	res := &model.Warehouse{
+		ID:                w.Id,
+		DeliveryPartnerID: w.DeliveryPartnerId,
+		Name:              w.Name,
+		Code:              w.Code,
+		Street:            w.Street,
+		City:              w.City,
+		State:             w.State,
+		PostalCode:        w.PostalCode,
+		IsActive:          w.IsActive,
+	}
+	if w.CreatedAt != "" {
+		res.CreatedAt = &w.CreatedAt
+	}
+	if w.UpdatedAt != "" {
+		res.UpdatedAt = &w.UpdatedAt
+	}
+	return res
+}
+
+func resolveDeliveryPartnerID(ctx context.Context, inputPartnerID *string) (string, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+			ok = true
+		}
+	}
+	if !ok || userCtx == nil {
+		return "", appErrors.Unauthorized("authentication required")
+	}
+
+	targetPartnerID := userCtx.PartnerID
+	if targetPartnerID == "" && strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
+		targetPartnerID = userCtx.UserID
+	}
+
+	if inputPartnerID != nil && strings.TrimSpace(*inputPartnerID) != "" {
+		if strings.EqualFold(userCtx.Role, auth.RoleAdmin) || targetPartnerID == "" || strings.EqualFold(targetPartnerID, strings.TrimSpace(*inputPartnerID)) {
+			targetPartnerID = strings.TrimSpace(*inputPartnerID)
+		} else {
+			return "", appErrors.Forbidden("you can only manage your own warehouses")
+		}
+	}
+
+	if strings.TrimSpace(targetPartnerID) == "" {
+		return "", appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
+	return strings.TrimSpace(targetPartnerID), nil
+}
+
+
 

@@ -99,3 +99,4 @@ message UpdatePartnerProfileRequest {
 message PartnerProfileResponse {
   DeliveryPartnerProfile profile = 1;
 }
+

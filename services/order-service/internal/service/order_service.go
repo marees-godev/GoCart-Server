@@ -259,8 +259,15 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	parentOrderID := uuid.New().String()
 	now := time.Now().UTC()
 	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
-	if currency == "" {
+	switch currency {
+	case "", "USD":
 		currency = "USD"
+	case "IND-RUPEE", "INDIAN-RUPEE", "RUPEE", "RUPEES":
+		currency = "INR"
+	default:
+		if len(currency) != 3 {
+			return nil, appErrors.BadRequest(fmt.Sprintf("invalid currency %q: must be a 3-letter ISO 4217 code (e.g. INR, USD)", input.Currency))
+		}
 	}
 
 	orders := make([]*model.Order, 0, len(storeMap))
@@ -494,7 +501,7 @@ func (s *orderService) GetOrder(ctx context.Context, id string, userID ...string
 		callerRole = userCtx.Role
 	}
 
-	if callerRole != "ADMIN" && callerRole != auth.RoleAdmin {
+	if callerRole != "ADMIN" && callerRole != auth.RoleAdmin && callerRole != "DELIVERY_PARTNER" && callerRole != auth.RoleDeliveryPartner && callerRole != "MERCHANT" && callerRole != auth.RoleMerchant {
 		if callerUserID != "" && order.UserID != callerUserID {
 			return nil, appErrors.Forbidden("you do not have permission to view this order")
 		}

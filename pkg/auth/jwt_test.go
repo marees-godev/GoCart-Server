@@ -177,4 +177,3 @@ func TestRoleSpecificClaims(t *testing.T) {
 		t.Errorf("user claims mismatch: got role %s, customer_id %s", uCtx.Role, uCtx.CustomerID)
 	}
 }
-

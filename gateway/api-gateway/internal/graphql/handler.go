@@ -229,6 +229,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if authHeader != "" {
+			trimmed := strings.TrimSpace(authHeader)
+			if strings.HasPrefix(strings.ToLower(trimmed), "bearer ") {
+				authHeader = "Bearer " + strings.TrimSpace(trimmed[7:])
+			} else if strings.Count(trimmed, ".") == 2 {
+				authHeader = "Bearer " + trimmed
+			}
 			userCtx, err := auth.ValidateToken(authHeader, secret)
 			if err != nil {
 				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())
@@ -300,6 +306,12 @@ func (h *Handler) HandleQuery(c *fiber.Ctx) error {
 		}
 
 		if authHeader != "" {
+			trimmed := strings.TrimSpace(authHeader)
+			if strings.HasPrefix(strings.ToLower(trimmed), "bearer ") {
+				authHeader = "Bearer " + strings.TrimSpace(trimmed[7:])
+			} else if strings.Count(trimmed, ".") == 2 {
+				authHeader = "Bearer " + trimmed
+			}
 			userCtx, err := auth.ValidateToken(authHeader, secret)
 			if err != nil {
 				logger.FromContext(ctx).Warn("JWT validation failed", "error", err.Error())

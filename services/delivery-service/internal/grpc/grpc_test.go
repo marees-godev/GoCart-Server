@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,35 +98,81 @@ func (m *mockDeliveryService) ListDeliveries(ctx context.Context, limit, offset 
 }
 
 func (m *mockDeliveryService) UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error) {
+	return m.ProcessStatusUpdate(ctx, &dto.DeliveryStatusUpdateRequest{
+		DeliveryID: id,
+		Status:     targetStatus,
+	})
+}
+
+func (m *mockDeliveryService) ProcessStatusUpdate(ctx context.Context, req *dto.DeliveryStatusUpdateRequest) (*model.Delivery, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request is required")
+	}
+	cleanStatus := model.DeliveryStatus(strings.ToUpper(strings.TrimSpace(string(req.Status))))
+	if !model.IsValidStatus(cleanStatus) {
+		return nil, appErrors.BadRequest("invalid status")
+	}
+
+	id := strings.TrimSpace(req.DeliveryID)
+	if id == "" {
+		id = strings.TrimSpace(req.TrackingNumber)
+	}
+	if id == "" {
+		id = strings.TrimSpace(req.OrderID)
+	}
+
 	d, exists := m.deliveries[id]
+	if !exists {
+		if delID, ok := m.byOrder[id]; ok {
+			d = m.deliveries[delID]
+			exists = true
+		} else if delID, ok := m.byTracking[id]; ok {
+			d = m.deliveries[delID]
+			exists = true
+		}
+	}
 	if !exists {
 		return nil, appErrors.NotFound("delivery not found")
 	}
-	if err := d.TransitionStatus(targetStatus); err != nil {
+
+	if d.Status == cleanStatus {
+		if req.EstimatedDelivery != nil {
+			d.EstimatedDelivery = req.EstimatedDelivery
+		}
+		if req.ActualDelivery != nil {
+			d.ActualDelivery = req.ActualDelivery
+		}
+		return d, nil
+	}
+
+	if err := d.TransitionStatus(cleanStatus); err != nil {
 		return nil, err
 	}
+
+	if req.EstimatedDelivery != nil {
+		d.EstimatedDelivery = req.EstimatedDelivery
+	}
+	if cleanStatus == model.StatusDelivered {
+		if req.ActualDelivery != nil {
+			d.ActualDelivery = req.ActualDelivery
+		} else if d.ActualDelivery == nil {
+			now := time.Now().UTC()
+			d.ActualDelivery = &now
+		}
+	} else if req.ActualDelivery != nil {
+		d.ActualDelivery = req.ActualDelivery
+	}
+
+	d.Status = cleanStatus
+	d.UpdatedAt = time.Now().UTC()
 	return d, nil
 }
 
-func (m *mockDeliveryService) GetTempOrderByID(ctx context.Context, orderID string) (*model.TempOrder, error) {
-	return nil, appErrors.NotFound("temporary order not found")
-}
-
-func (m *mockDeliveryService) UpsertTempOrder(ctx context.Context, order *model.TempOrder) error {
-	return nil
-}
-
-func (m *mockDeliveryService) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
+func (m *mockDeliveryService) EstimateDelivery(ctx context.Context, orderID string, partnerID ...string) (*dto.EstimatedDeliveryResponse, error) {
 	return nil, nil
 }
 
-func (m *mockDeliveryService) AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error {
-	return nil
-}
 
-func (m *mockDeliveryService) GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error) {
-	return nil, nil
-}
 
 func (m *mockDeliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
 	if m.partnerProfiles == nil {
@@ -342,6 +389,21 @@ func TestGRPC_PartnerProfile(t *testing.T) {
 		t.Errorf("expected company_name 'Flash Courier', got %s", createResp.Profile.CompanyName)
 	}
 
+	// 1b. CreatePartnerProfile with empty company_name (registration flow)
+	emptyPartnerID := uuid.New().String()
+	emptyCompanyResp, err := client.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+		PartnerId:     emptyPartnerID,
+		CompanyName:   "",
+		Email:         "partner.register@example.com",
+		ContactNumber: "",
+	})
+	if err != nil {
+		t.Fatalf("CreatePartnerProfile with empty company_name failed: %v", err)
+	}
+	if emptyCompanyResp.Profile.PartnerId != emptyPartnerID {
+		t.Errorf("expected partner_id %s, got %s", emptyPartnerID, emptyCompanyResp.Profile.PartnerId)
+	}
+
 	// 2. GetPartnerProfile
 	getResp, err := client.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
 		PartnerId: partnerID,
@@ -371,4 +433,7 @@ func TestGRPC_PartnerProfile(t *testing.T) {
 		t.Errorf("expected updated contact_number, got %s", updateResp.Profile.ContactNumber)
 	}
 }
+
+
+
 

@@ -493,6 +493,9 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	var businessEmail string
 	var partnerID string
 	var customerID string
+	var eventType string
+	var topic string
+	var eventPayload []byte
 
 	switch role {
 	case model.RoleMerchant:
@@ -538,34 +541,19 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			}
 		}
 
-	case model.RoleUser:
-		if s.userClient != nil {
-			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-				Id:        userID.String(),
-				Email:     cred.Email,
-				FirstName: firstName,
-				LastName:  lastName,
-			})
-			if err != nil {
-				_ = s.repo.DeleteCredential(ctx, credID)
-				if st, ok := status.FromError(err); ok {
-					switch st.Code() {
-					case codes.AlreadyExists:
-						return nil, appErrors.Conflict("user with this email already exists")
-					case codes.InvalidArgument:
-						return nil, appErrors.BadRequest(st.Message())
-					}
-				}
-				return nil, appErrors.Internal(err, "failed to create user record in user service")
-			}
+		if merchantID == "" {
+			merchantID = userID.String()
 		}
-	}
+		eventType = "MerchantRegistered"
+		topic = "auth.merchant.registered"
+		eventPayload, _ = json.Marshal(map[string]any{
+			"merchant_id":   merchantID,
+			"user_id":       userID.String(),
+			"email":         cred.Email,
+			"role":          cred.Role.String(),
+			"registered_at": time.Now().UTC(),
+		})
 
-	var eventType string
-	var topic string
-	var eventPayload []byte
-
-	switch role {
 	case model.RoleDeliveryPartner:
 		partnerID = userID.String()
 		companyName := ""
@@ -613,21 +601,28 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			_ = s.eventPublisher.Publish(ctx, topic, eventType, partnerID, partnerEvt)
 		}
 
-	case model.RoleMerchant:
-		if merchantID == "" {
-			merchantID = userID.String()
-		}
-		eventType = "MerchantRegistered"
-		topic = "auth.merchant.registered"
-		eventPayload, _ = json.Marshal(map[string]any{
-			"merchant_id":   merchantID,
-			"user_id":       userID.String(),
-			"email":         cred.Email,
-			"role":          cred.Role.String(),
-			"registered_at": time.Now().UTC(),
-		})
-
 	default: // RoleUser / CUSTOMER
+		if s.userClient != nil {
+			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+				Id:        userID.String(),
+				Email:     cred.Email,
+				FirstName: firstName,
+				LastName:  lastName,
+			})
+			if err != nil {
+				_ = s.repo.DeleteCredential(ctx, credID)
+				if st, ok := status.FromError(err); ok {
+					switch st.Code() {
+					case codes.AlreadyExists:
+						return nil, appErrors.Conflict("user with this email already exists")
+					case codes.InvalidArgument:
+						return nil, appErrors.BadRequest(st.Message())
+					}
+				}
+				return nil, appErrors.Internal(err, "failed to create user record in user service")
+			}
+		}
+
 		customerID = userID.String()
 		eventType = "UserRegistered"
 		topic = "auth.user.registered"

@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
@@ -86,13 +88,19 @@ func (r *OrderRepo) CreateOrdersWithOutbox(
 				idempKey = *order.IdempotencyKey
 			}
 
-			shippingJSON := order.ShippingAddress
+			shippingJSON := strings.TrimSpace(order.ShippingAddress)
 			if shippingJSON == "" {
 				shippingJSON = "{}"
+			} else if !json.Valid([]byte(shippingJSON)) {
+				b, _ := json.Marshal(map[string]string{"address": shippingJSON})
+				shippingJSON = string(b)
 			}
-			billingJSON := order.BillingAddress
+			billingJSON := strings.TrimSpace(order.BillingAddress)
 			if billingJSON == "" {
 				billingJSON = "{}"
+			} else if !json.Valid([]byte(billingJSON)) {
+				b, _ := json.Marshal(map[string]string{"address": billingJSON})
+				billingJSON = string(b)
 			}
 
 			_, err := tx.Exec(ctx, insertOrderQuery,
