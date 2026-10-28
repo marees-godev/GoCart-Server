@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,13 +11,21 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	ratingpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/handler"
+	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/service"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -78,7 +87,43 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize application layers & downstream clients
+	ratingRepo := repository.NewRatingRepo(db)
+
+	var ordClient orderpb.OrderServiceClient
+	orderConn, err := grpc.NewClient(cfg.GRPC.OrderServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err == nil {
+		ordClient = orderpb.NewOrderServiceClient(orderConn)
+		defer orderConn.Close()
+	} else {
+		log.Warn("Failed to dial Order Service", "error", err)
+	}
+
+	ratingService := service.NewRatingService(ratingRepo, ordClient, log)
+	ratingGRPCHandler := handler.NewRatingGRPCHandler(ratingService, log)
+
+	// 6. Setup gRPC Server
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
+	if err != nil {
+		log.Error("Failed to listen for gRPC", "error", err)
+		os.Exit(1)
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcclient.UnaryServerInterceptor(),
+		),
+	)
+	ratingpb.RegisterRatingServiceServer(grpcServer, ratingGRPCHandler)
+
+	go func() {
+		log.Info("gRPC server listening", "service", cfg.App.Name, "port", cfg.GRPC.Port)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Error("gRPC server failed", "error", err)
+		}
+	}()
+
+	// 7. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -95,7 +140,7 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	go func() {
-		log.Info("Service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
+		log.Info("HTTP service listening", "service", cfg.App.Name, "port", cfg.HTTP.Port)
 		if err := app.Listen(fmt.Sprintf(":%s", cfg.HTTP.Port)); err != nil {
 			log.Error("HTTP server failed", "error", err)
 			os.Exit(1)
@@ -105,6 +150,7 @@ func main() {
 	<-ctx.Done()
 	log.Info("Shutting down service gracefully", "service", cfg.App.Name)
 
+	grpcServer.GracefulStop()
 	if err := app.Shutdown(); err != nil {
 		log.Error("Failed to gracefully shutdown HTTP server", "error", err)
 	}
