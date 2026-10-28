@@ -6,17 +6,160 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	ratingpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
-// AddRating is the resolver for the addRating field.
-func (r *mutationResolver) AddRating(ctx context.Context, input model.AddRatingInput) (*model.Rating, error) {
-	panic(fmt.Errorf("not implemented: AddRating - addRating"))
+// CreateRating is the resolver for the createRating field.
+func (r *mutationResolver) CreateRating(ctx context.Context, input model.CreateRatingInput) (*model.Rating, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	review := ""
+	if input.Review != nil {
+		review = *input.Review
+	}
+
+	req := &ratingpb.CreateRatingRequest{
+		ProductId:   input.ProductID,
+		OrderId:     input.OrderID,
+		OrderItemId: input.OrderItemID,
+		UserId:      userID,
+		Rating:      int32(input.Rating),
+		Review:      review,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.CreateRating(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapRating(resp.GetRating()), nil
+}
+
+// UpdateRating is the resolver for the updateRating field.
+func (r *mutationResolver) UpdateRating(ctx context.Context, input model.UpdateRatingInput) (*model.Rating, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	review := ""
+	if input.Review != nil {
+		review = *input.Review
+	}
+
+	req := &ratingpb.UpdateRatingRequest{
+		Id:     input.ID,
+		UserId: userID,
+		Rating: int32(input.Rating),
+		Review: review,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.UpdateRating(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapRating(resp.GetRating()), nil
+}
+
+// DeleteRating is the resolver for the deleteRating field.
+func (r *mutationResolver) DeleteRating(ctx context.Context, id string) (*model.DeleteRatingResponse, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.DeleteRatingRequest{
+		Id:     id,
+		UserId: userID,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.DeleteRating(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteRatingResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
 }
 
 // ProductRatings is the resolver for the productRatings field.
 func (r *queryResolver) ProductRatings(ctx context.Context, productID string, limit *int, offset *int) (*model.ProductRatings, error) {
-	panic(fmt.Errorf("not implemented: ProductRatings - productRatings"))
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	var lim int32 = 10
+	if limit != nil && *limit > 0 {
+		lim = int32(*limit)
+	}
+
+	var off int32 = 0
+	if offset != nil && *offset >= 0 {
+		off = int32(*offset)
+	}
+
+	req := &ratingpb.GetProductRatingsRequest{
+		ProductId: productID,
+		Limit:     lim,
+		Offset:    off,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.GetProductRatings(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ProductRatings{
+		Ratings:       maps.MapRatings(resp.GetRatings()),
+		AverageRating: resp.GetAverageRating(),
+		Total:         int(resp.GetTotal()),
+	}, nil
+}
+
+// GetRating is the resolver for the getRating field.
+func (r *queryResolver) GetRating(ctx context.Context, id string) (*model.Rating, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.GetRatingRequest{
+		Id: id,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.GetRating(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapRating(resp.GetRating()), nil
 }

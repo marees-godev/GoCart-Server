@@ -10,6 +10,7 @@ import (
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
+	GRPC     GRPCConfig
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
@@ -23,6 +24,12 @@ type AppConfig struct {
 
 type HTTPConfig struct {
 	Port string
+}
+
+type GRPCConfig struct {
+	Port             string
+	OrderServiceAddr string
+	TimeoutSeconds   int
 }
 
 type DatabaseConfig struct {
@@ -59,8 +66,13 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "5555"),
 		},
+		GRPC: GRPCConfig{
+			Port:             GetEnv("GRPC_PORT", "55063"),
+			OrderServiceAddr: GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059")),
+			TimeoutSeconds:   GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 10),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("RATINGS_SERVICE_DATABASE_URL", ""),
+			URL:            GetEnv("RATINGS_SERVICE_DATABASE_URL", GetEnv("RATING_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", ""))),
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
