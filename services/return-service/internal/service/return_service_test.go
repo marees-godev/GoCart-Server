@@ -22,6 +22,7 @@ type mockReturnRepo struct {
 	mu           sync.RWMutex
 	returns      map[string]*model.Return
 	byOrderItem  map[string]*model.Return
+	exchanges    map[string]*model.Exchange
 	outboxEvents []*outbox.Event
 }
 
@@ -29,6 +30,7 @@ func newMockReturnRepo() *mockReturnRepo {
 	return &mockReturnRepo{
 		returns:      make(map[string]*model.Return),
 		byOrderItem:  make(map[string]*model.Return),
+		exchanges:    make(map[string]*model.Exchange),
 		outboxEvents: make([]*outbox.Event, 0),
 	}
 }
@@ -81,14 +83,31 @@ func (m *mockReturnRepo) ListReturnsByOrderID(ctx context.Context, orderID strin
 }
 
 func (m *mockReturnRepo) UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error) {
+	return m.UpdateReturnStatusWithOutbox(ctx, id, status, "")
+}
+
+func (m *mockReturnRepo) UpdateReturnStatusWithOutbox(ctx context.Context, id string, status model.ReturnStatus, rejectionReason string, outboxEvents ...*outbox.Event) (*model.Return, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ret, ok := m.returns[id]
 	if !ok {
 		return nil, repository.ErrReturnNotFound
 	}
+	now := time.Now().UTC()
 	ret.Status = status
-	ret.UpdatedAt = time.Now().UTC()
+	ret.UpdatedAt = now
+	if status == model.ReturnStatusApproved {
+		ret.ApprovedAt = &now
+	}
+	if status == model.ReturnStatusCompleted {
+		ret.CompletedAt = &now
+	}
+	if rejectionReason != "" {
+		ret.RejectionReason = rejectionReason
+	}
+	if len(outboxEvents) > 0 {
+		m.outboxEvents = append(m.outboxEvents, outboxEvents...)
+	}
 	cp := *ret
 	return &cp, nil
 }
@@ -139,6 +158,82 @@ func (m *mockReturnRepo) GetVerificationByReturnID(ctx context.Context, returnID
 	}
 	cp := *ret.Verification
 	return &cp, nil
+}
+
+func (m *mockReturnRepo) CreateExchangeWithOutbox(ctx context.Context, exc *model.Exchange, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *exc
+	cp.Answers = answers
+	if m.exchanges == nil {
+		m.exchanges = make(map[string]*model.Exchange)
+	}
+	m.exchanges[exc.ID] = &cp
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
+}
+
+func (m *mockReturnRepo) GetExchangeByID(ctx context.Context, id string) (*model.Exchange, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[id]
+	if !ok {
+		return nil, repository.ErrExchangeNotFound
+	}
+	cp := *exc
+	return &cp, nil
+}
+
+func (m *mockReturnRepo) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, exc := range m.exchanges {
+		if exc.OrderID == orderID {
+			cp := *exc
+			return &cp, nil
+		}
+	}
+	return nil, repository.ErrExchangeNotFound
+}
+
+func (m *mockReturnRepo) CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	exc, ok := m.exchanges[v.ExchangeID]
+	if !ok {
+		return repository.ErrExchangeNotFound
+	}
+	exc.Status = newStatus
+	exc.FinalDiscount = finalDiscount
+	exc.Verification = v
+	exc.UpdatedAt = time.Now().UTC()
+	if len(outboxEvents) > 0 {
+		m.outboxEvents = append(m.outboxEvents, outboxEvents...)
+	}
+	return nil
+}
+
+func (m *mockReturnRepo) GetExchangeVerification(ctx context.Context, exchangeID string) (*model.ExchangeVerification, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[exchangeID]
+	if !ok || exc.Verification == nil {
+		return nil, nil
+	}
+	cp := *exc.Verification
+	return &cp, nil
+}
+
+func (m *mockReturnRepo) GetExchangeQuestionAnswers(ctx context.Context, exchangeID string) ([]*model.ExchangeQuestionAnswer, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[exchangeID]
+	if !ok {
+		return nil, nil
+	}
+	return exc.Answers, nil
 }
 
 
@@ -572,41 +667,7 @@ func TestReturnService_RequestReturn_ItemNotFoundInOrder(t *testing.T) {
 	}
 }
 
-func TestReturnService_RequestReturn_FallbackToItemIDs(t *testing.T) {
-	ctx := context.Background()
-	repo := newMockReturnRepo()
-
-	orderID := "order-123"
-	userID := "user-456"
-	itemID := "item-789"
-	productID := "prod-101"
-
-	orderClient := &mockOrderClient{
-		order: validDeliveredOrder(orderID, userID, itemID, productID, time.Now().UTC()),
-	}
-	productClient := &mockProductClient{
-		product: &productpb.Product{Id: productID, IsReturnable: true},
-	}
-
-	svc := service.NewReturnService(repo, orderClient, productClient, 14, nil)
-	// Omitting OrderItemID, providing ItemIDs
-	req := &dto.RequestReturnDTO{
-		OrderID: orderID,
-		UserID:  userID,
-		Reason:  "Compatibility test",
-		ItemIDs: []string{itemID},
-	}
-
-	res, err := svc.RequestReturn(ctx, req)
-	if err != nil {
-		t.Fatalf("expected success with ItemIDs fallback, got: %v", err)
-	}
-	if res.OrderItemID != itemID {
-		t.Errorf("expected OrderItemID %s, got %s", itemID, res.OrderItemID)
-	}
-}
-
-func TestReturnService_RequestReturn_MultipleItemIDsRejected(t *testing.T) {
+func TestReturnService_RequestReturn_MissingOrderItemIDRejected(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockReturnRepo()
 
@@ -615,33 +676,14 @@ func TestReturnService_RequestReturn_MultipleItemIDsRejected(t *testing.T) {
 		OrderID: "order-123",
 		UserID:  "user-456",
 		Reason:  "Defective",
-		ItemIDs: []string{"item-1", "item-2"},
 	}
 
 	_, err := svc.RequestReturn(ctx, req)
-	if !errors.Is(err, service.ErrMultipleItemsNotSupported) {
-		t.Fatalf("expected ErrMultipleItemsNotSupported, got: %v", err)
+	if !errors.Is(err, service.ErrOrderItemRequired) {
+		t.Fatalf("expected ErrOrderItemRequired, got: %v", err)
 	}
 }
 
-func TestReturnService_RequestReturn_ItemIDsMismatchRejected(t *testing.T) {
-	ctx := context.Background()
-	repo := newMockReturnRepo()
-
-	svc := service.NewReturnService(repo, nil, nil, 14, nil)
-	req := &dto.RequestReturnDTO{
-		OrderID:     "order-123",
-		OrderItemID: "item-1",
-		UserID:      "user-456",
-		Reason:      "Defective",
-		ItemIDs:     []string{"item-2"},
-	}
-
-	_, err := svc.RequestReturn(ctx, req)
-	if !errors.Is(err, service.ErrOrderItemMismatch) {
-		t.Fatalf("expected ErrOrderItemMismatch, got: %v", err)
-	}
-}
 
 func TestReturnService_GetReturn_AndUpdateReturnStatus(t *testing.T) {
 	ctx := context.Background()
@@ -1039,3 +1081,622 @@ func TestReturnService_VerifyProduct_Rejection(t *testing.T) {
 	}
 }
 
+func TestReturnService_Lifecycle_FullProgression(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-lifecycle-1",
+		OrderID:      "order-1",
+		OrderItemID:  "item-1",
+		UserID:       "cust-123",
+		Reason:       "Wrong size",
+		Status:       model.ReturnStatusRequested,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 50.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	svc := service.NewReturnService(repo, nil, nil, 14, nil)
+	adminID := "admin-999"
+
+	// 1. REQUESTED -> UNDER_REVIEW
+	updated, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusUnderReview, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to UNDER_REVIEW, got err: %v", err)
+	}
+	if updated.Status != model.ReturnStatusUnderReview {
+		t.Errorf("expected status UNDER_REVIEW, got: %s", updated.Status)
+	}
+
+	// 2. UNDER_REVIEW -> APPROVED (via ApproveReturn)
+	approved, err := svc.ApproveReturn(ctx, ret.ID, adminID)
+	if err != nil {
+		t.Fatalf("expected approval to succeed, got err: %v", err)
+	}
+	if approved.Status != model.ReturnStatusApproved {
+		t.Errorf("expected status APPROVED, got: %s", approved.Status)
+	}
+
+	// 3. APPROVED -> PICKUP_SCHEDULED
+	pickupScheduled, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusPickupScheduled, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to PICKUP_SCHEDULED, got err: %v", err)
+	}
+	if pickupScheduled.Status != model.ReturnStatusPickupScheduled {
+		t.Errorf("expected status PICKUP_SCHEDULED, got: %s", pickupScheduled.Status)
+	}
+
+	// 4. PICKUP_SCHEDULED -> PICKED_UP
+	pickedUp, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusPickedUp, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to PICKED_UP, got err: %v", err)
+	}
+	if pickedUp.Status != model.ReturnStatusPickedUp {
+		t.Errorf("expected status PICKED_UP, got: %s", pickedUp.Status)
+	}
+
+	// 5. PICKED_UP -> RECEIVED
+	received, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusReceived, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to RECEIVED, got err: %v", err)
+	}
+	if received.Status != model.ReturnStatusReceived {
+		t.Errorf("expected status RECEIVED, got: %s", received.Status)
+	}
+
+	// 6. RECEIVED -> REFUND_INITIATED
+	refundInit, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusRefundInitiated, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to REFUND_INITIATED, got err: %v", err)
+	}
+	if refundInit.Status != model.ReturnStatusRefundInitiated {
+		t.Errorf("expected status REFUND_INITIATED, got: %s", refundInit.Status)
+	}
+
+	// 7. REFUND_INITIATED -> COMPLETED
+	completed, err := svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusCompleted, "", adminID)
+	if err != nil {
+		t.Fatalf("expected transition to COMPLETED, got err: %v", err)
+	}
+	if completed.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected status COMPLETED, got: %s", completed.Status)
+	}
+}
+
+func TestReturnService_ApproveAndReject_OutboxEvents(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	adminID := "admin-reviewer"
+	custID := "customer-1"
+
+	t.Run("ApproveReturn_OutboxEvents", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := &model.Return{
+			ID:           "ret-app-evt",
+			OrderID:      "order-app",
+			OrderItemID:  "item-app",
+			UserID:       custID,
+			Reason:       "Defective",
+			Status:       model.ReturnStatusRequested,
+			Type:         model.ReturnTypeReturn,
+			RefundAmount: 75.0,
+			RequestedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+		approved, err := svc.ApproveReturn(ctx, ret.ID, adminID)
+		if err != nil {
+			t.Fatalf("unexpected error approving return: %v", err)
+		}
+		if approved.Status != model.ReturnStatusApproved {
+			t.Errorf("expected status APPROVED, got: %s", approved.Status)
+		}
+
+		// Must have 2 outbox events: ReturnApproved and ReturnStatusUpdated
+		if len(repo.outboxEvents) != 2 {
+			t.Fatalf("expected 2 outbox events, got: %d", len(repo.outboxEvents))
+		}
+
+		approvedEvt := repo.outboxEvents[0]
+		if approvedEvt.EventType != events.EventTypeReturnApproved {
+			t.Errorf("expected event type %s, got: %s", events.EventTypeReturnApproved, approvedEvt.EventType)
+		}
+		if approvedEvt.Topic != events.TopicReturnApproved {
+			t.Errorf("expected topic %s, got: %s", events.TopicReturnApproved, approvedEvt.Topic)
+		}
+
+		var env events.EventEnvelope
+		if err := json.Unmarshal(approvedEvt.Payload, &env); err != nil {
+			t.Fatalf("failed to unmarshal approved envelope: %v", err)
+		}
+		var payload events.ReturnApprovedEvent
+		if err := env.UnmarshalData(&payload); err != nil {
+			t.Fatalf("failed to unmarshal ReturnApprovedEvent payload: %v", err)
+		}
+		if payload.ReturnID != ret.ID {
+			t.Errorf("expected ReturnID %s, got: %s", ret.ID, payload.ReturnID)
+		}
+		if payload.ApprovedBy != adminID {
+			t.Errorf("expected ApprovedBy %s, got: %s", adminID, payload.ApprovedBy)
+		}
+		if payload.UserID != custID {
+			t.Errorf("expected UserID %s, got: %s", custID, payload.UserID)
+		}
+
+		statusUpdatedEvt := repo.outboxEvents[1]
+		if statusUpdatedEvt.EventType != events.EventTypeReturnStatusUpdated {
+			t.Errorf("expected event type %s, got: %s", events.EventTypeReturnStatusUpdated, statusUpdatedEvt.EventType)
+		}
+	})
+
+	t.Run("RejectReturn_OutboxEvents", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := &model.Return{
+			ID:           "ret-rej-evt",
+			OrderID:      "order-rej",
+			OrderItemID:  "item-rej",
+			UserID:       custID,
+			Reason:       "Defective",
+			Status:       model.ReturnStatusRequested,
+			Type:         model.ReturnTypeReturn,
+			RefundAmount: 75.0,
+			RequestedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+		rejectionReason := "Policy violation: product seal is broken"
+		rejected, err := svc.RejectReturn(ctx, ret.ID, rejectionReason, adminID)
+		if err != nil {
+			t.Fatalf("unexpected error rejecting return: %v", err)
+		}
+		if rejected.Status != model.ReturnStatusRejected {
+			t.Errorf("expected status REJECTED, got: %s", rejected.Status)
+		}
+		if rejected.RejectionReason != rejectionReason {
+			t.Errorf("expected rejection reason %q, got: %q", rejectionReason, rejected.RejectionReason)
+		}
+
+		// Must have 2 outbox events: ReturnRejected and ReturnStatusUpdated
+		if len(repo.outboxEvents) != 2 {
+			t.Fatalf("expected 2 outbox events, got: %d", len(repo.outboxEvents))
+		}
+
+		rejectedEvt := repo.outboxEvents[0]
+		if rejectedEvt.EventType != events.EventTypeReturnRejected {
+			t.Errorf("expected event type %s, got: %s", events.EventTypeReturnRejected, rejectedEvt.EventType)
+		}
+		if rejectedEvt.Topic != events.TopicReturnRejected {
+			t.Errorf("expected topic %s, got: %s", events.TopicReturnRejected, rejectedEvt.Topic)
+		}
+
+		var env events.EventEnvelope
+		if err := json.Unmarshal(rejectedEvt.Payload, &env); err != nil {
+			t.Fatalf("failed to unmarshal rejected envelope: %v", err)
+		}
+		var payload events.ReturnRejectedEvent
+		if err := env.UnmarshalData(&payload); err != nil {
+			t.Fatalf("failed to unmarshal ReturnRejectedEvent payload: %v", err)
+		}
+		if payload.ReturnID != ret.ID {
+			t.Errorf("expected ReturnID %s, got: %s", ret.ID, payload.ReturnID)
+		}
+		if payload.RejectedBy != adminID {
+			t.Errorf("expected RejectedBy %s, got: %s", adminID, payload.RejectedBy)
+		}
+		if payload.RejectionReason != rejectionReason {
+			t.Errorf("expected RejectionReason %q, got: %q", rejectionReason, payload.RejectionReason)
+		}
+	})
+}
+
+func TestReturnService_CustomerCannotReviewOwnReturn(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	customerID := "customer-123"
+
+	ret := &model.Return{
+		ID:          "ret-customer-guard",
+		OrderID:     "order-1",
+		OrderItemID: "item-1",
+		UserID:      customerID,
+		Status:      model.ReturnStatusRequested,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+	svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+	// Customer tries to approve their own return
+	_, err := svc.ApproveReturn(ctx, ret.ID, customerID)
+	if !errors.Is(err, service.ErrCustomerCannotReviewOwnReturn) {
+		t.Errorf("expected ErrCustomerCannotReviewOwnReturn, got: %v", err)
+	}
+
+	// Customer tries to reject their own return
+	_, err = svc.RejectReturn(ctx, ret.ID, "Some reason", customerID)
+	if !errors.Is(err, service.ErrCustomerCannotReviewOwnReturn) {
+		t.Errorf("expected ErrCustomerCannotReviewOwnReturn, got: %v", err)
+	}
+
+	// Customer tries via UpdateReturnStatus
+	_, err = svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusApproved, "", customerID)
+	if !errors.Is(err, service.ErrCustomerCannotReviewOwnReturn) {
+		t.Errorf("expected ErrCustomerCannotReviewOwnReturn, got: %v", err)
+	}
+
+	_, err = svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusRejected, "Some reason", customerID)
+	if !errors.Is(err, service.ErrCustomerCannotReviewOwnReturn) {
+		t.Errorf("expected ErrCustomerCannotReviewOwnReturn, got: %v", err)
+	}
+}
+
+func TestReturnService_RejectReturn_ReasonValidation(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	adminID := "admin-reviewer"
+
+	ret := &model.Return{
+		ID:          "ret-reject-val",
+		OrderID:     "order-1",
+		OrderItemID: "item-1",
+		UserID:      "customer-456",
+		Status:      model.ReturnStatusRequested,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+	svc := service.NewReturnService(repo, nil, nil, 14, nil)
+
+	// Empty reason
+	_, err := svc.RejectReturn(ctx, ret.ID, "", adminID)
+	if !errors.Is(err, service.ErrRejectionReasonRequired) {
+		t.Errorf("expected ErrRejectionReasonRequired for empty reason, got: %v", err)
+	}
+
+	// Whitespace reason
+	_, err = svc.RejectReturn(ctx, ret.ID, "   \t \n ", adminID)
+	if !errors.Is(err, service.ErrRejectionReasonRequired) {
+		t.Errorf("expected ErrRejectionReasonRequired for whitespace reason, got: %v", err)
+	}
+
+	// Via UpdateReturnStatus without reason
+	_, err = svc.UpdateReturnStatus(ctx, ret.ID, model.ReturnStatusRejected, "", adminID)
+	if !errors.Is(err, service.ErrRejectionReasonRequired) {
+		t.Errorf("expected ErrRejectionReasonRequired via UpdateReturnStatus, got: %v", err)
+	}
+}
+
+func TestReturnService_Exchange_Lifecycle(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+
+	orderID := "order-exch"
+	userID := "user-exch"
+	itemID := "item-exch"
+	productID := "prod-exch"
+
+	orderClient := &mockOrderClient{
+		order: validDeliveredOrder(orderID, userID, itemID, productID, time.Now().UTC().Add(-2*24*time.Hour)),
+	}
+	productClient := &mockProductClient{
+		product: &productpb.Product{Id: productID, IsReturnable: true},
+	}
+
+	svc := service.NewReturnService(repo, orderClient, productClient, 7, nil)
+	adminID := "admin-1"
+
+	req := &dto.RequestReturnDTO{
+		OrderID:     orderID,
+		OrderItemID: itemID,
+		UserID:      userID,
+		Reason:      "Wrong color, need exchange",
+		Type:        "EXCHANGE",
+	}
+
+	res, err := svc.RequestReturn(ctx, req)
+	if err != nil {
+		t.Fatalf("expected successful exchange request, got: %v", err)
+	}
+	if res.Type != model.ReturnTypeExchange {
+		t.Errorf("expected type EXCHANGE, got: %s", res.Type)
+	}
+	if res.Status != model.ReturnStatusExchangeRequested {
+		t.Errorf("expected status EXCHANGE_REQUESTED, got: %s", res.Status)
+	}
+
+	// Transition: EXCHANGE_REQUESTED -> UNDER_REVIEW
+	underReview, err := svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusUnderReview, "", adminID)
+	if err != nil {
+		t.Fatalf("expected EXCHANGE_REQUESTED -> UNDER_REVIEW, got err: %v", err)
+	}
+	if underReview.Status != model.ReturnStatusUnderReview {
+		t.Errorf("expected status UNDER_REVIEW, got: %s", underReview.Status)
+	}
+
+	// UNDER_REVIEW -> APPROVED
+	approved, err := svc.ApproveReturn(ctx, res.ID, adminID)
+	if err != nil {
+		t.Fatalf("expected approval of exchange, got err: %v", err)
+	}
+	if approved.Status != model.ReturnStatusApproved {
+		t.Errorf("expected status APPROVED, got: %s", approved.Status)
+	}
+
+	// APPROVED -> PICKUP_SCHEDULED -> PICKED_UP -> RECEIVED -> EXCHANGE_INITIATED -> COMPLETED
+	_, err = svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusPickupScheduled, "", adminID)
+	if err != nil {
+		t.Fatalf("failed pickup scheduled: %v", err)
+	}
+	_, err = svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusPickedUp, "", adminID)
+	if err != nil {
+		t.Fatalf("failed picked up: %v", err)
+	}
+	_, err = svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusReceived, "", adminID)
+	if err != nil {
+		t.Fatalf("failed received: %v", err)
+	}
+	exchInit, err := svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusExchangeInitiated, "", adminID)
+	if err != nil {
+		t.Fatalf("failed exchange initiated: %v", err)
+	}
+	if exchInit.Status != model.ReturnStatusExchangeInitiated {
+		t.Errorf("expected EXCHANGE_INITIATED, got: %s", exchInit.Status)
+	}
+	completed, err := svc.UpdateReturnStatus(ctx, res.ID, model.ReturnStatusCompleted, "", adminID)
+	if err != nil {
+		t.Fatalf("failed completed: %v", err)
+	}
+	if completed.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected COMPLETED, got: %s", completed.Status)
+	}
+}
+
+func TestReturnService_CreateExchange_SuccessAndCalculation(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	prodClient := &mockProductClient{
+		product: &productpb.Product{
+			Id:    "new-prod-999",
+			Price: 799.0,
+		},
+	}
+	svc := service.NewReturnService(repo, nil, prodClient, 7)
+
+	req := &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		OrderItemID:       "item-456",
+		UserID:            "user-789",
+		NewProductID:      "new-prod-999",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		OldVariant:        "128GB",
+		SerialOrIMEI:      "354829104829104",
+		BaseExchangeValue: 300.0,
+		Answers: []*dto.ExchangeAnswerDTO{
+			{QuestionKey: "SCREEN_CONDITION", AnswerValue: "MINOR_SCRATCHES", DeductionAmount: 30.0},
+			{QuestionKey: "BATTERY_HEALTH", AnswerValue: "NORMAL", DeductionAmount: 0.0},
+			{QuestionKey: "BODY_CONDITION", AnswerValue: "DENTS", DeductionAmount: 20.0},
+		},
+	}
+
+	exc, err := svc.CreateExchange(ctx, req)
+	if err != nil {
+		t.Fatalf("expected create exchange success, got err: %v", err)
+	}
+	if exc.BaseExchangeValue != 300.0 {
+		t.Errorf("expected base value 300, got: %f", exc.BaseExchangeValue)
+	}
+	// 300 - 30 - 20 = 250
+	if exc.EstimatedDiscount != 250.0 {
+		t.Errorf("expected estimated discount 250, got: %f", exc.EstimatedDiscount)
+	}
+	// Price difference: 799 - 250 = 549
+	if exc.PriceDifference != 549.0 {
+		t.Errorf("expected price diff 549, got: %f", exc.PriceDifference)
+	}
+	if exc.Status != model.ExchangeStatusOfferCreated {
+		t.Errorf("expected OFFER_CREATED, got: %s", exc.Status)
+	}
+	if len(exc.Answers) != 3 {
+		t.Errorf("expected 3 answers, got: %d", len(exc.Answers))
+	}
+}
+
+func TestReturnService_CreateExchange_ValidationErrors(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	// Missing user
+	_, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:      "order-1",
+		NewProductID: "prod-1",
+		OldBrand:     "Brand",
+		OldModel:     "Model",
+	})
+	if !errors.Is(err, service.ErrUserIDRequired) {
+		t.Errorf("expected ErrUserIDRequired, got: %v", err)
+	}
+
+	// Missing order
+	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:       "user-1",
+		NewProductID: "prod-1",
+		OldBrand:     "Brand",
+		OldModel:     "Model",
+	})
+	if !errors.Is(err, service.ErrOrderIDRequired) {
+		t.Errorf("expected ErrOrderIDRequired, got: %v", err)
+	}
+
+	// Missing new product
+	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:   "user-1",
+		OrderID:  "order-1",
+		OldBrand: "Brand",
+		OldModel: "Model",
+	})
+	if !errors.Is(err, service.ErrExchangeNewProductRequired) {
+		t.Errorf("expected ErrExchangeNewProductRequired, got: %v", err)
+	}
+
+	// Missing brand/model
+	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:       "user-1",
+		OrderID:      "order-1",
+		NewProductID: "prod-1",
+	})
+	if !errors.Is(err, service.ErrExchangeBrandModelRequired) {
+		t.Errorf("expected ErrExchangeBrandModelRequired, got: %v", err)
+	}
+
+	// Order client configured: order not found
+	svcWithOrder := service.NewReturnService(repo, &mockOrderClient{order: nil}, nil, 7)
+	_, err = svcWithOrder.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:       "user-1",
+		OrderID:      "order-1",
+		NewProductID: "prod-1",
+		OldBrand:     "Brand",
+		OldModel:     "Model",
+	})
+	if !errors.Is(err, service.ErrOrderNotFound) {
+		t.Errorf("expected ErrOrderNotFound, got: %v", err)
+	}
+
+	// Order client configured: order belongs to another customer
+	svcWithOtherUser := service.NewReturnService(repo, &mockOrderClient{
+		order: &orderpb.Order{
+			Id:     "order-1",
+			UserId: "user-different",
+		},
+	}, nil, 7)
+	_, err = svcWithOtherUser.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:       "user-1",
+		OrderID:      "order-1",
+		NewProductID: "prod-1",
+		OldBrand:     "Brand",
+		OldModel:     "Model",
+	})
+	if !errors.Is(err, service.ErrUnauthorizedReturnRequest) {
+		t.Errorf("expected ErrUnauthorizedReturnRequest, got: %v", err)
+	}
+}
+
+func TestReturnService_VerifyExchangeProduct_Success(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Samsung",
+		OldModel:          "Galaxy S21",
+		BaseExchangeValue: 200.0,
+	})
+	if err != nil {
+		t.Fatalf("failed create exchange: %v", err)
+	}
+
+	// Verify product approved
+	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:       exc.ID,
+		VerifiedBy:       "delivery-partner-1",
+		ConditionRating:  "GOOD",
+		IsApproved:       true,
+		ScreenIntact:     true,
+		BodyIntact:       true,
+		Functional:       true,
+		SerialMatches:    true,
+		AdjustedDiscount: 200.0,
+		ProofImages:      []string{"https://img.example.com/proof1.jpg"},
+		Notes:            "Device in good condition",
+	})
+	if err != nil {
+		t.Fatalf("expected verify success, got err: %v", err)
+	}
+	if verifiedExc.Status != model.ExchangeStatusVerified {
+		t.Errorf("expected VERIFIED, got: %s", verifiedExc.Status)
+	}
+	if v == nil || !v.IsApproved {
+		t.Errorf("expected verification approved")
+	}
+	if len(v.ProofImages) != 1 {
+		t.Errorf("expected 1 proof image, got: %d", len(v.ProofImages))
+	}
+}
+
+func TestReturnService_VerifyExchangeProduct_Disapproved(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Samsung",
+		OldModel:          "Galaxy S21",
+		BaseExchangeValue: 200.0,
+	})
+
+	// Verify product disapproved
+	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:      exc.ID,
+		VerifiedBy:      "delivery-partner-1",
+		ConditionRating: "DAMAGED",
+		IsApproved:      false,
+		ScreenIntact:    false,
+		Functional:      false,
+		SerialMatches:   true,
+		Notes:           "Screen completely broken",
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if verifiedExc.Status != model.ExchangeStatusCancelled {
+		t.Errorf("expected CANCELLED, got: %s", verifiedExc.Status)
+	}
+	if verifiedExc.FinalDiscount != 0 {
+		t.Errorf("expected 0 final discount, got: %f", verifiedExc.FinalDiscount)
+	}
+	if v.IsApproved {
+		t.Errorf("expected not approved")
+	}
+}
+
+func TestReturnService_VerifyExchangeProduct_NonFunctionalCannotBeApproved(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Samsung",
+		OldModel:          "Galaxy S21",
+		BaseExchangeValue: 200.0,
+	})
+
+	// Attempting to approve non-functional device
+	_, _, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:      exc.ID,
+		VerifiedBy:      "delivery-partner-1",
+		ConditionRating: "POOR",
+		IsApproved:      true,
+		Functional:      false,
+		SerialMatches:   true,
+	})
+	if !errors.Is(err, service.ErrExchangeFunctionalRequired) {
+		t.Errorf("expected ErrExchangeFunctionalRequired, got: %v", err)
+	}
+}

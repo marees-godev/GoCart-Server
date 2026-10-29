@@ -167,6 +167,54 @@ type ComplexityRoot struct {
 		UpdatedAt     func(childComplexity int) int
 	}
 
+	Exchange struct {
+		Answers           func(childComplexity int) int
+		BaseExchangeValue func(childComplexity int) int
+		CreatedAt         func(childComplexity int) int
+		EstimatedDiscount func(childComplexity int) int
+		FinalDiscount     func(childComplexity int) int
+		ID                func(childComplexity int) int
+		NewProductID      func(childComplexity int) int
+		OldBrand          func(childComplexity int) int
+		OldModel          func(childComplexity int) int
+		OldVariant        func(childComplexity int) int
+		OrderID           func(childComplexity int) int
+		OrderItemID       func(childComplexity int) int
+		PriceDifference   func(childComplexity int) int
+		SerialOrImei      func(childComplexity int) int
+		Status            func(childComplexity int) int
+		UpdatedAt         func(childComplexity int) int
+		UserID            func(childComplexity int) int
+		Verification      func(childComplexity int) int
+	}
+
+	ExchangeQuestionAnswer struct {
+		AnswerValue     func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		DeductionAmount func(childComplexity int) int
+		ExchangeID      func(childComplexity int) int
+		ID              func(childComplexity int) int
+		QuestionKey     func(childComplexity int) int
+	}
+
+	ExchangeVerification struct {
+		AdjustedDiscount func(childComplexity int) int
+		BodyIntact       func(childComplexity int) int
+		ConditionRating  func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		ExchangeID       func(childComplexity int) int
+		Functional       func(childComplexity int) int
+		ID               func(childComplexity int) int
+		IsApproved       func(childComplexity int) int
+		Notes            func(childComplexity int) int
+		ProofImages      func(childComplexity int) int
+		ScreenIntact     func(childComplexity int) int
+		SerialMatches    func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
+		VerifiedAt       func(childComplexity int) int
+		VerifiedBy       func(childComplexity int) int
+	}
+
 	ForgotPasswordPayload struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
@@ -223,6 +271,7 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddToCart                    func(childComplexity int, input model.AddToCartInput) int
 		AppealStore                  func(childComplexity int, id string, reason string) int
+		ApproveReturn                func(childComplexity int, id string) int
 		ApproveStore                 func(childComplexity int, id string) int
 		CancelOrder                  func(childComplexity int, id string, reason *string) int
 		CancelPayment                func(childComplexity int, paymentID *string, orderID *string, reason *string) int
@@ -232,6 +281,7 @@ type ComplexityRoot struct {
 		CloseStore                   func(childComplexity int, id string, reason *string) int
 		CreateCategory               func(childComplexity int, input model.CreateCategoryInput) int
 		CreateDelivery               func(childComplexity int, input model.CreateDeliveryInput) int
+		CreateExchange               func(childComplexity int, input model.CreateExchangeInput) int
 		CreateInventory              func(childComplexity int, input model.CreateInventoryInput) int
 		CreateOrder                  func(childComplexity int, input model.CreateOrderInput) int
 		CreateProduct                func(childComplexity int, input model.CreateProductInput) int
@@ -258,6 +308,7 @@ type ComplexityRoot struct {
 		ReactivateAccount            func(childComplexity int) int
 		RefreshToken                 func(childComplexity int, input model.RefreshTokenInput) int
 		Register                     func(childComplexity int, input model.RegisterInput) int
+		RejectReturn                 func(childComplexity int, id string, reason string) int
 		RejectStore                  func(childComplexity int, id string, reason string) int
 		ReleaseStock                 func(childComplexity int, reservationID string) int
 		RemoveFromCart               func(childComplexity int, userID *string, productID string) int
@@ -282,12 +333,13 @@ type ComplexityRoot struct {
 		UpdateOrderStatus            func(childComplexity int, id string, status string) int
 		UpdateProduct                func(childComplexity int, id string, input model.UpdateProductInput) int
 		UpdateRating                 func(childComplexity int, input model.UpdateRatingInput) int
-		UpdateReturnStatus           func(childComplexity int, id string, status string) int
+		UpdateReturnStatus           func(childComplexity int, id string, status string, rejectionReason *string) int
 		UpdateStock                  func(childComplexity int, inventoryID *string, productID *string, variantID *string, quantity int) int
 		UpdateStore                  func(childComplexity int, input model.UpdateStoreInput) int
 		UpdateUser                   func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress            func(childComplexity int, id string, input model.UpdateAddressInput) int
 		VerifyEmail                  func(childComplexity int, email string, otp string, role model.AuthRole) int
+		VerifyExchangeProduct        func(childComplexity int, input model.VerifyExchangeProductInput) int
 		VerifyProduct                func(childComplexity int, input model.VerifyProductInput) int
 	}
 
@@ -431,6 +483,7 @@ type ComplexityRoot struct {
 		DeliveryByOrder               func(childComplexity int, orderID string) int
 		DeliveryByTracking            func(childComplexity int, trackingNumber string) int
 		DeliveryPartnerProfile        func(childComplexity int, partnerID *string) int
+		Exchange                      func(childComplexity int, id string) int
 		GetOrder                      func(childComplexity int, id string) int
 		GetRating                     func(childComplexity int, id string) int
 		Health                        func(childComplexity int) int
@@ -502,20 +555,21 @@ type ComplexityRoot struct {
 	}
 
 	ReturnOrder struct {
-		ApprovedAt   func(childComplexity int) int
-		CompletedAt  func(childComplexity int) int
-		CreatedAt    func(childComplexity int) int
-		ID           func(childComplexity int) int
-		OrderID      func(childComplexity int) int
-		OrderItemID  func(childComplexity int) int
-		Reason       func(childComplexity int) int
-		RefundAmount func(childComplexity int) int
-		RequestedAt  func(childComplexity int) int
-		Status       func(childComplexity int) int
-		Type         func(childComplexity int) int
-		UpdatedAt    func(childComplexity int) int
-		UserID       func(childComplexity int) int
-		Verification func(childComplexity int) int
+		ApprovedAt      func(childComplexity int) int
+		CompletedAt     func(childComplexity int) int
+		CreatedAt       func(childComplexity int) int
+		ID              func(childComplexity int) int
+		OrderID         func(childComplexity int) int
+		OrderItemID     func(childComplexity int) int
+		Reason          func(childComplexity int) int
+		RefundAmount    func(childComplexity int) int
+		RejectionReason func(childComplexity int) int
+		RequestedAt     func(childComplexity int) int
+		Status          func(childComplexity int) int
+		Type            func(childComplexity int) int
+		UpdatedAt       func(childComplexity int) int
+		UserID          func(childComplexity int) int
+		Verification    func(childComplexity int) int
 	}
 
 	StockItem struct {
@@ -642,7 +696,11 @@ type MutationResolver interface {
 	RequestReturn(ctx context.Context, input model.RequestReturnInput) (*model.ReturnOrder, error)
 	RequestReplacement(ctx context.Context, input model.RequestReplacementInput) (*model.ReturnOrder, error)
 	VerifyProduct(ctx context.Context, input model.VerifyProductInput) (*model.ReturnOrder, error)
-	UpdateReturnStatus(ctx context.Context, id string, status string) (*model.ReturnOrder, error)
+	UpdateReturnStatus(ctx context.Context, id string, status string, rejectionReason *string) (*model.ReturnOrder, error)
+	ApproveReturn(ctx context.Context, id string) (*model.ReturnOrder, error)
+	RejectReturn(ctx context.Context, id string, reason string) (*model.ReturnOrder, error)
+	CreateExchange(ctx context.Context, input model.CreateExchangeInput) (*model.Exchange, error)
+	VerifyExchangeProduct(ctx context.Context, input model.VerifyExchangeProductInput) (*model.Exchange, error)
 	CreateStore(ctx context.Context, input model.CreateStoreInput) (*model.Store, error)
 	UpdateStore(ctx context.Context, input model.UpdateStoreInput) (*model.Store, error)
 	GenerateStoreUploadURL(ctx context.Context, input model.GenerateStoreUploadURLInput) (*model.StoreUploadURLPayload, error)
@@ -696,6 +754,7 @@ type QueryResolver interface {
 	ReturnOrder(ctx context.Context, id string) (*model.ReturnOrder, error)
 	ReturnOrdersByOrder(ctx context.Context, orderID string) ([]*model.ReturnOrder, error)
 	ListReturns(ctx context.Context, limit *int, offset *int, status *string) ([]*model.ReturnOrder, error)
+	Exchange(ctx context.Context, id string) (*model.Exchange, error)
 	Store(ctx context.Context, id string) (*model.Store, error)
 	MyStore(ctx context.Context) (*model.Store, error)
 	Stores(ctx context.Context, merchantID *string, limit *int, offset *int) (*model.StoreList, error)
@@ -1250,6 +1309,279 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeliveryPartnerProfile.UpdatedAt(childComplexity), true
 
+	case "Exchange.answers":
+		if e.complexity.Exchange.Answers == nil {
+			break
+		}
+
+		return e.complexity.Exchange.Answers(childComplexity), true
+
+	case "Exchange.baseExchangeValue":
+		if e.complexity.Exchange.BaseExchangeValue == nil {
+			break
+		}
+
+		return e.complexity.Exchange.BaseExchangeValue(childComplexity), true
+
+	case "Exchange.createdAt":
+		if e.complexity.Exchange.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Exchange.CreatedAt(childComplexity), true
+
+	case "Exchange.estimatedDiscount":
+		if e.complexity.Exchange.EstimatedDiscount == nil {
+			break
+		}
+
+		return e.complexity.Exchange.EstimatedDiscount(childComplexity), true
+
+	case "Exchange.finalDiscount":
+		if e.complexity.Exchange.FinalDiscount == nil {
+			break
+		}
+
+		return e.complexity.Exchange.FinalDiscount(childComplexity), true
+
+	case "Exchange.id":
+		if e.complexity.Exchange.ID == nil {
+			break
+		}
+
+		return e.complexity.Exchange.ID(childComplexity), true
+
+	case "Exchange.newProductId":
+		if e.complexity.Exchange.NewProductID == nil {
+			break
+		}
+
+		return e.complexity.Exchange.NewProductID(childComplexity), true
+
+	case "Exchange.oldBrand":
+		if e.complexity.Exchange.OldBrand == nil {
+			break
+		}
+
+		return e.complexity.Exchange.OldBrand(childComplexity), true
+
+	case "Exchange.oldModel":
+		if e.complexity.Exchange.OldModel == nil {
+			break
+		}
+
+		return e.complexity.Exchange.OldModel(childComplexity), true
+
+	case "Exchange.oldVariant":
+		if e.complexity.Exchange.OldVariant == nil {
+			break
+		}
+
+		return e.complexity.Exchange.OldVariant(childComplexity), true
+
+	case "Exchange.orderId":
+		if e.complexity.Exchange.OrderID == nil {
+			break
+		}
+
+		return e.complexity.Exchange.OrderID(childComplexity), true
+
+	case "Exchange.orderItemId":
+		if e.complexity.Exchange.OrderItemID == nil {
+			break
+		}
+
+		return e.complexity.Exchange.OrderItemID(childComplexity), true
+
+	case "Exchange.priceDifference":
+		if e.complexity.Exchange.PriceDifference == nil {
+			break
+		}
+
+		return e.complexity.Exchange.PriceDifference(childComplexity), true
+
+	case "Exchange.serialOrImei":
+		if e.complexity.Exchange.SerialOrImei == nil {
+			break
+		}
+
+		return e.complexity.Exchange.SerialOrImei(childComplexity), true
+
+	case "Exchange.status":
+		if e.complexity.Exchange.Status == nil {
+			break
+		}
+
+		return e.complexity.Exchange.Status(childComplexity), true
+
+	case "Exchange.updatedAt":
+		if e.complexity.Exchange.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.Exchange.UpdatedAt(childComplexity), true
+
+	case "Exchange.userId":
+		if e.complexity.Exchange.UserID == nil {
+			break
+		}
+
+		return e.complexity.Exchange.UserID(childComplexity), true
+
+	case "Exchange.verification":
+		if e.complexity.Exchange.Verification == nil {
+			break
+		}
+
+		return e.complexity.Exchange.Verification(childComplexity), true
+
+	case "ExchangeQuestionAnswer.answerValue":
+		if e.complexity.ExchangeQuestionAnswer.AnswerValue == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.AnswerValue(childComplexity), true
+
+	case "ExchangeQuestionAnswer.createdAt":
+		if e.complexity.ExchangeQuestionAnswer.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.CreatedAt(childComplexity), true
+
+	case "ExchangeQuestionAnswer.deductionAmount":
+		if e.complexity.ExchangeQuestionAnswer.DeductionAmount == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.DeductionAmount(childComplexity), true
+
+	case "ExchangeQuestionAnswer.exchangeId":
+		if e.complexity.ExchangeQuestionAnswer.ExchangeID == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.ExchangeID(childComplexity), true
+
+	case "ExchangeQuestionAnswer.id":
+		if e.complexity.ExchangeQuestionAnswer.ID == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.ID(childComplexity), true
+
+	case "ExchangeQuestionAnswer.questionKey":
+		if e.complexity.ExchangeQuestionAnswer.QuestionKey == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuestionAnswer.QuestionKey(childComplexity), true
+
+	case "ExchangeVerification.adjustedDiscount":
+		if e.complexity.ExchangeVerification.AdjustedDiscount == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.AdjustedDiscount(childComplexity), true
+
+	case "ExchangeVerification.bodyIntact":
+		if e.complexity.ExchangeVerification.BodyIntact == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.BodyIntact(childComplexity), true
+
+	case "ExchangeVerification.conditionRating":
+		if e.complexity.ExchangeVerification.ConditionRating == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.ConditionRating(childComplexity), true
+
+	case "ExchangeVerification.createdAt":
+		if e.complexity.ExchangeVerification.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.CreatedAt(childComplexity), true
+
+	case "ExchangeVerification.exchangeId":
+		if e.complexity.ExchangeVerification.ExchangeID == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.ExchangeID(childComplexity), true
+
+	case "ExchangeVerification.functional":
+		if e.complexity.ExchangeVerification.Functional == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.Functional(childComplexity), true
+
+	case "ExchangeVerification.id":
+		if e.complexity.ExchangeVerification.ID == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.ID(childComplexity), true
+
+	case "ExchangeVerification.isApproved":
+		if e.complexity.ExchangeVerification.IsApproved == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.IsApproved(childComplexity), true
+
+	case "ExchangeVerification.notes":
+		if e.complexity.ExchangeVerification.Notes == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.Notes(childComplexity), true
+
+	case "ExchangeVerification.proofImages":
+		if e.complexity.ExchangeVerification.ProofImages == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.ProofImages(childComplexity), true
+
+	case "ExchangeVerification.screenIntact":
+		if e.complexity.ExchangeVerification.ScreenIntact == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.ScreenIntact(childComplexity), true
+
+	case "ExchangeVerification.serialMatches":
+		if e.complexity.ExchangeVerification.SerialMatches == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.SerialMatches(childComplexity), true
+
+	case "ExchangeVerification.updatedAt":
+		if e.complexity.ExchangeVerification.UpdatedAt == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.UpdatedAt(childComplexity), true
+
+	case "ExchangeVerification.verifiedAt":
+		if e.complexity.ExchangeVerification.VerifiedAt == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.VerifiedAt(childComplexity), true
+
+	case "ExchangeVerification.verifiedBy":
+		if e.complexity.ExchangeVerification.VerifiedBy == nil {
+			break
+		}
+
+		return e.complexity.ExchangeVerification.VerifiedBy(childComplexity), true
+
 	case "ForgotPasswordPayload.message":
 		if e.complexity.ForgotPasswordPayload.Message == nil {
 			break
@@ -1519,6 +1851,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AppealStore(childComplexity, args["id"].(string), args["reason"].(string)), true
 
+	case "Mutation.approveReturn":
+		if e.complexity.Mutation.ApproveReturn == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_approveReturn_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ApproveReturn(childComplexity, args["id"].(string)), true
+
 	case "Mutation.approveStore":
 		if e.complexity.Mutation.ApproveStore == nil {
 			break
@@ -1626,6 +1970,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateDelivery(childComplexity, args["input"].(model.CreateDeliveryInput)), true
+
+	case "Mutation.createExchange":
+		if e.complexity.Mutation.CreateExchange == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createExchange_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateExchange(childComplexity, args["input"].(model.CreateExchangeInput)), true
 
 	case "Mutation.createInventory":
 		if e.complexity.Mutation.CreateInventory == nil {
@@ -1923,6 +2279,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
+
+	case "Mutation.rejectReturn":
+		if e.complexity.Mutation.RejectReturn == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_rejectReturn_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RejectReturn(childComplexity, args["id"].(string), args["reason"].(string)), true
 
 	case "Mutation.rejectStore":
 		if e.complexity.Mutation.RejectStore == nil {
@@ -2222,7 +2590,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateReturnStatus(childComplexity, args["id"].(string), args["status"].(string)), true
+		return e.complexity.Mutation.UpdateReturnStatus(childComplexity, args["id"].(string), args["status"].(string), args["rejectionReason"].(*string)), true
 
 	case "Mutation.updateStock":
 		if e.complexity.Mutation.UpdateStock == nil {
@@ -2283,6 +2651,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.VerifyEmail(childComplexity, args["email"].(string), args["otp"].(string), args["role"].(model.AuthRole)), true
+
+	case "Mutation.verifyExchangeProduct":
+		if e.complexity.Mutation.VerifyExchangeProduct == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyExchangeProduct_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyExchangeProduct(childComplexity, args["input"].(model.VerifyExchangeProductInput)), true
 
 	case "Mutation.verifyProduct":
 		if e.complexity.Mutation.VerifyProduct == nil {
@@ -3078,6 +3458,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.DeliveryPartnerProfile(childComplexity, args["partnerId"].(*string)), true
 
+	case "Query.exchange":
+		if e.complexity.Query.Exchange == nil {
+			break
+		}
+
+		args, err := ec.field_Query_exchange_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Exchange(childComplexity, args["id"].(string)), true
+
 	case "Query.getOrder":
 		if e.complexity.Query.GetOrder == nil {
 			break
@@ -3635,6 +4027,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ReturnOrder.RefundAmount(childComplexity), true
 
+	case "ReturnOrder.rejectionReason":
+		if e.complexity.ReturnOrder.RejectionReason == nil {
+			break
+		}
+
+		return e.complexity.ReturnOrder.RejectionReason(childComplexity), true
+
 	case "ReturnOrder.requestedAt":
 		if e.complexity.ReturnOrder.RequestedAt == nil {
 			break
@@ -4076,6 +4475,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateAddressInput,
 		ec.unmarshalInputCreateCategoryInput,
 		ec.unmarshalInputCreateDeliveryInput,
+		ec.unmarshalInputCreateExchangeInput,
 		ec.unmarshalInputCreateInventoryInput,
 		ec.unmarshalInputCreateOrderInput,
 		ec.unmarshalInputCreateProductInput,
@@ -4084,6 +4484,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateStoreInput,
 		ec.unmarshalInputDeactivateAccountInput,
 		ec.unmarshalInputDeleteAccountInput,
+		ec.unmarshalInputExchangeQuestionAnswerInput,
 		ec.unmarshalInputForgotPasswordInput,
 		ec.unmarshalInputGenerateStoreUploadUrlInput,
 		ec.unmarshalInputLoginInput,
@@ -4106,6 +4507,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUpdateRatingInput,
 		ec.unmarshalInputUpdateStoreInput,
 		ec.unmarshalInputUpdateUserInput,
+		ec.unmarshalInputVerifyExchangeProductInput,
 		ec.unmarshalInputVerifyProductInput,
 	)
 	first := true
@@ -4907,13 +5309,20 @@ extend type Mutation {
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/return/return.graphql", Input: `enum ReturnStatus {
   RETURN_REQUESTED
+  REQUESTED
   REPLACEMENT_REQUESTED
+  EXCHANGE_REQUESTED
+  UNDER_REVIEW
   APPROVED
   REJECTED
-  VERIFIED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  RECEIVED
   ITEM_RECEIVED
+  VERIFIED
   REFUND_INITIATED
   REPLACEMENT_INITIATED
+  EXCHANGE_INITIATED
   COMPLETED
   CANCELLED
 }
@@ -4921,6 +5330,7 @@ extend type Mutation {
 enum ReturnType {
   RETURN
   REPLACEMENT
+  EXCHANGE
 }
 
 enum VerificationCondition {
@@ -4957,6 +5367,7 @@ type ReturnOrder {
   requestedAt: String
   approvedAt: String
   completedAt: String
+  rejectionReason: String
   createdAt: String
   updatedAt: String
 }
@@ -4965,8 +5376,8 @@ input RequestReturnInput {
   orderId: String!
   userId: String
   orderItemId: String
+  itemId: String
   reason: String!
-  itemIds: [String!]
   type: ReturnType
 }
 
@@ -4974,8 +5385,8 @@ input RequestReplacementInput {
   orderId: String!
   userId: String
   orderItemId: String
+  itemId: String
   reason: String!
-  itemIds: [String!]
 }
 
 input VerifyProductInput {
@@ -4987,17 +5398,101 @@ input VerifyProductInput {
   notes: String
 }
 
+type ExchangeQuestionAnswer {
+  id: ID!
+  exchangeId: ID!
+  questionKey: String!
+  answerValue: String!
+  deductionAmount: Float!
+  createdAt: String
+}
+
+type ExchangeVerification {
+  id: ID!
+  exchangeId: ID!
+  verifiedBy: String!
+  conditionRating: String!
+  isApproved: Boolean!
+  screenIntact: Boolean!
+  bodyIntact: Boolean!
+  functional: Boolean!
+  serialMatches: Boolean!
+  adjustedDiscount: Float!
+  proofImages: [String!]
+  notes: String
+  verifiedAt: String!
+  createdAt: String
+  updatedAt: String
+}
+
+type Exchange {
+  id: ID!
+  orderId: String!
+  orderItemId: String!
+  userId: String!
+  newProductId: String!
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  baseExchangeValue: Float!
+  estimatedDiscount: Float!
+  finalDiscount: Float
+  priceDifference: Float
+  status: String!
+  answers: [ExchangeQuestionAnswer!]
+  verification: ExchangeVerification
+  createdAt: String
+  updatedAt: String
+}
+
+input ExchangeQuestionAnswerInput {
+  questionKey: String!
+  answerValue: String!
+  deductionAmount: Float
+}
+
+input CreateExchangeInput {
+  orderId: String!
+  userId: String
+  orderItemId: String!
+  newProductId: String!
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  baseExchangeValue: Float!
+  answers: [ExchangeQuestionAnswerInput!]
+}
+
+input VerifyExchangeProductInput {
+  exchangeId: ID!
+  conditionRating: String!
+  isApproved: Boolean!
+  screenIntact: Boolean!
+  bodyIntact: Boolean!
+  functional: Boolean!
+  serialMatches: Boolean!
+  adjustedDiscount: Float
+  notes: String
+}
+
 extend type Query {
   returnOrder(id: ID!): ReturnOrder @auth
   returnOrdersByOrder(orderId: String!): [ReturnOrder!]! @auth
   listReturns(limit: Int, offset: Int, status: String): [ReturnOrder!]! @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
+  exchange(id: ID!): Exchange @auth
 }
 
 extend type Mutation {
   requestReturn(input: RequestReturnInput!): ReturnOrder @auth
   requestReplacement(input: RequestReplacementInput!): ReturnOrder @auth
   verifyProduct(input: VerifyProductInput!): ReturnOrder @auth(requires: [DELIVERY_PARTNER, ADMIN])
-  updateReturnStatus(id: ID!, status: String!): ReturnOrder @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
+  updateReturnStatus(id: ID!, status: String!, rejectionReason: String): ReturnOrder @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
+  approveReturn(id: ID!): ReturnOrder @auth(requires: [ADMIN])
+  rejectReturn(id: ID!, reason: String!): ReturnOrder @auth(requires: [ADMIN])
+  createExchange(input: CreateExchangeInput!): Exchange @auth
+  verifyExchangeProduct(input: VerifyExchangeProductInput!): Exchange @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
 
 `, BuiltIn: false},
@@ -5301,6 +5796,21 @@ func (ec *executionContext) field_Mutation_appealStore_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_approveReturn_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_approveStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -5464,6 +5974,21 @@ func (ec *executionContext) field_Mutation_createDelivery_args(ctx context.Conte
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNCreateDeliveryInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateDeliveryInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createExchange_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CreateExchangeInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNCreateExchangeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateExchangeInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -5868,6 +6393,30 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_rejectReturn_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -6378,6 +6927,15 @@ func (ec *executionContext) field_Mutation_updateReturnStatus_args(ctx context.C
 		}
 	}
 	args["status"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["rejectionReason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rejectionReason"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["rejectionReason"] = arg2
 	return args, nil
 }
 
@@ -6516,6 +7074,21 @@ func (ec *executionContext) field_Mutation_verifyEmail_args(ctx context.Context,
 		}
 	}
 	args["role"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyExchangeProduct_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.VerifyExchangeProductInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNVerifyExchangeProductInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐVerifyExchangeProductInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -6700,6 +7273,21 @@ func (ec *executionContext) field_Query_deliveryPartnerProfile_args(ctx context.
 }
 
 func (ec *executionContext) field_Query_delivery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_exchange_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 string
@@ -10559,6 +11147,1729 @@ func (ec *executionContext) _DeliveryPartnerProfile_updatedAt(ctx context.Contex
 func (ec *executionContext) fieldContext_DeliveryPartnerProfile_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_id(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_orderId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_orderId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OrderID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_orderId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_orderItemId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_orderItemId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OrderItemID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_orderItemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_userId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_userId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_newProductId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_newProductId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewProductID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_newProductId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_oldBrand(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_oldBrand(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OldBrand, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_oldBrand(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_oldModel(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_oldModel(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OldModel, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_oldModel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_oldVariant(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_oldVariant(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OldVariant, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_oldVariant(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_serialOrImei(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_serialOrImei(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SerialOrImei, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_serialOrImei(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_baseExchangeValue(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_baseExchangeValue(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BaseExchangeValue, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_baseExchangeValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_estimatedDiscount(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_estimatedDiscount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EstimatedDiscount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_estimatedDiscount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_finalDiscount(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_finalDiscount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FinalDiscount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_finalDiscount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_priceDifference(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_priceDifference(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PriceDifference, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_priceDifference(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_status(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_answers(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_answers(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Answers, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ExchangeQuestionAnswer)
+	fc.Result = res
+	return ec.marshalOExchangeQuestionAnswer2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_answers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ExchangeQuestionAnswer_id(ctx, field)
+			case "exchangeId":
+				return ec.fieldContext_ExchangeQuestionAnswer_exchangeId(ctx, field)
+			case "questionKey":
+				return ec.fieldContext_ExchangeQuestionAnswer_questionKey(ctx, field)
+			case "answerValue":
+				return ec.fieldContext_ExchangeQuestionAnswer_answerValue(ctx, field)
+			case "deductionAmount":
+				return ec.fieldContext_ExchangeQuestionAnswer_deductionAmount(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ExchangeQuestionAnswer_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ExchangeQuestionAnswer", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_verification(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_verification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Verification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ExchangeVerification)
+	fc.Result = res
+	return ec.marshalOExchangeVerification2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeVerification(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_verification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ExchangeVerification_id(ctx, field)
+			case "exchangeId":
+				return ec.fieldContext_ExchangeVerification_exchangeId(ctx, field)
+			case "verifiedBy":
+				return ec.fieldContext_ExchangeVerification_verifiedBy(ctx, field)
+			case "conditionRating":
+				return ec.fieldContext_ExchangeVerification_conditionRating(ctx, field)
+			case "isApproved":
+				return ec.fieldContext_ExchangeVerification_isApproved(ctx, field)
+			case "screenIntact":
+				return ec.fieldContext_ExchangeVerification_screenIntact(ctx, field)
+			case "bodyIntact":
+				return ec.fieldContext_ExchangeVerification_bodyIntact(ctx, field)
+			case "functional":
+				return ec.fieldContext_ExchangeVerification_functional(ctx, field)
+			case "serialMatches":
+				return ec.fieldContext_ExchangeVerification_serialMatches(ctx, field)
+			case "adjustedDiscount":
+				return ec.fieldContext_ExchangeVerification_adjustedDiscount(ctx, field)
+			case "proofImages":
+				return ec.fieldContext_ExchangeVerification_proofImages(ctx, field)
+			case "notes":
+				return ec.fieldContext_ExchangeVerification_notes(ctx, field)
+			case "verifiedAt":
+				return ec.fieldContext_ExchangeVerification_verifiedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ExchangeVerification_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ExchangeVerification_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ExchangeVerification", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Exchange_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Exchange_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Exchange_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Exchange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_id(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_exchangeId(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_exchangeId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExchangeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_exchangeId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_questionKey(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_questionKey(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.QuestionKey, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_questionKey(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_answerValue(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_answerValue(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AnswerValue, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_answerValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_deductionAmount(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_deductionAmount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeductionAmount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_deductionAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeQuestionAnswer_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuestionAnswer) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuestionAnswer_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeQuestionAnswer_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeQuestionAnswer",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_id(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_exchangeId(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_exchangeId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExchangeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_exchangeId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_verifiedBy(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_verifiedBy(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.VerifiedBy, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_verifiedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_conditionRating(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_conditionRating(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ConditionRating, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_conditionRating(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_isApproved(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_isApproved(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsApproved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_isApproved(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_screenIntact(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_screenIntact(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ScreenIntact, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_screenIntact(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_bodyIntact(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_bodyIntact(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BodyIntact, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_bodyIntact(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_functional(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_functional(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Functional, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_functional(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_serialMatches(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_serialMatches(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SerialMatches, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_serialMatches(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_adjustedDiscount(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_adjustedDiscount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AdjustedDiscount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_adjustedDiscount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_proofImages(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_proofImages(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProofImages, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_proofImages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_notes(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_notes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Notes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_notes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_verifiedAt(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_verifiedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.VerifiedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_verifiedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ExchangeVerification_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeVerification) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeVerification_updatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UpdatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ExchangeVerification_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ExchangeVerification",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -15848,6 +18159,8 @@ func (ec *executionContext) fieldContext_Mutation_requestReturn(ctx context.Cont
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -15950,6 +18263,8 @@ func (ec *executionContext) fieldContext_Mutation_requestReplacement(ctx context
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -16056,6 +18371,8 @@ func (ec *executionContext) fieldContext_Mutation_verifyProduct(ctx context.Cont
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -16093,7 +18410,7 @@ func (ec *executionContext) _Mutation_updateReturnStatus(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().UpdateReturnStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(string))
+			return ec.resolvers.Mutation().UpdateReturnStatus(rctx, fc.Args["id"].(string), fc.Args["status"].(string), fc.Args["rejectionReason"].(*string))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN", "MERCHANT", "DELIVERY_PARTNER"})
@@ -16162,6 +18479,8 @@ func (ec *executionContext) fieldContext_Mutation_updateReturnStatus(ctx context
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -16178,6 +18497,446 @@ func (ec *executionContext) fieldContext_Mutation_updateReturnStatus(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateReturnStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_approveReturn(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_approveReturn(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ApproveReturn(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.ReturnOrder); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.ReturnOrder`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ReturnOrder)
+	fc.Result = res
+	return ec.marshalOReturnOrder2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐReturnOrder(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_approveReturn(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReturnOrder_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_ReturnOrder_orderId(ctx, field)
+			case "orderItemId":
+				return ec.fieldContext_ReturnOrder_orderItemId(ctx, field)
+			case "userId":
+				return ec.fieldContext_ReturnOrder_userId(ctx, field)
+			case "reason":
+				return ec.fieldContext_ReturnOrder_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_ReturnOrder_status(ctx, field)
+			case "type":
+				return ec.fieldContext_ReturnOrder_type(ctx, field)
+			case "refundAmount":
+				return ec.fieldContext_ReturnOrder_refundAmount(ctx, field)
+			case "verification":
+				return ec.fieldContext_ReturnOrder_verification(ctx, field)
+			case "requestedAt":
+				return ec.fieldContext_ReturnOrder_requestedAt(ctx, field)
+			case "approvedAt":
+				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReturnOrder_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReturnOrder", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_approveReturn_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_rejectReturn(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_rejectReturn(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RejectReturn(rctx, fc.Args["id"].(string), fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.ReturnOrder); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.ReturnOrder`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ReturnOrder)
+	fc.Result = res
+	return ec.marshalOReturnOrder2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐReturnOrder(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_rejectReturn(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ReturnOrder_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_ReturnOrder_orderId(ctx, field)
+			case "orderItemId":
+				return ec.fieldContext_ReturnOrder_orderItemId(ctx, field)
+			case "userId":
+				return ec.fieldContext_ReturnOrder_userId(ctx, field)
+			case "reason":
+				return ec.fieldContext_ReturnOrder_reason(ctx, field)
+			case "status":
+				return ec.fieldContext_ReturnOrder_status(ctx, field)
+			case "type":
+				return ec.fieldContext_ReturnOrder_type(ctx, field)
+			case "refundAmount":
+				return ec.fieldContext_ReturnOrder_refundAmount(ctx, field)
+			case "verification":
+				return ec.fieldContext_ReturnOrder_verification(ctx, field)
+			case "requestedAt":
+				return ec.fieldContext_ReturnOrder_requestedAt(ctx, field)
+			case "approvedAt":
+				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
+			case "completedAt":
+				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ReturnOrder_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReturnOrder", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_rejectReturn_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createExchange(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createExchange(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CreateExchange(rctx, fc.Args["input"].(model.CreateExchangeInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Exchange); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Exchange`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Exchange)
+	fc.Result = res
+	return ec.marshalOExchange2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchange(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createExchange(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Exchange_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Exchange_orderId(ctx, field)
+			case "orderItemId":
+				return ec.fieldContext_Exchange_orderItemId(ctx, field)
+			case "userId":
+				return ec.fieldContext_Exchange_userId(ctx, field)
+			case "newProductId":
+				return ec.fieldContext_Exchange_newProductId(ctx, field)
+			case "oldBrand":
+				return ec.fieldContext_Exchange_oldBrand(ctx, field)
+			case "oldModel":
+				return ec.fieldContext_Exchange_oldModel(ctx, field)
+			case "oldVariant":
+				return ec.fieldContext_Exchange_oldVariant(ctx, field)
+			case "serialOrImei":
+				return ec.fieldContext_Exchange_serialOrImei(ctx, field)
+			case "baseExchangeValue":
+				return ec.fieldContext_Exchange_baseExchangeValue(ctx, field)
+			case "estimatedDiscount":
+				return ec.fieldContext_Exchange_estimatedDiscount(ctx, field)
+			case "finalDiscount":
+				return ec.fieldContext_Exchange_finalDiscount(ctx, field)
+			case "priceDifference":
+				return ec.fieldContext_Exchange_priceDifference(ctx, field)
+			case "status":
+				return ec.fieldContext_Exchange_status(ctx, field)
+			case "answers":
+				return ec.fieldContext_Exchange_answers(ctx, field)
+			case "verification":
+				return ec.fieldContext_Exchange_verification(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Exchange_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Exchange_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Exchange", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createExchange_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyExchangeProduct(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyExchangeProduct(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().VerifyExchangeProduct(rctx, fc.Args["input"].(model.VerifyExchangeProductInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER", "ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Exchange); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Exchange`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Exchange)
+	fc.Result = res
+	return ec.marshalOExchange2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchange(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyExchangeProduct(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Exchange_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Exchange_orderId(ctx, field)
+			case "orderItemId":
+				return ec.fieldContext_Exchange_orderItemId(ctx, field)
+			case "userId":
+				return ec.fieldContext_Exchange_userId(ctx, field)
+			case "newProductId":
+				return ec.fieldContext_Exchange_newProductId(ctx, field)
+			case "oldBrand":
+				return ec.fieldContext_Exchange_oldBrand(ctx, field)
+			case "oldModel":
+				return ec.fieldContext_Exchange_oldModel(ctx, field)
+			case "oldVariant":
+				return ec.fieldContext_Exchange_oldVariant(ctx, field)
+			case "serialOrImei":
+				return ec.fieldContext_Exchange_serialOrImei(ctx, field)
+			case "baseExchangeValue":
+				return ec.fieldContext_Exchange_baseExchangeValue(ctx, field)
+			case "estimatedDiscount":
+				return ec.fieldContext_Exchange_estimatedDiscount(ctx, field)
+			case "finalDiscount":
+				return ec.fieldContext_Exchange_finalDiscount(ctx, field)
+			case "priceDifference":
+				return ec.fieldContext_Exchange_priceDifference(ctx, field)
+			case "status":
+				return ec.fieldContext_Exchange_status(ctx, field)
+			case "answers":
+				return ec.fieldContext_Exchange_answers(ctx, field)
+			case "verification":
+				return ec.fieldContext_Exchange_verification(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Exchange_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Exchange_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Exchange", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyExchangeProduct_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -25059,6 +27818,8 @@ func (ec *executionContext) fieldContext_Query_returnOrder(ctx context.Context, 
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -25164,6 +27925,8 @@ func (ec *executionContext) fieldContext_Query_returnOrdersByOrder(ctx context.C
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -25273,6 +28036,8 @@ func (ec *executionContext) fieldContext_Query_listReturns(ctx context.Context, 
 				return ec.fieldContext_ReturnOrder_approvedAt(ctx, field)
 			case "completedAt":
 				return ec.fieldContext_ReturnOrder_completedAt(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_ReturnOrder_createdAt(ctx, field)
 			case "updatedAt":
@@ -25289,6 +28054,116 @@ func (ec *executionContext) fieldContext_Query_listReturns(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_listReturns_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_exchange(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_exchange(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().Exchange(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Exchange); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Exchange`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Exchange)
+	fc.Result = res
+	return ec.marshalOExchange2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchange(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_exchange(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Exchange_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Exchange_orderId(ctx, field)
+			case "orderItemId":
+				return ec.fieldContext_Exchange_orderItemId(ctx, field)
+			case "userId":
+				return ec.fieldContext_Exchange_userId(ctx, field)
+			case "newProductId":
+				return ec.fieldContext_Exchange_newProductId(ctx, field)
+			case "oldBrand":
+				return ec.fieldContext_Exchange_oldBrand(ctx, field)
+			case "oldModel":
+				return ec.fieldContext_Exchange_oldModel(ctx, field)
+			case "oldVariant":
+				return ec.fieldContext_Exchange_oldVariant(ctx, field)
+			case "serialOrImei":
+				return ec.fieldContext_Exchange_serialOrImei(ctx, field)
+			case "baseExchangeValue":
+				return ec.fieldContext_Exchange_baseExchangeValue(ctx, field)
+			case "estimatedDiscount":
+				return ec.fieldContext_Exchange_estimatedDiscount(ctx, field)
+			case "finalDiscount":
+				return ec.fieldContext_Exchange_finalDiscount(ctx, field)
+			case "priceDifference":
+				return ec.fieldContext_Exchange_priceDifference(ctx, field)
+			case "status":
+				return ec.fieldContext_Exchange_status(ctx, field)
+			case "answers":
+				return ec.fieldContext_Exchange_answers(ctx, field)
+			case "verification":
+				return ec.fieldContext_Exchange_verification(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Exchange_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Exchange_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Exchange", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_exchange_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -27729,6 +30604,47 @@ func (ec *executionContext) _ReturnOrder_completedAt(ctx context.Context, field 
 }
 
 func (ec *executionContext) fieldContext_ReturnOrder_completedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReturnOrder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReturnOrder_rejectionReason(ctx context.Context, field graphql.CollectedField, obj *model.ReturnOrder) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReturnOrder_rejectionReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RejectionReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReturnOrder_rejectionReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ReturnOrder",
 		Field:      field,
@@ -32318,6 +35234,96 @@ func (ec *executionContext) unmarshalInputCreateDeliveryInput(ctx context.Contex
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateExchangeInput(ctx context.Context, obj interface{}) (model.CreateExchangeInput, error) {
+	var it model.CreateExchangeInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"orderId", "userId", "orderItemId", "newProductId", "oldBrand", "oldModel", "oldVariant", "serialOrImei", "baseExchangeValue", "answers"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "orderId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OrderID = data
+		case "userId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UserID = data
+		case "orderItemId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderItemId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OrderItemID = data
+		case "newProductId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newProductId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NewProductID = data
+		case "oldBrand":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldBrand"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldBrand = data
+		case "oldModel":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldModel"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldModel = data
+		case "oldVariant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldVariant"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldVariant = data
+		case "serialOrImei":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("serialOrImei"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SerialOrImei = data
+		case "baseExchangeValue":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("baseExchangeValue"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BaseExchangeValue = data
+		case "answers":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("answers"))
+			data, err := ec.unmarshalOExchangeQuestionAnswerInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Answers = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateInventoryInput(ctx context.Context, obj interface{}) (model.CreateInventoryInput, error) {
 	var it model.CreateInventoryInput
 	asMap := map[string]interface{}{}
@@ -32821,6 +35827,47 @@ func (ec *executionContext) unmarshalInputDeleteAccountInput(ctx context.Context
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputExchangeQuestionAnswerInput(ctx context.Context, obj interface{}) (model.ExchangeQuestionAnswerInput, error) {
+	var it model.ExchangeQuestionAnswerInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"questionKey", "answerValue", "deductionAmount"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "questionKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("questionKey"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.QuestionKey = data
+		case "answerValue":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("answerValue"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AnswerValue = data
+		case "deductionAmount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deductionAmount"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeductionAmount = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputForgotPasswordInput(ctx context.Context, obj interface{}) (model.ForgotPasswordInput, error) {
 	var it model.ForgotPasswordInput
 	asMap := map[string]interface{}{}
@@ -33081,7 +36128,7 @@ func (ec *executionContext) unmarshalInputRequestReplacementInput(ctx context.Co
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderId", "userId", "orderItemId", "reason", "itemIds"}
+	fieldsInOrder := [...]string{"orderId", "userId", "orderItemId", "itemId", "reason"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -33109,6 +36156,13 @@ func (ec *executionContext) unmarshalInputRequestReplacementInput(ctx context.Co
 				return it, err
 			}
 			it.OrderItemID = data
+		case "itemId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ItemID = data
 		case "reason":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -33116,13 +36170,6 @@ func (ec *executionContext) unmarshalInputRequestReplacementInput(ctx context.Co
 				return it, err
 			}
 			it.Reason = data
-		case "itemIds":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemIds"))
-			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ItemIds = data
 		}
 	}
 
@@ -33136,7 +36183,7 @@ func (ec *executionContext) unmarshalInputRequestReturnInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderId", "userId", "orderItemId", "reason", "itemIds", "type"}
+	fieldsInOrder := [...]string{"orderId", "userId", "orderItemId", "itemId", "reason", "type"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -33164,6 +36211,13 @@ func (ec *executionContext) unmarshalInputRequestReturnInput(ctx context.Context
 				return it, err
 			}
 			it.OrderItemID = data
+		case "itemId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ItemID = data
 		case "reason":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -33171,13 +36225,6 @@ func (ec *executionContext) unmarshalInputRequestReturnInput(ctx context.Context
 				return it, err
 			}
 			it.Reason = data
-		case "itemIds":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("itemIds"))
-			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ItemIds = data
 		case "type":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
 			data, err := ec.unmarshalOReturnType2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐReturnType(ctx, v)
@@ -34101,6 +37148,89 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputVerifyExchangeProductInput(ctx context.Context, obj interface{}) (model.VerifyExchangeProductInput, error) {
+	var it model.VerifyExchangeProductInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"exchangeId", "conditionRating", "isApproved", "screenIntact", "bodyIntact", "functional", "serialMatches", "adjustedDiscount", "notes"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "exchangeId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("exchangeId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExchangeID = data
+		case "conditionRating":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conditionRating"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ConditionRating = data
+		case "isApproved":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isApproved"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsApproved = data
+		case "screenIntact":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("screenIntact"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ScreenIntact = data
+		case "bodyIntact":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("bodyIntact"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BodyIntact = data
+		case "functional":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("functional"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Functional = data
+		case "serialMatches":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("serialMatches"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SerialMatches = data
+		case "adjustedDiscount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("adjustedDiscount"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AdjustedDiscount = data
+		case "notes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notes"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Notes = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputVerifyProductInput(ctx context.Context, obj interface{}) (model.VerifyProductInput, error) {
 	var it model.VerifyProductInput
 	asMap := map[string]interface{}{}
@@ -34966,6 +38096,264 @@ func (ec *executionContext) _DeliveryPartnerProfile(ctx context.Context, sel ast
 	return out
 }
 
+var exchangeImplementors = []string{"Exchange"}
+
+func (ec *executionContext) _Exchange(ctx context.Context, sel ast.SelectionSet, obj *model.Exchange) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, exchangeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Exchange")
+		case "id":
+			out.Values[i] = ec._Exchange_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "orderId":
+			out.Values[i] = ec._Exchange_orderId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "orderItemId":
+			out.Values[i] = ec._Exchange_orderItemId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._Exchange_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "newProductId":
+			out.Values[i] = ec._Exchange_newProductId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "oldBrand":
+			out.Values[i] = ec._Exchange_oldBrand(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "oldModel":
+			out.Values[i] = ec._Exchange_oldModel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "oldVariant":
+			out.Values[i] = ec._Exchange_oldVariant(ctx, field, obj)
+		case "serialOrImei":
+			out.Values[i] = ec._Exchange_serialOrImei(ctx, field, obj)
+		case "baseExchangeValue":
+			out.Values[i] = ec._Exchange_baseExchangeValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "estimatedDiscount":
+			out.Values[i] = ec._Exchange_estimatedDiscount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "finalDiscount":
+			out.Values[i] = ec._Exchange_finalDiscount(ctx, field, obj)
+		case "priceDifference":
+			out.Values[i] = ec._Exchange_priceDifference(ctx, field, obj)
+		case "status":
+			out.Values[i] = ec._Exchange_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "answers":
+			out.Values[i] = ec._Exchange_answers(ctx, field, obj)
+		case "verification":
+			out.Values[i] = ec._Exchange_verification(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._Exchange_createdAt(ctx, field, obj)
+		case "updatedAt":
+			out.Values[i] = ec._Exchange_updatedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var exchangeQuestionAnswerImplementors = []string{"ExchangeQuestionAnswer"}
+
+func (ec *executionContext) _ExchangeQuestionAnswer(ctx context.Context, sel ast.SelectionSet, obj *model.ExchangeQuestionAnswer) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, exchangeQuestionAnswerImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ExchangeQuestionAnswer")
+		case "id":
+			out.Values[i] = ec._ExchangeQuestionAnswer_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "exchangeId":
+			out.Values[i] = ec._ExchangeQuestionAnswer_exchangeId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "questionKey":
+			out.Values[i] = ec._ExchangeQuestionAnswer_questionKey(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "answerValue":
+			out.Values[i] = ec._ExchangeQuestionAnswer_answerValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deductionAmount":
+			out.Values[i] = ec._ExchangeQuestionAnswer_deductionAmount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ExchangeQuestionAnswer_createdAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var exchangeVerificationImplementors = []string{"ExchangeVerification"}
+
+func (ec *executionContext) _ExchangeVerification(ctx context.Context, sel ast.SelectionSet, obj *model.ExchangeVerification) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, exchangeVerificationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ExchangeVerification")
+		case "id":
+			out.Values[i] = ec._ExchangeVerification_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "exchangeId":
+			out.Values[i] = ec._ExchangeVerification_exchangeId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verifiedBy":
+			out.Values[i] = ec._ExchangeVerification_verifiedBy(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "conditionRating":
+			out.Values[i] = ec._ExchangeVerification_conditionRating(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isApproved":
+			out.Values[i] = ec._ExchangeVerification_isApproved(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "screenIntact":
+			out.Values[i] = ec._ExchangeVerification_screenIntact(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bodyIntact":
+			out.Values[i] = ec._ExchangeVerification_bodyIntact(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "functional":
+			out.Values[i] = ec._ExchangeVerification_functional(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "serialMatches":
+			out.Values[i] = ec._ExchangeVerification_serialMatches(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "adjustedDiscount":
+			out.Values[i] = ec._ExchangeVerification_adjustedDiscount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "proofImages":
+			out.Values[i] = ec._ExchangeVerification_proofImages(ctx, field, obj)
+		case "notes":
+			out.Values[i] = ec._ExchangeVerification_notes(ctx, field, obj)
+		case "verifiedAt":
+			out.Values[i] = ec._ExchangeVerification_verifiedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ExchangeVerification_createdAt(ctx, field, obj)
+		case "updatedAt":
+			out.Values[i] = ec._ExchangeVerification_updatedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var forgotPasswordPayloadImplementors = []string{"ForgotPasswordPayload"}
 
 func (ec *executionContext) _ForgotPasswordPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ForgotPasswordPayload) graphql.Marshaler {
@@ -35560,6 +38948,22 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateReturnStatus":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateReturnStatus(ctx, field)
+			})
+		case "approveReturn":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_approveReturn(ctx, field)
+			})
+		case "rejectReturn":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_rejectReturn(ctx, field)
+			})
+		case "createExchange":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createExchange(ctx, field)
+			})
+		case "verifyExchangeProduct":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyExchangeProduct(ctx, field)
 			})
 		case "createStore":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -37085,6 +40489,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "exchange":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_exchange(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "store":
 			field := field
 
@@ -37603,6 +41026,8 @@ func (ec *executionContext) _ReturnOrder(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._ReturnOrder_approvedAt(ctx, field, obj)
 		case "completedAt":
 			out.Values[i] = ec._ReturnOrder_completedAt(ctx, field, obj)
+		case "rejectionReason":
+			out.Values[i] = ec._ReturnOrder_rejectionReason(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._ReturnOrder_createdAt(ctx, field, obj)
 		case "updatedAt":
@@ -38662,6 +42087,11 @@ func (ec *executionContext) unmarshalNCreateDeliveryInput2githubᚗcomᚋmarees�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateExchangeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateExchangeInput(ctx context.Context, v interface{}) (model.CreateExchangeInput, error) {
+	res, err := ec.unmarshalInputCreateExchangeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateInventoryInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateInventoryInput(ctx context.Context, v interface{}) (model.CreateInventoryInput, error) {
 	res, err := ec.unmarshalInputCreateInventoryInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -38742,6 +42172,21 @@ func (ec *executionContext) unmarshalNDeliveryStatus2githubᚗcomᚋmareesᚑgod
 
 func (ec *executionContext) marshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx context.Context, sel ast.SelectionSet, v model.DeliveryStatus) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNExchangeQuestionAnswer2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswer(ctx context.Context, sel ast.SelectionSet, v *model.ExchangeQuestionAnswer) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ExchangeQuestionAnswer(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNExchangeQuestionAnswerInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerInput(ctx context.Context, v interface{}) (*model.ExchangeQuestionAnswerInput, error) {
+	res, err := ec.unmarshalInputExchangeQuestionAnswerInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
@@ -39708,6 +43153,11 @@ func (ec *executionContext) marshalNValidateCategoryResponse2ᚖgithubᚗcomᚋm
 	return ec._ValidateCategoryResponse(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNVerifyExchangeProductInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐVerifyExchangeProductInput(ctx context.Context, v interface{}) (model.VerifyExchangeProductInput, error) {
+	res, err := ec.unmarshalInputVerifyExchangeProductInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNVerifyProductInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐVerifyProductInput(ctx context.Context, v interface{}) (model.VerifyProductInput, error) {
 	res, err := ec.unmarshalInputVerifyProductInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -40083,6 +43533,87 @@ func (ec *executionContext) marshalODeliveryPartnerProfile2ᚖgithubᚗcomᚋmar
 		return graphql.Null
 	}
 	return ec._DeliveryPartnerProfile(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOExchange2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchange(ctx context.Context, sel ast.SelectionSet, v *model.Exchange) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Exchange(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOExchangeQuestionAnswer2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ExchangeQuestionAnswer) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNExchangeQuestionAnswer2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswer(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalOExchangeQuestionAnswerInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerInputᚄ(ctx context.Context, v interface{}) ([]*model.ExchangeQuestionAnswerInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.ExchangeQuestionAnswerInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNExchangeQuestionAnswerInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeQuestionAnswerInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOExchangeVerification2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeVerification(ctx context.Context, sel ast.SelectionSet, v *model.ExchangeVerification) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ExchangeVerification(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v interface{}) (*float64, error) {

@@ -18,10 +18,15 @@ import (
 type mockReturnService struct {
 	requestReturnFunc        func(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error)
 	getReturnFunc            func(ctx context.Context, id string) (*model.Return, error)
-	updateReturnStatusFunc   func(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error)
+	updateReturnStatusFunc   func(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error)
+	approveReturnFunc        func(ctx context.Context, id string, reviewerID string) (*model.Return, error)
+	rejectReturnFunc         func(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error)
 	verifyProductFunc        func(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error)
 	listReturnsFunc          func(ctx context.Context, req *dto.ListReturnsDTO) ([]*model.Return, int, error)
 	listReturnsByOrderIDFunc func(ctx context.Context, orderID string) ([]*model.Return, error)
+	createExchangeFunc        func(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error)
+	getExchangeFunc           func(ctx context.Context, id string) (*model.Exchange, error)
+	verifyExchangeProductFunc func(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error)
 }
 
 func (m *mockReturnService) RequestReturn(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error) {
@@ -38,9 +43,23 @@ func (m *mockReturnService) GetReturn(ctx context.Context, id string) (*model.Re
 	return nil, nil
 }
 
-func (m *mockReturnService) UpdateReturnStatus(ctx context.Context, id string, st model.ReturnStatus) (*model.Return, error) {
+func (m *mockReturnService) UpdateReturnStatus(ctx context.Context, id string, st model.ReturnStatus, rejectionReason ...string) (*model.Return, error) {
 	if m.updateReturnStatusFunc != nil {
-		return m.updateReturnStatusFunc(ctx, id, st)
+		return m.updateReturnStatusFunc(ctx, id, st, rejectionReason...)
+	}
+	return nil, nil
+}
+
+func (m *mockReturnService) ApproveReturn(ctx context.Context, id string, reviewerID string) (*model.Return, error) {
+	if m.approveReturnFunc != nil {
+		return m.approveReturnFunc(ctx, id, reviewerID)
+	}
+	return nil, nil
+}
+
+func (m *mockReturnService) RejectReturn(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error) {
+	if m.rejectReturnFunc != nil {
+		return m.rejectReturnFunc(ctx, id, rejectionReason, reviewerID)
 	}
 	return nil, nil
 }
@@ -64,6 +83,27 @@ func (m *mockReturnService) ListReturnsByOrderID(ctx context.Context, orderID st
 		return m.listReturnsByOrderIDFunc(ctx, orderID)
 	}
 	return nil, nil
+}
+
+func (m *mockReturnService) CreateExchange(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error) {
+	if m.createExchangeFunc != nil {
+		return m.createExchangeFunc(ctx, req)
+	}
+	return nil, nil
+}
+
+func (m *mockReturnService) GetExchange(ctx context.Context, id string) (*model.Exchange, error) {
+	if m.getExchangeFunc != nil {
+		return m.getExchangeFunc(ctx, id)
+	}
+	return nil, nil
+}
+
+func (m *mockReturnService) VerifyExchangeProduct(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error) {
+	if m.verifyExchangeProductFunc != nil {
+		return m.verifyExchangeProductFunc(ctx, req)
+	}
+	return nil, nil, nil
 }
 
 
@@ -213,19 +253,49 @@ func TestReturnGRPCHandler_UpdateReturnStatus_Success(t *testing.T) {
 	now := time.Now().UTC()
 
 	mockSvc := &mockReturnService{
-		updateReturnStatusFunc: func(ctx context.Context, id string, st model.ReturnStatus) (*model.Return, error) {
+		updateReturnStatusFunc: func(ctx context.Context, id string, st model.ReturnStatus, rejectionReason ...string) (*model.Return, error) {
 			if !st.IsValid() {
 				return nil, service.ErrInvalidReturnStatus
 			}
+			var rejReason string
+			if len(rejectionReason) > 0 {
+				rejReason = rejectionReason[0]
+			}
+			return &model.Return{
+				ID:              id,
+				OrderID:         "order-1",
+				OrderItemID:     "item-1",
+				UserID:          "user-1",
+				Status:          st,
+				RejectionReason: rejReason,
+				RequestedAt:     now,
+				CreatedAt:       now,
+				UpdatedAt:       now,
+			}, nil
+		},
+		approveReturnFunc: func(ctx context.Context, id string, reviewerID string) (*model.Return, error) {
 			return &model.Return{
 				ID:          id,
 				OrderID:     "order-1",
 				OrderItemID: "item-1",
 				UserID:      "user-1",
-				Status:      st,
+				Status:      model.ReturnStatusApproved,
 				RequestedAt: now,
 				CreatedAt:   now,
 				UpdatedAt:   now,
+			}, nil
+		},
+		rejectReturnFunc: func(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error) {
+			return &model.Return{
+				ID:              id,
+				OrderID:         "order-1",
+				OrderItemID:     "item-1",
+				UserID:          "user-1",
+				Status:          model.ReturnStatusRejected,
+				RejectionReason: rejectionReason,
+				RequestedAt:     now,
+				CreatedAt:       now,
+				UpdatedAt:       now,
 			}, nil
 		},
 	}
@@ -241,6 +311,34 @@ func TestReturnGRPCHandler_UpdateReturnStatus_Success(t *testing.T) {
 	}
 	if res.ReturnOrder.Status != string(model.ReturnStatusApproved) {
 		t.Errorf("expected status %s, got %s", model.ReturnStatusApproved, res.ReturnOrder.Status)
+	}
+
+	// ApproveReturn
+	apprRes, err := h.ApproveReturn(ctx, &returns.ApproveReturnRequest{
+		Id:         "ret-1",
+		ReviewerId: "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on ApproveReturn: %v", err)
+	}
+	if apprRes.ReturnOrder.Status != string(model.ReturnStatusApproved) {
+		t.Errorf("expected status %s, got %s", model.ReturnStatusApproved, apprRes.ReturnOrder.Status)
+	}
+
+	// RejectReturn
+	rejRes, err := h.RejectReturn(ctx, &returns.RejectReturnRequest{
+		Id:              "ret-1",
+		RejectionReason: "Policy violation",
+		ReviewerId:      "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on RejectReturn: %v", err)
+	}
+	if rejRes.ReturnOrder.Status != string(model.ReturnStatusRejected) {
+		t.Errorf("expected status %s, got %s", model.ReturnStatusRejected, rejRes.ReturnOrder.Status)
+	}
+	if rejRes.ReturnOrder.RejectionReason != "Policy violation" {
+		t.Errorf("expected rejection reason 'Policy violation', got %s", rejRes.ReturnOrder.RejectionReason)
 	}
 
 	// Invalid status
@@ -342,4 +440,232 @@ func TestReturnGRPCHandler_ListReturns_Success(t *testing.T) {
 		t.Fatalf("expected 1 return, got: %v", res)
 	}
 }
+
+func TestReturnGRPCHandler_ApproveReturn_SuccessAndPermissionDenied(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	mockSvc := &mockReturnService{
+		approveReturnFunc: func(ctx context.Context, id string, reviewerID string) (*model.Return, error) {
+			if reviewerID == "customer-1" {
+				return nil, service.ErrCustomerCannotReviewOwnReturn
+			}
+			return &model.Return{
+				ID:          id,
+				OrderID:     "order-1",
+				OrderItemID: "item-1",
+				UserID:      "customer-1",
+				Status:      model.ReturnStatusApproved,
+				Type:        model.ReturnTypeReturn,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+				RequestedAt: now,
+			}, nil
+		},
+	}
+
+	h := handler.NewReturnGRPCHandler(mockSvc, nil)
+
+	// 1. Success as admin
+	res, err := h.ApproveReturn(ctx, &returns.ApproveReturnRequest{Id: "ret-1", ReviewerId: "admin-1"})
+	if err != nil {
+		t.Fatalf("unexpected error approving return: %v", err)
+	}
+	if res.ReturnOrder.Status != string(model.ReturnStatusApproved) {
+		t.Errorf("expected APPROVED status, got %s", res.ReturnOrder.Status)
+	}
+
+	// 2. PermissionDenied when customer attempts to approve own return
+	_, err = h.ApproveReturn(ctx, &returns.ApproveReturnRequest{Id: "ret-1", ReviewerId: "customer-1"})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+}
+
+func TestReturnGRPCHandler_RejectReturn_SuccessAndReasonRequired(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	mockSvc := &mockReturnService{
+		rejectReturnFunc: func(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error) {
+			if rejectionReason == "" {
+				return nil, service.ErrRejectionReasonRequired
+			}
+			return &model.Return{
+				ID:              id,
+				OrderID:         "order-1",
+				OrderItemID:     "item-1",
+				UserID:          "customer-1",
+				Status:          model.ReturnStatusRejected,
+				RejectionReason: rejectionReason,
+				Type:            model.ReturnTypeReturn,
+				CreatedAt:       now,
+				UpdatedAt:       now,
+				RequestedAt:     now,
+			}, nil
+		},
+	}
+
+	h := handler.NewReturnGRPCHandler(mockSvc, nil)
+
+	// 1. Success with reason
+	res, err := h.RejectReturn(ctx, &returns.RejectReturnRequest{
+		Id:              "ret-1",
+		RejectionReason: "Policy non-compliance",
+		ReviewerId:      "admin-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error rejecting return: %v", err)
+	}
+	if res.ReturnOrder.Status != string(model.ReturnStatusRejected) {
+		t.Errorf("expected REJECTED status, got %s", res.ReturnOrder.Status)
+	}
+	if res.ReturnOrder.RejectionReason != "Policy non-compliance" {
+		t.Errorf("expected rejection reason, got %s", res.ReturnOrder.RejectionReason)
+	}
+
+	// 2. InvalidArgument when reason required
+	_, err = h.RejectReturn(ctx, &returns.RejectReturnRequest{
+		Id:              "ret-1",
+		RejectionReason: "",
+		ReviewerId:      "admin-1",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestReturnGRPCHandler_RequestReturn_ItemIDMismatch_Rejected(t *testing.T) {
+	ctx := context.Background()
+	h := handler.NewReturnGRPCHandler(&mockReturnService{}, nil)
+	_, err := h.RequestReturn(ctx, &returns.RequestReturnRequest{
+		OrderId:     "order-1",
+		OrderItemId: "item-1",
+		ItemId:      "item-2",
+		UserId:      "user-1",
+		Reason:      "damaged",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for mismatched item ID, got: %v", err)
+	}
+}
+
+func TestReturnGRPCHandler_RequestReturn_SingleItemID_Success(t *testing.T) {
+	ctx := context.Background()
+	var capturedOrderItemID string
+	svc := &mockReturnService{
+		requestReturnFunc: func(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error) {
+			capturedOrderItemID = req.OrderItemID
+			return &model.Return{ID: "ret-1", OrderItemID: req.OrderItemID}, nil
+		},
+	}
+	h := handler.NewReturnGRPCHandler(svc, nil)
+	res, err := h.RequestReturn(ctx, &returns.RequestReturnRequest{
+		OrderId: "order-1",
+		ItemId:  "item-1",
+		UserId:  "user-1",
+		Reason:  "damaged",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedOrderItemID != "item-1" {
+		t.Errorf("expected captured order item id 'item-1', got '%s'", capturedOrderItemID)
+	}
+	if res.ReturnOrder.OrderItemId != "item-1" {
+		t.Errorf("expected return order item id 'item-1', got '%s'", res.ReturnOrder.OrderItemId)
+	}
+}
+
+func TestReturnGRPCHandler_CreateExchange_Success(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	svc := &mockReturnService{
+		createExchangeFunc: func(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error) {
+			return &model.Exchange{
+				ID:                "exc-101",
+				OrderID:           req.OrderID,
+				UserID:            req.UserID,
+				NewProductID:      req.NewProductID,
+				OldBrand:          req.OldBrand,
+				OldModel:          req.OldModel,
+				BaseExchangeValue: req.BaseExchangeValue,
+				EstimatedDiscount: 150.0,
+				Status:            model.ExchangeStatusOfferCreated,
+				CreatedAt:         now,
+				UpdatedAt:         now,
+			}, nil
+		},
+	}
+	h := handler.NewReturnGRPCHandler(svc, nil)
+	resp, err := h.CreateExchange(ctx, &returns.CreateExchangeRequest{
+		OrderId:           "order-101",
+		UserId:            "user-101",
+		NewProductId:      "prod-101",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 11",
+		BaseExchangeValue: 200.0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Exchange.Id != "exc-101" {
+		t.Errorf("expected exc-101, got: %s", resp.Exchange.Id)
+	}
+	if resp.Exchange.EstimatedDiscount != 150.0 {
+		t.Errorf("expected discount 150, got: %f", resp.Exchange.EstimatedDiscount)
+	}
+}
+
+func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+	svc := &mockReturnService{
+		verifyExchangeProductFunc: func(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error) {
+			return &model.Exchange{
+					ID:            req.ExchangeID,
+					FinalDiscount: req.AdjustedDiscount,
+					Status:        model.ExchangeStatusVerified,
+					CreatedAt:     now,
+					UpdatedAt:     now,
+				}, &model.ExchangeVerification{
+					ID:               "ver-202",
+					ExchangeID:       req.ExchangeID,
+					VerifiedBy:       req.VerifiedBy,
+					ConditionRating:  model.RatingGood,
+					IsApproved:       req.IsApproved,
+					ScreenIntact:     req.ScreenIntact,
+					Functional:       req.Functional,
+					SerialMatches:    req.SerialMatches,
+					AdjustedDiscount: req.AdjustedDiscount,
+					VerifiedAt:       now,
+					CreatedAt:        now,
+					UpdatedAt:        now,
+				}, nil
+		},
+	}
+	h := handler.NewReturnGRPCHandler(svc, nil)
+	resp, err := h.VerifyExchangeProduct(ctx, &returns.VerifyExchangeProductRequest{
+		ExchangeId:       "exc-101",
+		VerifiedBy:       "delivery-1",
+		ConditionRating:  "GOOD",
+		IsApproved:       true,
+		ScreenIntact:     true,
+		BodyIntact:       true,
+		Functional:       true,
+		SerialMatches:    true,
+		AdjustedDiscount: 150.0,
+		Notes:            "All good",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Exchange.Status != "VERIFIED" {
+		t.Errorf("expected VERIFIED, got: %s", resp.Exchange.Status)
+	}
+	if !resp.Verification.IsApproved {
+		t.Errorf("expected verification to be approved")
+	}
+}
+
 

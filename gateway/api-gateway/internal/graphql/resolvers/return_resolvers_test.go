@@ -20,6 +20,9 @@ type mockReturnClient struct {
 	lastGetReq       *returnpb.GetReturnRequest
 	lastGetByOrder   *returnpb.GetReturnsByOrderRequest
 	lastListReq      *returnpb.ListReturnsRequest
+	lastCreateExcReq *returnpb.CreateExchangeRequest
+	lastGetExcReq    *returnpb.GetExchangeRequest
+	lastVerifyExcReq *returnpb.VerifyExchangeProductRequest
 }
 
 func (m *mockReturnClient) RequestReturn(ctx context.Context, in *returnpb.RequestReturnRequest, opts ...grpcPkg.CallOption) (*returnpb.RequestReturnResponse, error) {
@@ -82,8 +85,28 @@ func (m *mockReturnClient) UpdateReturnStatus(ctx context.Context, in *returnpb.
 	m.lastUpdateReq = in
 	return &returnpb.UpdateReturnStatusResponse{
 		ReturnOrder: &returnpb.ReturnOrder{
+			Id:              in.Id,
+			Status:          in.Status,
+			RejectionReason: in.RejectionReason,
+		},
+	}, nil
+}
+
+func (m *mockReturnClient) ApproveReturn(ctx context.Context, in *returnpb.ApproveReturnRequest, opts ...grpcPkg.CallOption) (*returnpb.ApproveReturnResponse, error) {
+	return &returnpb.ApproveReturnResponse{
+		ReturnOrder: &returnpb.ReturnOrder{
 			Id:     in.Id,
-			Status: in.Status,
+			Status: "APPROVED",
+		},
+	}, nil
+}
+
+func (m *mockReturnClient) RejectReturn(ctx context.Context, in *returnpb.RejectReturnRequest, opts ...grpcPkg.CallOption) (*returnpb.RejectReturnResponse, error) {
+	return &returnpb.RejectReturnResponse{
+		ReturnOrder: &returnpb.ReturnOrder{
+			Id:              in.Id,
+			Status:          "REJECTED",
+			RejectionReason: in.RejectionReason,
 		},
 	}, nil
 }
@@ -128,6 +151,81 @@ func (m *mockReturnClient) ListReturns(ctx context.Context, in *returnpb.ListRet
 			},
 		},
 		Total: 1,
+	}, nil
+}
+
+func (m *mockReturnClient) CreateExchange(ctx context.Context, in *returnpb.CreateExchangeRequest, opts ...grpcPkg.CallOption) (*returnpb.CreateExchangeResponse, error) {
+	m.lastCreateExcReq = in
+	return &returnpb.CreateExchangeResponse{
+		Exchange: &returnpb.Exchange{
+			Id:                "exc-100",
+			OrderId:           in.OrderId,
+			OrderItemId:       in.OrderItemId,
+			UserId:            in.UserId,
+			NewProductId:      in.NewProductId,
+			OldBrand:          in.OldBrand,
+			OldModel:          in.OldModel,
+			BaseExchangeValue: in.BaseExchangeValue,
+			EstimatedDiscount: in.BaseExchangeValue,
+			Status:            "ESTIMATED",
+			Answers:           in.Answers,
+		},
+	}, nil
+}
+
+func (m *mockReturnClient) GetExchange(ctx context.Context, in *returnpb.GetExchangeRequest, opts ...grpcPkg.CallOption) (*returnpb.GetExchangeResponse, error) {
+	m.lastGetExcReq = in
+	return &returnpb.GetExchangeResponse{
+		Exchange: &returnpb.Exchange{
+			Id:                "exc-100",
+			OrderId:           "order-1",
+			OrderItemId:       "item-1",
+			UserId:            "user-123",
+			NewProductId:      "prod-2",
+			OldBrand:          "Apple",
+			OldModel:          "iPhone 13",
+			BaseExchangeValue: 300.0,
+			EstimatedDiscount: 250.0,
+			Status:            "ESTIMATED",
+		},
+	}, nil
+}
+
+func (m *mockReturnClient) VerifyExchangeProduct(ctx context.Context, in *returnpb.VerifyExchangeProductRequest, opts ...grpcPkg.CallOption) (*returnpb.VerifyExchangeProductResponse, error) {
+	m.lastVerifyExcReq = in
+	status := "VERIFIED"
+	if !in.IsApproved {
+		status = "VERIFICATION_FAILED"
+	}
+	return &returnpb.VerifyExchangeProductResponse{
+		Exchange: &returnpb.Exchange{
+			Id:                in.ExchangeId,
+			OrderId:           "order-1",
+			OrderItemId:       "item-1",
+			UserId:            "user-123",
+			NewProductId:      "prod-2",
+			OldBrand:          "Apple",
+			OldModel:          "iPhone 13",
+			BaseExchangeValue: 300.0,
+			EstimatedDiscount: 250.0,
+			FinalDiscount:     in.AdjustedDiscount,
+			Status:            status,
+			Verification: &returnpb.ExchangeVerification{
+				Id:               "ver-exc-1",
+				ExchangeId:       in.ExchangeId,
+				VerifiedBy:       in.VerifiedBy,
+				ConditionRating:  in.ConditionRating,
+				IsApproved:       in.IsApproved,
+				ScreenIntact:     in.ScreenIntact,
+				BodyIntact:       in.BodyIntact,
+				Functional:       in.Functional,
+				SerialMatches:    in.SerialMatches,
+				AdjustedDiscount: in.AdjustedDiscount,
+				ProofImages:      in.ProofImages,
+				Notes:            in.Notes,
+				VerifiedAt:       "2026-10-26T12:00:00Z",
+			},
+		},
 	}, nil
 }
 
@@ -213,7 +311,7 @@ func TestRequestReturn_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestRequestReturn_MultipleItemIDs_BadRequest(t *testing.T) {
+func TestRequestReturn_SingleItemID_Success(t *testing.T) {
 	mockClient := &mockReturnClient{}
 	clients := &grpc.Clients{ReturnClient: mockClient}
 	resolver := NewResolver(clients)
@@ -222,15 +320,19 @@ func TestRequestReturn_MultipleItemIDs_BadRequest(t *testing.T) {
 		UserID: "user-123",
 		Role:   "USER",
 	})
+	itemID := "item-1"
 	input := model.RequestReturnInput{
 		OrderID: "order-456",
+		ItemID:  &itemID,
 		Reason:  "Defective",
-		ItemIds: []string{"item-1", "item-2"},
 	}
 
-	_, err := resolver.Mutation().RequestReturn(ctx, input)
-	if err == nil {
-		t.Fatal("expected bad request error for multiple items, got nil")
+	res, err := resolver.Mutation().RequestReturn(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.OrderItemID == nil || *res.OrderItemID != "item-1" {
+		t.Errorf("expected order item id 'item-1'")
 	}
 }
 
@@ -244,10 +346,11 @@ func TestRequestReturn_ItemIDsMismatch_BadRequest(t *testing.T) {
 		Role:   "USER",
 	})
 	orderItemID := "item-1"
+	itemID := "item-2"
 	input := model.RequestReturnInput{
 		OrderID:     "order-456",
 		OrderItemID: &orderItemID,
-		ItemIds:     []string{"item-2"},
+		ItemID:      &itemID,
 		Reason:      "Defective",
 	}
 
@@ -277,7 +380,7 @@ func TestRequestReturn_MissingOrderItemID_BadRequest(t *testing.T) {
 	}
 }
 
-func TestRequestReplacement_MultipleItemIDs_BadRequest(t *testing.T) {
+func TestRequestReplacement_ItemIDsMismatch_BadRequest(t *testing.T) {
 	mockClient := &mockReturnClient{}
 	clients := &grpc.Clients{ReturnClient: mockClient}
 	resolver := NewResolver(clients)
@@ -286,15 +389,18 @@ func TestRequestReplacement_MultipleItemIDs_BadRequest(t *testing.T) {
 		UserID: "user-123",
 		Role:   "USER",
 	})
+	orderItemID := "item-1"
+	itemID := "item-2"
 	input := model.RequestReplacementInput{
-		OrderID: "order-456",
-		Reason:  "Defective",
-		ItemIds: []string{"item-1", "item-2"},
+		OrderID:     "order-456",
+		OrderItemID: &orderItemID,
+		ItemID:      &itemID,
+		Reason:      "Defective",
 	}
 
 	_, err := resolver.Mutation().RequestReplacement(ctx, input)
 	if err == nil {
-		t.Fatal("expected bad request error for multiple items, got nil")
+		t.Fatal("expected bad request error for mismatched item IDs, got nil")
 	}
 }
 
@@ -433,13 +539,87 @@ func TestUpdateReturnStatus_Success(t *testing.T) {
 		Role:   "ADMIN",
 	})
 
-	res, err := resolver.Mutation().UpdateReturnStatus(ctx, "ret-100", "APPROVED")
+	res, err := resolver.Mutation().UpdateReturnStatus(ctx, "ret-100", "APPROVED", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if res.Status != "APPROVED" {
 		t.Errorf("expected status 'APPROVED', got '%s'", res.Status)
+	}
+}
+
+func TestApproveReturn_Success(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	res, err := resolver.Mutation().ApproveReturn(ctx, "ret-100")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Status != "APPROVED" {
+		t.Errorf("expected status 'APPROVED', got '%s'", res.Status)
+	}
+}
+
+func TestApproveReturn_CustomerCannotApproveOwnReturn(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	// User user-1 is the owner of ret-100
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-1",
+		Role:   "ADMIN",
+	})
+
+	_, err := resolver.Mutation().ApproveReturn(ctx, "ret-100")
+	if err == nil {
+		t.Fatal("expected error when customer tries to approve own return, got nil")
+	}
+}
+
+func TestRejectReturn_Success(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	res, err := resolver.Mutation().RejectReturn(ctx, "ret-100", "Damaged by customer")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Status != "REJECTED" {
+		t.Errorf("expected status 'REJECTED', got '%s'", res.Status)
+	}
+	if res.RejectionReason == nil || *res.RejectionReason != "Damaged by customer" {
+		t.Errorf("expected rejection reason 'Damaged by customer'")
+	}
+}
+
+func TestRejectReturn_RequiresReason(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	_, err := resolver.Mutation().RejectReturn(ctx, "ret-100", "   ")
+	if err == nil {
+		t.Fatal("expected error when rejection reason is empty, got nil")
 	}
 }
 
@@ -604,3 +784,256 @@ func TestListReturns_Success(t *testing.T) {
 		t.Errorf("expected user id 'user-123', got '%s'", mockClient.lastListReq.UserId)
 	}
 }
+
+func TestCreateExchange_Success(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+
+	ded := 50.0
+	input := model.CreateExchangeInput{
+		OrderID:           "order-1",
+		OrderItemID:       "item-1",
+		NewProductID:      "prod-2",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 300.0,
+		Answers: []*model.ExchangeQuestionAnswerInput{
+			{
+				QuestionKey:     "screen_condition",
+				AnswerValue:     "minor_scratches",
+				DeductionAmount: &ded,
+			},
+		},
+	}
+
+	exc, err := resolver.Mutation().CreateExchange(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if exc.ID != "exc-100" {
+		t.Errorf("expected exchange ID 'exc-100', got '%s'", exc.ID)
+	}
+	if mockClient.lastCreateExcReq.UserId != "user-123" {
+		t.Errorf("expected user ID 'user-123', got '%s'", mockClient.lastCreateExcReq.UserId)
+	}
+	if len(mockClient.lastCreateExcReq.Answers) != 1 {
+		t.Fatalf("expected 1 answer, got %d", len(mockClient.lastCreateExcReq.Answers))
+	}
+	if mockClient.lastCreateExcReq.Answers[0].QuestionKey != "screen_condition" {
+		t.Errorf("expected question key 'screen_condition', got '%s'", mockClient.lastCreateExcReq.Answers[0].QuestionKey)
+	}
+}
+
+func TestCreateExchange_Unauthorized(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	input := model.CreateExchangeInput{
+		OrderID:           "order-1",
+		OrderItemID:       "item-1",
+		NewProductID:      "prod-2",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 300.0,
+	}
+
+	_, err := resolver.Mutation().CreateExchange(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+}
+
+func TestCreateExchange_WithInputUserID_Success(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	targetUser := "user-custom-456"
+	input := model.CreateExchangeInput{
+		OrderID:           "order-1",
+		UserID:            &targetUser,
+		OrderItemID:       "item-1",
+		NewProductID:      "prod-2",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 300.0,
+	}
+
+	exc, err := resolver.Mutation().CreateExchange(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exc.ID != "exc-100" {
+		t.Errorf("expected exc-100, got %s", exc.ID)
+	}
+	if mockClient.lastCreateExcReq.UserId != "user-custom-456" {
+		t.Errorf("expected user ID 'user-custom-456', got '%s'", mockClient.lastCreateExcReq.UserId)
+	}
+}
+
+func TestCreateExchange_Forbidden_OtherUser(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+
+	otherUser := "user-999"
+	input := model.CreateExchangeInput{
+		OrderID:           "order-1",
+		UserID:            &otherUser,
+		OrderItemID:       "item-1",
+		NewProductID:      "prod-2",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 300.0,
+	}
+
+	_, err := resolver.Mutation().CreateExchange(ctx, input)
+	if err == nil {
+		t.Fatal("expected forbidden error, got nil")
+	}
+}
+
+func TestCreateExchange_Admin_OverrideCustomer(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	customerUser := "customer-100"
+	input := model.CreateExchangeInput{
+		OrderID:           "order-1",
+		UserID:            &customerUser,
+		OrderItemID:       "item-1",
+		NewProductID:      "prod-2",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 300.0,
+	}
+
+	exc, err := resolver.Mutation().CreateExchange(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exc == nil {
+		t.Fatal("expected exchange, got nil")
+	}
+	if mockClient.lastCreateExcReq.UserId != "customer-100" {
+		t.Errorf("expected user ID 'customer-100', got '%s'", mockClient.lastCreateExcReq.UserId)
+	}
+}
+
+func TestVerifyExchangeProduct_Success_DeliveryPartner(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "agent-1",
+		PartnerID: "partner-1",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	adj := 280.0
+	notes := "Inspected at doorstep, minor scratches verified"
+	input := model.VerifyExchangeProductInput{
+		ExchangeID:       "exc-100",
+		ConditionRating:  "GOOD",
+		IsApproved:       true,
+		ScreenIntact:     true,
+		BodyIntact:       true,
+		Functional:       true,
+		SerialMatches:    true,
+		AdjustedDiscount: &adj,
+		Notes:            &notes,
+	}
+
+	exc, err := resolver.Mutation().VerifyExchangeProduct(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if exc.Status != "VERIFIED" {
+		t.Errorf("expected status 'VERIFIED', got '%s'", exc.Status)
+	}
+	if exc.Verification == nil {
+		t.Fatal("expected verification details, got nil")
+	}
+	if exc.Verification.VerifiedBy != "partner-1" {
+		t.Errorf("expected verifiedBy 'partner-1', got '%s'", exc.Verification.VerifiedBy)
+	}
+}
+
+func TestVerifyExchangeProduct_Forbidden_Customer(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+
+	input := model.VerifyExchangeProductInput{
+		ExchangeID:      "exc-100",
+		ConditionRating: "EXCELLENT",
+		IsApproved:      true,
+	}
+
+	_, err := resolver.Mutation().VerifyExchangeProduct(ctx, input)
+	if err == nil {
+		t.Fatal("expected forbidden error for regular user, got nil")
+	}
+}
+
+func TestExchangeQuery_Success_Owner(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   "USER",
+	})
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exc.ID != "exc-100" {
+		t.Errorf("expected exchange ID 'exc-100', got '%s'", exc.ID)
+	}
+}
+
+func TestExchangeQuery_Forbidden_OtherUser(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "other-user",
+		Role:   "USER",
+	})
+
+	_, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err == nil {
+		t.Fatal("expected forbidden error for other user, got nil")
+	}
+}
+

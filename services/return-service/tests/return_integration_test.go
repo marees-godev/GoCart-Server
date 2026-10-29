@@ -29,6 +29,7 @@ type inMemReturnRepo struct {
 	mu           sync.RWMutex
 	returns      map[string]*model.Return
 	byOrderItem  map[string]*model.Return
+	exchanges    map[string]*model.Exchange
 	outboxEvents []*outbox.Event
 }
 
@@ -36,6 +37,7 @@ func newInMemReturnRepo() *inMemReturnRepo {
 	return &inMemReturnRepo{
 		returns:      make(map[string]*model.Return),
 		byOrderItem:  make(map[string]*model.Return),
+		exchanges:    make(map[string]*model.Exchange),
 		outboxEvents: make([]*outbox.Event, 0),
 	}
 }
@@ -88,14 +90,31 @@ func (m *inMemReturnRepo) ListReturnsByOrderID(ctx context.Context, orderID stri
 }
 
 func (m *inMemReturnRepo) UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error) {
+	return m.UpdateReturnStatusWithOutbox(ctx, id, status, "")
+}
+
+func (m *inMemReturnRepo) UpdateReturnStatusWithOutbox(ctx context.Context, id string, status model.ReturnStatus, rejectionReason string, outboxEvents ...*outbox.Event) (*model.Return, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ret, ok := m.returns[id]
 	if !ok {
 		return nil, repository.ErrReturnNotFound
 	}
+	now := time.Now().UTC()
 	ret.Status = status
-	ret.UpdatedAt = time.Now().UTC()
+	ret.UpdatedAt = now
+	if status == model.ReturnStatusApproved {
+		ret.ApprovedAt = &now
+	}
+	if status == model.ReturnStatusCompleted {
+		ret.CompletedAt = &now
+	}
+	if rejectionReason != "" {
+		ret.RejectionReason = rejectionReason
+	}
+	if len(outboxEvents) > 0 {
+		m.outboxEvents = append(m.outboxEvents, outboxEvents...)
+	}
 	cp := *ret
 	return &cp, nil
 }
@@ -125,6 +144,82 @@ func (m *inMemReturnRepo) GetVerificationByReturnID(ctx context.Context, returnI
 	}
 	cp := *ret.Verification
 	return &cp, nil
+}
+
+func (m *inMemReturnRepo) CreateExchangeWithOutbox(ctx context.Context, exc *model.Exchange, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *exc
+	cp.Answers = answers
+	if m.exchanges == nil {
+		m.exchanges = make(map[string]*model.Exchange)
+	}
+	m.exchanges[exc.ID] = &cp
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
+}
+
+func (m *inMemReturnRepo) GetExchangeByID(ctx context.Context, id string) (*model.Exchange, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[id]
+	if !ok {
+		return nil, repository.ErrExchangeNotFound
+	}
+	cp := *exc
+	return &cp, nil
+}
+
+func (m *inMemReturnRepo) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, exc := range m.exchanges {
+		if exc.OrderID == orderID {
+			cp := *exc
+			return &cp, nil
+		}
+	}
+	return nil, repository.ErrExchangeNotFound
+}
+
+func (m *inMemReturnRepo) CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	exc, ok := m.exchanges[v.ExchangeID]
+	if !ok {
+		return repository.ErrExchangeNotFound
+	}
+	exc.Status = newStatus
+	exc.FinalDiscount = finalDiscount
+	exc.Verification = v
+	exc.UpdatedAt = time.Now().UTC()
+	if len(outboxEvents) > 0 {
+		m.outboxEvents = append(m.outboxEvents, outboxEvents...)
+	}
+	return nil
+}
+
+func (m *inMemReturnRepo) GetExchangeVerification(ctx context.Context, exchangeID string) (*model.ExchangeVerification, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[exchangeID]
+	if !ok || exc.Verification == nil {
+		return nil, nil
+	}
+	cp := *exc.Verification
+	return &cp, nil
+}
+
+func (m *inMemReturnRepo) GetExchangeQuestionAnswers(ctx context.Context, exchangeID string) ([]*model.ExchangeQuestionAnswer, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	exc, ok := m.exchanges[exchangeID]
+	if !ok {
+		return nil, nil
+	}
+	return exc.Answers, nil
 }
 
 func (m *inMemReturnRepo) ListReturns(ctx context.Context, limit, offset int, status, userID, returnType string) ([]*model.Return, int, error) {

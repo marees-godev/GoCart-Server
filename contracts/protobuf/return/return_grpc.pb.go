@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v7.36.0
-// source: return.proto
+// source: contracts/protobuf/return/return.proto
 
 package returns
 
@@ -19,12 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ReturnService_RequestReturn_FullMethodName      = "/gocart.return.v1.ReturnService/RequestReturn"
-	ReturnService_GetReturn_FullMethodName          = "/gocart.return.v1.ReturnService/GetReturn"
-	ReturnService_UpdateReturnStatus_FullMethodName = "/gocart.return.v1.ReturnService/UpdateReturnStatus"
-	ReturnService_VerifyProduct_FullMethodName      = "/gocart.return.v1.ReturnService/VerifyProduct"
-	ReturnService_ListReturns_FullMethodName        = "/gocart.return.v1.ReturnService/ListReturns"
-	ReturnService_GetReturnsByOrder_FullMethodName  = "/gocart.return.v1.ReturnService/GetReturnsByOrder"
+	ReturnService_RequestReturn_FullMethodName         = "/gocart.return.v1.ReturnService/RequestReturn"
+	ReturnService_GetReturn_FullMethodName             = "/gocart.return.v1.ReturnService/GetReturn"
+	ReturnService_UpdateReturnStatus_FullMethodName    = "/gocart.return.v1.ReturnService/UpdateReturnStatus"
+	ReturnService_ApproveReturn_FullMethodName         = "/gocart.return.v1.ReturnService/ApproveReturn"
+	ReturnService_RejectReturn_FullMethodName          = "/gocart.return.v1.ReturnService/RejectReturn"
+	ReturnService_VerifyProduct_FullMethodName         = "/gocart.return.v1.ReturnService/VerifyProduct"
+	ReturnService_ListReturns_FullMethodName           = "/gocart.return.v1.ReturnService/ListReturns"
+	ReturnService_GetReturnsByOrder_FullMethodName     = "/gocart.return.v1.ReturnService/GetReturnsByOrder"
+	ReturnService_CreateExchange_FullMethodName        = "/gocart.return.v1.ReturnService/CreateExchange"
+	ReturnService_GetExchange_FullMethodName           = "/gocart.return.v1.ReturnService/GetExchange"
+	ReturnService_VerifyExchangeProduct_FullMethodName = "/gocart.return.v1.ReturnService/VerifyExchangeProduct"
 )
 
 // ReturnServiceClient is the client API for ReturnService service.
@@ -34,9 +39,14 @@ type ReturnServiceClient interface {
 	RequestReturn(ctx context.Context, in *RequestReturnRequest, opts ...grpc.CallOption) (*RequestReturnResponse, error)
 	GetReturn(ctx context.Context, in *GetReturnRequest, opts ...grpc.CallOption) (*GetReturnResponse, error)
 	UpdateReturnStatus(ctx context.Context, in *UpdateReturnStatusRequest, opts ...grpc.CallOption) (*UpdateReturnStatusResponse, error)
+	ApproveReturn(ctx context.Context, in *ApproveReturnRequest, opts ...grpc.CallOption) (*ApproveReturnResponse, error)
+	RejectReturn(ctx context.Context, in *RejectReturnRequest, opts ...grpc.CallOption) (*RejectReturnResponse, error)
 	VerifyProduct(ctx context.Context, in *VerifyProductRequest, opts ...grpc.CallOption) (*VerifyProductResponse, error)
 	ListReturns(ctx context.Context, in *ListReturnsRequest, opts ...grpc.CallOption) (*ListReturnsResponse, error)
 	GetReturnsByOrder(ctx context.Context, in *GetReturnsByOrderRequest, opts ...grpc.CallOption) (*GetReturnsByOrderResponse, error)
+	CreateExchange(ctx context.Context, in *CreateExchangeRequest, opts ...grpc.CallOption) (*CreateExchangeResponse, error)
+	GetExchange(ctx context.Context, in *GetExchangeRequest, opts ...grpc.CallOption) (*GetExchangeResponse, error)
+	VerifyExchangeProduct(ctx context.Context, in *VerifyExchangeProductRequest, opts ...grpc.CallOption) (*VerifyExchangeProductResponse, error)
 }
 
 type returnServiceClient struct {
@@ -77,6 +87,26 @@ func (c *returnServiceClient) UpdateReturnStatus(ctx context.Context, in *Update
 	return out, nil
 }
 
+func (c *returnServiceClient) ApproveReturn(ctx context.Context, in *ApproveReturnRequest, opts ...grpc.CallOption) (*ApproveReturnResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveReturnResponse)
+	err := c.cc.Invoke(ctx, ReturnService_ApproveReturn_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) RejectReturn(ctx context.Context, in *RejectReturnRequest, opts ...grpc.CallOption) (*RejectReturnResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejectReturnResponse)
+	err := c.cc.Invoke(ctx, ReturnService_RejectReturn_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *returnServiceClient) VerifyProduct(ctx context.Context, in *VerifyProductRequest, opts ...grpc.CallOption) (*VerifyProductResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyProductResponse)
@@ -107,6 +137,36 @@ func (c *returnServiceClient) GetReturnsByOrder(ctx context.Context, in *GetRetu
 	return out, nil
 }
 
+func (c *returnServiceClient) CreateExchange(ctx context.Context, in *CreateExchangeRequest, opts ...grpc.CallOption) (*CreateExchangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateExchangeResponse)
+	err := c.cc.Invoke(ctx, ReturnService_CreateExchange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) GetExchange(ctx context.Context, in *GetExchangeRequest, opts ...grpc.CallOption) (*GetExchangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetExchangeResponse)
+	err := c.cc.Invoke(ctx, ReturnService_GetExchange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) VerifyExchangeProduct(ctx context.Context, in *VerifyExchangeProductRequest, opts ...grpc.CallOption) (*VerifyExchangeProductResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyExchangeProductResponse)
+	err := c.cc.Invoke(ctx, ReturnService_VerifyExchangeProduct_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReturnServiceServer is the server API for ReturnService service.
 // All implementations must embed UnimplementedReturnServiceServer
 // for forward compatibility.
@@ -114,9 +174,14 @@ type ReturnServiceServer interface {
 	RequestReturn(context.Context, *RequestReturnRequest) (*RequestReturnResponse, error)
 	GetReturn(context.Context, *GetReturnRequest) (*GetReturnResponse, error)
 	UpdateReturnStatus(context.Context, *UpdateReturnStatusRequest) (*UpdateReturnStatusResponse, error)
+	ApproveReturn(context.Context, *ApproveReturnRequest) (*ApproveReturnResponse, error)
+	RejectReturn(context.Context, *RejectReturnRequest) (*RejectReturnResponse, error)
 	VerifyProduct(context.Context, *VerifyProductRequest) (*VerifyProductResponse, error)
 	ListReturns(context.Context, *ListReturnsRequest) (*ListReturnsResponse, error)
 	GetReturnsByOrder(context.Context, *GetReturnsByOrderRequest) (*GetReturnsByOrderResponse, error)
+	CreateExchange(context.Context, *CreateExchangeRequest) (*CreateExchangeResponse, error)
+	GetExchange(context.Context, *GetExchangeRequest) (*GetExchangeResponse, error)
+	VerifyExchangeProduct(context.Context, *VerifyExchangeProductRequest) (*VerifyExchangeProductResponse, error)
 	mustEmbedUnimplementedReturnServiceServer()
 }
 
@@ -136,6 +201,12 @@ func (UnimplementedReturnServiceServer) GetReturn(context.Context, *GetReturnReq
 func (UnimplementedReturnServiceServer) UpdateReturnStatus(context.Context, *UpdateReturnStatusRequest) (*UpdateReturnStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateReturnStatus not implemented")
 }
+func (UnimplementedReturnServiceServer) ApproveReturn(context.Context, *ApproveReturnRequest) (*ApproveReturnResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApproveReturn not implemented")
+}
+func (UnimplementedReturnServiceServer) RejectReturn(context.Context, *RejectReturnRequest) (*RejectReturnResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RejectReturn not implemented")
+}
 func (UnimplementedReturnServiceServer) VerifyProduct(context.Context, *VerifyProductRequest) (*VerifyProductResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyProduct not implemented")
 }
@@ -144,6 +215,15 @@ func (UnimplementedReturnServiceServer) ListReturns(context.Context, *ListReturn
 }
 func (UnimplementedReturnServiceServer) GetReturnsByOrder(context.Context, *GetReturnsByOrderRequest) (*GetReturnsByOrderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReturnsByOrder not implemented")
+}
+func (UnimplementedReturnServiceServer) CreateExchange(context.Context, *CreateExchangeRequest) (*CreateExchangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateExchange not implemented")
+}
+func (UnimplementedReturnServiceServer) GetExchange(context.Context, *GetExchangeRequest) (*GetExchangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetExchange not implemented")
+}
+func (UnimplementedReturnServiceServer) VerifyExchangeProduct(context.Context, *VerifyExchangeProductRequest) (*VerifyExchangeProductResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyExchangeProduct not implemented")
 }
 func (UnimplementedReturnServiceServer) mustEmbedUnimplementedReturnServiceServer() {}
 func (UnimplementedReturnServiceServer) testEmbeddedByValue()                       {}
@@ -220,6 +300,42 @@ func _ReturnService_UpdateReturnStatus_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReturnService_ApproveReturn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveReturnRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).ApproveReturn(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_ApproveReturn_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).ApproveReturn(ctx, req.(*ApproveReturnRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_RejectReturn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectReturnRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).RejectReturn(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_RejectReturn_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).RejectReturn(ctx, req.(*RejectReturnRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ReturnService_VerifyProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyProductRequest)
 	if err := dec(in); err != nil {
@@ -274,6 +390,60 @@ func _ReturnService_GetReturnsByOrder_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReturnService_CreateExchange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateExchangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).CreateExchange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_CreateExchange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).CreateExchange(ctx, req.(*CreateExchangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_GetExchange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExchangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).GetExchange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_GetExchange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).GetExchange(ctx, req.(*GetExchangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_VerifyExchangeProduct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyExchangeProductRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).VerifyExchangeProduct(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_VerifyExchangeProduct_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).VerifyExchangeProduct(ctx, req.(*VerifyExchangeProductRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReturnService_ServiceDesc is the grpc.ServiceDesc for ReturnService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -294,6 +464,14 @@ var ReturnService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ReturnService_UpdateReturnStatus_Handler,
 		},
 		{
+			MethodName: "ApproveReturn",
+			Handler:    _ReturnService_ApproveReturn_Handler,
+		},
+		{
+			MethodName: "RejectReturn",
+			Handler:    _ReturnService_RejectReturn_Handler,
+		},
+		{
 			MethodName: "VerifyProduct",
 			Handler:    _ReturnService_VerifyProduct_Handler,
 		},
@@ -305,7 +483,19 @@ var ReturnService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetReturnsByOrder",
 			Handler:    _ReturnService_GetReturnsByOrder_Handler,
 		},
+		{
+			MethodName: "CreateExchange",
+			Handler:    _ReturnService_CreateExchange_Handler,
+		},
+		{
+			MethodName: "GetExchange",
+			Handler:    _ReturnService_GetExchange_Handler,
+		},
+		{
+			MethodName: "VerifyExchangeProduct",
+			Handler:    _ReturnService_VerifyExchangeProduct_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "return.proto",
+	Metadata: "contracts/protobuf/return/return.proto",
 }
