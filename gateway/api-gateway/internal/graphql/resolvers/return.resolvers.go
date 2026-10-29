@@ -41,25 +41,21 @@ func (r *mutationResolver) RequestReturn(ctx context.Context, input model.Reques
 		return nil, appErrors.BadRequest("reason is required")
 	}
 
-	if len(input.ItemIds) > 1 {
-		return nil, appErrors.BadRequest("only one item per return request is supported; please submit separate requests for multiple items")
-	}
-
 	orderItemID := ""
 	if input.OrderItemID != nil {
 		orderItemID = strings.TrimSpace(*input.OrderItemID)
 	}
-
-	if len(input.ItemIds) == 1 {
-		firstItemID := strings.TrimSpace(input.ItemIds[0])
-		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
-			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
-		}
-		if orderItemID == "" {
-			orderItemID = firstItemID
-		}
+	itemID := ""
+	if input.ItemID != nil {
+		itemID = strings.TrimSpace(*input.ItemID)
 	}
 
+	if orderItemID != "" && itemID != "" && orderItemID != itemID {
+		return nil, appErrors.BadRequest("orderItemId and itemId must match")
+	}
+	if orderItemID == "" {
+		orderItemID = itemID
+	}
 	if orderItemID == "" {
 		return nil, appErrors.BadRequest("orderItemId is required")
 	}
@@ -73,8 +69,8 @@ func (r *mutationResolver) RequestReturn(ctx context.Context, input model.Reques
 		OrderId:     orderID,
 		UserId:      userID,
 		OrderItemId: orderItemID,
+		ItemId:      orderItemID,
 		Reason:      reason,
-		ItemIds:     []string{orderItemID},
 		Type:        reqType,
 	})
 	if err != nil {
@@ -110,25 +106,21 @@ func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.R
 		return nil, appErrors.BadRequest("reason is required")
 	}
 
-	if len(input.ItemIds) > 1 {
-		return nil, appErrors.BadRequest("only one item per replacement request is supported; please submit separate requests for multiple items")
-	}
-
 	orderItemID := ""
 	if input.OrderItemID != nil {
 		orderItemID = strings.TrimSpace(*input.OrderItemID)
 	}
-
-	if len(input.ItemIds) == 1 {
-		firstItemID := strings.TrimSpace(input.ItemIds[0])
-		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
-			return nil, appErrors.BadRequest("orderItemId and itemIds must match")
-		}
-		if orderItemID == "" {
-			orderItemID = firstItemID
-		}
+	itemID := ""
+	if input.ItemID != nil {
+		itemID = strings.TrimSpace(*input.ItemID)
 	}
 
+	if orderItemID != "" && itemID != "" && orderItemID != itemID {
+		return nil, appErrors.BadRequest("orderItemId and itemId must match")
+	}
+	if orderItemID == "" {
+		orderItemID = itemID
+	}
 	if orderItemID == "" {
 		return nil, appErrors.BadRequest("orderItemId is required")
 	}
@@ -137,8 +129,8 @@ func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.R
 		OrderId:     orderID,
 		UserId:      userID,
 		OrderItemId: orderItemID,
+		ItemId:      orderItemID,
 		Reason:      reason,
-		ItemIds:     []string{orderItemID},
 		Type:        "REPLACEMENT",
 	})
 	if err != nil {
@@ -221,7 +213,260 @@ func (r *mutationResolver) VerifyProduct(ctx context.Context, input model.Verify
 }
 
 // UpdateReturnStatus is the resolver for the updateReturnStatus field.
-func (r *mutationResolver) UpdateReturnStatus(ctx context.Context, id string, status string) (*model.ReturnOrder, error) {
+func (r *mutationResolver) UpdateReturnStatus(ctx context.Context, id string, status string, rejectionReason *string) (*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" && role != "MERCHANT" {
+		return nil, appErrors.Forbidden("permission denied to update return status")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("return id is required")
+	}
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return nil, appErrors.BadRequest("status is required")
+	}
+
+	var rejReason string
+	if rejectionReason != nil {
+		rejReason = strings.TrimSpace(*rejectionReason)
+	}
+
+	upperStatus := strings.ToUpper(status)
+	if upperStatus == "REJECTED" && rejReason == "" {
+		return nil, appErrors.BadRequest("rejection reason is required")
+	}
+
+	// Customer cannot approve/reject their own return
+	if upperStatus == "APPROVED" || upperStatus == "REJECTED" {
+		retCheck, getErr := client.GetReturn(ctx, &returnpb.GetReturnRequest{Id: id})
+		if getErr == nil && retCheck != nil && retCheck.ReturnOrder != nil {
+			if retCheck.ReturnOrder.UserId == userCtx.UserID {
+				return nil, appErrors.Forbidden("customer cannot approve or reject their own return")
+			}
+		}
+	}
+
+	res, err := client.UpdateReturnStatus(ctx, &returnpb.UpdateReturnStatusRequest{
+		Id:              id,
+		Status:          status,
+		RejectionReason: rejReason,
+		ReviewerId:      userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// ApproveReturn is the resolver for the approveReturn field.
+func (r *mutationResolver) ApproveReturn(ctx context.Context, id string) (*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" {
+		return nil, appErrors.Forbidden("only admin can approve returns")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("return id is required")
+	}
+
+	retCheck, getErr := client.GetReturn(ctx, &returnpb.GetReturnRequest{Id: id})
+	if getErr == nil && retCheck != nil && retCheck.ReturnOrder != nil {
+		if retCheck.ReturnOrder.UserId == userCtx.UserID {
+			return nil, appErrors.Forbidden("customer cannot approve or reject their own return")
+		}
+	}
+
+	res, err := client.ApproveReturn(ctx, &returnpb.ApproveReturnRequest{
+		Id:         id,
+		ReviewerId: userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// RejectReturn is the resolver for the rejectReturn field.
+func (r *mutationResolver) RejectReturn(ctx context.Context, id string, reason string) (*model.ReturnOrder, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" {
+		return nil, appErrors.Forbidden("only admin can reject returns")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("return id is required")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, appErrors.BadRequest("rejection reason is required")
+	}
+
+	retCheck, getErr := client.GetReturn(ctx, &returnpb.GetReturnRequest{Id: id})
+	if getErr == nil && retCheck != nil && retCheck.ReturnOrder != nil {
+		if retCheck.ReturnOrder.UserId == userCtx.UserID {
+			return nil, appErrors.Forbidden("customer cannot approve or reject their own return")
+		}
+	}
+
+	res, err := client.RejectReturn(ctx, &returnpb.RejectReturnRequest{
+		Id:              id,
+		RejectionReason: reason,
+		ReviewerId:      userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelReturnOrder(res.ReturnOrder), nil
+}
+
+// CreateExchange is the resolver for the createExchange field.
+func (r *mutationResolver) CreateExchange(ctx context.Context, input model.CreateExchangeInput) (*model.Exchange, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if input.UserID != nil && strings.TrimSpace(*input.UserID) != "" {
+		inputUserID := strings.TrimSpace(*input.UserID)
+		if userID != "" && userID != inputUserID {
+			userCtx, ok := auth.UserFromContext(ctx)
+			if ok && userCtx != nil && (strings.EqualFold(userCtx.Role, "ADMIN") || strings.EqualFold(userCtx.Role, "SUPPORT")) {
+				userID = inputUserID
+			} else {
+				return nil, appErrors.Forbidden("cannot create exchange for another user")
+			}
+		} else if userID == "" {
+			userID = inputUserID
+		}
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	orderItemID := strings.TrimSpace(input.OrderItemID)
+	if orderItemID == "" {
+		return nil, appErrors.BadRequest("orderItemId is required")
+	}
+
+	newProductID := strings.TrimSpace(input.NewProductID)
+	if newProductID == "" {
+		return nil, appErrors.BadRequest("newProductId is required")
+	}
+
+	oldBrand := strings.TrimSpace(input.OldBrand)
+	if oldBrand == "" {
+		return nil, appErrors.BadRequest("oldBrand is required")
+	}
+
+	oldModel := strings.TrimSpace(input.OldModel)
+	if oldModel == "" {
+		return nil, appErrors.BadRequest("oldModel is required")
+	}
+
+	if input.BaseExchangeValue < 0 {
+		return nil, appErrors.BadRequest("baseExchangeValue cannot be negative")
+	}
+
+	req := &returnpb.CreateExchangeRequest{
+		OrderId:           orderID,
+		OrderItemId:       orderItemID,
+		UserId:            userID,
+		NewProductId:      newProductID,
+		OldBrand:          oldBrand,
+		OldModel:          oldModel,
+		BaseExchangeValue: input.BaseExchangeValue,
+	}
+
+	if input.OldVariant != nil {
+		req.OldVariant = strings.TrimSpace(*input.OldVariant)
+	}
+	if input.SerialOrImei != nil {
+		req.SerialOrImei = strings.TrimSpace(*input.SerialOrImei)
+	}
+
+	for _, a := range input.Answers {
+		if a != nil {
+			ans := &returnpb.ExchangeQuestionAnswer{
+				QuestionKey: a.QuestionKey,
+				AnswerValue: a.AnswerValue,
+			}
+			if a.DeductionAmount != nil {
+				ans.DeductionAmount = *a.DeductionAmount
+			}
+			req.Answers = append(req.Answers, ans)
+		}
+	}
+
+	res, err := client.CreateExchange(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelExchange(res.Exchange), nil
+}
+
+// VerifyExchangeProduct is the resolver for the verifyExchangeProduct field.
+func (r *mutationResolver) VerifyExchangeProduct(ctx context.Context, input model.VerifyExchangeProductInput) (*model.Exchange, error) {
 	client, err := r.getReturnClient()
 	if err != nil {
 		return nil, err
@@ -239,27 +484,53 @@ func (r *mutationResolver) UpdateReturnStatus(ctx context.Context, id string, st
 
 	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	if role != "ADMIN" && role != "DELIVERY_PARTNER" {
-		return nil, appErrors.Forbidden("permission denied to update return status")
+		return nil, appErrors.Forbidden("only delivery partners or admins can verify exchanged products")
 	}
 
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return nil, appErrors.BadRequest("return id is required")
-	}
-	status = strings.TrimSpace(status)
-	if status == "" {
-		return nil, appErrors.BadRequest("status is required")
+	exchangeID := strings.TrimSpace(input.ExchangeID)
+	if exchangeID == "" {
+		return nil, appErrors.BadRequest("exchangeId is required")
 	}
 
-	res, err := client.UpdateReturnStatus(ctx, &returnpb.UpdateReturnStatusRequest{
-		Id:     id,
-		Status: status,
-	})
+	rating := strings.ToUpper(strings.TrimSpace(input.ConditionRating))
+	if rating == "" {
+		return nil, appErrors.BadRequest("conditionRating is required")
+	}
+	switch rating {
+	case "EXCELLENT", "GOOD", "AVERAGE", "POOR", "DAMAGED":
+	default:
+		return nil, appErrors.BadRequest("invalid conditionRating: must be EXCELLENT, GOOD, AVERAGE, POOR, or DAMAGED")
+	}
+
+	verifiedBy := userCtx.PartnerID
+	if verifiedBy == "" {
+		verifiedBy = userCtx.UserID
+	}
+
+	notes := ""
+	if input.Notes != nil {
+		notes = *input.Notes
+	}
+
+	req := &returnpb.VerifyExchangeProductRequest{
+		ExchangeId:       exchangeID,
+		VerifiedBy:       verifiedBy,
+		ConditionRating:  rating,
+		IsApproved:       input.IsApproved,
+		ScreenIntact:     input.ScreenIntact,
+		BodyIntact:       input.BodyIntact,
+		Functional:       input.Functional,
+		SerialMatches:    input.SerialMatches,
+		AdjustedDiscount: input.AdjustedDiscount,
+		Notes:            notes,
+	}
+
+	res, err := client.VerifyExchangeProduct(ctx, req)
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return toModelExchange(res.Exchange), nil
 }
 
 // ReturnOrder is the resolver for the returnOrder field.
@@ -376,6 +647,56 @@ func (r *queryResolver) ListReturns(ctx context.Context, limit *int, offset *int
 	return result, nil
 }
 
+// Exchange is the resolver for the exchange field.
+func (r *queryResolver) Exchange(ctx context.Context, id string) (*model.Exchange, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, appErrors.BadRequest("exchange id is required")
+	}
+
+	res, err := client.GetExchange(ctx, &returnpb.GetExchangeRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if res == nil || res.Exchange == nil {
+		return nil, nil
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	switch role {
+	case "ADMIN":
+	case "MERCHANT":
+		if !r.merchantHasAccessToExchange(ctx, userCtx, res.Exchange) {
+			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
+		}
+	case "DELIVERY_PARTNER":
+		if !r.deliveryPartnerHasAccessToExchange(ctx, userCtx, res.Exchange) {
+			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
+		}
+	default:
+		if res.Exchange.UserId != userCtx.UserID {
+			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
+		}
+	}
+
+	return toModelExchange(res.Exchange), nil
+}
+
 // !!! WARNING !!!
 // The code below was going to be deleted when updating resolvers. It has been copied here so you have
 // one last chance to move it out of harms way if you want. There are two reasons this happens:
@@ -424,6 +745,9 @@ func toModelReturnOrder(protoReturn *returnpb.ReturnOrder) *model.ReturnOrder {
 	if protoReturn.UpdatedAt != "" {
 		res.UpdatedAt = &protoReturn.UpdatedAt
 	}
+	if protoReturn.RejectionReason != "" {
+		res.RejectionReason = &protoReturn.RejectionReason
+	}
 
 	if protoReturn.Verification != nil {
 		var notes *string
@@ -450,6 +774,100 @@ func toModelReturnOrder(protoReturn *returnpb.ReturnOrder) *model.ReturnOrder {
 			VerifiedAt:  protoReturn.Verification.VerifiedAt,
 			CreatedAt:   createdAt,
 			UpdatedAt:   updatedAt,
+		}
+	}
+
+	return res
+}
+func toModelExchange(protoExc *returnpb.Exchange) *model.Exchange {
+	if protoExc == nil {
+		return nil
+	}
+
+	res := &model.Exchange{
+		ID:                protoExc.Id,
+		OrderID:           protoExc.OrderId,
+		OrderItemID:       protoExc.OrderItemId,
+		UserID:            protoExc.UserId,
+		NewProductID:      protoExc.NewProductId,
+		OldBrand:          protoExc.OldBrand,
+		OldModel:          protoExc.OldModel,
+		BaseExchangeValue: protoExc.BaseExchangeValue,
+		EstimatedDiscount: protoExc.EstimatedDiscount,
+		Status:            protoExc.Status,
+	}
+
+	if protoExc.OldVariant != "" {
+		res.OldVariant = &protoExc.OldVariant
+	}
+	if protoExc.SerialOrImei != "" {
+		res.SerialOrImei = &protoExc.SerialOrImei
+	}
+	if protoExc.FinalDiscount != 0 || protoExc.Status != "PENDING_ESTIMATION" {
+		fd := protoExc.FinalDiscount
+		res.FinalDiscount = &fd
+	}
+	if protoExc.PriceDifference != 0 {
+		pd := protoExc.PriceDifference
+		res.PriceDifference = &pd
+	}
+	if protoExc.CreatedAt != "" {
+		res.CreatedAt = &protoExc.CreatedAt
+	}
+	if protoExc.UpdatedAt != "" {
+		res.UpdatedAt = &protoExc.UpdatedAt
+	}
+
+	if len(protoExc.Answers) > 0 {
+		res.Answers = make([]*model.ExchangeQuestionAnswer, 0, len(protoExc.Answers))
+		for _, a := range protoExc.Answers {
+			if a == nil {
+				continue
+			}
+			ansModel := &model.ExchangeQuestionAnswer{
+				ID:              a.Id,
+				ExchangeID:      a.ExchangeId,
+				QuestionKey:     a.QuestionKey,
+				AnswerValue:     a.AnswerValue,
+				DeductionAmount: a.DeductionAmount,
+			}
+			if a.CreatedAt != "" {
+				ansModel.CreatedAt = &a.CreatedAt
+			}
+			res.Answers = append(res.Answers, ansModel)
+		}
+	}
+
+	if protoExc.Verification != nil {
+		var notes *string
+		if protoExc.Verification.Notes != "" {
+			notes = &protoExc.Verification.Notes
+		}
+		var createdAt *string
+		if protoExc.Verification.CreatedAt != "" {
+			createdAt = &protoExc.Verification.CreatedAt
+		}
+		var updatedAt *string
+		if protoExc.Verification.UpdatedAt != "" {
+			updatedAt = &protoExc.Verification.UpdatedAt
+		}
+
+		res.Verification = &model.ExchangeVerification{
+			ID:               protoExc.Verification.Id,
+			ExchangeID:       protoExc.Verification.ExchangeId,
+			VerifiedBy:       protoExc.Verification.VerifiedBy,
+			ConditionRating:  protoExc.Verification.ConditionRating,
+			IsApproved:       protoExc.Verification.IsApproved,
+			ScreenIntact:     protoExc.Verification.ScreenIntact,
+			BodyIntact:       protoExc.Verification.BodyIntact,
+			Functional:       protoExc.Verification.Functional,
+			SerialMatches:    protoExc.Verification.SerialMatches,
+			AdjustedDiscount: protoExc.Verification.AdjustedDiscount,
+			ProofImages:      protoExc.Verification.ProofImages,
+			Notes:            notes,
+			VerifiedAt:       protoExc.Verification.VerifiedAt,
+			CreatedAt:        createdAt,
+			UpdatedAt:        updatedAt,
 		}
 	}
 

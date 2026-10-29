@@ -379,6 +379,27 @@ type ReturnRequestedEvent struct {
 	RequestedAt  time.Time `json:"requested_at"`
 }
 
+// ReturnApprovedEvent represents the payload for ReturnApproved domain event.
+type ReturnApprovedEvent struct {
+	ReturnID    string    `json:"return_id"`
+	OrderID     string    `json:"order_id"`
+	OrderItemID string    `json:"order_item_id"`
+	UserID      string    `json:"user_id"`
+	ApprovedBy  string    `json:"approved_by,omitempty"`
+	ApprovedAt  time.Time `json:"approved_at"`
+}
+
+// ReturnRejectedEvent represents the payload for ReturnRejected domain event.
+type ReturnRejectedEvent struct {
+	ReturnID        string    `json:"return_id"`
+	OrderID         string    `json:"order_id"`
+	OrderItemID     string    `json:"order_item_id"`
+	UserID          string    `json:"user_id"`
+	RejectedBy      string    `json:"rejected_by,omitempty"`
+	RejectionReason string    `json:"rejection_reason"`
+	RejectedAt      time.Time `json:"rejected_at"`
+}
+
 // ReturnVerifiedEvent represents the payload for ReturnVerified domain event.
 type ReturnVerifiedEvent struct {
 	ReturnID    string    `json:"return_id"`

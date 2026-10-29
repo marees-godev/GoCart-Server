@@ -7,11 +7,12 @@ type ReturnType string
 const (
 	ReturnTypeReturn      ReturnType = "RETURN"
 	ReturnTypeReplacement ReturnType = "REPLACEMENT"
+	ReturnTypeExchange    ReturnType = "EXCHANGE"
 )
 
 func (t ReturnType) IsValid() bool {
 	switch t {
-	case ReturnTypeReturn, ReturnTypeReplacement:
+	case ReturnTypeReturn, ReturnTypeReplacement, ReturnTypeExchange:
 		return true
 	default:
 		return false
@@ -22,22 +23,31 @@ type ReturnStatus string
 
 const (
 	ReturnStatusRequested            ReturnStatus = "RETURN_REQUESTED"
+	ReturnStatusRequestedAlias       ReturnStatus = "REQUESTED"
 	ReturnStatusReplacementRequested ReturnStatus = "REPLACEMENT_REQUESTED"
+	ReturnStatusExchangeRequested    ReturnStatus = "EXCHANGE_REQUESTED"
+	ReturnStatusUnderReview          ReturnStatus = "UNDER_REVIEW"
 	ReturnStatusApproved             ReturnStatus = "APPROVED"
 	ReturnStatusRejected             ReturnStatus = "REJECTED"
-	ReturnStatusVerified             ReturnStatus = "VERIFIED"
+	ReturnStatusPickupScheduled      ReturnStatus = "PICKUP_SCHEDULED"
+	ReturnStatusPickedUp             ReturnStatus = "PICKED_UP"
+	ReturnStatusReceived             ReturnStatus = "RECEIVED"
 	ReturnStatusItemReceived         ReturnStatus = "ITEM_RECEIVED"
+	ReturnStatusVerified             ReturnStatus = "VERIFIED"
 	ReturnStatusRefundInitiated      ReturnStatus = "REFUND_INITIATED"
 	ReturnStatusReplacementInitiated ReturnStatus = "REPLACEMENT_INITIATED"
+	ReturnStatusExchangeInitiated    ReturnStatus = "EXCHANGE_INITIATED"
 	ReturnStatusCompleted            ReturnStatus = "COMPLETED"
 	ReturnStatusCancelled            ReturnStatus = "CANCELLED"
 )
 
 func (s ReturnStatus) IsValid() bool {
 	switch s {
-	case ReturnStatusRequested, ReturnStatusReplacementRequested, ReturnStatusApproved, ReturnStatusRejected,
-		ReturnStatusVerified, ReturnStatusItemReceived, ReturnStatusRefundInitiated,
-		ReturnStatusReplacementInitiated, ReturnStatusCompleted, ReturnStatusCancelled:
+	case ReturnStatusRequested, ReturnStatusRequestedAlias, ReturnStatusReplacementRequested, ReturnStatusExchangeRequested,
+		ReturnStatusUnderReview, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusPickupScheduled,
+		ReturnStatusPickedUp, ReturnStatusReceived, ReturnStatusItemReceived, ReturnStatusVerified,
+		ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted, ReturnStatusCancelled:
 		return true
 	default:
 		return false
@@ -47,32 +57,78 @@ func (s ReturnStatus) IsValid() bool {
 // AllowedStatusTransitions defines permitted state transitions for ReturnStatus.
 var AllowedStatusTransitions = map[ReturnStatus][]ReturnStatus{
 	ReturnStatusRequested: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusRequestedAlias: {
+		ReturnStatusUnderReview,
 		ReturnStatusApproved,
 		ReturnStatusRejected,
 		ReturnStatusVerified,
 		ReturnStatusCancelled,
 	},
 	ReturnStatusReplacementRequested: {
+		ReturnStatusUnderReview,
 		ReturnStatusApproved,
 		ReturnStatusRejected,
 		ReturnStatusVerified,
 		ReturnStatusCancelled,
 	},
-	ReturnStatusApproved: {
+	ReturnStatusExchangeRequested: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
 		ReturnStatusVerified,
-		ReturnStatusItemReceived,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusUnderReview: {
+		ReturnStatusApproved,
 		ReturnStatusRejected,
 		ReturnStatusCancelled,
 	},
-	ReturnStatusVerified: {
+	ReturnStatusApproved: {
+		ReturnStatusPickupScheduled,
+		ReturnStatusPickedUp,
 		ReturnStatusItemReceived,
+		ReturnStatusReceived,
+		ReturnStatusVerified,
+		ReturnStatusRejected,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusPickupScheduled: {
+		ReturnStatusPickedUp,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusPickedUp: {
+		ReturnStatusReceived,
+		ReturnStatusItemReceived,
+		ReturnStatusVerified,
+	},
+	ReturnStatusReceived: {
+		ReturnStatusVerified,
 		ReturnStatusRefundInitiated,
 		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted,
 		ReturnStatusRejected,
 	},
 	ReturnStatusItemReceived: {
+		ReturnStatusVerified,
 		ReturnStatusRefundInitiated,
 		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusVerified: {
+		ReturnStatusReceived,
+		ReturnStatusItemReceived,
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
 		ReturnStatusCompleted,
 		ReturnStatusRejected,
 	},
@@ -81,6 +137,10 @@ var AllowedStatusTransitions = map[ReturnStatus][]ReturnStatus{
 		ReturnStatusRejected,
 	},
 	ReturnStatusReplacementInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusExchangeInitiated: {
 		ReturnStatusCompleted,
 		ReturnStatusCancelled,
 	},
@@ -145,19 +205,20 @@ type VerificationImage struct {
 }
 
 type Return struct {
-	ID           string               `json:"id" db:"id"`
-	OrderID      string               `json:"order_id" db:"order_id"`
-	OrderItemID  string               `json:"order_item_id" db:"order_item_id"`
-	UserID       string               `json:"user_id" db:"user_id"`
-	Reason       string               `json:"reason" db:"reason"`
-	Status       ReturnStatus         `json:"status" db:"status"`
-	Type         ReturnType           `json:"type" db:"type"`
-	RefundAmount float64              `json:"refund_amount" db:"refund_amount"`
-	Verification *ProductVerification `json:"verification,omitempty"`
-	RequestedAt  time.Time            `json:"requested_at" db:"requested_at"`
-	ApprovedAt   *time.Time           `json:"approved_at,omitempty" db:"approved_at"`
-	CompletedAt  *time.Time           `json:"completed_at,omitempty" db:"completed_at"`
-	CreatedAt    time.Time            `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time            `json:"updated_at" db:"updated_at"`
+	ID              string               `json:"id" db:"id"`
+	OrderID         string               `json:"order_id" db:"order_id"`
+	OrderItemID     string               `json:"order_item_id" db:"order_item_id"`
+	UserID          string               `json:"user_id" db:"user_id"`
+	Reason          string               `json:"reason" db:"reason"`
+	Status          ReturnStatus         `json:"status" db:"status"`
+	Type            ReturnType           `json:"type" db:"type"`
+	RefundAmount    float64              `json:"refund_amount" db:"refund_amount"`
+	Verification    *ProductVerification `json:"verification,omitempty"`
+	RequestedAt     time.Time            `json:"requested_at" db:"requested_at"`
+	ApprovedAt      *time.Time           `json:"approved_at,omitempty" db:"approved_at"`
+	CompletedAt     *time.Time           `json:"completed_at,omitempty" db:"completed_at"`
+	RejectionReason string               `json:"rejection_reason,omitempty" db:"rejection_reason"`
+	CreatedAt       time.Time            `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at" db:"updated_at"`
 }
 
