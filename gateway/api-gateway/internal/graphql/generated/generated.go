@@ -3529,13 +3529,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Warehouse(childComplexity, args["id"].(string), args["deliveryPartnerId"].(*string)), true
 
-	case "Rating.comment":
-		if e.complexity.Rating.Comment == nil {
-			break
-		}
-
-		return e.complexity.Rating.Comment(childComplexity), true
-
 	case "Rating.createdAt":
 		if e.complexity.Rating.CreatedAt == nil {
 			break
@@ -41149,10 +41142,7 @@ func (ec *executionContext) unmarshalNRequestReturnInput2githubᚗcomᚋmarees�
 }
 
 func (ec *executionContext) unmarshalNReservationItemInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐReservationItemInputᚄ(ctx context.Context, v interface{}) ([]*model.ReservationItemInput, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.ReservationItemInput, len(vSlice))
 	for i := range vSlice {
@@ -41635,10 +41625,7 @@ func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Conte
 }
 
 func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -41890,10 +41877,7 @@ func (ec *executionContext) unmarshalOCreateProductVariantInput2ᚕᚖgithubᚗc
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.CreateProductVariantInput, len(vSlice))
 	for i := range vSlice {
@@ -42206,10 +42190,7 @@ func (ec *executionContext) unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGo
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]model.Role, len(vSlice))
 	for i := range vSlice {
@@ -42303,10 +42284,7 @@ func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -42357,10 +42335,7 @@ func (ec *executionContext) unmarshalOUpdateProductVariantInput2ᚕᚖgithubᚗc
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.UpdateProductVariantInput, len(vSlice))
 	for i := range vSlice {
@@ -42377,10 +42352,7 @@ func (ec *executionContext) unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgq
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*graphql.Upload, len(vSlice))
 	for i := range vSlice {

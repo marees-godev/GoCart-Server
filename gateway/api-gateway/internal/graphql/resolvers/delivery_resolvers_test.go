@@ -142,7 +142,7 @@ func (m *mockUserClientForDeliveryTest) GetUser(ctx context.Context, in *userpb.
 	return nil, appErrors.NotFound("user not found")
 }
 
-func strPtr(s string) *string {
+func deliveryStrPtr(s string) *string {
 	return &s
 }
 
@@ -167,7 +167,7 @@ func TestCreateDelivery_Success(t *testing.T) {
 		OrderID:           "ord-999",
 		DeliveryPartnerID: "partner-uuid-1",
 		ShippingAddressID: "addr-1",
-		ContactNumber:     strPtr("+1-415-555-0200"),
+		ContactNumber:     deliveryStrPtr("+1-415-555-0200"),
 	}
 
 	res, err := r.CreateDelivery(ctx, input)
@@ -217,7 +217,7 @@ func TestCreateDelivery_WithDeliveryPartnerID_GetsCompanyName(t *testing.T) {
 		OrderID:           "ord-999",
 		DeliveryPartnerID: "partner-uuid-1",
 		ShippingAddressID: "addr-1",
-		ContactNumber:     strPtr("+1-415-555-0200"),
+		ContactNumber:     deliveryStrPtr("+1-415-555-0200"),
 	}
 
 	res, err := r.CreateDelivery(ctx, input)
@@ -299,7 +299,7 @@ func TestCreateDelivery_AdminSuccess(t *testing.T) {
 		OrderID:           "ord-100",
 		DeliveryPartnerID: "partner-uuid-1",
 		ShippingAddressID: "addr-100",
-		ContactNumber:     strPtr("+1-415-555-0100"),
+		ContactNumber:     deliveryStrPtr("+1-415-555-0100"),
 	}
 
 	res, err := r.CreateDelivery(ctx, input)
@@ -331,7 +331,7 @@ func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 		OrderID:           "ord-777",
 		DeliveryPartnerID: "partner-uuid-1",
 		ShippingAddressID: "",
-		ContactNumber:     strPtr("+1-234-567-8900"),
+		ContactNumber:     deliveryStrPtr("+1-234-567-8900"),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)
@@ -361,7 +361,7 @@ func TestCreateDelivery_MissingContactNumber_Fails(t *testing.T) {
 		OrderID:           "ord-777",
 		DeliveryPartnerID: "partner-uuid-1",
 		ShippingAddressID: "addr-1",
-		ContactNumber:     strPtr(""),
+		ContactNumber:     deliveryStrPtr(""),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)
@@ -391,7 +391,7 @@ func TestCreateDelivery_MissingDeliveryPartnerID_Fails(t *testing.T) {
 		OrderID:           "ord-777",
 		DeliveryPartnerID: "",
 		ShippingAddressID: "addr-1",
-		ContactNumber:     strPtr("+1-234-567-8900"),
+		ContactNumber:     deliveryStrPtr("+1-234-567-8900"),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)

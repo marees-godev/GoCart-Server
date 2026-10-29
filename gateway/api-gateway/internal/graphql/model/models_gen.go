@@ -235,6 +235,11 @@ type DeleteRatingResponse struct {
 	Message string `json:"message"`
 }
 
+type DeleteWarehouseResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type Delivery struct {
 	ID                  string         `json:"id"`
 	OrderID             string         `json:"orderId"`
