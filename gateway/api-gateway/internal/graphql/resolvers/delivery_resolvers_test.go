@@ -5,9 +5,12 @@ import (
 	"testing"
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	grpcPkg "google.golang.org/grpc"
 )
 
@@ -19,6 +22,21 @@ type mockDeliveryClient struct {
 	lastGetTrackingReq  *deliverypb.GetDeliveryByTrackingRequest
 	lastGetOrderReq     *deliverypb.GetDeliveryByOrderRequest
 	lastCreatePartnerReq *deliverypb.CreatePartnerProfileRequest
+}
+
+func (m *mockDeliveryClient) GetPartnerProfile(ctx context.Context, in *deliverypb.GetPartnerProfileRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	if in.PartnerId == "partner-uuid-1" {
+		return &deliverypb.PartnerProfileResponse{
+			Profile: &deliverypb.DeliveryPartnerProfile{
+				Id:          "prof-1",
+				PartnerId:   in.PartnerId,
+				CompanyName: "Super Express Logistics",
+				Email:       "contact@superexpress.com",
+				IsActive:    true,
+			},
+		}, nil
+	}
+	return nil, appErrors.NotFound("partner profile not found")
 }
 
 func (m *mockDeliveryClient) CreatePartnerProfile(ctx context.Context, in *deliverypb.CreatePartnerProfileRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
@@ -92,10 +110,48 @@ func (m *mockDeliveryClient) GetDeliveryByOrder(ctx context.Context, in *deliver
 	}, nil
 }
 
+type mockOrderClientForDeliveryTest struct {
+	orderpb.OrderServiceClient
+	order *orderpb.Order
+}
+
+func (m *mockOrderClientForDeliveryTest) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.GetOrderResponse, error) {
+	if m.order != nil && m.order.Id == in.Id {
+		return &orderpb.GetOrderResponse{Order: m.order}, nil
+	}
+	return nil, appErrors.NotFound("order not found")
+}
+
+type mockUserClientForDeliveryTest struct {
+	userpb.UserServiceClient
+	address *userpb.Address
+	user    *userpb.User
+}
+
+func (m *mockUserClientForDeliveryTest) GetUserAddress(ctx context.Context, in *userpb.GetUserAddressRequest, opts ...grpcPkg.CallOption) (*userpb.GetUserAddressResponse, error) {
+	if m.address != nil {
+		return &userpb.GetUserAddressResponse{Address: m.address}, nil
+	}
+	return nil, appErrors.NotFound("address not found")
+}
+
+func (m *mockUserClientForDeliveryTest) GetUser(ctx context.Context, in *userpb.GetUserRequest, opts ...grpcPkg.CallOption) (*userpb.GetUserResponse, error) {
+	if m.user != nil {
+		return &userpb.GetUserResponse{User: m.user}, nil
+	}
+	return nil, appErrors.NotFound("user not found")
+}
+
+func deliveryStrPtr(s string) *string {
+	return &s
+}
+
 func TestCreateDelivery_Success(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		UserClient: userMock,
 	}
 
 	r := &mutationResolver{
@@ -108,10 +164,10 @@ func TestCreateDelivery_Success(t *testing.T) {
 	})
 
 	input := model.CreateDeliveryInput{
-		OrderID:         "ord-999",
-		DeliveryPartner: "STANDARD",
-		ShippingAddress: "200 Market St, San Francisco, CA 94105",
-		ContactNumber:   "+1-415-555-0200",
+		OrderID:           "ord-999",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+		ContactNumber:     deliveryStrPtr("+1-415-555-0200"),
 	}
 
 	res, err := r.CreateDelivery(ctx, input)
@@ -129,8 +185,8 @@ func TestCreateDelivery_Success(t *testing.T) {
 	if deliveryMock.lastCreateReq.OrderId != "ord-999" {
 		t.Errorf("expected order ID 'ord-999', got %s", deliveryMock.lastCreateReq.OrderId)
 	}
-	if deliveryMock.lastCreateReq.DeliveryPartner != "STANDARD" {
-		t.Errorf("expected partner 'STANDARD', got %s", deliveryMock.lastCreateReq.DeliveryPartner)
+	if deliveryMock.lastCreateReq.DeliveryPartner != "Super Express Logistics" {
+		t.Errorf("expected partner 'Super Express Logistics', got %s", deliveryMock.lastCreateReq.DeliveryPartner)
 	}
 	if deliveryMock.lastCreateReq.ShippingAddress != "200 Market St, San Francisco, CA 94105" {
 		t.Errorf("expected shipping address '200 Market St, San Francisco, CA 94105', got %s", deliveryMock.lastCreateReq.ShippingAddress)
@@ -140,10 +196,94 @@ func TestCreateDelivery_Success(t *testing.T) {
 	}
 }
 
-func TestCreateDelivery_AdminSuccess(t *testing.T) {
+func TestCreateDelivery_WithDeliveryPartnerID_GetsCompanyName(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{Clients: clients},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-42",
+		Role:   "MERCHANT",
+	})
+
+	input := model.CreateDeliveryInput{
+		OrderID:           "ord-999",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+		ContactNumber:     deliveryStrPtr("+1-415-555-0200"),
+	}
+
+	res, err := r.CreateDelivery(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.DeliveryPartner != "Super Express Logistics" {
+		t.Errorf("expected company name 'Super Express Logistics', got %s", res.DeliveryPartner)
+	}
+	if deliveryMock.lastCreateReq.DeliveryPartner != "Super Express Logistics" {
+		t.Errorf("expected request DeliveryPartner 'Super Express Logistics', got %s", deliveryMock.lastCreateReq.DeliveryPartner)
+	}
+}
+
+func TestCreateDelivery_ResolvesAddressAndPhoneFromOrder(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{
+			Id:              "ord-auto",
+			UserId:          "user-cust-1",
+			ShippingAddress: `{"street":"500 Howard St","city":"San Francisco","state":"CA","postal_code":"94105","contact_number":"+1-555-0199"}`,
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{Clients: clients},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	// Do not pass ShippingAddress or ContactNumber in input
+	input := model.CreateDeliveryInput{
+		OrderID:           "ord-auto",
+		DeliveryPartnerID: "partner-uuid-1",
+	}
+
+	res, err := r.CreateDelivery(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.DeliveryPartner != "Super Express Logistics" {
+		t.Errorf("expected company name 'Super Express Logistics', got %s", res.DeliveryPartner)
+	}
+	if deliveryMock.lastCreateReq.ContactNumber != "+1-555-0199" {
+		t.Errorf("expected contact number '+1-555-0199', got %s", deliveryMock.lastCreateReq.ContactNumber)
+	}
+	if deliveryMock.lastCreateReq.ShippingAddress == "" {
+		t.Error("expected shipping address to be resolved from order")
+	}
+}
+
+func TestCreateDelivery_AdminSuccess(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-100", AddressLine: "100 Pine St, San Francisco, CA 94111"}}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		UserClient: userMock,
 	}
 
 	r := &mutationResolver{
@@ -156,10 +296,10 @@ func TestCreateDelivery_AdminSuccess(t *testing.T) {
 	})
 
 	input := model.CreateDeliveryInput{
-		OrderID:         "ord-100",
-		DeliveryPartner: "DHL",
-		ShippingAddress: "100 Pine St, San Francisco, CA 94111",
-		ContactNumber:   "+1-415-555-0100",
+		OrderID:           "ord-100",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-100",
+		ContactNumber:     deliveryStrPtr("+1-415-555-0100"),
 	}
 
 	res, err := r.CreateDelivery(ctx, input)
@@ -188,22 +328,24 @@ func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 	})
 
 	input := model.CreateDeliveryInput{
-		OrderID:         "ord-777",
-		DeliveryPartner: "FEDEX",
-		ShippingAddress: "",
-		ContactNumber:   "+1-234-567-8900",
+		OrderID:           "ord-777",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "",
+		ContactNumber:     deliveryStrPtr("+1-234-567-8900"),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)
 	if err == nil {
-		t.Fatal("expected error when shippingAddress is empty")
+		t.Fatal("expected error when shippingAddress cannot be resolved")
 	}
 }
 
 func TestCreateDelivery_MissingContactNumber_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "123 Main St"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		UserClient: userMock,
 	}
 
 	r := &mutationResolver{
@@ -216,22 +358,24 @@ func TestCreateDelivery_MissingContactNumber_Fails(t *testing.T) {
 	})
 
 	input := model.CreateDeliveryInput{
-		OrderID:         "ord-777",
-		DeliveryPartner: "FEDEX",
-		ShippingAddress: "123 Main St",
-		ContactNumber:   "",
+		OrderID:           "ord-777",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+		ContactNumber:     deliveryStrPtr(""),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)
 	if err == nil {
-		t.Fatal("expected error when contactNumber is empty")
+		t.Fatal("expected error when contactNumber cannot be resolved")
 	}
 }
 
-func TestCreateDelivery_MissingDeliveryPartner_Fails(t *testing.T) {
+func TestCreateDelivery_MissingDeliveryPartnerID_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "123 Main St"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		UserClient: userMock,
 	}
 
 	r := &mutationResolver{
@@ -244,15 +388,15 @@ func TestCreateDelivery_MissingDeliveryPartner_Fails(t *testing.T) {
 	})
 
 	input := model.CreateDeliveryInput{
-		OrderID:         "ord-777",
-		DeliveryPartner: "",
-		ShippingAddress: "123 Main St",
-		ContactNumber:   "+1-234-567-8900",
+		OrderID:           "ord-777",
+		DeliveryPartnerID: "",
+		ShippingAddressID: "addr-1",
+		ContactNumber:     deliveryStrPtr("+1-234-567-8900"),
 	}
 
 	_, err := r.CreateDelivery(ctx, input)
 	if err == nil {
-		t.Fatal("expected error when delivery partner is empty")
+		t.Fatal("expected error when delivery partner id is empty")
 	}
 }
 
@@ -261,7 +405,7 @@ func TestCreateDelivery_Unauthorized(t *testing.T) {
 		Resolver: &Resolver{Clients: &grpc.Clients{DeliveryClient: &mockDeliveryClient{}}},
 	}
 
-	_, err := r.CreateDelivery(context.Background(), model.CreateDeliveryInput{OrderID: "ord-1"})
+	_, err := r.CreateDelivery(context.Background(), model.CreateDeliveryInput{OrderID: "ord-1", DeliveryPartnerID: "partner-uuid-1", ShippingAddressID: "addr-1"})
 	if err == nil {
 		t.Fatal("expected unauthorized error when no user in context")
 	}

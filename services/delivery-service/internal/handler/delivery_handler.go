@@ -30,22 +30,16 @@ func NewDeliveryHandler(deliveryService service.DeliveryService, jwtSecret ...st
 
 func (h *DeliveryHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/orders/:orderId/tracking", h.GetTrackingByOrderID)
+	app.Get("/orders/:orderId/estimate", h.EstimateDelivery)
+	app.Get("/api/deliveries/estimate/:orderId", h.EstimateDelivery)
 	app.Get("/deliveries/:trackingNumber", h.GetTrackingByNumber)
 	app.Patch("/deliveries/:id/status", h.UpdateStatus)
+	app.Post("/webhooks/delivery", h.HandleWebhook)
+	app.Post("/api/webhooks/delivery", h.HandleWebhook)
 
-	// Warehouse Location Lookup API (Task 6)
-	app.Get("/api/warehouses/available", h.GetAvailableWarehouses)
+	// Partner Profile Management
+	partnerAuth := middleware.DeliveryPartnerAuthMiddleware(h.jwtSecret)
 
-	// Partner Profile & Warehouse Association (Tasks 7, 8)
-	var partnerAuth fiber.Handler
-	if h.jwtSecret != "" {
-		partnerAuth = middleware.DeliveryPartnerAuthMiddleware(h.jwtSecret)
-	} else {
-		partnerAuth = func(c *fiber.Ctx) error { return c.Next() }
-	}
-
-	app.Post("/api/partners/warehouses", partnerAuth, h.SelectWarehouses)
-	app.Get("/api/partners/me/warehouses", partnerAuth, h.GetMyWarehouses)
 	app.Get("/api/partners/me", partnerAuth, h.GetMyProfile)
 	app.Put("/api/partners/me", partnerAuth, h.UpdateMyProfile)
 }
@@ -119,12 +113,19 @@ func (h *DeliveryHandler) UpdateStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	delivery, err := h.deliveryService.UpdateStatus(c.UserContext(), id, targetStatus)
+	delivery, err := h.deliveryService.ProcessStatusUpdate(c.UserContext(), &dto.DeliveryStatusUpdateRequest{
+		DeliveryID:        id,
+		Status:            targetStatus,
+		EstimatedDelivery: req.EstimatedDelivery,
+		ActualDelivery:    req.ActualDelivery,
+		Location:          req.Location,
+		Notes:             req.Notes,
+	})
 	if err != nil {
 		return h.handleError(c, err)
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	resp := fiber.Map{
 		"id":               delivery.ID,
 		"order_id":         delivery.OrderID,
 		"tracking_number":  delivery.TrackingNumber,
@@ -132,33 +133,19 @@ func (h *DeliveryHandler) UpdateStatus(c *fiber.Ctx) error {
 		"status":           delivery.Status,
 		"shipping_address": delivery.ShippingAddress,
 		"updated_at":       delivery.UpdatedAt,
-	})
-}
+	}
+	if delivery.EstimatedDelivery != nil {
+		resp["estimated_delivery"] = delivery.EstimatedDelivery
+	}
+	if delivery.ActualDelivery != nil {
+		resp["actual_delivery"] = delivery.ActualDelivery
+	}
 
-func (h *DeliveryHandler) GetAvailableWarehouses(c *fiber.Ctx) error {
-	warehouses, err := h.deliveryService.GetAvailableWarehouses(c.UserContext())
-	if err != nil {
-		return h.handleError(c, err)
-	}
-	resp := make([]*dto.WarehouseResponse, len(warehouses))
-	for i, w := range warehouses {
-		resp[i] = dto.FromWarehouse(w)
-	}
 	return c.Status(fiber.StatusOK).JSON(resp)
 }
 
-func (h *DeliveryHandler) SelectWarehouses(c *fiber.Ctx) error {
-	partnerID := middleware.GetPartnerID(c)
-	if partnerID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": fiber.Map{
-				"code":    appErrors.CodeUnauthorized,
-				"message": "partner_id not found in request context",
-			},
-		})
-	}
-
-	var req dto.AssignWarehousesRequest
+func (h *DeliveryHandler) HandleWebhook(c *fiber.Ctx) error {
+	var req dto.DeliveryStatusUpdateRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fiber.Map{
@@ -168,44 +155,32 @@ func (h *DeliveryHandler) SelectWarehouses(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.deliveryService.AssignPartnerWarehouses(c.UserContext(), partnerID, req.WarehouseIDs); err != nil {
-		return h.handleError(c, err)
-	}
-
-	warehouses, err := h.deliveryService.GetPartnerWarehouses(c.UserContext(), partnerID)
+	delivery, err := h.deliveryService.ProcessStatusUpdate(c.UserContext(), &req)
 	if err != nil {
 		return h.handleError(c, err)
 	}
-	resp := make([]*dto.WarehouseResponse, len(warehouses))
-	for i, w := range warehouses {
-		resp[i] = dto.FromWarehouse(w)
-	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message":    "warehouses associated successfully",
-		"warehouses": resp,
-	})
+
+	return c.Status(fiber.StatusOK).JSON(dto.FromDelivery(delivery))
 }
 
-func (h *DeliveryHandler) GetMyWarehouses(c *fiber.Ctx) error {
-	partnerID := middleware.GetPartnerID(c)
-	if partnerID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+func (h *DeliveryHandler) EstimateDelivery(c *fiber.Ctx) error {
+	orderID := strings.TrimSpace(c.Params("orderId"))
+	if orderID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fiber.Map{
-				"code":    appErrors.CodeUnauthorized,
-				"message": "partner_id not found in request context",
+				"code":    appErrors.CodeBadRequest,
+				"message": "order_id is required",
 			},
 		})
 	}
 
-	warehouses, err := h.deliveryService.GetPartnerWarehouses(c.UserContext(), partnerID)
+	partner := strings.TrimSpace(c.Query("partner"))
+	estimate, err := h.deliveryService.EstimateDelivery(c.UserContext(), orderID, partner)
 	if err != nil {
 		return h.handleError(c, err)
 	}
-	resp := make([]*dto.WarehouseResponse, len(warehouses))
-	for i, w := range warehouses {
-		resp[i] = dto.FromWarehouse(w)
-	}
-	return c.Status(fiber.StatusOK).JSON(resp)
+
+	return c.Status(fiber.StatusOK).JSON(estimate)
 }
 
 func (h *DeliveryHandler) GetMyProfile(c *fiber.Ctx) error {

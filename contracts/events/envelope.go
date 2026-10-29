@@ -49,6 +49,7 @@ const (
 	// Delivery Service Events
 	EventTypeDeliveryCreated       = "DeliveryCreated"
 	EventTypeDeliveryStatusUpdated = "DeliveryStatusUpdated"
+	EventTypeDeliveryStatusChanged = "DeliveryStatusChanged"
 
 	// Product Service Events
 	EventTypeProductCreated   = "ProductCreated"
@@ -102,6 +103,7 @@ const (
 	TopicDeliveryCreated       = "gocart.delivery.delivery-created"
 	TopicDeliveryDispatched    = "gocart.delivery.delivery-dispatched"
 	TopicDeliveryStatusUpdated = "gocart.delivery.delivery-status-updated"
+	TopicDeliveryStatusChanged = "gocart.delivery.delivery-status-changed"
 
 	// Product Service Topics
 	TopicProductCreated   = "gocart.product.product-created"

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -18,11 +19,12 @@ type Config struct {
 	Tracing  TracingConfig
 	Kafka    KafkaConfig
 	Outbox   OutboxConfig
-	JWT      JWTConfig
+	Services ServicesConfig
 }
 
-type JWTConfig struct {
-	Secret string
+type ServicesConfig struct {
+	OrderServiceURL          string
+	InventoryServiceGRPCAddr string
 }
 
 type GRPCConfig struct {
@@ -122,10 +124,24 @@ func LoadEnv() *Config {
 			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
 			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.delivery.dlq"),
 		},
-		JWT: JWTConfig{
-			Secret: GetEnv("JWT_SECRET", "super-secret-key-change-in-production"),
+		Services: ServicesConfig{
+			OrderServiceURL:          GetEnv("ORDER_SERVICE_GRPC_URL", GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059")),
+			InventoryServiceGRPCAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
 		},
 	}
+}
+
+// Validate validates critical configuration requirements.
+func (c *Config) Validate() error {
+	isDev := strings.EqualFold(c.App.Environment, "development") ||
+		strings.EqualFold(c.App.Environment, "dev") ||
+		strings.EqualFold(c.App.Environment, "local") ||
+		strings.EqualFold(c.App.Environment, "test")
+
+	if !isDev && strings.TrimSpace(c.Database.URL) == "" {
+		return errors.New("database URL is required in deployed environment (" + c.App.Environment + ")")
+	}
+	return nil
 }
 
 func GetEnv(key, defaultValue string) string {

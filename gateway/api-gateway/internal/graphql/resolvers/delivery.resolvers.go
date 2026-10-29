@@ -6,9 +6,12 @@ package resolvers
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -31,24 +34,116 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 		return nil, appErrors.BadRequest("orderId is required")
 	}
 
-	partner := strings.TrimSpace(input.DeliveryPartner)
-	if partner == "" {
-		return nil, appErrors.BadRequest("deliveryPartner is required")
+	partnerID := strings.TrimSpace(input.DeliveryPartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("deliveryPartnerId is required")
 	}
 
-	shippingAddr := strings.TrimSpace(input.ShippingAddress)
+	var partnerName string
+	profileResp, err := r.Clients.DeliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+		PartnerId: partnerID,
+	})
+	if err == nil && profileResp != nil && profileResp.Profile != nil && strings.TrimSpace(profileResp.Profile.CompanyName) != "" {
+		partnerName = strings.TrimSpace(profileResp.Profile.CompanyName)
+	} else {
+		partnerName = partnerID
+	}
+
+	shippingAddressID := strings.TrimSpace(input.ShippingAddressID)
+
+	var contactNum string
+	if input.ContactNumber != nil {
+		contactNum = strings.TrimSpace(*input.ContactNumber)
+	}
+
+	var shippingAddr string
+
+	orderClient, oErr := r.getOrderClient()
+	var ord *orderpb.Order
+	if oErr == nil && orderClient != nil {
+		orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
+		if err == nil && orderResp != nil && orderResp.Order != nil {
+			ord = orderResp.Order
+			if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
+				shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
+			}
+		}
+	}
+
+	if shippingAddressID == "" && (ord == nil || strings.TrimSpace(ord.ShippingAddress) == "") {
+		return nil, appErrors.BadRequest("shippingAddressId is required")
+	}
+
+	userClient := r.getUserClient()
+	if userClient != nil {
+		customerID := ""
+		if ord != nil && strings.TrimSpace(ord.UserId) != "" {
+			customerID = ord.UserId
+		}
+		if customerID == "" {
+			customerID = authID
+		}
+
+		addrResp, addrErr := userClient.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+			UserId:    customerID,
+			AddressId: shippingAddressID,
+		})
+		if addrErr == nil && addrResp != nil && addrResp.Address != nil {
+			ua := addrResp.Address
+			if ua.City != "" || ua.State != "" {
+				addrMap := map[string]string{
+					"street":      ua.AddressLine,
+					"city":        ua.City,
+					"state":       ua.State,
+					"postal_code": ua.PostalCode,
+					"country":     ua.Country,
+				}
+				if bytes, mErr := json.Marshal(addrMap); mErr == nil {
+					shippingAddr = string(bytes)
+				}
+			} else {
+				shippingAddr = strings.TrimSpace(ua.AddressLine)
+			}
+			if contactNum == "" && strings.TrimSpace(ua.PhoneNumber) != "" {
+				contactNum = strings.TrimSpace(ua.PhoneNumber)
+			}
+		}
+	}
+
+	if shippingAddr == "" && ord != nil && strings.TrimSpace(ord.ShippingAddress) != "" {
+		shippingAddr = strings.TrimSpace(ord.ShippingAddress)
+	}
+
+	if contactNum == "" && ord != nil {
+		if strings.TrimSpace(ord.ShippingAddress) != "" {
+			var rawMap map[string]interface{}
+			if err := json.Unmarshal([]byte(ord.ShippingAddress), &rawMap); err == nil {
+				for _, k := range []string{"contact_number", "contactNumber", "phone_number", "phoneNumber", "phone"} {
+					if v, ok := rawMap[k].(string); ok && strings.TrimSpace(v) != "" {
+						contactNum = strings.TrimSpace(v)
+						break
+					}
+				}
+			}
+		}
+		if contactNum == "" && ord.UserId != "" && userClient != nil {
+			uResp, uErr := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: ord.UserId})
+			if uErr == nil && uResp != nil && uResp.User != nil && strings.TrimSpace(uResp.User.Phone) != "" {
+				contactNum = strings.TrimSpace(uResp.User.Phone)
+			}
+		}
+	}
+
 	if shippingAddr == "" {
-		return nil, appErrors.BadRequest("shippingAddress is required")
+		return nil, appErrors.BadRequest("shippingAddress is required and could not be resolved from order")
 	}
-
-	contactNum := strings.TrimSpace(input.ContactNumber)
 	if contactNum == "" {
-		return nil, appErrors.BadRequest("contactNumber is required")
+		return nil, appErrors.BadRequest("contactNumber is required and could not be resolved from customer profile")
 	}
 
 	req := &deliverypb.CreateDeliveryRequest{
 		OrderId:         orderID,
-		DeliveryPartner: partner,
+		DeliveryPartner: partnerName,
 		ShippingAddress: shippingAddr,
 		ContactNumber:   contactNum,
 	}

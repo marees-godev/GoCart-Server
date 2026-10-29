@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -125,6 +126,10 @@ func (r *memoryDeliveryRepo) List(ctx context.Context, limit, offset int, status
 }
 
 func (r *memoryDeliveryRepo) UpdateStatus(ctx context.Context, id string, status model.DeliveryStatus) (*model.Delivery, error) {
+	return r.UpdateStatusWithDetails(ctx, id, status, nil, nil, "", "")
+}
+
+func (r *memoryDeliveryRepo) UpdateStatusWithDetails(ctx context.Context, id string, status model.DeliveryStatus, estimatedDelivery, actualDelivery *time.Time, location, notes string) (*model.Delivery, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -136,22 +141,45 @@ func (r *memoryDeliveryRepo) UpdateStatus(ctx context.Context, id string, status
 			return nil, appErrors.NotFound("delivery not found")
 		}
 	}
-	if d.Status == status {
+
+	cleanStatus := model.DeliveryStatus(strings.ToUpper(strings.TrimSpace(string(status))))
+	if !model.IsValidStatus(cleanStatus) {
+		return nil, appErrors.BadRequest("invalid or unknown delivery status: " + string(status))
+	}
+
+	if d.Status == cleanStatus {
+		if estimatedDelivery != nil {
+			d.EstimatedDelivery = estimatedDelivery
+		}
+		if actualDelivery != nil {
+			d.ActualDelivery = actualDelivery
+		}
 		copyD := *d
 		return &copyD, nil
 	}
-	d.Status = status
+
+	if err := d.TransitionStatus(cleanStatus); err != nil {
+		return nil, err
+	}
+
+	if estimatedDelivery != nil {
+		d.EstimatedDelivery = estimatedDelivery
+	}
+	if cleanStatus == model.StatusDelivered {
+		if actualDelivery != nil {
+			d.ActualDelivery = actualDelivery
+		} else if d.ActualDelivery == nil {
+			now := time.Now().UTC()
+			d.ActualDelivery = &now
+		}
+	} else if actualDelivery != nil {
+		d.ActualDelivery = actualDelivery
+	}
+
+	d.Status = cleanStatus
 	d.UpdatedAt = time.Now().UTC()
 	copyD := *d
 	return &copyD, nil
-}
-
-func (r *memoryDeliveryRepo) UpsertTempOrder(ctx context.Context, order *model.TempOrder) error {
-	return nil
-}
-
-func (r *memoryDeliveryRepo) GetTempOrderByID(ctx context.Context, id string) (*model.TempOrder, error) {
-	return nil, appErrors.NotFound("temporary order not found")
 }
 
 func (r *memoryDeliveryRepo) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
@@ -167,18 +195,47 @@ func (r *memoryDeliveryRepo) GetAvailableWarehouses(ctx context.Context) ([]*mod
 	return res, nil
 }
 
-func (r *memoryDeliveryRepo) GetWarehouseByID(ctx context.Context, id uuid.UUID) (*model.Warehouse, error) {
+func (r *memoryDeliveryRepo) GetWarehouseByID(ctx context.Context, partnerID uuid.UUID, id uuid.UUID) (*model.Warehouse, error) {
+	if partnerID == uuid.Nil {
+		return nil, appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	w, ok := r.warehouses[id]
-	if !ok {
+	if !ok || w.DeliveryPartnerID != partnerID {
 		return nil, appErrors.NotFound("warehouse not found")
 	}
 	cp := *w
 	return &cp, nil
 }
 
+
+
+
+func (r *memoryDeliveryRepo) GetWarehousesByPartnerID(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error) {
+	if partnerID == uuid.Nil {
+		return nil, appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.Warehouse, 0)
+	for _, w := range r.warehouses {
+		if w.DeliveryPartnerID == partnerID {
+			cp := *w
+			res = append(res, &cp)
+		}
+	}
+	return res, nil
+}
+
+func (r *memoryDeliveryRepo) GetPartnerWarehouses(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error) {
+	return r.GetWarehousesByPartnerID(ctx, partnerID)
+}
+
 func (r *memoryDeliveryRepo) CreateWarehouse(ctx context.Context, w *model.Warehouse) error {
+	if w.DeliveryPartnerID == uuid.Nil {
+		return appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if w.ID == uuid.Nil {
@@ -186,6 +243,38 @@ func (r *memoryDeliveryRepo) CreateWarehouse(ctx context.Context, w *model.Wareh
 	}
 	cp := *w
 	r.warehouses[w.ID] = &cp
+	return nil
+}
+
+func (r *memoryDeliveryRepo) UpdateWarehouse(ctx context.Context, w *model.Warehouse) (*model.Warehouse, error) {
+	if w.DeliveryPartnerID == uuid.Nil {
+		return nil, appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	existing, ok := r.warehouses[w.ID]
+	if !ok || existing.DeliveryPartnerID != w.DeliveryPartnerID {
+		return nil, appErrors.NotFound("warehouse not found")
+	}
+	cp := *w
+	r.warehouses[w.ID] = &cp
+	return &cp, nil
+}
+
+
+
+
+func (r *memoryDeliveryRepo) DeleteWarehouse(ctx context.Context, partnerID uuid.UUID, id uuid.UUID) error {
+	if partnerID == uuid.Nil {
+		return appErrors.BadRequest("delivery_partner_id is mandatory to proceed")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	existing, ok := r.warehouses[id]
+	if !ok || existing.DeliveryPartnerID != partnerID {
+		return appErrors.NotFound("warehouse not found")
+	}
+	delete(r.warehouses, id)
 	return nil
 }
 
@@ -211,29 +300,21 @@ func (r *memoryDeliveryRepo) GetPartnerProfile(ctx context.Context, partnerID uu
 	return &cp, nil
 }
 
-func (r *memoryDeliveryRepo) AssignPartnerWarehouses(ctx context.Context, partnerID uuid.UUID, warehouseIDs []uuid.UUID) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.partnerWarehouses[partnerID] = warehouseIDs
-	return nil
-}
-
-func (r *memoryDeliveryRepo) GetPartnerWarehouses(ctx context.Context, partnerID uuid.UUID) ([]*model.Warehouse, error) {
+func (r *memoryDeliveryRepo) GetPartnerProfileByCompanyName(ctx context.Context, name string) (*model.DeliveryPartnerProfile, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	wIDs, ok := r.partnerWarehouses[partnerID]
-	if !ok {
-		return make([]*model.Warehouse, 0), nil
-	}
-	res := make([]*model.Warehouse, 0, len(wIDs))
-	for _, id := range wIDs {
-		if w, exists := r.warehouses[id]; exists {
-			cp := *w
-			res = append(res, &cp)
+	clean := strings.ToLower(strings.TrimSpace(name))
+	for _, p := range r.partnerProfiles {
+		if strings.ToLower(strings.TrimSpace(p.CompanyName)) == clean {
+			cp := *p
+			return &cp, nil
 		}
 	}
-	return res, nil
+	return nil, appErrors.NotFound("partner profile not found")
 }
+
+
+
 
 func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	ctx := context.Background()
