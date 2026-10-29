@@ -130,6 +130,19 @@ type CreateDeliveryInput struct {
 	ContactNumber     *string `json:"contactNumber,omitempty"`
 }
 
+type CreateExchangeInput struct {
+	OrderID           string                         `json:"orderId"`
+	UserID            *string                        `json:"userId,omitempty"`
+	OrderItemID       string                         `json:"orderItemId"`
+	NewProductID      string                         `json:"newProductId"`
+	OldBrand          string                         `json:"oldBrand"`
+	OldModel          string                         `json:"oldModel"`
+	OldVariant        *string                        `json:"oldVariant,omitempty"`
+	SerialOrImei      *string                        `json:"serialOrImei,omitempty"`
+	BaseExchangeValue float64                        `json:"baseExchangeValue"`
+	Answers           []*ExchangeQuestionAnswerInput `json:"answers,omitempty"`
+}
+
 type CreateInventoryInput struct {
 	WarehouseID       *string `json:"warehouseId,omitempty"`
 	ProductID         string  `json:"productId"`
@@ -263,6 +276,60 @@ type DeliveryPartnerProfile struct {
 	IsActive      bool    `json:"isActive"`
 	CreatedAt     *string `json:"createdAt,omitempty"`
 	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type Exchange struct {
+	ID                string                    `json:"id"`
+	OrderID           string                    `json:"orderId"`
+	OrderItemID       string                    `json:"orderItemId"`
+	UserID            string                    `json:"userId"`
+	NewProductID      string                    `json:"newProductId"`
+	OldBrand          string                    `json:"oldBrand"`
+	OldModel          string                    `json:"oldModel"`
+	OldVariant        *string                   `json:"oldVariant,omitempty"`
+	SerialOrImei      *string                   `json:"serialOrImei,omitempty"`
+	BaseExchangeValue float64                   `json:"baseExchangeValue"`
+	EstimatedDiscount float64                   `json:"estimatedDiscount"`
+	FinalDiscount     *float64                  `json:"finalDiscount,omitempty"`
+	PriceDifference   *float64                  `json:"priceDifference,omitempty"`
+	Status            string                    `json:"status"`
+	Answers           []*ExchangeQuestionAnswer `json:"answers,omitempty"`
+	Verification      *ExchangeVerification     `json:"verification,omitempty"`
+	CreatedAt         *string                   `json:"createdAt,omitempty"`
+	UpdatedAt         *string                   `json:"updatedAt,omitempty"`
+}
+
+type ExchangeQuestionAnswer struct {
+	ID              string  `json:"id"`
+	ExchangeID      string  `json:"exchangeId"`
+	QuestionKey     string  `json:"questionKey"`
+	AnswerValue     string  `json:"answerValue"`
+	DeductionAmount float64 `json:"deductionAmount"`
+	CreatedAt       *string `json:"createdAt,omitempty"`
+}
+
+type ExchangeQuestionAnswerInput struct {
+	QuestionKey     string   `json:"questionKey"`
+	AnswerValue     string   `json:"answerValue"`
+	DeductionAmount *float64 `json:"deductionAmount,omitempty"`
+}
+
+type ExchangeVerification struct {
+	ID               string   `json:"id"`
+	ExchangeID       string   `json:"exchangeId"`
+	VerifiedBy       string   `json:"verifiedBy"`
+	ConditionRating  string   `json:"conditionRating"`
+	IsApproved       bool     `json:"isApproved"`
+	ScreenIntact     bool     `json:"screenIntact"`
+	BodyIntact       bool     `json:"bodyIntact"`
+	Functional       bool     `json:"functional"`
+	SerialMatches    bool     `json:"serialMatches"`
+	AdjustedDiscount float64  `json:"adjustedDiscount"`
+	ProofImages      []string `json:"proofImages,omitempty"`
+	Notes            *string  `json:"notes,omitempty"`
+	VerifiedAt       string   `json:"verifiedAt"`
+	CreatedAt        *string  `json:"createdAt,omitempty"`
+	UpdatedAt        *string  `json:"updatedAt,omitempty"`
 }
 
 type ForgotPasswordInput struct {
@@ -516,19 +583,19 @@ type RegisterInput struct {
 }
 
 type RequestReplacementInput struct {
-	OrderID     string   `json:"orderId"`
-	UserID      *string  `json:"userId,omitempty"`
-	OrderItemID *string  `json:"orderItemId,omitempty"`
-	Reason      string   `json:"reason"`
-	ItemIds     []string `json:"itemIds,omitempty"`
+	OrderID     string  `json:"orderId"`
+	UserID      *string `json:"userId,omitempty"`
+	OrderItemID *string `json:"orderItemId,omitempty"`
+	ItemID      *string `json:"itemId,omitempty"`
+	Reason      string  `json:"reason"`
 }
 
 type RequestReturnInput struct {
 	OrderID     string      `json:"orderId"`
 	UserID      *string     `json:"userId,omitempty"`
 	OrderItemID *string     `json:"orderItemId,omitempty"`
+	ItemID      *string     `json:"itemId,omitempty"`
 	Reason      string      `json:"reason"`
-	ItemIds     []string    `json:"itemIds,omitempty"`
 	Type        *ReturnType `json:"type,omitempty"`
 }
 
@@ -571,20 +638,21 @@ type RestockInventoryPayload struct {
 }
 
 type ReturnOrder struct {
-	ID           string               `json:"id"`
-	OrderID      string               `json:"orderId"`
-	OrderItemID  *string              `json:"orderItemId,omitempty"`
-	UserID       string               `json:"userId"`
-	Reason       string               `json:"reason"`
-	Status       string               `json:"status"`
-	Type         string               `json:"type"`
-	RefundAmount float64              `json:"refundAmount"`
-	Verification *ProductVerification `json:"verification,omitempty"`
-	RequestedAt  *string              `json:"requestedAt,omitempty"`
-	ApprovedAt   *string              `json:"approvedAt,omitempty"`
-	CompletedAt  *string              `json:"completedAt,omitempty"`
-	CreatedAt    *string              `json:"createdAt,omitempty"`
-	UpdatedAt    *string              `json:"updatedAt,omitempty"`
+	ID              string               `json:"id"`
+	OrderID         string               `json:"orderId"`
+	OrderItemID     *string              `json:"orderItemId,omitempty"`
+	UserID          string               `json:"userId"`
+	Reason          string               `json:"reason"`
+	Status          string               `json:"status"`
+	Type            string               `json:"type"`
+	RefundAmount    float64              `json:"refundAmount"`
+	Verification    *ProductVerification `json:"verification,omitempty"`
+	RequestedAt     *string              `json:"requestedAt,omitempty"`
+	ApprovedAt      *string              `json:"approvedAt,omitempty"`
+	CompletedAt     *string              `json:"completedAt,omitempty"`
+	RejectionReason *string              `json:"rejectionReason,omitempty"`
+	CreatedAt       *string              `json:"createdAt,omitempty"`
+	UpdatedAt       *string              `json:"updatedAt,omitempty"`
 }
 
 type SendNotificationInput struct {
@@ -783,6 +851,18 @@ type ValidateCategoryResponse struct {
 	IsValid  bool      `json:"isValid"`
 	Message  string    `json:"message"`
 	Category *Category `json:"category,omitempty"`
+}
+
+type VerifyExchangeProductInput struct {
+	ExchangeID       string   `json:"exchangeId"`
+	ConditionRating  string   `json:"conditionRating"`
+	IsApproved       bool     `json:"isApproved"`
+	ScreenIntact     bool     `json:"screenIntact"`
+	BodyIntact       bool     `json:"bodyIntact"`
+	Functional       bool     `json:"functional"`
+	SerialMatches    bool     `json:"serialMatches"`
+	AdjustedDiscount *float64 `json:"adjustedDiscount,omitempty"`
+	Notes            *string  `json:"notes,omitempty"`
 }
 
 type VerifyProductInput struct {
@@ -1100,33 +1180,47 @@ type ReturnStatus string
 
 const (
 	ReturnStatusReturnRequested      ReturnStatus = "RETURN_REQUESTED"
+	ReturnStatusRequested            ReturnStatus = "REQUESTED"
 	ReturnStatusReplacementRequested ReturnStatus = "REPLACEMENT_REQUESTED"
+	ReturnStatusExchangeRequested    ReturnStatus = "EXCHANGE_REQUESTED"
+	ReturnStatusUnderReview          ReturnStatus = "UNDER_REVIEW"
 	ReturnStatusApproved             ReturnStatus = "APPROVED"
 	ReturnStatusRejected             ReturnStatus = "REJECTED"
-	ReturnStatusVerified             ReturnStatus = "VERIFIED"
+	ReturnStatusPickupScheduled      ReturnStatus = "PICKUP_SCHEDULED"
+	ReturnStatusPickedUp             ReturnStatus = "PICKED_UP"
+	ReturnStatusReceived             ReturnStatus = "RECEIVED"
 	ReturnStatusItemReceived         ReturnStatus = "ITEM_RECEIVED"
+	ReturnStatusVerified             ReturnStatus = "VERIFIED"
 	ReturnStatusRefundInitiated      ReturnStatus = "REFUND_INITIATED"
 	ReturnStatusReplacementInitiated ReturnStatus = "REPLACEMENT_INITIATED"
+	ReturnStatusExchangeInitiated    ReturnStatus = "EXCHANGE_INITIATED"
 	ReturnStatusCompleted            ReturnStatus = "COMPLETED"
 	ReturnStatusCancelled            ReturnStatus = "CANCELLED"
 )
 
 var AllReturnStatus = []ReturnStatus{
 	ReturnStatusReturnRequested,
+	ReturnStatusRequested,
 	ReturnStatusReplacementRequested,
+	ReturnStatusExchangeRequested,
+	ReturnStatusUnderReview,
 	ReturnStatusApproved,
 	ReturnStatusRejected,
-	ReturnStatusVerified,
+	ReturnStatusPickupScheduled,
+	ReturnStatusPickedUp,
+	ReturnStatusReceived,
 	ReturnStatusItemReceived,
+	ReturnStatusVerified,
 	ReturnStatusRefundInitiated,
 	ReturnStatusReplacementInitiated,
+	ReturnStatusExchangeInitiated,
 	ReturnStatusCompleted,
 	ReturnStatusCancelled,
 }
 
 func (e ReturnStatus) IsValid() bool {
 	switch e {
-	case ReturnStatusReturnRequested, ReturnStatusReplacementRequested, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusVerified, ReturnStatusItemReceived, ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusCompleted, ReturnStatusCancelled:
+	case ReturnStatusReturnRequested, ReturnStatusRequested, ReturnStatusReplacementRequested, ReturnStatusExchangeRequested, ReturnStatusUnderReview, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusPickupScheduled, ReturnStatusPickedUp, ReturnStatusReceived, ReturnStatusItemReceived, ReturnStatusVerified, ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusExchangeInitiated, ReturnStatusCompleted, ReturnStatusCancelled:
 		return true
 	}
 	return false
@@ -1158,16 +1252,18 @@ type ReturnType string
 const (
 	ReturnTypeReturn      ReturnType = "RETURN"
 	ReturnTypeReplacement ReturnType = "REPLACEMENT"
+	ReturnTypeExchange    ReturnType = "EXCHANGE"
 )
 
 var AllReturnType = []ReturnType{
 	ReturnTypeReturn,
 	ReturnTypeReplacement,
+	ReturnTypeExchange,
 }
 
 func (e ReturnType) IsValid() bool {
 	switch e {
-	case ReturnTypeReturn, ReturnTypeReplacement:
+	case ReturnTypeReturn, ReturnTypeReplacement, ReturnTypeExchange:
 		return true
 	}
 	return false
