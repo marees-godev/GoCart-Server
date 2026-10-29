@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/repository"
@@ -25,34 +26,42 @@ type DeliveryService interface {
 	GetDeliveryByID(ctx context.Context, id string) (*model.Delivery, error)
 	ListDeliveries(ctx context.Context, limit, offset int, status string) ([]*model.Delivery, int, error)
 	UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error)
-	GetTempOrderByID(ctx context.Context, orderID string) (*model.TempOrder, error)
-	UpsertTempOrder(ctx context.Context, order *model.TempOrder) error
+	ProcessStatusUpdate(ctx context.Context, req *dto.DeliveryStatusUpdateRequest) (*model.Delivery, error)
 
-	// Warehouse & Partner Management (Tasks 6, 7, 9)
-	GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error)
-	AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error
-	GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error)
+	// Estimated delivery using order_service and transit rules
+	EstimateDelivery(ctx context.Context, orderID string, partnerID ...string) (*dto.EstimatedDeliveryResponse, error)
+
+	// Partner Management
 	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
 	GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
 	UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error)
 }
 
 type deliveryService struct {
-	repo   repository.DeliveryRepository
-	logger *slog.Logger
+	repo            repository.DeliveryRepository
+	orderClient     client.OrderClient
+	inventoryClient client.InventoryClient
+	logger          *slog.Logger
 }
 
-func NewDeliveryService(repo repository.DeliveryRepository, log ...*slog.Logger) DeliveryService {
-	var l *slog.Logger
-	if len(log) > 0 && log[0] != nil {
-		l = log[0]
-	} else {
-		l = slog.Default()
-	}
-	return &deliveryService{
+func NewDeliveryService(repo repository.DeliveryRepository, args ...any) DeliveryService {
+	s := &deliveryService{
 		repo:   repo,
-		logger: l,
+		logger: slog.Default(),
 	}
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case client.OrderClient:
+			s.orderClient = v
+		case client.InventoryClient:
+			s.inventoryClient = v
+		case *slog.Logger:
+			if v != nil {
+				s.logger = v
+			}
+		}
+	}
+	return s
 }
 
 func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto.OrderConfirmedPayload) (*model.Delivery, error) {
@@ -75,48 +84,108 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 		addr = *payload.ShippingAddress
 	}
 
+	// Retrieve order from order_service if orderClient is configured and address info is needed or for authoritative enrichment
+	if s.orderClient != nil {
+		if ord, oErr := s.orderClient.GetOrder(ctx, orderID); oErr == nil && ord != nil {
+			if strings.TrimSpace(addr.City) == "" && strings.TrimSpace(ord.ShippingAddress.City) != "" {
+				addr.City = ord.ShippingAddress.City
+			}
+			if strings.TrimSpace(addr.State) == "" && strings.TrimSpace(ord.ShippingAddress.State) != "" {
+				addr.State = ord.ShippingAddress.State
+			}
+			if strings.TrimSpace(addr.Street) == "" && strings.TrimSpace(ord.ShippingAddress.Street) != "" {
+				addr.Street = ord.ShippingAddress.Street
+			}
+			if strings.TrimSpace(addr.PostalCode) == "" && strings.TrimSpace(ord.ShippingAddress.PostalCode) != "" {
+				addr.PostalCode = ord.ShippingAddress.PostalCode
+			}
+			if strings.TrimSpace(addr.Country) == "" && strings.TrimSpace(ord.ShippingAddress.Country) != "" {
+				addr.Country = ord.ShippingAddress.Country
+			}
+			if strings.TrimSpace(addr.ContactNumber) == "" && strings.TrimSpace(ord.ShippingAddress.ContactNumber) != "" {
+				addr.ContactNumber = ord.ShippingAddress.ContactNumber
+			}
+		}
+	}
+
 	if strings.TrimSpace(addr.ContactNumber) == "" {
 		s.logger.Warn("HandleOrderConfirmed failed: contact_number is required in shipping address", slog.String("order_id", orderID))
 		return nil, appErrors.BadRequest("contact_number is required in shipping address")
 	}
 
-	partner := strings.TrimSpace(payload.DeliveryPartner)
-	if partner == "" {
-		partner = "STANDARD"
-	}
+	model.NormalizeAddressFromTokens(&addr)
 
-	trackingNumber, err := s.generateTrackingNumber(partner)
-	if err != nil {
-		s.logger.Error("Failed to generate tracking number", slog.Any("error", err))
-		return nil, appErrors.Internal(err, "failed to generate tracking number")
+	rawPartner := strings.TrimSpace(payload.DeliveryPartner)
+	var partnerUUID uuid.UUID
+	var partnerName string
+	if rawPartner != "" {
+		if pUUID, pErr := uuid.Parse(rawPartner); pErr == nil {
+			partnerUUID = pUUID
+			if prof, profErr := s.repo.GetPartnerProfile(ctx, partnerUUID); profErr == nil && prof != nil && strings.TrimSpace(prof.CompanyName) != "" {
+				partnerName = strings.TrimSpace(prof.CompanyName)
+			}
+		} else {
+			partnerName = rawPartner
+			if prof, profErr := s.repo.GetPartnerProfileByCompanyName(ctx, rawPartner); profErr == nil && prof != nil {
+				partnerUUID = prof.PartnerID
+			}
+		}
+	}
+	if partnerName == "" {
+		if rawPartner != "" {
+			partnerName = rawPartner
+		} else {
+			partnerName = "STANDARD"
+		}
 	}
 
 	now := time.Now().UTC()
 
-	// Transit SLA Calculation (Provisional Rough Estimate for MVP):
-	// NOTE: The chosen origin warehouse serves as a provisional fulfillment origin for initial SLA calculation.
-	// This represents a rough estimate and should not be presented as a finalized location-specific ETA
-	// until the actual fulfillment origin warehouse is selected and confirmed by the fulfillment workflow.
+	// Transit SLA Calculation:
+	// Use warehouse location from delivery partner check availability and set estimated delivery date
+	var originWarehouse *model.Warehouse
 	var originCity, originState string
-	if partnerID, parseErr := uuid.Parse(partner); parseErr == nil {
-		warehouses, wErr := s.repo.GetPartnerWarehouses(ctx, partnerID)
-		if wErr == nil && len(warehouses) > 0 {
-			originCity, originState = resolveProvisionalOrigin(warehouses, addr.City, addr.State)
+
+	var partnerIDStr string
+	if partnerUUID != uuid.Nil {
+		partnerIDStr = partnerUUID.String()
+	}
+	warehouses := s.fetchPartnerWarehouses(ctx, partnerIDStr)
+	if len(warehouses) > 0 {
+		if addr.City == "" {
+			model.InferCityStateFromWarehouses(&addr, warehouses)
+		}
+		originWarehouse = resolveProvisionalWarehouse(warehouses, addr.City, addr.State)
+	}
+	if originWarehouse == nil {
+		if avail := s.fetchAvailableWarehouses(ctx); len(avail) > 0 {
+			if addr.City == "" {
+				model.InferCityStateFromWarehouses(&addr, avail)
+			}
+			originWarehouse = resolveProvisionalWarehouse(avail, addr.City, addr.State)
 		}
 	}
-	if originCity == "" && originState == "" {
-		if avail, err := s.repo.GetAvailableWarehouses(ctx); err == nil && len(avail) > 0 {
-			originCity, originState = resolveProvisionalOrigin(avail, addr.City, addr.State)
+	if originWarehouse != nil {
+		originCity = originWarehouse.City
+		originState = originWarehouse.State
+		if addr.City == "" && originCity != "" {
+			addr.City = originCity
 		}
 	}
 
 	transitResult := CalculateTransitDeliveryDate(originCity, originState, addr.City, addr.State, now)
 	targetDate := transitResult.TargetDate
 
+	trackingNumber, err := s.generateTrackingNumber(partnerName)
+	if err != nil {
+		s.logger.Error("Failed to generate tracking number", slog.String("order_id", orderID), slog.Any("error", err))
+		return nil, err
+	}
+
 	delivery := &model.Delivery{
 		ID:                uuid.NewString(),
 		OrderID:           orderID,
-		DeliveryPartner:   partner,
+		DeliveryPartner:   partnerName,
 		TrackingNumber:    trackingNumber,
 		ShippingAddress:   addr,
 		Status:            model.StatusCreated,
@@ -125,7 +194,7 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 		UpdatedAt:         now,
 	}
 
-	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partner), slog.String("tracking_number", trackingNumber), slog.Time("estimated_delivery", targetDate))
+	s.logger.Info("Creating delivery record", slog.String("order_id", orderID), slog.String("partner", partnerName), slog.String("tracking_number", trackingNumber), slog.Time("estimated_delivery", targetDate))
 	if err := s.repo.Create(ctx, delivery); err != nil {
 		s.logger.Error("Failed to persist delivery record", slog.String("order_id", orderID), slog.Any("error", err))
 		return nil, err
@@ -137,6 +206,81 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	}
 
 	return delivery, nil
+}
+
+func (s *deliveryService) EstimateDelivery(ctx context.Context, orderID string, partnerID ...string) (*dto.EstimatedDeliveryResponse, error) {
+	cleanOrderID := strings.TrimSpace(orderID)
+	if cleanOrderID == "" {
+		return nil, appErrors.BadRequest("order_id is required")
+	}
+
+	var destCity, destState string
+	var destAddr *model.ShippingAddress
+
+	// 1. Fetch authoritative order from order_service
+	if s.orderClient != nil {
+		ord, err := s.orderClient.GetOrder(ctx, cleanOrderID)
+		if err != nil {
+			return nil, err
+		}
+		destCity = ord.ShippingAddress.City
+		destState = ord.ShippingAddress.State
+		destAddr = &ord.ShippingAddress
+	} else {
+		// Fallback to existing delivery if order_client is not configured
+		del, err := s.repo.GetByOrderID(ctx, cleanOrderID)
+		if err == nil && del != nil {
+			destCity = del.ShippingAddress.City
+			destState = del.ShippingAddress.State
+			destAddr = &del.ShippingAddress
+		} else {
+			return nil, appErrors.NotFound("order not found in order service")
+		}
+	}
+
+	partner := "STANDARD"
+	if len(partnerID) > 0 && strings.TrimSpace(partnerID[0]) != "" {
+		partner = strings.TrimSpace(partnerID[0])
+	}
+
+	now := time.Now().UTC()
+
+	// 2. Check warehouse location from delivery partner and check availability
+	var originWarehouse *model.Warehouse
+	var originCity, originState string
+	warehouses := s.fetchPartnerWarehouses(ctx, partner)
+	if len(warehouses) > 0 {
+		originWarehouse = resolveProvisionalWarehouse(warehouses, destCity, destState)
+	}
+	if originWarehouse == nil {
+		if avail := s.fetchAvailableWarehouses(ctx); len(avail) > 0 {
+			originWarehouse = resolveProvisionalWarehouse(avail, destCity, destState)
+		}
+	}
+	if originWarehouse != nil {
+		originCity = originWarehouse.City
+		originState = originWarehouse.State
+	}
+
+	// 3. Calculate estimated transit delivery date:
+	// - Same-city delivery: 1–2 days (target: 2 days)
+	// - Within the same state: 2–4 days (target: 4 days)
+	// - Inter-state delivery: 4–7 days (target: 7 days)
+	transitResult := CalculateTransitDeliveryDate(originCity, originState, destCity, destState, now)
+
+	return &dto.EstimatedDeliveryResponse{
+		OrderID:           cleanOrderID,
+		DeliveryPartner:   partner,
+		DeliveryType:      transitResult.DeliveryType,
+		TransitEstimate:   transitResult.EstimatedTransit,
+		MinDays:           transitResult.MinDays,
+		MaxDays:           transitResult.MaxDays,
+		EstimatedDelivery: transitResult.TargetDate,
+		OriginWarehouse:   originWarehouse,
+		DestinationCity:   destCity,
+		DestinationState:  destState,
+		ShippingAddress:   destAddr,
+	}, nil
 }
 
 func (s *deliveryService) GetDeliveryByOrderID(ctx context.Context, orderID string) (*model.Delivery, error) {
@@ -182,34 +326,59 @@ func (s *deliveryService) ListDeliveries(ctx context.Context, limit, offset int,
 }
 
 func (s *deliveryService) UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error) {
-	cleanID := strings.TrimSpace(id)
-	if cleanID == "" {
-		s.logger.Warn("UpdateStatus failed: id is required")
-		return nil, appErrors.BadRequest("id is required")
+	return s.ProcessStatusUpdate(ctx, &dto.DeliveryStatusUpdateRequest{
+		DeliveryID: id,
+		Status:     targetStatus,
+	})
+}
+
+func (s *deliveryService) ProcessStatusUpdate(ctx context.Context, req *dto.DeliveryStatusUpdateRequest) (*model.Delivery, error) {
+	if req == nil {
+		s.logger.Warn("ProcessStatusUpdate failed: request is nil")
+		return nil, appErrors.BadRequest("status update request is required")
 	}
 
-	cleanTargetStatus := model.DeliveryStatus(strings.ToUpper(strings.TrimSpace(string(targetStatus))))
-	if cleanTargetStatus == "" {
-		s.logger.Warn("UpdateStatus failed: target status is required")
-		return nil, appErrors.BadRequest("status is required")
+	cleanStatus := model.DeliveryStatus(strings.ToUpper(strings.TrimSpace(string(req.Status))))
+	if !model.IsValidStatus(cleanStatus) {
+		s.logger.Warn("ProcessStatusUpdate rejected: invalid or unknown status", slog.String("status", string(req.Status)))
+		return nil, appErrors.BadRequest("invalid or unknown delivery status: " + string(req.Status))
 	}
 
-	delivery, err := s.repo.GetByID(ctx, cleanID)
+	identifier := strings.TrimSpace(req.TrackingNumber)
+	if identifier == "" {
+		identifier = strings.TrimSpace(req.DeliveryID)
+	}
+	if identifier == "" {
+		identifier = strings.TrimSpace(req.OrderID)
+	}
+	if identifier == "" {
+		s.logger.Warn("ProcessStatusUpdate failed: missing delivery identifier")
+		return nil, appErrors.BadRequest("tracking_number, delivery_id, or order_id is required")
+	}
+
+	delivery, err := s.repo.GetByTrackingNumber(ctx, identifier)
 	if err != nil && appErrors.IsNotFound(err) {
-		delivery, err = s.repo.GetByOrderID(ctx, cleanID)
+		delivery, err = s.repo.GetByID(ctx, identifier)
+	}
+	if err != nil && appErrors.IsNotFound(err) {
+		delivery, err = s.repo.GetByOrderID(ctx, identifier)
 	}
 	if err != nil {
-		s.logger.Error("UpdateStatus failed: delivery not found", slog.String("delivery_id", cleanID), slog.Any("error", err))
+		s.logger.Error("ProcessStatusUpdate failed: delivery not found", slog.String("identifier", identifier), slog.Any("error", err))
 		return nil, err
 	}
 
-	if delivery.Status == cleanTargetStatus {
-		s.logger.Info("Delivery is already in target status (idempotent)", slog.String("delivery_id", delivery.ID), slog.String("status", string(cleanTargetStatus)))
+	// Idempotency: Duplicate delivery events handled safely
+	if delivery.Status == cleanStatus {
+		s.logger.Info("Delivery is already in target status (idempotent)", slog.String("delivery_id", delivery.ID), slog.String("status", string(cleanStatus)))
+		if req.EstimatedDelivery != nil || req.ActualDelivery != nil {
+			return s.repo.UpdateStatusWithDetails(ctx, delivery.ID, cleanStatus, req.EstimatedDelivery, req.ActualDelivery, req.Location, req.Notes)
+		}
 		return delivery, nil
 	}
 
-	if err := model.TransitionStatus(delivery.Status, cleanTargetStatus); err != nil {
-		s.logger.Warn("Invalid delivery state transition", slog.String("delivery_id", delivery.ID), slog.String("current_status", string(delivery.Status)), slog.String("target_status", string(cleanTargetStatus)), slog.Any("error", err))
+	if err := model.TransitionStatus(delivery.Status, cleanStatus); err != nil {
+		s.logger.Warn("Invalid delivery state transition", slog.String("delivery_id", delivery.ID), slog.String("current", string(delivery.Status)), slog.String("target", string(cleanStatus)), slog.Any("error", err))
 		var transErr *model.InvalidStateTransitionError
 		if errors.As(err, &transErr) {
 			return nil, transErr.ToAppError()
@@ -217,27 +386,15 @@ func (s *deliveryService) UpdateStatus(ctx context.Context, id string, targetSta
 		return nil, appErrors.New(appErrors.CodeUnprocessableEntity, err.Error(), http.StatusUnprocessableEntity)
 	}
 
-	s.logger.Info("Transitioning delivery status", slog.String("delivery_id", delivery.ID), slog.String("current_status", string(delivery.Status)), slog.String("target_status", string(cleanTargetStatus)))
-	return s.repo.UpdateStatus(ctx, delivery.ID, cleanTargetStatus)
-}
-
-func (s *deliveryService) GetTempOrderByID(ctx context.Context, orderID string) (*model.TempOrder, error) {
-	cleanID := strings.TrimSpace(orderID)
-	if cleanID == "" {
-		s.logger.Warn("GetTempOrderByID failed: order_id is required")
-		return nil, appErrors.BadRequest("order_id is required")
+	// If transitioning to DELIVERED and actual_delivery is not specified, record it
+	actDelivery := req.ActualDelivery
+	if cleanStatus == model.StatusDelivered && actDelivery == nil {
+		now := time.Now().UTC()
+		actDelivery = &now
 	}
-	s.logger.Info("Retrieving temporary order by ID", slog.String("order_id", cleanID))
-	return s.repo.GetTempOrderByID(ctx, cleanID)
-}
 
-func (s *deliveryService) UpsertTempOrder(ctx context.Context, order *model.TempOrder) error {
-	if order == nil || strings.TrimSpace(order.ID) == "" {
-		s.logger.Warn("UpsertTempOrder failed: valid order is required")
-		return appErrors.BadRequest("order is required")
-	}
-	s.logger.Info("Upserting temporary order", slog.String("order_id", order.ID))
-	return s.repo.UpsertTempOrder(ctx, order)
+	s.logger.Info("Processing delivery status update", slog.String("delivery_id", delivery.ID), slog.String("current", string(delivery.Status)), slog.String("target", string(cleanStatus)))
+	return s.repo.UpdateStatusWithDetails(ctx, delivery.ID, cleanStatus, req.EstimatedDelivery, actDelivery, req.Location, req.Notes)
 }
 
 func (s *deliveryService) generateTrackingNumber(partner string) (string, error) {
@@ -252,71 +409,114 @@ func (s *deliveryService) generateTrackingNumber(partner string) (string, error)
 	return fmt.Sprintf("GC-%s-%s", prefix, strings.ToUpper(hex.EncodeToString(b))), nil
 }
 
-func (s *deliveryService) GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error) {
-	s.logger.Info("Retrieving available warehouses")
-	return s.repo.GetAvailableWarehouses(ctx)
-}
-
-func (s *deliveryService) AssignPartnerWarehouses(ctx context.Context, partnerID string, warehouseIDs []string) error {
-	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
-	if err != nil {
-		return appErrors.BadRequest("invalid partner_id format")
-	}
-	var wUUIDs []uuid.UUID
-	for _, idStr := range warehouseIDs {
-		wUUID, err := uuid.Parse(strings.TrimSpace(idStr))
-		if err != nil {
-			return appErrors.BadRequest("invalid warehouse_id: " + idStr)
+func (s *deliveryService) fetchPartnerWarehouses(ctx context.Context, partnerID string) []*model.Warehouse {
+	if s.inventoryClient != nil {
+		whs, err := s.inventoryClient.GetPartnerWarehouses(ctx, partnerID)
+		if err == nil && len(whs) > 0 {
+			result := make([]*model.Warehouse, len(whs))
+			for i, w := range whs {
+				pUUID, _ := uuid.Parse(w.DeliveryPartnerID)
+				wUUID, _ := uuid.Parse(w.ID)
+				result[i] = &model.Warehouse{
+					ID:                wUUID,
+					DeliveryPartnerID: pUUID,
+					Name:              w.Name,
+					Code:              w.Code,
+					City:              w.City,
+					State:             w.State,
+					IsActive:          w.IsActive,
+				}
+			}
+			return result
 		}
-		wUUIDs = append(wUUIDs, wUUID)
 	}
-	s.logger.Info("Assigning warehouses to partner", slog.String("partner_id", partnerID), slog.Int("warehouse_count", len(wUUIDs)))
-	return s.repo.AssignPartnerWarehouses(ctx, pUUID, wUUIDs)
+	if s.repo != nil {
+		if pUUID, err := uuid.Parse(partnerID); err == nil {
+			if whs, err := s.repo.GetPartnerWarehouses(ctx, pUUID); err == nil && len(whs) > 0 {
+				return whs
+			}
+		}
+	}
+	return nil
 }
 
-func (s *deliveryService) GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error) {
-	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
-	if err != nil {
-		return nil, appErrors.BadRequest("invalid partner_id format")
+func (s *deliveryService) fetchAvailableWarehouses(ctx context.Context) []*model.Warehouse {
+	if s.inventoryClient != nil {
+		whs, err := s.inventoryClient.GetAvailableWarehouses(ctx)
+		if err == nil && len(whs) > 0 {
+			result := make([]*model.Warehouse, len(whs))
+			for i, w := range whs {
+				pUUID, _ := uuid.Parse(w.DeliveryPartnerID)
+				wUUID, _ := uuid.Parse(w.ID)
+				result[i] = &model.Warehouse{
+					ID:                wUUID,
+					DeliveryPartnerID: pUUID,
+					Name:              w.Name,
+					Code:              w.Code,
+					City:              w.City,
+					State:             w.State,
+					IsActive:          w.IsActive,
+				}
+			}
+			return result
+		}
 	}
-	s.logger.Info("Retrieving assigned warehouses for partner", slog.String("partner_id", partnerID))
-	return s.repo.GetPartnerWarehouses(ctx, pUUID)
+	if s.repo != nil {
+		if whs, err := s.repo.GetAvailableWarehouses(ctx); err == nil && len(whs) > 0 {
+			return whs
+		}
+	}
+	return nil
 }
 
 func (s *deliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error {
-	if profile == nil || profile.PartnerID == uuid.Nil {
-		return appErrors.BadRequest("valid partner profile with partner_id is required")
+	if profile == nil {
+		return appErrors.BadRequest("profile is required")
 	}
-	s.logger.Info("Creating or updating delivery partner profile", slog.String("partner_id", profile.PartnerID.String()))
+	if profile.PartnerID == uuid.Nil {
+		return appErrors.BadRequest("partner_id is required")
+	}
 	return s.repo.CreateOrUpdatePartnerProfile(ctx, profile)
 }
 
 func (s *deliveryService) GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
-	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
-	if err != nil {
-		return nil, appErrors.BadRequest("invalid partner_id format")
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
 	}
-	s.logger.Info("Retrieving partner profile", slog.String("partner_id", partnerID))
-	return s.repo.GetPartnerProfile(ctx, pUUID)
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+	return s.repo.GetPartnerProfile(ctx, partnerUUID)
 }
 
 func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
-	pUUID, err := uuid.Parse(strings.TrimSpace(partnerID))
-	if err != nil {
-		return nil, appErrors.BadRequest("invalid partner_id format")
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
 	}
-	existing, err := s.repo.GetPartnerProfile(ctx, pUUID)
+	partnerUUID, err := uuid.Parse(targetPartner)
 	if err != nil {
-		if !appErrors.IsNotFound(err) {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		if appErrors.IsNotFound(err) {
+			now := time.Now().UTC()
+			existing = &model.DeliveryPartnerProfile{
+				ID:        uuid.New(),
+				PartnerID: partnerUUID,
+				IsActive:  true,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+		} else {
 			return nil, err
 		}
-		existing = &model.DeliveryPartnerProfile{
-			ID:        uuid.New(),
-			PartnerID: pUUID,
-			IsActive:  true,
-			CreatedAt: time.Now().UTC(),
-		}
 	}
+
 	if companyName != nil {
 		existing.CompanyName = strings.TrimSpace(*companyName)
 	}
@@ -337,30 +537,48 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 	return existing, nil
 }
 
-// resolveProvisionalOrigin selects a provisional origin warehouse for preliminary transit calculation.
-// In the current MVP, this produces an initial rough estimate. It prioritizes warehouse proximity (same city or state)
-// when multiple warehouses are associated with a partner, falling back to the primary warehouse.
-func resolveProvisionalOrigin(warehouses []*model.Warehouse, destCity, destState string) (string, string) {
+// resolveProvisionalWarehouse selects an available origin warehouse for preliminary transit calculation.
+// Checks warehouse availability (is_active) and prioritizes proximity (same-city, then same-state).
+func resolveProvisionalWarehouse(warehouses []*model.Warehouse, destCity, destState string) *model.Warehouse {
 	if len(warehouses) == 0 {
-		return "", ""
+		return nil
 	}
 	dCity := strings.TrimSpace(strings.ToLower(destCity))
 	dState := strings.TrimSpace(strings.ToLower(destState))
 
+	// Filter for active/available warehouses first
+	var activeWarehouses []*model.Warehouse
+	for _, w := range warehouses {
+		if w.IsActive {
+			activeWarehouses = append(activeWarehouses, w)
+		}
+	}
+	if len(activeWarehouses) == 0 {
+		activeWarehouses = warehouses
+	}
+
 	if dCity != "" {
-		for _, w := range warehouses {
+		for _, w := range activeWarehouses {
 			if strings.TrimSpace(strings.ToLower(w.City)) == dCity {
-				return w.City, w.State
+				return w
 			}
 		}
 	}
 	if dState != "" {
-		for _, w := range warehouses {
+		for _, w := range activeWarehouses {
 			if strings.TrimSpace(strings.ToLower(w.State)) == dState {
-				return w.City, w.State
+				return w
 			}
 		}
 	}
-	return warehouses[0].City, warehouses[0].State
+	return activeWarehouses[0]
 }
 
+// resolveProvisionalOrigin selects origin city and state from warehouses for backward compatibility.
+func resolveProvisionalOrigin(warehouses []*model.Warehouse, destCity, destState string) (string, string) {
+	w := resolveProvisionalWarehouse(warehouses, destCity, destState)
+	if w == nil {
+		return "", ""
+	}
+	return w.City, w.State
+}

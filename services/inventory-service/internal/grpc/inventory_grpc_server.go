@@ -30,8 +30,13 @@ func toProtoInventoryItem(inv *model.Inventory) *inventorypb.InventoryItem {
 	if inv.VariantID != nil {
 		variantID = *inv.VariantID
 	}
+	var warehouseID string
+	if inv.WarehouseID != nil {
+		warehouseID = *inv.WarehouseID
+	}
 	return &inventorypb.InventoryItem{
 		InventoryId:       inv.ID,
+		WarehouseId:       warehouseID,
 		ProductId:         inv.ProductID,
 		VariantId:         variantID,
 		Sku:               inv.SKU,
@@ -54,8 +59,15 @@ func (s *InventoryGRPCServer) CreateInventory(ctx context.Context, req *inventor
 		variantID = &v
 	}
 
+	var warehouseID *string
+	if req.GetWarehouseId() != "" {
+		w := req.GetWarehouseId()
+		warehouseID = &w
+	}
+
 	inv, err := s.service.CreateInventory(ctx, dto.CreateInventoryInput{
 		MerchantID:        req.GetMerchantId(),
+		WarehouseID:       warehouseID,
 		ProductID:         req.GetProductId(),
 		VariantID:         variantID,
 		SKU:               req.GetSku(),
@@ -76,10 +88,14 @@ func (s *InventoryGRPCServer) GetInventory(ctx context.Context, req *inventorypb
 		return nil, appErrors.BadRequest("request cannot be nil").ToGRPC()
 	}
 
-	var invID, prodID, varID, merchID *string
+	var invID, prodID, varID, merchID, whID *string
 	if req.GetInventoryId() != "" {
 		v := req.GetInventoryId()
 		invID = &v
+	}
+	if req.GetWarehouseId() != "" {
+		v := req.GetWarehouseId()
+		whID = &v
 	}
 	if req.GetProductId() != "" {
 		v := req.GetProductId()
@@ -96,6 +112,7 @@ func (s *InventoryGRPCServer) GetInventory(ctx context.Context, req *inventorypb
 
 	inv, err := s.service.GetInventory(ctx, dto.GetInventoryInput{
 		InventoryID: invID,
+		WarehouseID: whID,
 		ProductID:   prodID,
 		VariantID:   varID,
 		MerchantID:  merchID,
@@ -291,5 +308,133 @@ func (s *InventoryGRPCServer) CommitStock(ctx context.Context, req *inventorypb.
 
 	return &inventorypb.CommitStockResponse{
 		Success: true,
+	}, nil
+}
+
+func toProtoWarehouse(w *model.Warehouse) *inventorypb.Warehouse {
+	if w == nil {
+		return nil
+	}
+	return &inventorypb.Warehouse{
+		Id:                w.ID.String(),
+		DeliveryPartnerId: w.DeliveryPartnerID.String(),
+		Name:              w.Name,
+		Code:              w.Code,
+		Street:            w.Street,
+		City:              w.City,
+		State:             w.State,
+		PostalCode:        w.PostalCode,
+		IsActive:          w.IsActive,
+		CreatedAt:         w.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:         w.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+func (s *InventoryGRPCServer) CreateWarehouse(ctx context.Context, req *inventorypb.CreateWarehouseRequest) (*inventorypb.WarehouseResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be nil").ToGRPC()
+	}
+
+	isActive := req.GetIsActive()
+	wh, err := s.service.CreateWarehouse(ctx, req.GetDeliveryPartnerId(), &dto.CreateWarehouseRequest{
+		DeliveryPartnerID: req.GetDeliveryPartnerId(),
+		Name:              req.GetName(),
+		Code:              req.GetCode(),
+		Street:            req.GetStreet(),
+		City:              req.GetCity(),
+		State:             req.GetState(),
+		PostalCode:        req.GetPostalCode(),
+		IsActive:          &isActive,
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &inventorypb.WarehouseResponse{
+		Warehouse: toProtoWarehouse(wh),
+	}, nil
+}
+
+func (s *InventoryGRPCServer) UpdateWarehouse(ctx context.Context, req *inventorypb.UpdateWarehouseRequest) (*inventorypb.WarehouseResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be nil").ToGRPC()
+	}
+
+	updateReq := &dto.UpdateWarehouseRequest{
+		DeliveryPartnerID: req.GetDeliveryPartnerId(),
+		ID:                req.GetId(),
+		Name:              req.Name,
+		Code:              req.Code,
+		Street:            req.Street,
+		City:              req.City,
+		State:             req.State,
+		PostalCode:        req.PostalCode,
+		IsActive:          req.IsActive,
+	}
+
+	wh, err := s.service.UpdateWarehouse(ctx, req.GetDeliveryPartnerId(), req.GetId(), updateReq)
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &inventorypb.WarehouseResponse{
+		Warehouse: toProtoWarehouse(wh),
+	}, nil
+}
+
+func (s *InventoryGRPCServer) DeleteWarehouse(ctx context.Context, req *inventorypb.DeleteWarehouseRequest) (*inventorypb.DeleteWarehouseResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be nil").ToGRPC()
+	}
+
+	if err := s.service.DeleteWarehouse(ctx, req.GetDeliveryPartnerId(), req.GetId()); err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &inventorypb.DeleteWarehouseResponse{
+		Success: true,
+		Message: "Warehouse deleted successfully",
+	}, nil
+}
+
+func (s *InventoryGRPCServer) GetWarehouse(ctx context.Context, req *inventorypb.GetWarehouseRequest) (*inventorypb.WarehouseResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request cannot be nil").ToGRPC()
+	}
+
+	wh, err := s.service.GetWarehouseByID(ctx, req.GetDeliveryPartnerId(), req.GetId())
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return &inventorypb.WarehouseResponse{
+		Warehouse: toProtoWarehouse(wh),
+	}, nil
+}
+
+func (s *InventoryGRPCServer) ListWarehouses(ctx context.Context, req *inventorypb.ListWarehousesRequest) (*inventorypb.ListWarehousesResponse, error) {
+	partnerID := ""
+	if req != nil {
+		partnerID = req.GetDeliveryPartnerId()
+	}
+
+	var warehouses []*model.Warehouse
+	var err error
+	if partnerID != "" {
+		warehouses, err = s.service.GetPartnerWarehouses(ctx, partnerID)
+	} else {
+		warehouses, err = s.service.GetAvailableWarehouses(ctx)
+	}
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	protoWarehouses := make([]*inventorypb.Warehouse, len(warehouses))
+	for i, w := range warehouses {
+		protoWarehouses[i] = toProtoWarehouse(w)
+	}
+
+	return &inventorypb.ListWarehousesResponse{
+		Warehouses: protoWarehouses,
 	}, nil
 }

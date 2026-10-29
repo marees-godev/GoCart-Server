@@ -24,9 +24,9 @@ type Delivery {
 
 input CreateDeliveryInput {
   orderId: String!
-  deliveryPartner: String!
-  shippingAddress: String!
-  contactNumber: String!
+  deliveryPartnerId: ID!
+  shippingAddressId: ID!
+  contactNumber: String
 }
 
 type DeliveryPartnerProfile {
@@ -55,7 +55,7 @@ extend type Query {
 }
 
 extend type Mutation {
-  createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [ADMIN, MERCHANT])
-  updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [ADMIN, MERCHANT])
+  createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [DELIVERY_PARTNER])
+  updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }

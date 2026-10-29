@@ -5,20 +5,29 @@ import (
 	"time"
 )
 
+const (
+	DeliveryTypeSameCity   = "Same-city delivery"
+	DeliveryTypeSameState  = "Within the same state"
+	DeliveryTypeInterState = "Inter-state delivery"
+
+	TransitEstimateSameCity   = "1–2 days"
+	TransitEstimateSameState  = "2–4 days"
+	TransitEstimateInterState = "4–7 days"
+)
+
 type TransitRuleResult struct {
-	RuleName   string
-	MinDays    int
-	MaxDays    int
-	TargetDate time.Time
+	RuleName         string
+	DeliveryType     string
+	EstimatedTransit string
+	MinDays          int
+	MaxDays          int
+	TargetDate       time.Time
 }
 
 // CalculateTransitDeliveryDate computes SLA target delivery date based on Origin vs Destination:
-// - Same-City: 1-2 days
-// - Same-State: 2-4 days
-// - Inter-State: 4-7 days
-//
-// Note (MVP): Estimates based on provisional warehouse origins serve as rough estimates
-// until the fulfillment workflow confirms the actual dispatch origin warehouse.
+// - Same-city delivery: 1–2 days (target: 2 days)
+// - Within the same state: 2–4 days (target: 4 days)
+// - Inter-state delivery: 4–7 days (target: 7 days)
 func CalculateTransitDeliveryDate(originCity, originState, destCity, destState string, baseTime time.Time) TransitRuleResult {
 	if baseTime.IsZero() {
 		baseTime = time.Now().UTC()
@@ -28,31 +37,37 @@ func CalculateTransitDeliveryDate(originCity, originState, destCity, destState s
 	oState := strings.TrimSpace(strings.ToLower(originState))
 	dState := strings.TrimSpace(strings.ToLower(destState))
 
-	// 1. Same-City: 1–2 days (target: 2 days)
+	// 1. Same-city delivery: 1–2 days (target: 2 days)
 	if oCity != "" && dCity != "" && oCity == dCity {
 		return TransitRuleResult{
-			RuleName:   "Same-City",
-			MinDays:    1,
-			MaxDays:    2,
-			TargetDate: baseTime.Add(2 * 24 * time.Hour),
+			RuleName:         "Same-City",
+			DeliveryType:     DeliveryTypeSameCity,
+			EstimatedTransit: TransitEstimateSameCity,
+			MinDays:          1,
+			MaxDays:          2,
+			TargetDate:       baseTime.Add(2 * 24 * time.Hour),
 		}
 	}
 
-	// 2. Same-State: 2–4 days (target: 4 days)
+	// 2. Within the same state: 2–4 days (target: 4 days)
 	if oState != "" && dState != "" && oState == dState {
 		return TransitRuleResult{
-			RuleName:   "Same-State",
-			MinDays:    2,
-			MaxDays:    4,
-			TargetDate: baseTime.Add(4 * 24 * time.Hour),
+			RuleName:         "Same-State",
+			DeliveryType:     DeliveryTypeSameState,
+			EstimatedTransit: TransitEstimateSameState,
+			MinDays:          2,
+			MaxDays:          4,
+			TargetDate:       baseTime.Add(4 * 24 * time.Hour),
 		}
 	}
 
-	// 3. Inter-State: 4–7 days (target: 7 days)
+	// 3. Inter-state delivery: 4–7 days (target: 7 days)
 	return TransitRuleResult{
-		RuleName:   "Inter-State",
-		MinDays:    4,
-		MaxDays:    7,
-		TargetDate: baseTime.Add(7 * 24 * time.Hour),
+		RuleName:         "Inter-State",
+		DeliveryType:     DeliveryTypeInterState,
+		EstimatedTransit: TransitEstimateInterState,
+		MinDays:          4,
+		MaxDays:          7,
+		TargetDate:       baseTime.Add(7 * 24 * time.Hour),
 	}
 }

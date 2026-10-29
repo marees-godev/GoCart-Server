@@ -57,3 +57,34 @@ func TestGetEnvHelpers(t *testing.T) {
 		t.Errorf("expected true, got %v", got)
 	}
 }
+
+
+func TestConfig_Validate(t *testing.T) {
+	t.Run("Deployed environment fails on missing or placeholder secret", func(t *testing.T) {
+		cfgEmpty := &Config{
+			App: AppConfig{Environment: "production"},
+			JWT: JWTConfig{Secret: ""},
+		}
+		if err := cfgEmpty.Validate(); err == nil {
+			t.Fatal("expected error for empty secret in production, got nil")
+		}
+
+		cfgPlaceholder := &Config{
+			App: AppConfig{Environment: "production"},
+			JWT: JWTConfig{Secret: "gocart-secret-key-change-in-production"},
+		}
+		if err := cfgPlaceholder.Validate(); err == nil {
+			t.Fatal("expected error for placeholder secret in production, got nil")
+		}
+	})
+
+	t.Run("Deployed environment passes with secure secret", func(t *testing.T) {
+		cfgValid := &Config{
+			App: AppConfig{Environment: "production"},
+			JWT: JWTConfig{Secret: "production-strong-secret-key-998877"},
+		}
+		if err := cfgValid.Validate(); err != nil {
+			t.Fatalf("expected nil error for valid secret, got: %v", err)
+		}
+	})
+}

@@ -295,6 +295,18 @@ type DeliveryStatusUpdatedEvent struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// DeliveryStatusChangedEvent represents the payload for DeliveryStatusChanged domain event.
+type DeliveryStatusChangedEvent struct {
+	DeliveryID        string     `json:"delivery_id"`
+	OrderID           string     `json:"order_id"`
+	PreviousStatus    string     `json:"previous_status"`
+	NewStatus         string     `json:"new_status"`
+	TrackingNumber    string     `json:"tracking_number"`
+	EstimatedDelivery *time.Time `json:"estimated_delivery,omitempty"`
+	ActualDelivery    *time.Time `json:"actual_delivery,omitempty"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
 // DeliveryDispatchedEvent represents the payload for DeliveryDispatched domain event.
 type DeliveryDispatchedEvent struct {
 	DeliveryID      string    `json:"delivery_id"`

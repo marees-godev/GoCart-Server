@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -201,6 +202,30 @@ func LoadEnv() *Config {
 	}
 }
 
+// Validate validates critical configuration requirements.
+// In deployed environments (production, staging, etc.), JWT_SECRET must be configured
+// through environment variables or secret manager, and must not use insecure defaults.
+func (c *Config) Validate() error {
+	isDev := strings.EqualFold(c.App.Environment, "development") ||
+		strings.EqualFold(c.App.Environment, "dev") ||
+		strings.EqualFold(c.App.Environment, "local") ||
+		strings.EqualFold(c.App.Environment, "test")
+
+	secret := strings.TrimSpace(c.JWT.Secret)
+	if !isDev {
+		if secret == "" {
+			return errors.New("JWT_SECRET is required in deployed environment (" + c.App.Environment + ")")
+		}
+		if secret == "super-secret-key-change-in-production" ||
+			secret == "gocart-secret-key-change-in-production" ||
+			secret == "your-jwt-secret-key" ||
+			secret == "your-secret-key" {
+			return errors.New("JWT_SECRET must not use insecure default value in deployed environment (" + c.App.Environment + ")")
+		}
+	}
+	return nil
+}
+
 func GetEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -262,4 +287,3 @@ func GetEnvAsStringSlice(key string, defaultValue []string) []string {
 	}
 	return result
 }
-

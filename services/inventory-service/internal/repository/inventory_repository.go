@@ -61,16 +61,17 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 
 	insertQuery := `
 		INSERT INTO inventories (
-			id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
+			id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9
-		) RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+		) RETURNING id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 	`
 
 	err = tx.QueryRow(
 		ctx,
 		insertQuery,
 		inv.ID,
+		inv.WarehouseID,
 		inv.ProductID,
 		inv.VariantID,
 		inv.SKU,
@@ -81,6 +82,7 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 		inv.UpdatedAt,
 	).Scan(
 		&inv.ID,
+		&inv.WarehouseID,
 		&inv.ProductID,
 		&inv.VariantID,
 		&inv.SKU,
@@ -141,6 +143,7 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 	createdEvent := events.InventoryCreatedEvent{
 		EventType:         events.EventInventoryCreated,
 		InventoryID:       inv.ID,
+		WarehouseID:       inv.WarehouseID,
 		ProductID:         inv.ProductID,
 		VariantID:         inv.VariantID,
 		SKU:               inv.SKU,
@@ -177,13 +180,14 @@ func (r *pgInventoryRepository) Create(ctx context.Context, inv *model.Inventory
 
 func (r *pgInventoryRepository) GetByID(ctx context.Context, id string) (*model.Inventory, error) {
 	query := `
-		SELECT id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
+		SELECT id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
 		FROM inventories
 		WHERE id = $1;
 	`
 	var inv model.Inventory
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&inv.ID,
+		&inv.WarehouseID,
 		&inv.ProductID,
 		&inv.VariantID,
 		&inv.SKU,
@@ -208,14 +212,14 @@ func (r *pgInventoryRepository) GetByProductAndVariant(ctx context.Context, prod
 
 	if variantID == nil || *variantID == "" {
 		query = `
-			SELECT id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
+			SELECT id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
 			FROM inventories
 			WHERE product_id = $1 AND variant_id IS NULL;
 		`
 		args = []interface{}{productID}
 	} else {
 		query = `
-			SELECT id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
+			SELECT id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
 			FROM inventories
 			WHERE product_id = $1 AND variant_id = $2;
 		`
@@ -225,6 +229,7 @@ func (r *pgInventoryRepository) GetByProductAndVariant(ctx context.Context, prod
 	var inv model.Inventory
 	err := r.pool.QueryRow(ctx, query, args...).Scan(
 		&inv.ID,
+		&inv.WarehouseID,
 		&inv.ProductID,
 		&inv.VariantID,
 		&inv.SKU,
@@ -260,12 +265,13 @@ func (r *pgInventoryRepository) Restock(ctx context.Context, id string, quantity
 		SET available_quantity = available_quantity + $1,
 		    updated_at = $2
 		WHERE id = $3
-		RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+		RETURNING id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 	`
 
 	var inv model.Inventory
 	err = tx.QueryRow(ctx, updateQuery, quantity, now, id).Scan(
 		&inv.ID,
+		&inv.WarehouseID,
 		&inv.ProductID,
 		&inv.VariantID,
 		&inv.SKU,
@@ -357,7 +363,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.Updat
 			SET available_quantity = $1,
 			    updated_at = $2
 			WHERE id = $3
-			RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+			RETURNING id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 		`
 		args = []interface{}{input.Quantity, now, invID}
 	} else if prodID != "" {
@@ -367,7 +373,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.Updat
 				SET available_quantity = $1,
 				    updated_at = $2
 				WHERE product_id = $3 AND variant_id = $4
-				RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+				RETURNING id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 			`
 			args = []interface{}{input.Quantity, now, prodID, varID}
 		} else {
@@ -376,7 +382,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.Updat
 				SET available_quantity = $1,
 				    updated_at = $2
 				WHERE product_id = $3 AND variant_id IS NULL
-				RETURNING id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
+				RETURNING id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at;
 			`
 			args = []interface{}{input.Quantity, now, prodID}
 		}
@@ -387,6 +393,7 @@ func (r *pgInventoryRepository) UpdateStock(ctx context.Context, input dto.Updat
 	var inv model.Inventory
 	err = tx.QueryRow(ctx, updateQuery, args...).Scan(
 		&inv.ID,
+		&inv.WarehouseID,
 		&inv.ProductID,
 		&inv.VariantID,
 		&inv.SKU,

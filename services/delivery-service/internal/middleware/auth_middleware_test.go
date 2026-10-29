@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"encoding/json"
+	"io"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -18,6 +20,31 @@ func TestDeliveryPartnerAuthMiddleware(t *testing.T) {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{
 			"partner_id": pID,
 		})
+	})
+
+	t.Run("Rejects request when JWT secret is empty/unconfigured", func(t *testing.T) {
+		appEmpty := fiber.New()
+		appEmpty.Get("/test-partner", DeliveryPartnerAuthMiddleware(""), func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ok"})
+		})
+
+		req := httptest.NewRequest("GET", "/test-partner", nil)
+		req.Header.Set("Authorization", "Bearer some-token")
+		resp, err := appEmpty.Test(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != fiber.StatusInternalServerError {
+			t.Errorf("expected 500 when secret is unconfigured, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var res map[string]interface{}
+		_ = json.Unmarshal(body, &res)
+		errMap, ok := res["error"].(map[string]interface{})
+		if !ok || errMap["message"] != "authentication cannot be configured: JWT secret is missing" {
+			t.Errorf("expected error message 'authentication cannot be configured: JWT secret is missing', got: %v", res)
+		}
 	})
 
 	t.Run("Missing Authorization Header", func(t *testing.T) {

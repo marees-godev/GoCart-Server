@@ -19,8 +19,18 @@ const (
 
 // DeliveryPartnerAuthMiddleware enforces JWT verification, restricts to role == "DELIVERY_PARTNER",
 // and injects the verified partner_id into the request context.
+// Never bypasses authentication: if the JWT secret is missing, it rejects requests with an error.
 func DeliveryPartnerAuthMiddleware(jwtSecret string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if strings.TrimSpace(jwtSecret) == "" {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    appErrors.CodeInternalError,
+					"message": "authentication cannot be configured: JWT secret is missing",
+				},
+			})
+		}
+
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{

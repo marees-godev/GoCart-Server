@@ -2,6 +2,7 @@ package dto
 
 type CreateInventoryInput struct {
 	MerchantID        string
+	WarehouseID       *string
 	ProductID         string
 	VariantID         *string
 	SKU               string
@@ -21,6 +22,7 @@ type RestockInventoryInput struct {
 
 type GetInventoryInput struct {
 	InventoryID *string
+	WarehouseID *string
 	ProductID   *string
 	VariantID   *string
 	MerchantID  *string
