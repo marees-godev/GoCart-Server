@@ -10,6 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/events"
@@ -36,18 +39,31 @@ var (
 	ErrInvalidVerificationCondition = errors.New("invalid product verification condition")
 	ErrReturnNotFound               = errors.New("return not found")
 	ErrReturnNotVerifiable          = errors.New("return cannot be verified in current status")
-	ErrMultipleItemsNotSupported    = errors.New("only one item per return request is supported")
-	ErrOrderItemMismatch            = errors.New("order item id and item ids mismatch")
-	ErrInvalidStateTransition       = errors.New("invalid return status transition")
+	ErrMultipleItemsNotSupported     = errors.New("only one item per return request is supported")
+	ErrOrderItemMismatch             = errors.New("order item id and item ids mismatch")
+	ErrInvalidStateTransition        = errors.New("invalid return status transition")
+	ErrCustomerCannotReviewOwnReturn = errors.New("customer cannot approve or reject their own return")
+	ErrRejectionReasonRequired       = errors.New("rejection reason is required")
+	ErrExchangeNotFound              = errors.New("exchange record not found")
+	ErrExchangeNotVerifiable         = errors.New("exchange cannot be verified in current status")
+	ErrExchangeBrandModelRequired    = errors.New("old brand and old model are required for exchange")
+	ErrExchangeNewProductRequired    = errors.New("new product id is required for exchange")
+	ErrExchangeFunctionalRequired    = errors.New("device must be functional and serial must match to approve exchange")
 )
 
 type ReturnService interface {
 	RequestReturn(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error)
 	GetReturn(ctx context.Context, id string) (*model.Return, error)
-	UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error)
+	UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error)
+	ApproveReturn(ctx context.Context, id string, reviewerID string) (*model.Return, error)
+	RejectReturn(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error)
 	VerifyProduct(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error)
 	ListReturns(ctx context.Context, req *dto.ListReturnsDTO) ([]*model.Return, int, error)
 	ListReturnsByOrderID(ctx context.Context, orderID string) ([]*model.Return, error)
+
+	CreateExchange(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error)
+	GetExchange(ctx context.Context, id string) (*model.Exchange, error)
+	VerifyExchangeProduct(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error)
 }
 
 type returnService struct {
@@ -101,27 +117,13 @@ func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestRetur
 		return nil, ErrOrderIDRequired
 	}
 
-	if len(req.ItemIDs) > 1 {
-		s.logger.WarnContext(ctx, "return request rejected: multiple item IDs not supported",
-			slog.String("order_id", req.OrderID),
-			slog.Int("item_count", len(req.ItemIDs)),
-		)
-		return nil, ErrMultipleItemsNotSupported
-	}
-
 	orderItemID := strings.TrimSpace(req.OrderItemID)
-	if len(req.ItemIDs) == 1 {
-		firstItemID := strings.TrimSpace(req.ItemIDs[0])
-		if orderItemID != "" && firstItemID != "" && orderItemID != firstItemID {
-			s.logger.WarnContext(ctx, "return request rejected: order_item_id and item_ids mismatch",
-				slog.String("order_item_id", orderItemID),
-				slog.String("item_id", firstItemID),
-			)
-			return nil, ErrOrderItemMismatch
-		}
-		if orderItemID == "" {
-			orderItemID = firstItemID
-		}
+	itemID := strings.TrimSpace(req.ItemID)
+	if orderItemID != "" && itemID != "" && orderItemID != itemID {
+		return nil, errors.New("order_item_id and item_id must match")
+	}
+	if orderItemID == "" {
+		orderItemID = itemID
 	}
 	if orderItemID == "" {
 		s.logger.WarnContext(ctx, "return request rejected: order_item_id is required",
@@ -201,25 +203,10 @@ func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestRetur
 	// 4. Verify the order item exists in the delivered order
 	var targetItem *orderpb.OrderItem
 	for _, it := range order.GetItems() {
-		if orderItemID != "" && (it.GetId() == orderItemID || it.GetProductId() == orderItemID) {
+		if it.GetId() == orderItemID || it.GetProductId() == orderItemID {
 			targetItem = it
 			break
 		}
-		for _, reqItemID := range req.ItemIDs {
-			trimmed := strings.TrimSpace(reqItemID)
-			if trimmed != "" && (it.GetId() == trimmed || it.GetProductId() == trimmed) {
-				targetItem = it
-				break
-			}
-		}
-		if targetItem != nil {
-			break
-		}
-	}
-
-	// If no specific item requested and the order has exactly one item, default to it
-	if targetItem == nil && orderItemID == "" && len(req.ItemIDs) == 0 && len(order.GetItems()) == 1 {
-		targetItem = order.GetItems()[0]
 	}
 
 	if targetItem == nil {
@@ -297,6 +284,8 @@ func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestRetur
 	initialStatus := model.ReturnStatusRequested
 	if reqType == model.ReturnTypeReplacement {
 		initialStatus = model.ReturnStatusReplacementRequested
+	} else if reqType == model.ReturnTypeExchange {
+		initialStatus = model.ReturnStatusExchangeRequested
 	}
 
 	ret := &model.Return{
@@ -358,7 +347,7 @@ func (s *returnService) GetReturn(ctx context.Context, id string) (*model.Return
 	return ret, err
 }
 
-func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error) {
+func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, errors.New("return id is required")
@@ -393,7 +382,67 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 		return nil, ErrInvalidStateTransition
 	}
 
-	ret, err := s.repo.UpdateReturnStatus(ctx, id, status)
+	reviewerID := grpcclient.GetUserID(ctx)
+	if reviewerID == "" {
+		if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+			reviewerID = u.UserID
+		}
+	}
+	if reviewerID == "" && len(rejectionReason) > 1 {
+		reviewerID = strings.TrimSpace(rejectionReason[1])
+	}
+
+	// Customer cannot approve or reject their own return
+	if status == model.ReturnStatusApproved || status == model.ReturnStatusRejected {
+		if reviewerID != "" && reviewerID == current.UserID {
+			s.logger.WarnContext(ctx, "customer cannot approve or reject their own return",
+				slog.String("return_id", id),
+				slog.String("user_id", current.UserID),
+				slog.String("reviewer_id", reviewerID),
+			)
+			return nil, ErrCustomerCannotReviewOwnReturn
+		}
+	}
+
+	var rejReason string
+	if len(rejectionReason) > 0 {
+		rejReason = strings.TrimSpace(rejectionReason[0])
+	}
+	if status == model.ReturnStatusRejected && rejReason == "" {
+		return nil, ErrRejectionReasonRequired
+	}
+
+	var outboxEvents []*outbox.Event
+
+	// Publish ReturnApproved event
+	if status == model.ReturnStatusApproved {
+		apprEvt, err := events.BuildReturnApprovedOutboxEvent(current, reviewerID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to build return approved outbox event", slog.Any("error", err))
+			return nil, err
+		}
+		outboxEvents = append(outboxEvents, apprEvt)
+	}
+
+	// Publish ReturnRejected event
+	if status == model.ReturnStatusRejected {
+		rejEvt, err := events.BuildReturnRejectedOutboxEvent(current, reviewerID, rejReason)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to build return rejected outbox event", slog.Any("error", err))
+			return nil, err
+		}
+		outboxEvents = append(outboxEvents, rejEvt)
+	}
+
+	// Publish ReturnStatusUpdated event
+	statusEvt, err := events.BuildReturnStatusUpdatedOutboxEvent(current, current.Status, status)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to build return status updated outbox event", slog.Any("error", err))
+		return nil, err
+	}
+	outboxEvents = append(outboxEvents, statusEvt)
+
+	ret, err := s.repo.UpdateReturnStatusWithOutbox(ctx, id, status, rejReason, outboxEvents...)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to update return status",
 			slog.String("return_id", id),
@@ -407,6 +456,20 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 		slog.String("status", string(ret.Status)),
 	)
 	return ret, nil
+}
+
+func (s *returnService) ApproveReturn(ctx context.Context, id string, reviewerID string) (*model.Return, error) {
+	if reviewerID != "" {
+		ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	}
+	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusApproved)
+}
+
+func (s *returnService) RejectReturn(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error) {
+	if reviewerID != "" {
+		ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	}
+	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusRejected, rejectionReason)
 }
 
 func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error) {
@@ -451,8 +514,13 @@ func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProduc
 	}
 
 	if ret.Status != model.ReturnStatusRequested &&
+		ret.Status != model.ReturnStatusRequestedAlias &&
 		ret.Status != model.ReturnStatusReplacementRequested &&
-		ret.Status != model.ReturnStatusApproved {
+		ret.Status != model.ReturnStatusExchangeRequested &&
+		ret.Status != model.ReturnStatusApproved &&
+		ret.Status != model.ReturnStatusPickedUp &&
+		ret.Status != model.ReturnStatusReceived &&
+		ret.Status != model.ReturnStatusItemReceived {
 		return nil, nil, ErrReturnNotVerifiable
 	}
 
@@ -540,5 +608,263 @@ func parseDeliveryTime(order *orderpb.Order) time.Time {
 		}
 	}
 	return time.Now().UTC()
+}
+
+func (s *returnService) CreateExchange(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	req.UserID = strings.TrimSpace(req.UserID)
+	if req.UserID == "" {
+		return nil, ErrUserIDRequired
+	}
+	req.OrderID = strings.TrimSpace(req.OrderID)
+	if req.OrderID == "" {
+		return nil, ErrOrderIDRequired
+	}
+	req.NewProductID = strings.TrimSpace(req.NewProductID)
+	if req.NewProductID == "" {
+		return nil, ErrExchangeNewProductRequired
+	}
+	req.OldBrand = strings.TrimSpace(req.OldBrand)
+	req.OldModel = strings.TrimSpace(req.OldModel)
+	if req.OldBrand == "" || req.OldModel == "" {
+		return nil, ErrExchangeBrandModelRequired
+	}
+	if req.BaseExchangeValue < 0 {
+		return nil, errors.New("base exchange value cannot be negative")
+	}
+
+	if s.orderClient != nil {
+		order, err := s.orderClient.GetOrder(ctx, req.OrderID, req.UserID)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to retrieve order from order service for exchange",
+				slog.String("order_id", req.OrderID),
+				slog.String("user_id", req.UserID),
+				slog.Any("error", err),
+			)
+			return nil, err
+		}
+		if order == nil {
+			s.logger.WarnContext(ctx, "order not found for exchange request", slog.String("order_id", req.OrderID))
+			return nil, ErrOrderNotFound
+		}
+		if order.GetUserId() != "" && order.GetUserId() != req.UserID {
+			s.logger.WarnContext(ctx, "exchange request rejected: unauthorized user",
+				slog.String("order_id", req.OrderID),
+				slog.String("request_user_id", req.UserID),
+				slog.String("order_user_id", order.GetUserId()),
+			)
+			return nil, ErrUnauthorizedReturnRequest
+		}
+	}
+
+	totalDeductions := 0.0
+	var answers []*model.ExchangeQuestionAnswer
+	now := time.Now().UTC()
+
+	for _, a := range req.Answers {
+		if a == nil {
+			continue
+		}
+		qKey := strings.TrimSpace(a.QuestionKey)
+		ansVal := strings.TrimSpace(a.AnswerValue)
+		if qKey == "" {
+			continue
+		}
+		ded := a.DeductionAmount
+		if ded < 0 {
+			ded = 0
+		}
+		totalDeductions += ded
+		answers = append(answers, &model.ExchangeQuestionAnswer{
+			ID:              uuid.New().String(),
+			QuestionKey:     qKey,
+			AnswerValue:     ansVal,
+			DeductionAmount: ded,
+			CreatedAt:       now,
+		})
+	}
+
+	estimatedDiscount := req.BaseExchangeValue - totalDeductions
+	if estimatedDiscount < 0 {
+		estimatedDiscount = 0
+	}
+
+	priceDiff := 0.0
+	if s.productClient != nil {
+		prod, err := s.productClient.GetProduct(ctx, req.NewProductID)
+		if err == nil && prod != nil && prod.GetPrice() > 0 {
+			priceDiff = prod.GetPrice() - estimatedDiscount
+		}
+	}
+
+	exc := &model.Exchange{
+		ID:                uuid.New().String(),
+		OrderID:           req.OrderID,
+		OrderItemID:       strings.TrimSpace(req.OrderItemID),
+		UserID:            req.UserID,
+		NewProductID:      req.NewProductID,
+		OldBrand:          req.OldBrand,
+		OldModel:          req.OldModel,
+		OldVariant:        strings.TrimSpace(req.OldVariant),
+		SerialOrIMEI:      strings.TrimSpace(req.SerialOrIMEI),
+		BaseExchangeValue: req.BaseExchangeValue,
+		EstimatedDiscount: estimatedDiscount,
+		FinalDiscount:     estimatedDiscount,
+		PriceDifference:   priceDiff,
+		Status:            model.ExchangeStatusOfferCreated,
+		Answers:           answers,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	outboxEvt, err := events.BuildExchangeCreatedOutboxEvent(exc)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to build exchange created outbox event", slog.Any("error", err))
+		return nil, err
+	}
+
+	if err := s.repo.CreateExchangeWithOutbox(ctx, exc, answers, outboxEvt); err != nil {
+		s.logger.ErrorContext(ctx, "failed to persist exchange", slog.Any("error", err))
+		return nil, err
+	}
+
+	s.logger.InfoContext(ctx, "exchange created successfully",
+		slog.String("exchange_id", exc.ID),
+		slog.String("order_id", exc.OrderID),
+		slog.String("user_id", exc.UserID),
+		slog.Float64("estimated_discount", exc.EstimatedDiscount),
+	)
+
+	return exc, nil
+}
+
+func (s *returnService) GetExchange(ctx context.Context, id string) (*model.Exchange, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, errors.New("exchange id is required")
+	}
+	exc, err := s.repo.GetExchangeByID(ctx, id)
+	if err != nil && !errors.Is(err, repository.ErrExchangeNotFound) {
+		s.logger.ErrorContext(ctx, "failed to retrieve exchange by id", slog.String("id", id), slog.Any("error", err))
+	}
+	return exc, err
+}
+
+func (s *returnService) VerifyExchangeProduct(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error) {
+	if req == nil {
+		return nil, nil, errors.New("request cannot be nil")
+	}
+
+	req.ExchangeID = strings.TrimSpace(req.ExchangeID)
+	if req.ExchangeID == "" {
+		return nil, nil, errors.New("exchange id is required")
+	}
+	req.VerifiedBy = strings.TrimSpace(req.VerifiedBy)
+	if req.VerifiedBy == "" {
+		return nil, nil, ErrVerifiedByRequired
+	}
+
+	condRating := model.ExchangeConditionRating(strings.ToUpper(strings.TrimSpace(req.ConditionRating)))
+	if !condRating.IsValid() {
+		condRating = model.RatingGood
+	}
+
+	exc, err := s.repo.GetExchangeByID(ctx, req.ExchangeID)
+	if err != nil {
+		if errors.Is(err, repository.ErrExchangeNotFound) {
+			return nil, nil, ErrExchangeNotFound
+		}
+		return nil, nil, err
+	}
+	if exc == nil {
+		return nil, nil, ErrExchangeNotFound
+	}
+
+	if exc.Status == model.ExchangeStatusCompleted || exc.Status == model.ExchangeStatusCancelled {
+		return nil, nil, ErrExchangeNotVerifiable
+	}
+
+	// Validation: Device must power on/be functional and serial/IMEI must match
+	if req.IsApproved && (!req.Functional || !req.SerialMatches) {
+		return nil, nil, ErrExchangeFunctionalRequired
+	}
+
+	now := time.Now().UTC()
+	var finalDiscount float64
+	var nextStatus model.ExchangeStatus
+
+	if req.IsApproved {
+		if req.AdjustedDiscount > 0 {
+			finalDiscount = req.AdjustedDiscount
+		} else {
+			finalDiscount = exc.EstimatedDiscount
+		}
+
+		if finalDiscount != exc.EstimatedDiscount {
+			nextStatus = model.ExchangeStatusRevaluated
+		} else {
+			nextStatus = model.ExchangeStatusVerified
+		}
+	} else {
+		finalDiscount = 0
+		nextStatus = model.ExchangeStatusCancelled
+	}
+
+	cleanedImages := make([]string, 0, len(req.ProofImages))
+	seen := make(map[string]bool)
+	for _, img := range req.ProofImages {
+		tImg := strings.TrimSpace(img)
+		if tImg != "" && !seen[tImg] {
+			seen[tImg] = true
+			cleanedImages = append(cleanedImages, tImg)
+		}
+	}
+
+	v := &model.ExchangeVerification{
+		ID:               uuid.New().String(),
+		ExchangeID:       exc.ID,
+		VerifiedBy:       req.VerifiedBy,
+		ConditionRating:  condRating,
+		IsApproved:       req.IsApproved,
+		ScreenIntact:     req.ScreenIntact,
+		BodyIntact:       req.BodyIntact,
+		Functional:       req.Functional,
+		SerialMatches:    req.SerialMatches,
+		AdjustedDiscount: finalDiscount,
+		ProofImages:      cleanedImages,
+		Notes:            strings.TrimSpace(req.Notes),
+		VerifiedAt:       now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+
+	outboxEvt, err := events.BuildExchangeVerifiedOutboxEvent(exc, v)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to build exchange verified outbox event", slog.Any("error", err))
+		return nil, nil, err
+	}
+
+	if err := s.repo.CreateExchangeVerificationWithOutbox(ctx, v, nextStatus, finalDiscount, outboxEvt); err != nil {
+		s.logger.ErrorContext(ctx, "failed to persist exchange verification", slog.Any("error", err))
+		return nil, nil, err
+	}
+
+	exc.Status = nextStatus
+	exc.FinalDiscount = finalDiscount
+	exc.Verification = v
+	exc.UpdatedAt = now
+
+	s.logger.InfoContext(ctx, "exchange product verified successfully",
+		slog.String("exchange_id", exc.ID),
+		slog.String("verified_by", req.VerifiedBy),
+		slog.Bool("is_approved", req.IsApproved),
+		slog.String("status", string(nextStatus)),
+		slog.Float64("final_discount", finalDiscount),
+	)
+
+	return exc, v, nil
 }
 
