@@ -1859,7 +1859,7 @@ type VerifyExchangeProductRequest struct {
 	BodyIntact       bool                   `protobuf:"varint,6,opt,name=body_intact,json=bodyIntact,proto3" json:"body_intact,omitempty"`
 	Functional       bool                   `protobuf:"varint,7,opt,name=functional,proto3" json:"functional,omitempty"`
 	SerialMatches    bool                   `protobuf:"varint,8,opt,name=serial_matches,json=serialMatches,proto3" json:"serial_matches,omitempty"`
-	AdjustedDiscount float64                `protobuf:"fixed64,9,opt,name=adjusted_discount,json=adjustedDiscount,proto3" json:"adjusted_discount,omitempty"`
+	AdjustedDiscount *float64               `protobuf:"fixed64,9,opt,name=adjusted_discount,json=adjustedDiscount,proto3,oneof" json:"adjusted_discount,omitempty"`
 	ProofImages      []string               `protobuf:"bytes,10,rep,name=proof_images,json=proofImages,proto3" json:"proof_images,omitempty"`
 	Notes            string                 `protobuf:"bytes,11,opt,name=notes,proto3" json:"notes,omitempty"`
 	unknownFields    protoimpl.UnknownFields
@@ -1953,8 +1953,8 @@ func (x *VerifyExchangeProductRequest) GetSerialMatches() bool {
 }
 
 func (x *VerifyExchangeProductRequest) GetAdjustedDiscount() float64 {
-	if x != nil {
-		return x.AdjustedDiscount
+	if x != nil && x.AdjustedDiscount != nil {
+		return *x.AdjustedDiscount
 	}
 	return 0
 }
@@ -2203,7 +2203,7 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\"M\n" +
 	"\x13GetExchangeResponse\x126\n" +
-	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\"\x9f\x03\n" +
+	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\"\xba\x03\n" +
 	"\x1cVerifyExchangeProductRequest\x12\x1f\n" +
 	"\vexchange_id\x18\x01 \x01(\tR\n" +
 	"exchangeId\x12\x1f\n" +
@@ -2218,11 +2218,12 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\n" +
 	"functional\x18\a \x01(\bR\n" +
 	"functional\x12%\n" +
-	"\x0eserial_matches\x18\b \x01(\bR\rserialMatches\x12+\n" +
-	"\x11adjusted_discount\x18\t \x01(\x01R\x10adjustedDiscount\x12!\n" +
+	"\x0eserial_matches\x18\b \x01(\bR\rserialMatches\x120\n" +
+	"\x11adjusted_discount\x18\t \x01(\x01H\x00R\x10adjustedDiscount\x88\x01\x01\x12!\n" +
 	"\fproof_images\x18\n" +
 	" \x03(\tR\vproofImages\x12\x14\n" +
-	"\x05notes\x18\v \x01(\tR\x05notes\"\xa3\x01\n" +
+	"\x05notes\x18\v \x01(\tR\x05notesB\x14\n" +
+	"\x12_adjusted_discount\"\xa3\x01\n" +
 	"\x1dVerifyExchangeProductResponse\x126\n" +
 	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\x12J\n" +
 	"\fverification\x18\x02 \x01(\v2&.gocart.return.v1.ExchangeVerificationR\fverification2\xe0\b\n" +
@@ -2333,6 +2334,7 @@ func file_contracts_protobuf_return_return_proto_init() {
 	if File_contracts_protobuf_return_return_proto != nil {
 		return
 	}
+	file_contracts_protobuf_return_return_proto_msgTypes[25].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

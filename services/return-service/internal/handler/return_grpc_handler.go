@@ -272,7 +272,7 @@ func (h *ReturnGRPCHandler) VerifyExchangeProduct(ctx context.Context, req *retu
 		BodyIntact:       req.GetBodyIntact(),
 		Functional:       req.GetFunctional(),
 		SerialMatches:    req.GetSerialMatches(),
-		AdjustedDiscount: req.GetAdjustedDiscount(),
+		AdjustedDiscount: req.AdjustedDiscount,
 		ProofImages:      req.GetProofImages(),
 		Notes:            req.GetNotes(),
 	})
@@ -425,6 +425,7 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrVerifiedByRequired),
 		errors.Is(err, service.ErrRejectionReasonRequired),
 		errors.Is(err, service.ErrInvalidVerificationCondition),
+		errors.Is(err, service.ErrInvalidExchangeConditionRating),
 		errors.Is(err, service.ErrExchangeBrandModelRequired),
 		errors.Is(err, service.ErrExchangeNewProductRequired):
 		return status.Error(codes.InvalidArgument, err.Error())

@@ -1607,6 +1607,7 @@ func TestReturnService_VerifyExchangeProduct_Success(t *testing.T) {
 	}
 
 	// Verify product approved
+	adjDiscount := 200.0
 	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
 		ExchangeID:       exc.ID,
 		VerifiedBy:       "delivery-partner-1",
@@ -1616,7 +1617,7 @@ func TestReturnService_VerifyExchangeProduct_Success(t *testing.T) {
 		BodyIntact:       true,
 		Functional:       true,
 		SerialMatches:    true,
-		AdjustedDiscount: 200.0,
+		AdjustedDiscount: &adjDiscount,
 		ProofImages:      []string{"https://img.example.com/proof1.jpg"},
 		Notes:            "Device in good condition",
 	})
@@ -1631,6 +1632,96 @@ func TestReturnService_VerifyExchangeProduct_Success(t *testing.T) {
 	}
 	if len(v.ProofImages) != 1 {
 		t.Errorf("expected 1 proof image, got: %d", len(v.ProofImages))
+	}
+}
+
+func TestReturnService_VerifyExchangeProduct_ZeroAdjustedDiscountAllowed(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 500.0,
+	})
+	if err != nil {
+		t.Fatalf("failed create exchange: %v", err)
+	}
+	if exc.EstimatedDiscount <= 0 {
+		t.Fatalf("expected positive estimated discount, got %f", exc.EstimatedDiscount)
+	}
+
+	zeroDiscount := 0.0
+	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:       exc.ID,
+		VerifiedBy:       "delivery-partner-1",
+		ConditionRating:  "DAMAGED",
+		IsApproved:       true,
+		ScreenIntact:     true,
+		BodyIntact:       true,
+		Functional:       true,
+		SerialMatches:    true,
+		AdjustedDiscount: &zeroDiscount,
+		ProofImages:      []string{"https://img.example.com/proof.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("expected verify success, got err: %v", err)
+	}
+	if verifiedExc.Status != model.ExchangeStatusRevaluated {
+		t.Errorf("expected REVALUATED, got: %s", verifiedExc.Status)
+	}
+	if verifiedExc.FinalDiscount != 0.0 {
+		t.Errorf("expected FinalDiscount 0.0, got: %f", verifiedExc.FinalDiscount)
+	}
+	if v.AdjustedDiscount != 0.0 {
+		t.Errorf("expected verification AdjustedDiscount 0.0, got: %f", v.AdjustedDiscount)
+	}
+}
+
+func TestReturnService_VerifyExchangeProduct_OmittedDiscountUsesEstimated(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Apple",
+		OldModel:          "iPhone 12",
+		BaseExchangeValue: 500.0,
+	})
+	if err != nil {
+		t.Fatalf("failed create exchange: %v", err)
+	}
+
+	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:       exc.ID,
+		VerifiedBy:       "delivery-partner-1",
+		ConditionRating:  "GOOD",
+		IsApproved:       true,
+		ScreenIntact:     true,
+		BodyIntact:       true,
+		Functional:       true,
+		SerialMatches:    true,
+		AdjustedDiscount: nil,
+		ProofImages:      []string{"https://img.example.com/proof.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("expected verify success, got err: %v", err)
+	}
+	if verifiedExc.Status != model.ExchangeStatusVerified {
+		t.Errorf("expected VERIFIED, got: %s", verifiedExc.Status)
+	}
+	if verifiedExc.FinalDiscount != exc.EstimatedDiscount {
+		t.Errorf("expected FinalDiscount %f, got: %f", exc.EstimatedDiscount, verifiedExc.FinalDiscount)
+	}
+	if v.AdjustedDiscount != exc.EstimatedDiscount {
+		t.Errorf("expected verification AdjustedDiscount %f, got: %f", exc.EstimatedDiscount, v.AdjustedDiscount)
 	}
 }
 
@@ -1700,3 +1791,31 @@ func TestReturnService_VerifyExchangeProduct_NonFunctionalCannotBeApproved(t *te
 		t.Errorf("expected ErrExchangeFunctionalRequired, got: %v", err)
 	}
 }
+
+func TestReturnService_VerifyExchangeProduct_InvalidConditionRating(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, nil, nil, 7)
+
+	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		OrderID:           "order-123",
+		UserID:            "user-789",
+		NewProductID:      "prod-999",
+		OldBrand:          "Samsung",
+		OldModel:          "Galaxy S21",
+		BaseExchangeValue: 200.0,
+	})
+
+	_, _, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
+		ExchangeID:      exc.ID,
+		VerifiedBy:      "delivery-partner-1",
+		ConditionRating: "INVALID_RATING",
+		IsApproved:      true,
+		Functional:      true,
+		SerialMatches:   true,
+	})
+	if !errors.Is(err, service.ErrInvalidExchangeConditionRating) {
+		t.Errorf("expected ErrInvalidExchangeConditionRating, got: %v", err)
+	}
+}
+

@@ -63,7 +63,7 @@ type VerifyExchangeProductDTO struct {
 	BodyIntact       bool     `json:"body_intact"`
 	Functional       bool     `json:"functional"`
 	SerialMatches    bool     `json:"serial_matches"`
-	AdjustedDiscount float64  `json:"adjusted_discount"`
+	AdjustedDiscount *float64 `json:"adjusted_discount,omitempty"`
 	ProofImages      []string `json:"proof_images,omitempty"`
 	Notes            string   `json:"notes,omitempty"`
 }

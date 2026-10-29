@@ -4,7 +4,10 @@ import (
 	"context"
 	"testing"
 
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
+	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -208,7 +211,7 @@ func (m *mockReturnClient) VerifyExchangeProduct(ctx context.Context, in *return
 			OldModel:          "iPhone 13",
 			BaseExchangeValue: 300.0,
 			EstimatedDiscount: 250.0,
-			FinalDiscount:     in.AdjustedDiscount,
+			FinalDiscount:     in.GetAdjustedDiscount(),
 			Status:            status,
 			Verification: &returnpb.ExchangeVerification{
 				Id:               "ver-exc-1",
@@ -220,7 +223,7 @@ func (m *mockReturnClient) VerifyExchangeProduct(ctx context.Context, in *return
 				BodyIntact:       in.BodyIntact,
 				Functional:       in.Functional,
 				SerialMatches:    in.SerialMatches,
-				AdjustedDiscount: in.AdjustedDiscount,
+				AdjustedDiscount: in.GetAdjustedDiscount(),
 				ProofImages:      in.ProofImages,
 				Notes:            in.Notes,
 				VerifiedAt:       "2026-10-26T12:00:00Z",
@@ -1002,6 +1005,29 @@ func TestVerifyExchangeProduct_Forbidden_Customer(t *testing.T) {
 	}
 }
 
+func TestVerifyExchangeProduct_InvalidConditionRating(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "agent-1",
+		PartnerID: "partner-1",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	input := model.VerifyExchangeProductInput{
+		ExchangeID:      "exc-100",
+		ConditionRating: "NOT_A_VALID_RATING",
+		IsApproved:      true,
+	}
+
+	_, err := resolver.Mutation().VerifyExchangeProduct(ctx, input)
+	if err == nil {
+		t.Fatal("expected bad request error for invalid condition rating, got nil")
+	}
+}
+
 func TestExchangeQuery_Success_Owner(t *testing.T) {
 	mockClient := &mockReturnClient{}
 	clients := &grpc.Clients{ReturnClient: mockClient}
@@ -1036,4 +1062,293 @@ func TestExchangeQuery_Forbidden_OtherUser(t *testing.T) {
 		t.Fatal("expected forbidden error for other user, got nil")
 	}
 }
+
+type mockOrderClientForReturnTest struct {
+	orderpb.OrderServiceClient
+	order *orderpb.Order
+	err   error
+}
+
+func (m *mockOrderClientForReturnTest) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.GetOrderResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.order != nil && m.order.Id == in.Id {
+		return &orderpb.GetOrderResponse{Order: m.order}, nil
+	}
+	return nil, appErrors.NotFound("order not found")
+}
+
+type mockDeliveryClientForReturnTest struct {
+	deliverypb.DeliveryServiceClient
+	delivery *deliverypb.Delivery
+	err      error
+}
+
+func (m *mockDeliveryClientForReturnTest) GetDeliveryByOrder(ctx context.Context, in *deliverypb.GetDeliveryByOrderRequest, opts ...grpcPkg.CallOption) (*deliverypb.GetDeliveryResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.delivery != nil && m.delivery.OrderId == in.OrderId {
+		return &deliverypb.GetDeliveryResponse{Delivery: m.delivery}, nil
+	}
+	return nil, appErrors.NotFound("delivery not found")
+}
+
+type mockStoreClientForReturnTest struct {
+	storepb.StoreServiceClient
+	store *storepb.Store
+	err   error
+}
+
+func (m *mockStoreClientForReturnTest) GetStore(ctx context.Context, in *storepb.GetStoreRequest, opts ...grpcPkg.CallOption) (*storepb.GetStoreResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.store != nil && (m.store.Id == in.Id || (in.MerchantId != "" && m.store.MerchantId == in.MerchantId)) {
+		return &storepb.GetStoreResponse{Store: m.store}, nil
+	}
+	return nil, appErrors.NotFound("store not found")
+}
+
+func TestExchangeQuery_Admin_Bypass(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-999",
+		Role:   "ADMIN",
+	})
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error for admin: %v", err)
+	}
+	if exc == nil || exc.ID != "exc-100" {
+		t.Fatalf("expected exchange exc-100, got %v", exc)
+	}
+}
+
+func TestExchangeQuery_Merchant_Forbidden_UnauthorizedOrder(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	orderMock := &mockOrderClientForReturnTest{
+		order: &orderpb.Order{
+			Id:      "order-1",
+			UserId:  "customer-1",
+			StoreId: "store-other",
+		},
+	}
+	storeMock := &mockStoreClientForReturnTest{
+		store: &storepb.Store{
+			Id:         "store-other",
+			MerchantId: "merchant-other",
+		},
+	}
+	clients := &grpc.Clients{
+		ReturnClient: mockClient,
+		OrderClient:  orderMock,
+		StoreClient:  storeMock,
+	}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:     "merchant-1",
+		MerchantID: "merchant-1",
+		Role:       "MERCHANT",
+	})
+
+	_, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err == nil {
+		t.Fatal("expected forbidden error for unauthorized merchant, got nil")
+	}
+}
+
+func TestExchangeQuery_Merchant_Success_OwnStoreOrder(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	orderMock := &mockOrderClientForReturnTest{
+		order: &orderpb.Order{
+			Id:      "order-1",
+			UserId:  "customer-1",
+			StoreId: "store-100",
+		},
+	}
+	storeMock := &mockStoreClientForReturnTest{
+		store: &storepb.Store{
+			Id:         "store-100",
+			MerchantId: "merchant-1",
+		},
+	}
+	clients := &grpc.Clients{
+		ReturnClient: mockClient,
+		OrderClient:  orderMock,
+		StoreClient:  storeMock,
+	}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:     "merchant-1",
+		MerchantID: "merchant-1",
+		Role:       "MERCHANT",
+	})
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error for authorized merchant: %v", err)
+	}
+	if exc == nil || exc.ID != "exc-100" {
+		t.Fatalf("expected exchange exc-100, got %v", exc)
+	}
+}
+
+func TestExchangeQuery_Merchant_Success_ItemStoreMatch(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	orderMock := &mockOrderClientForReturnTest{
+		order: &orderpb.Order{
+			Id:      "order-1",
+			UserId:  "customer-1",
+			StoreId: "store-other",
+			Items: []*orderpb.OrderItem{
+				{
+					Id:      "item-1",
+					StoreId: "store-100",
+				},
+			},
+		},
+	}
+	storeMock := &mockStoreClientForReturnTest{
+		store: &storepb.Store{
+			Id:         "store-100",
+			MerchantId: "merchant-1",
+		},
+	}
+	clients := &grpc.Clients{
+		ReturnClient: mockClient,
+		OrderClient:  orderMock,
+		StoreClient:  storeMock,
+	}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:     "merchant-1",
+		MerchantID: "merchant-1",
+		Role:       "MERCHANT",
+	})
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error for authorized merchant via item store: %v", err)
+	}
+	if exc == nil || exc.ID != "exc-100" {
+		t.Fatalf("expected exchange exc-100, got %v", exc)
+	}
+}
+
+func TestExchangeQuery_DeliveryPartner_Forbidden_Unassigned(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	delMock := &mockDeliveryClientForReturnTest{
+		delivery: &deliverypb.Delivery{
+			OrderId:         "order-1",
+			DeliveryPartner: "partner-other",
+		},
+	}
+	clients := &grpc.Clients{
+		ReturnClient:   mockClient,
+		DeliveryClient: delMock,
+	}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "agent-1",
+		PartnerID: "partner-1",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	_, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err == nil {
+		t.Fatal("expected forbidden error for unassigned delivery partner, got nil")
+	}
+}
+
+func TestExchangeQuery_DeliveryPartner_Success_AssignedDelivery(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	delMock := &mockDeliveryClientForReturnTest{
+		delivery: &deliverypb.Delivery{
+			OrderId:         "order-1",
+			DeliveryPartner: "partner-1",
+		},
+	}
+	clients := &grpc.Clients{
+		ReturnClient:   mockClient,
+		DeliveryClient: delMock,
+	}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "agent-1",
+		PartnerID: "partner-1",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error for assigned delivery partner: %v", err)
+	}
+	if exc == nil || exc.ID != "exc-100" {
+		t.Fatalf("expected exchange exc-100, got %v", exc)
+	}
+}
+
+func TestExchangeQuery_DeliveryPartner_Success_VerifiedBy(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{
+		ReturnClient: mockClient,
+	}
+	resolver := NewResolver(clients)
+
+	// In mockReturnClient, GetExchange returns an exchange with ID exc-100.
+	// If we set Verification.VerifiedBy to partner-1:
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "agent-1",
+		PartnerID: "partner-1",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	// Wrap or test when Verification.VerifiedBy matches:
+	originalGetExchange := mockClient.GetExchange
+	_ = originalGetExchange
+	// We can update mockClient to return an exchange verified by partner-1
+	mockClientWithVerification := &mockReturnClientWithVerifiedBy{
+		mockReturnClient: *mockClient,
+		verifiedBy:       "partner-1",
+	}
+	clients.ReturnClient = mockClientWithVerification
+
+	exc, err := resolver.Query().Exchange(ctx, "exc-100")
+	if err != nil {
+		t.Fatalf("unexpected error for verifying delivery partner: %v", err)
+	}
+	if exc == nil || exc.ID != "exc-100" {
+		t.Fatalf("expected exchange exc-100, got %v", exc)
+	}
+}
+
+type mockReturnClientWithVerifiedBy struct {
+	mockReturnClient
+	verifiedBy string
+}
+
+func (m *mockReturnClientWithVerifiedBy) GetExchange(ctx context.Context, in *returnpb.GetExchangeRequest, opts ...grpcPkg.CallOption) (*returnpb.GetExchangeResponse, error) {
+	resp, err := m.mockReturnClient.GetExchange(ctx, in, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if resp != nil && resp.Exchange != nil {
+		resp.Exchange.Verification = &returnpb.ExchangeVerification{
+			VerifiedBy: m.verifiedBy,
+		}
+	}
+	return resp, nil
+}
+
 

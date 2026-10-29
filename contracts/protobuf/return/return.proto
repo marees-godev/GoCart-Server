@@ -218,7 +218,7 @@ message VerifyExchangeProductRequest {
   bool body_intact = 6;
   bool functional = 7;
   bool serial_matches = 8;
-  double adjusted_discount = 9;
+  optional double adjusted_discount = 9;
   repeated string proof_images = 10;
   string notes = 11;
 }

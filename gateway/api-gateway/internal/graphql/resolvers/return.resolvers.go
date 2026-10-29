@@ -492,9 +492,14 @@ func (r *mutationResolver) VerifyExchangeProduct(ctx context.Context, input mode
 		return nil, appErrors.BadRequest("exchangeId is required")
 	}
 
-	rating := strings.TrimSpace(input.ConditionRating)
+	rating := strings.ToUpper(strings.TrimSpace(input.ConditionRating))
 	if rating == "" {
 		return nil, appErrors.BadRequest("conditionRating is required")
+	}
+	switch rating {
+	case "EXCELLENT", "GOOD", "AVERAGE", "POOR", "DAMAGED":
+	default:
+		return nil, appErrors.BadRequest("invalid conditionRating: must be EXCELLENT, GOOD, AVERAGE, POOR, or DAMAGED")
 	}
 
 	verifiedBy := userCtx.PartnerID
@@ -508,18 +513,16 @@ func (r *mutationResolver) VerifyExchangeProduct(ctx context.Context, input mode
 	}
 
 	req := &returnpb.VerifyExchangeProductRequest{
-		ExchangeId:      exchangeID,
-		VerifiedBy:      verifiedBy,
-		ConditionRating: rating,
-		IsApproved:      input.IsApproved,
-		ScreenIntact:    input.ScreenIntact,
-		BodyIntact:      input.BodyIntact,
-		Functional:      input.Functional,
-		SerialMatches:   input.SerialMatches,
-		Notes:           notes,
-	}
-	if input.AdjustedDiscount != nil {
-		req.AdjustedDiscount = *input.AdjustedDiscount
+		ExchangeId:       exchangeID,
+		VerifiedBy:       verifiedBy,
+		ConditionRating:  rating,
+		IsApproved:       input.IsApproved,
+		ScreenIntact:     input.ScreenIntact,
+		BodyIntact:       input.BodyIntact,
+		Functional:       input.Functional,
+		SerialMatches:    input.SerialMatches,
+		AdjustedDiscount: input.AdjustedDiscount,
+		Notes:            notes,
 	}
 
 	res, err := client.VerifyExchangeProduct(ctx, req)
@@ -670,10 +673,23 @@ func (r *queryResolver) Exchange(ctx context.Context, id string) (*model.Exchang
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
+	if res == nil || res.Exchange == nil {
+		return nil, nil
+	}
 
 	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
-	if role != "ADMIN" && role != "DELIVERY_PARTNER" && role != "MERCHANT" {
-		if res.Exchange != nil && res.Exchange.UserId != userCtx.UserID {
+	switch role {
+	case "ADMIN":
+	case "MERCHANT":
+		if !r.merchantHasAccessToExchange(ctx, userCtx, res.Exchange) {
+			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
+		}
+	case "DELIVERY_PARTNER":
+		if !r.deliveryPartnerHasAccessToExchange(ctx, userCtx, res.Exchange) {
+			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
+		}
+	default:
+		if res.Exchange.UserId != userCtx.UserID {
 			return nil, appErrors.Forbidden("you do not have permission to view this exchange")
 		}
 	}

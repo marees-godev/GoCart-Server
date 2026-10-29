@@ -37,6 +37,7 @@ var (
 	ErrProofImagesRequired          = errors.New("at least one proof image is required for product verification")
 	ErrVerifiedByRequired           = errors.New("verified by delivery partner ID is required")
 	ErrInvalidVerificationCondition = errors.New("invalid product verification condition")
+	ErrInvalidExchangeConditionRating = errors.New("invalid exchange condition rating")
 	ErrReturnNotFound               = errors.New("return not found")
 	ErrReturnNotVerifiable          = errors.New("return cannot be verified in current status")
 	ErrMultipleItemsNotSupported     = errors.New("only one item per return request is supported")
@@ -769,7 +770,7 @@ func (s *returnService) VerifyExchangeProduct(ctx context.Context, req *dto.Veri
 
 	condRating := model.ExchangeConditionRating(strings.ToUpper(strings.TrimSpace(req.ConditionRating)))
 	if !condRating.IsValid() {
-		condRating = model.RatingGood
+		return nil, nil, ErrInvalidExchangeConditionRating
 	}
 
 	exc, err := s.repo.GetExchangeByID(ctx, req.ExchangeID)
@@ -797,8 +798,8 @@ func (s *returnService) VerifyExchangeProduct(ctx context.Context, req *dto.Veri
 	var nextStatus model.ExchangeStatus
 
 	if req.IsApproved {
-		if req.AdjustedDiscount > 0 {
-			finalDiscount = req.AdjustedDiscount
+		if req.AdjustedDiscount != nil {
+			finalDiscount = *req.AdjustedDiscount
 		} else {
 			finalDiscount = exc.EstimatedDiscount
 		}

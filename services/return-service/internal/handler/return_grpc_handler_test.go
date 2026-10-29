@@ -622,9 +622,13 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 	now := time.Now().UTC()
 	svc := &mockReturnService{
 		verifyExchangeProductFunc: func(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error) {
+			finalDiscount := 0.0
+			if req.AdjustedDiscount != nil {
+				finalDiscount = *req.AdjustedDiscount
+			}
 			return &model.Exchange{
 					ID:            req.ExchangeID,
-					FinalDiscount: req.AdjustedDiscount,
+					FinalDiscount: finalDiscount,
 					Status:        model.ExchangeStatusVerified,
 					CreatedAt:     now,
 					UpdatedAt:     now,
@@ -637,7 +641,7 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 					ScreenIntact:     req.ScreenIntact,
 					Functional:       req.Functional,
 					SerialMatches:    req.SerialMatches,
-					AdjustedDiscount: req.AdjustedDiscount,
+					AdjustedDiscount: finalDiscount,
 					VerifiedAt:       now,
 					CreatedAt:        now,
 					UpdatedAt:        now,
@@ -645,6 +649,7 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 		},
 	}
 	h := handler.NewReturnGRPCHandler(svc, nil)
+	adjDiscount := 150.0
 	resp, err := h.VerifyExchangeProduct(ctx, &returns.VerifyExchangeProductRequest{
 		ExchangeId:       "exc-101",
 		VerifiedBy:       "delivery-1",
@@ -654,7 +659,7 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 		BodyIntact:       true,
 		Functional:       true,
 		SerialMatches:    true,
-		AdjustedDiscount: 150.0,
+		AdjustedDiscount: &adjDiscount,
 		Notes:            "All good",
 	})
 	if err != nil {
