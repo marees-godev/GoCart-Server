@@ -46,7 +46,13 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
-	// 2. Initialize distributed tracing
+	// 2. Validate configuration before starting servers
+	if err := cfg.Validate(); err != nil {
+		log.Error("Startup validation failed: invalid configuration", "error", err)
+		os.Exit(1)
+	}
+
+	// 3. Initialize distributed tracing
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
 		Environment: cfg.App.Environment,
@@ -65,7 +71,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// 3. Initialize database connection pool
+	// 4. Initialize database connection pool
 	db, err := database.New(ctx, database.Config{
 		URL:            cfg.Database.URL,
 		MaxConns:       cfg.Database.MaxConns,
@@ -80,7 +86,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// 4. Run auto migrations if enabled
+	// 5. Run auto migrations if enabled
 	if cfg.Database.AutoMigrate {
 		migrator, err := database.NewMigrator(db.Pool, cfg.Database.MigrationsPath)
 		if err != nil {
@@ -93,7 +99,7 @@ func main() {
 		}
 	}
 
-	// 5. Initialize Kafka producer
+	// 6. Initialize Kafka producer
 	producer := kafka.NewProducer(kafka.Config{
 		Brokers:        cfg.Kafka.Brokers,
 		ClientID:       cfg.Kafka.ClientID,
@@ -107,7 +113,7 @@ func main() {
 		}
 	}()
 
-	// 6. Initialize outbox store, repository, order client & service
+	// 7. Initialize outbox store, repository, order client & service
 	outboxStore := outbox.NewStore()
 	deliveryRepo := repository.NewDeliveryRepositoryWithOutbox(db, outboxStore, log)
 	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
@@ -122,7 +128,7 @@ func main() {
 	}
 	deliveryService := service.NewDeliveryService(deliveryRepo, orderClient, inventoryClient, log)
 
-	// 7. Start transactional outbox publisher as a background worker
+	// 8. Start transactional outbox publisher as a background worker
 	if cfg.Outbox.Enabled {
 		outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
 			ServiceName:    cfg.App.Name,
@@ -138,7 +144,7 @@ func main() {
 		log.Info("Outbox publisher is disabled via OUTBOX_ENABLED=false")
 	}
 
-	// 8. Setup Kafka event consumer
+	// 9. Setup Kafka event consumer
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "delivery-service-group",
@@ -162,7 +168,7 @@ func main() {
 		defer func() { _ = kafkaConsumer.Close() }()
 	}
 
-	// 9. Setup Fiber HTTP server with observability middleware
+	// 10. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -179,10 +185,10 @@ func main() {
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
 	// Tracking and Partner HTTP routes
-	deliveryHandler := handler.NewDeliveryHandler(deliveryService, cfg.JWT.Secret)
+	deliveryHandler := handler.NewDeliveryHandler(deliveryService)
 	deliveryHandler.RegisterRoutes(app)
 
-	// 10. Setup gRPC server
+	// 11. Setup gRPC server
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),
 		grpc.MaxRecvMsgSize(10*1024*1024),

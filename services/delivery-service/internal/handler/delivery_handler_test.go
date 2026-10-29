@@ -609,3 +609,43 @@ func TestDeliveryStatusUpdate_NotFound(t *testing.T) {
 		t.Fatalf("expected status 404 for non-existent delivery, got %d", resp.StatusCode)
 	}
 }
+
+
+func TestPartnerProfile_NeverBypassesAuthentication(t *testing.T) {
+	repo := newMemoryDeliveryRepo()
+	svc := service.NewDeliveryService(repo)
+
+	t.Run("Protected endpoint rejects request when JWT secret is empty", func(t *testing.T) {
+		app := fiber.New()
+		h := handler.NewDeliveryHandler(svc) // no secret provided
+		h.RegisterRoutes(app)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/partners/me", nil)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("expected 500 rejection because authentication cannot be configured, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("Protected endpoint rejects request when unauthenticated", func(t *testing.T) {
+		app := fiber.New()
+		h := handler.NewDeliveryHandler(svc, "test-secret-key-12345")
+		h.RegisterRoutes(app)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/partners/me", nil)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("expected 401 Unauthorized for missing token, got %d", resp.StatusCode)
+		}
+	})
+}

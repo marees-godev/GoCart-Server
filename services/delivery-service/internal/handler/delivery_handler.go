@@ -38,12 +38,7 @@ func (h *DeliveryHandler) RegisterRoutes(app *fiber.App) {
 	app.Post("/api/webhooks/delivery", h.HandleWebhook)
 
 	// Partner Profile Management
-	var partnerAuth fiber.Handler
-	if h.jwtSecret != "" {
-		partnerAuth = middleware.DeliveryPartnerAuthMiddleware(h.jwtSecret)
-	} else {
-		partnerAuth = func(c *fiber.Ctx) error { return c.Next() }
-	}
+	partnerAuth := middleware.DeliveryPartnerAuthMiddleware(h.jwtSecret)
 
 	app.Get("/api/partners/me", partnerAuth, h.GetMyProfile)
 	app.Put("/api/partners/me", partnerAuth, h.UpdateMyProfile)
