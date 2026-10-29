@@ -6,6 +6,7 @@ import (
 	"time"
 
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
+	events "github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	paymentGRPC "github.com/marees-godev/GoCart-Server/services/payment-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
@@ -119,6 +120,10 @@ func (m *mockPaymentService) GetRefundsByPaymentID(ctx context.Context, paymentI
 
 func (m *mockPaymentService) HandleRazorpayWebhook(ctx context.Context, body []byte) error {
 	return nil
+}
+
+func (m *mockPaymentService) HandleOrderCreated(ctx context.Context, event *events.OrderCreatedEvent, correlationID, traceID string) (*model.Payment, error) {
+	return nil, nil
 }
 
 func TestPaymentGRPCServer_ProcessPayment(t *testing.T) {

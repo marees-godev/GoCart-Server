@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
@@ -26,6 +28,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/order-service/internal/consumer"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/service"
@@ -148,6 +151,37 @@ func main() {
 	orderRepo := repository.NewOrderRepo(db, outboxStore)
 	orderService := service.NewOrderService(orderRepo, cartClient, prodClient, invClient, cfg.GRPC.TimeoutSeconds, log)
 	orderGRPCHandler := handler.NewOrderGRPCHandler(orderService, log)
+
+	// 8b. Start Kafka event consumer for order lifecycle events (PaymentSuccessful, PaymentFailed)
+	if len(cfg.Kafka.Brokers) > 0 {
+		consumerCfg := kafka.ConsumerConfig{
+			GroupID: "order-service-group",
+			Topics: []string{
+				events.TopicPaymentSuccessful,
+				events.TopicPaymentFailed,
+			},
+		}
+		orderKafkaConsumer := kafka.NewConsumer(kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       cfg.Kafka.ClientID,
+			ConnectTimeout: 10 * time.Second,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			RetryInterval:  500 * time.Millisecond,
+		}, consumerCfg, producer)
+
+		orderEvtConsumer := consumer.NewOrderEventConsumer(orderService)
+		go func() {
+			log.Info("Starting Order Kafka Event Consumer...")
+			if err := orderKafkaConsumer.Start(ctx, orderEvtConsumer.HandleEvent); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Order Kafka event consumer failed", "error", err)
+			}
+		}()
+		defer func() {
+			if err := orderKafkaConsumer.Close(); err != nil {
+				log.Error("Failed to close Order Kafka consumer", "error", err)
+			}
+		}()
+	}
 
 	// 9. Setup gRPC Server
 	grpcServer := grpc.NewServer(

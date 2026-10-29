@@ -15,17 +15,19 @@ import (
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/repository"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 const (
-	OrderCreatedTopic   = "gocart.orders.order-created"
-	OrderCancelledTopic = "gocart.orders.order-cancelled"
+	OrderCreatedTopic   = events.TopicOrderCreated
+	OrderCancelledTopic = events.TopicOrderCancelled
 )
 
 type OrderService interface {
@@ -35,6 +37,8 @@ type OrderService interface {
 	UpdateOrderStatus(ctx context.Context, id string, orderStatus model.OrderStatus, reason ...string) (*model.Order, error)
 	CancelOrder(ctx context.Context, id string, userID string, reason string) (*model.Order, error)
 	GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error)
+	HandlePaymentSuccessful(ctx context.Context, event *events.PaymentSuccessfulEvent, correlationID, traceID string) (*model.Order, error)
+	HandlePaymentFailed(ctx context.Context, event *events.PaymentFailedEvent, correlationID, traceID string) (*model.Order, error)
 }
 
 type orderService struct {
@@ -401,6 +405,18 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			return nil, appErrors.Internal(err, "failed to create event envelope")
 		}
 
+		if corrID, ok := ctx.Value(logger.CorrelationIDKey).(string); ok && corrID != "" {
+			envelope.CorrelationID = corrID
+		} else if reqID, ok := ctx.Value(logger.RequestIDKey).(string); ok && reqID != "" {
+			envelope.CorrelationID = reqID
+		} else {
+			envelope.CorrelationID = ord.ID
+		}
+		span := trace.SpanFromContext(ctx)
+		if span.SpanContext().IsValid() {
+			envelope.TraceID = span.SpanContext().TraceID().String()
+		}
+
 		orders = append(orders, ord)
 		envelopes = append(envelopes, envelope)
 	}
@@ -540,6 +556,10 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.Internal(err, "failed to get order")
 	}
 
+	if order.Status == orderStatus {
+		return order, nil
+	}
+
 	if !model.IsValidTransition(order.Status, orderStatus) {
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", order.Status, orderStatus))
 	}
@@ -551,6 +571,114 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		}
 		return nil, err
 	}
+	return updatedOrder, nil
+}
+
+func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *events.PaymentSuccessfulEvent, correlationID, traceID string) (*model.Order, error) {
+	if event == nil || strings.TrimSpace(event.OrderID) == "" {
+		return nil, appErrors.BadRequest("order_id is required in PaymentSuccessful payload")
+	}
+
+	orderID := strings.TrimSpace(event.OrderID)
+	order, err := s.repo.GetOrderByID(ctx, orderID)
+	if err != nil {
+		if errorsIs(err, repository.ErrOrderNotFound) {
+			return nil, appErrors.NotFound("order not found for payment success")
+		}
+		return nil, appErrors.Internal(err, "failed to get order")
+	}
+
+	// Idempotency: if already confirmed or paid, return early without state changes
+	if order.Status == model.OrderStatusConfirmed || order.Status == model.OrderStatusPaid {
+		s.log.Info("Order already confirmed/paid, ignoring duplicate PaymentSuccessful event",
+			"order_id", orderID,
+			"current_status", order.Status,
+		)
+		return order, nil
+	}
+
+	now := time.Now().UTC()
+	confirmedEvt := events.OrderConfirmedEvent{
+		OrderID:     order.ID,
+		ConfirmedAt: now,
+	}
+
+	envelope, err := events.NewEventEnvelopeWithAggregate(
+		events.EventTypeOrderConfirmed,
+		"order-service",
+		order.ID,
+		confirmedEvt,
+	)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to create OrderConfirmed event envelope")
+	}
+	if correlationID != "" {
+		envelope.CorrelationID = correlationID
+	}
+	if traceID != "" {
+		envelope.TraceID = traceID
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
+		ctx,
+		orderID,
+		model.OrderStatusConfirmed,
+		envelope,
+		events.TopicOrderConfirmed,
+		"Payment successful",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Order transitioned to CONFIRMED and OrderConfirmed event recorded in outbox",
+		"order_id", orderID,
+		"payment_id", event.PaymentID,
+	)
+	return updatedOrder, nil
+}
+
+func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.PaymentFailedEvent, correlationID, traceID string) (*model.Order, error) {
+	if event == nil || strings.TrimSpace(event.OrderID) == "" {
+		return nil, appErrors.BadRequest("order_id is required in PaymentFailed payload")
+	}
+
+	orderID := strings.TrimSpace(event.OrderID)
+	order, err := s.repo.GetOrderByID(ctx, orderID)
+	if err != nil {
+		if errorsIs(err, repository.ErrOrderNotFound) {
+			return nil, appErrors.NotFound("order not found for payment failed")
+		}
+		return nil, appErrors.Internal(err, "failed to get order")
+	}
+
+	// Idempotency: if already payment failed, return early
+	if order.Status == model.OrderStatusPaymentFailed {
+		s.log.Info("Order already marked as PAYMENT_FAILED, ignoring duplicate event",
+			"order_id", orderID,
+		)
+		return order, nil
+	}
+
+	reason := event.Reason
+	if reason == "" {
+		reason = "Payment failed at gateway"
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatus(
+		ctx,
+		orderID,
+		model.OrderStatusPaymentFailed,
+		reason,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	s.log.Info("Order transitioned to PAYMENT_FAILED",
+		"order_id", orderID,
+		"reason", reason,
+	)
 	return updatedOrder, nil
 }
 

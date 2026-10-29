@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/dto"
@@ -63,6 +64,14 @@ func (m *mockOrderService) GetOrderStatusHistory(ctx context.Context, orderID st
 	if m.getOrderStatusHistory != nil {
 		return m.getOrderStatusHistory(ctx, orderID)
 	}
+	return nil, nil
+}
+
+func (m *mockOrderService) HandlePaymentSuccessful(ctx context.Context, event *events.PaymentSuccessfulEvent, correlationID, traceID string) (*model.Order, error) {
+	return nil, nil
+}
+
+func (m *mockOrderService) HandlePaymentFailed(ctx context.Context, event *events.PaymentFailedEvent, correlationID, traceID string) (*model.Order, error) {
 	return nil, nil
 }
 

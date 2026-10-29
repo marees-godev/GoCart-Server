@@ -46,15 +46,20 @@ func (s OrderStatus) IsValid() bool {
 var ValidStateTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusCreated: {
 		OrderStatusPendingPayment,
+		OrderStatusPaid,
+		OrderStatusConfirmed,
+		OrderStatusPaymentFailed,
 		OrderStatusCancelled,
 	},
 	OrderStatusPendingPayment: {
 		OrderStatusPaid,
+		OrderStatusConfirmed,
 		OrderStatusPaymentFailed,
 		OrderStatusCancelled,
 	},
 	OrderStatusPaid: {
 		OrderStatusConfirmed,
+		OrderStatusProcessing,
 		OrderStatusCancelled,
 	},
 	OrderStatusConfirmed: {
@@ -86,6 +91,9 @@ var ValidStateTransitions = map[OrderStatus][]OrderStatus{
 func IsValidTransition(current, next OrderStatus) bool {
 	if !current.IsValid() || !next.IsValid() {
 		return false
+	}
+	if current == next {
+		return true
 	}
 	allowed, exists := ValidStateTransitions[current]
 	if !exists {

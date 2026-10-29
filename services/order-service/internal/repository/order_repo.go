@@ -30,6 +30,7 @@ type OrderRepository interface {
 	GetOrdersByIdempotencyKey(ctx context.Context, idempotencyKey string) ([]*model.Order, error)
 	ListOrdersByUserID(ctx context.Context, userID string, limit, offset int) ([]*model.Order, int, error)
 	UpdateOrderStatus(ctx context.Context, id string, status model.OrderStatus, reason ...string) (*model.Order, error)
+	UpdateOrderStatusWithOutbox(ctx context.Context, id string, status model.OrderStatus, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error)
 	CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error)
 	GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error)
 	CreateOrderWithOutbox(
@@ -397,6 +398,17 @@ func (r *OrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit
 }
 
 func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, id string, status model.OrderStatus, reason ...string) (*model.Order, error) {
+	return r.UpdateOrderStatusWithOutbox(ctx, id, status, nil, "", reason...)
+}
+
+func (r *OrderRepo) UpdateOrderStatusWithOutbox(
+	ctx context.Context,
+	id string,
+	status model.OrderStatus,
+	envelope *events.EventEnvelope,
+	topic string,
+	reason ...string,
+) (*model.Order, error) {
 	var updatedOrder *model.Order
 	reasonText := ""
 	if len(reason) > 0 {
@@ -420,13 +432,46 @@ func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, id string, status mod
 			return fmt.Errorf("failed to lock order for update: %w", err)
 		}
 
+		if currentStatus == status {
+			var o model.Order
+			var parentID, shipAddrID, billAddrID, idempKey *string
+			var shipAddrStr, billAddrStr *string
+			readQuery := `
+				SELECT id, order_number, parent_order_id, user_id, store_id,
+					subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+					currency, payment_status, status, shipping_address::text, billing_address::text,
+					shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
+				FROM orders WHERE id = $1`
+			err = tx.QueryRow(ctx, readQuery, id).Scan(
+				&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
+				&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+				&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
+				&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to read order: %w", err)
+			}
+			o.ParentOrderID = parentID
+			o.ShippingAddressID = shipAddrID
+			o.BillingAddressID = billAddrID
+			o.IdempotencyKey = idempKey
+			if shipAddrStr != nil {
+				o.ShippingAddress = *shipAddrStr
+			}
+			if billAddrStr != nil {
+				o.BillingAddress = *billAddrStr
+			}
+			updatedOrder = &o
+			return nil
+		}
+
 		if !model.IsValidTransition(currentStatus, status) {
 			return appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", currentStatus, status))
 		}
 
 		newPaymentStatus := paymentStatus
 		switch status {
-		case model.OrderStatusPaid:
+		case model.OrderStatusPaid, model.OrderStatusConfirmed:
 			newPaymentStatus = model.PaymentStatusPaid
 		case model.OrderStatusPaymentFailed:
 			newPaymentStatus = model.PaymentStatusFailed
@@ -483,6 +528,23 @@ func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, id string, status mod
 
 		if _, err := tx.Exec(ctx, historyQuery, id, string(currentStatus), string(status), rVal); err != nil {
 			return fmt.Errorf("failed to insert order status history: %w", err)
+		}
+
+		if envelope != nil && r.outboxStore != nil {
+			payload, err := envelope.Marshal()
+			if err != nil {
+				return fmt.Errorf("failed to marshal order status outbox event: %w", err)
+			}
+			evt := &outbox.Event{
+				AggregateType: "order",
+				AggregateID:   id,
+				EventType:     envelope.EventType,
+				Payload:       payload,
+				Topic:         topic,
+			}
+			if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+				return fmt.Errorf("failed to insert order status outbox event: %w", err)
+			}
 		}
 
 		updatedOrder = &o

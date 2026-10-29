@@ -134,6 +134,30 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 		p.PaymentMethodID = scannedPmID
 	}
 
+	if p.Status == model.PaymentStatusInitiated {
+		initEvt := events.PaymentInitiatedEvent{
+			PaymentID:     p.ID,
+			OrderID:       p.OrderID,
+			UserID:        p.UserID,
+			Amount:        p.Amount,
+			Currency:      p.Currency,
+			PaymentMethod: p.PaymentMethod,
+			InitiatedAt:   p.CreatedAt,
+		}
+		if env, envErr := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentInitiated, "payment-service", p.ID, initEvt); envErr == nil {
+			if payloadBytes, mErr := env.Marshal(); mErr == nil {
+				outboxQuery := `
+					INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+					SELECT 'payment', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+					WHERE NOT EXISTS (
+						SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+					)
+				`
+				_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentInitiated, payloadBytes, events.TopicPaymentInitiated)
+			}
+		}
+	}
+
 	slog.InfoContext(ctx, "payment created in repository", "payment_id", p.ID, "order_id", p.OrderID, "payment_method_id", p.PaymentMethodID)
 	return nil
 }
