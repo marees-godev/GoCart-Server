@@ -376,8 +376,10 @@ func TestUpdateUser_Success(t *testing.T) {
 func TestUpdateUser_DateOfBirthValidation(t *testing.T) {
 	now := time.Now()
 	tooYoungDOB := now.AddDate(-15, 0, 0).Format("2006-01-02")
+	tooOldDOB := now.AddDate(-101, 0, 0).Format("2006-01-02")
 	futureDOB := now.AddDate(1, 0, 0).Format("2006-01-02")
 	validDOB := now.AddDate(-20, 0, 0).Format("2006-01-02")
+	exactHundredDOB := now.AddDate(-100, 0, 0).Format("2006-01-02")
 	emptyDOB := ""
 	invalidFormatDOB := "15-05-1990"
 
@@ -394,6 +396,12 @@ func TestUpdateUser_DateOfBirthValidation(t *testing.T) {
 			expectedMsg: "user must be at least 16 years old",
 		},
 		{
+			name:        "more than 100 years old should fail",
+			dob:         &tooOldDOB,
+			expectError: true,
+			expectedMsg: "date_of_birth must be within the last 100 years",
+		},
+		{
 			name:        "future date should fail",
 			dob:         &futureDOB,
 			expectError: true,
@@ -408,6 +416,11 @@ func TestUpdateUser_DateOfBirthValidation(t *testing.T) {
 		{
 			name:        "valid age >= 16 should succeed",
 			dob:         &validDOB,
+			expectError: false,
+		},
+		{
+			name:        "exactly 100 years old should succeed",
+			dob:         &exactHundredDOB,
 			expectError: false,
 		},
 		{
