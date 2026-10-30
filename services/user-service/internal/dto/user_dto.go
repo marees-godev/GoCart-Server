@@ -158,8 +158,16 @@ func (r *UpdateUserRequest) Validate() error {
 			if err != nil {
 				return errors.BadRequest("date_of_birth must be formatted as YYYY-MM-DD")
 			}
-			if dob.After(time.Now()) {
+			now := time.Now()
+			if dob.After(now) {
 				return errors.BadRequest("date_of_birth cannot be in the future")
+			}
+			age := now.Year() - dob.Year()
+			if now.Month() < dob.Month() || (now.Month() == dob.Month() && now.Day() < dob.Day()) {
+				age--
+			}
+			if age < 16 {
+				return errors.BadRequest("user must be at least 16 years old")
 			}
 		}
 	}
