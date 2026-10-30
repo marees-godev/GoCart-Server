@@ -10,6 +10,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/consumer"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
@@ -206,11 +207,41 @@ func (m *mockPaymentRepo) MarkWebhookProcessed(ctx context.Context, eventID stri
 	return nil
 }
 
-func setupConsumerTest() (*consumer.PaymentEventConsumer, *mockPaymentRepo) {
+type mockOrderClient struct {
+	mu     sync.Mutex
+	orders map[string]*client.AuthoritativeOrder
+}
+
+func newMockOrderClient() *mockOrderClient {
+	return &mockOrderClient{orders: make(map[string]*client.AuthoritativeOrder)}
+}
+
+func (m *mockOrderClient) GetOrder(ctx context.Context, orderID string) (*client.AuthoritativeOrder, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ord, ok := m.orders[orderID]; ok {
+		return ord, nil
+	}
+	return &client.AuthoritativeOrder{
+		ID:          orderID,
+		UserID:      "usr-" + orderID,
+		TotalAmount: 250.00,
+		Currency:    "USD",
+		Status:      "CREATED",
+	}, nil
+}
+
+func setupConsumerTestWithGateway() (*consumer.PaymentEventConsumer, *mockPaymentRepo, *gateway.MockGateway, *mockOrderClient) {
 	repo := newMockPaymentRepo()
 	gw := gateway.NewMockGateway(10 * time.Millisecond)
-	svc := service.NewPaymentService(repo, gw, nil, 2*time.Second)
+	orderClient := newMockOrderClient()
+	svc := service.NewPaymentService(repo, gw, orderClient, 2*time.Second)
 	c := consumer.NewPaymentEventConsumer(svc)
+	return c, repo, gw, orderClient
+}
+
+func setupConsumerTest() (*consumer.PaymentEventConsumer, *mockPaymentRepo) {
+	c, repo, _, _ := setupConsumerTestWithGateway()
 	return c, repo
 }
 
@@ -295,10 +326,20 @@ func TestPaymentEventConsumer_OrderCreated_Success(t *testing.T) {
 }
 
 func TestPaymentEventConsumer_OrderCreated_Failure(t *testing.T) {
-	c, repo := setupConsumerTest()
+	c, repo, gw, orderClient := setupConsumerTestWithGateway()
 
-	// Using 'fail' in orderID triggers fail_gateway idempotency key in HandleOrderCreated
 	orderID := "ord-fail-202"
+	orderClient.orders[orderID] = &client.AuthoritativeOrder{
+		ID:          orderID,
+		UserID:      "usr-fail-202",
+		TotalAmount: 99.00,
+		Currency:    "USD",
+		Status:      "CREATED",
+	}
+
+	// Explicitly simulate gateway decline via mock gateway configuration
+	gw.SetFailPayment(true)
+
 	payload := events.OrderCreatedEvent{
 		OrderID:     orderID,
 		UserID:      "usr-fail-202",

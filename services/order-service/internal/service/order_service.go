@@ -26,8 +26,10 @@ import (
 )
 
 const (
-	OrderCreatedTopic   = events.TopicOrderCreated
-	OrderCancelledTopic = events.TopicOrderCancelled
+	OrderCreatedTopic       = events.TopicOrderCreated
+	OrderCancelledTopic     = events.TopicOrderCancelled
+	OrderConfirmedTopic     = events.TopicOrderConfirmed
+	OrderPaymentFailedTopic = events.TopicOrderPaymentFailed
 )
 
 type OrderService interface {
@@ -665,17 +667,43 @@ func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.Pa
 		reason = "Payment failed at gateway"
 	}
 
-	updatedOrder, err := s.repo.UpdateOrderStatus(
+	now := time.Now().UTC()
+	paymentFailedEvt := events.OrderPaymentFailedEvent{
+		OrderID:   order.ID,
+		PaymentID: event.PaymentID,
+		Reason:    reason,
+		FailedAt:  now,
+	}
+
+	envelope, err := events.NewEventEnvelopeWithAggregate(
+		events.EventTypeOrderPaymentFailed,
+		"order-service",
+		order.ID,
+		paymentFailedEvt,
+	)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to create OrderPaymentFailed event envelope")
+	}
+	if correlationID != "" {
+		envelope.CorrelationID = correlationID
+	}
+	if traceID != "" {
+		envelope.TraceID = traceID
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
 		orderID,
 		model.OrderStatusPaymentFailed,
+		envelope,
+		OrderPaymentFailedTopic,
 		reason,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	s.log.Info("Order transitioned to PAYMENT_FAILED",
+	s.log.Info("Order transitioned to PAYMENT_FAILED and OrderPaymentFailed event recorded in outbox",
 		"order_id", orderID,
 		"reason", reason,
 	)

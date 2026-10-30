@@ -100,30 +100,22 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 	}
 
 	// 2. Fetch Authoritative Order to get authoritative amount and currency
-	var authoritativeAmount float64
-	var currency string
-	var userID string = dto.UserID
+	if s.orderClient == nil {
+		slog.ErrorContext(ctx, "order client is not configured in payment service", "order_id", dto.OrderID)
+		return nil, appErrors.Internal(nil, "order service client is not available")
+	}
 
-	if s.orderClient != nil {
-		authOrder, err := s.orderClient.GetOrder(ctx, dto.OrderID)
-		if err == nil && authOrder != nil {
-			authoritativeAmount = authOrder.TotalAmount
-			currency = authOrder.Currency
-			if userID == "" {
-				userID = authOrder.UserID
-			}
-		} else if dto.ClientAmount > 0 {
-			authoritativeAmount = dto.ClientAmount
-			currency = dto.ClientCurrency
-		} else {
-			slog.ErrorContext(ctx, "failed to fetch authoritative order for payment in service", "order_id", dto.OrderID, "error", err)
-			return nil, appErrors.BadRequest(fmt.Sprintf("cannot process payment: authoritative order error: %v", err))
-		}
-	} else if dto.ClientAmount > 0 {
-		authoritativeAmount = dto.ClientAmount
-		currency = dto.ClientCurrency
-	} else {
-		return nil, appErrors.BadRequest("cannot process payment: orderClient unavailable and client amount empty")
+	authOrder, err := s.orderClient.GetOrder(ctx, dto.OrderID)
+	if err != nil || authOrder == nil {
+		slog.ErrorContext(ctx, "failed to fetch authoritative order for payment in service", "order_id", dto.OrderID, "error", err)
+		return nil, appErrors.BadRequest(fmt.Sprintf("cannot process payment: authoritative order error: %v", err))
+	}
+
+	authoritativeAmount := authOrder.TotalAmount
+	currency := authOrder.Currency
+	userID := dto.UserID
+	if userID == "" {
+		userID = authOrder.UserID
 	}
 
 	// Double check if payment for this order already succeeded
@@ -830,9 +822,6 @@ func (s *paymentService) HandleOrderCreated(ctx context.Context, event *events.O
 
 	// 2. Generate idempotency key for payment processing
 	idempKey := fmt.Sprintf("order-pay-%s", orderID)
-	if strings.Contains(strings.ToLower(orderID), "fail") || strings.Contains(strings.ToLower(correlationID), "fail") {
-		idempKey = fmt.Sprintf("order-pay-%s-fail_gateway", orderID)
-	}
 
 	currency := event.Currency
 	if currency == "" {

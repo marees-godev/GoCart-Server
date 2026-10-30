@@ -205,12 +205,27 @@ func TestOrderEventConsumer_PaymentFailed_UpdatesOrderStatus(t *testing.T) {
 		t.Errorf("expected payment status FAILED, got %s", order.PaymentStatus)
 	}
 
-	// Test Idempotency: duplicate event does not error
+	// Verify outbox envelope recorded OrderPaymentFailed event
+	if len(repo.outboxEnvelopes) != 1 {
+		t.Fatalf("expected 1 outbox envelope, got %d", len(repo.outboxEnvelopes))
+	}
+	outboxEnv := repo.outboxEnvelopes[0]
+	if outboxEnv.EventType != events.EventTypeOrderPaymentFailed {
+		t.Errorf("expected outbox event_type %s, got %s", events.EventTypeOrderPaymentFailed, outboxEnv.EventType)
+	}
+	if repo.outboxTopic != events.TopicOrderPaymentFailed {
+		t.Errorf("expected outbox topic %s, got %s", events.TopicOrderPaymentFailed, repo.outboxTopic)
+	}
+
+	// Test Idempotency: duplicate event does not error and outbox is not duplicated
 	if err := c.HandleEvent(context.Background(), env); err != nil {
 		t.Fatalf("duplicate PaymentFailed HandleEvent failed: %v", err)
 	}
 	if order.Status != model.OrderStatusPaymentFailed {
 		t.Errorf("expected order status to remain PAYMENT_FAILED, got %s", order.Status)
+	}
+	if len(repo.outboxEnvelopes) != 1 {
+		t.Errorf("expected outbox envelopes to remain 1 after duplicate, got %d", len(repo.outboxEnvelopes))
 	}
 }
 
