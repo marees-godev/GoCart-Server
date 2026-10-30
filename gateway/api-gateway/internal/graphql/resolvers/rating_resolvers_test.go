@@ -522,6 +522,13 @@ func TestRatingResolvers_ProductRatings_Success_DefaultPagination(t *testing.T) 
 			},
 			AverageRating: 4.5,
 			Total:         2,
+			Stars: &ratingpb.StarRating{
+				FiveStar:  1,
+				FourStar:  1,
+				ThreeStar: 0,
+				TwoStar:   0,
+				OneStar:   0,
+			},
 		},
 	}
 	_, query := newTestRatingResolver(mock)
@@ -534,6 +541,11 @@ func TestRatingResolvers_ProductRatings_Success_DefaultPagination(t *testing.T) 
 	if res.Total != 2 || res.AverageRating != 4.5 || len(res.Ratings) != 2 {
 		t.Errorf("unexpected product ratings result: %+v", res)
 	}
+
+	if res.Stars == nil || res.Stars.FiveStar != 1 || res.Stars.FourStar != 1 {
+		t.Errorf("unexpected stars distribution: %+v", res.Stars)
+	}
+
 	if mock.lastGetProductRatingsReq == nil {
 		t.Fatal("expected GetProductRatings to be called")
 	}

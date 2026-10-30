@@ -452,6 +452,7 @@ type ComplexityRoot struct {
 	ProductRatings struct {
 		AverageRating func(childComplexity int) int
 		Ratings       func(childComplexity int) int
+		Stars         func(childComplexity int) int
 		Total         func(childComplexity int) int
 	}
 
@@ -581,6 +582,14 @@ type ComplexityRoot struct {
 		UpdatedAt       func(childComplexity int) int
 		UserID          func(childComplexity int) int
 		Verification    func(childComplexity int) int
+	}
+
+	StarRating struct {
+		FiveStar  func(childComplexity int) int
+		FourStar  func(childComplexity int) int
+		OneStar   func(childComplexity int) int
+		ThreeStar func(childComplexity int) int
+		TwoStar   func(childComplexity int) int
 	}
 
 	StockItem struct {
@@ -3288,6 +3297,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ProductRatings.Ratings(childComplexity), true
 
+	case "ProductRatings.stars":
+		if e.complexity.ProductRatings.Stars == nil {
+			break
+		}
+
+		return e.complexity.ProductRatings.Stars(childComplexity), true
+
 	case "ProductRatings.total":
 		if e.complexity.ProductRatings.Total == nil {
 			break
@@ -4186,6 +4202,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ReturnOrder.Verification(childComplexity), true
+
+	case "StarRating.fiveStar":
+		if e.complexity.StarRating.FiveStar == nil {
+			break
+		}
+
+		return e.complexity.StarRating.FiveStar(childComplexity), true
+
+	case "StarRating.fourStar":
+		if e.complexity.StarRating.FourStar == nil {
+			break
+		}
+
+		return e.complexity.StarRating.FourStar(childComplexity), true
+
+	case "StarRating.oneStar":
+		if e.complexity.StarRating.OneStar == nil {
+			break
+		}
+
+		return e.complexity.StarRating.OneStar(childComplexity), true
+
+	case "StarRating.threeStar":
+		if e.complexity.StarRating.ThreeStar == nil {
+			break
+		}
+
+		return e.complexity.StarRating.ThreeStar(childComplexity), true
+
+	case "StarRating.twoStar":
+		if e.complexity.StarRating.TwoStar == nil {
+			break
+		}
+
+		return e.complexity.StarRating.TwoStar(childComplexity), true
 
 	case "StockItem.availableQuantity":
 		if e.complexity.StockItem.AvailableQuantity == nil {
@@ -5510,10 +5561,19 @@ extend type Mutation {
   updatedAt: String
 }
 
+type StarRating {
+  fiveStar: Int!
+  fourStar: Int!
+  threeStar: Int!
+  twoStar: Int!
+  oneStar: Int!
+}
+
 type ProductRatings {
   ratings: [Rating!]!
   averageRating: Float!
   total: Int!
+  stars: StarRating!
 }
 
 type DeleteRatingResponse {
@@ -25322,6 +25382,62 @@ func (ec *executionContext) fieldContext_ProductRatings_total(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _ProductRatings_stars(ctx context.Context, field graphql.CollectedField, obj *model.ProductRatings) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProductRatings_stars(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Stars, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.StarRating)
+	fc.Result = res
+	return ec.marshalNStarRating2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStarRating(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProductRatings_stars(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductRatings",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "fiveStar":
+				return ec.fieldContext_StarRating_fiveStar(ctx, field)
+			case "fourStar":
+				return ec.fieldContext_StarRating_fourStar(ctx, field)
+			case "threeStar":
+				return ec.fieldContext_StarRating_threeStar(ctx, field)
+			case "twoStar":
+				return ec.fieldContext_StarRating_twoStar(ctx, field)
+			case "oneStar":
+				return ec.fieldContext_StarRating_oneStar(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StarRating", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ProductVariant_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductVariant) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ProductVariant_id(ctx, field)
 	if err != nil {
@@ -28583,6 +28699,8 @@ func (ec *executionContext) fieldContext_Query_productRatings(ctx context.Contex
 				return ec.fieldContext_ProductRatings_averageRating(ctx, field)
 			case "total":
 				return ec.fieldContext_ProductRatings_total(ctx, field)
+			case "stars":
+				return ec.fieldContext_ProductRatings_stars(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ProductRatings", field.Name)
 		},
@@ -31695,6 +31813,226 @@ func (ec *executionContext) fieldContext_ReturnOrder_updatedAt(_ context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarRating_fiveStar(ctx context.Context, field graphql.CollectedField, obj *model.StarRating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StarRating_fiveStar(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FiveStar, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StarRating_fiveStar(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarRating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarRating_fourStar(ctx context.Context, field graphql.CollectedField, obj *model.StarRating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StarRating_fourStar(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FourStar, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StarRating_fourStar(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarRating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarRating_threeStar(ctx context.Context, field graphql.CollectedField, obj *model.StarRating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StarRating_threeStar(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ThreeStar, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StarRating_threeStar(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarRating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarRating_twoStar(ctx context.Context, field graphql.CollectedField, obj *model.StarRating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StarRating_twoStar(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TwoStar, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StarRating_twoStar(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarRating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarRating_oneStar(ctx context.Context, field graphql.CollectedField, obj *model.StarRating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StarRating_oneStar(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OneStar, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StarRating_oneStar(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarRating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -41344,6 +41682,11 @@ func (ec *executionContext) _ProductRatings(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "stars":
+			out.Values[i] = ec._ProductRatings_stars(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -42736,6 +43079,65 @@ func (ec *executionContext) _ReturnOrder(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = ec._ReturnOrder_createdAt(ctx, field, obj)
 		case "updatedAt":
 			out.Values[i] = ec._ReturnOrder_updatedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var starRatingImplementors = []string{"StarRating"}
+
+func (ec *executionContext) _StarRating(ctx context.Context, sel ast.SelectionSet, obj *model.StarRating) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, starRatingImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StarRating")
+		case "fiveStar":
+			out.Values[i] = ec._StarRating_fiveStar(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fourStar":
+			out.Values[i] = ec._StarRating_fourStar(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "threeStar":
+			out.Values[i] = ec._StarRating_threeStar(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "twoStar":
+			out.Values[i] = ec._StarRating_twoStar(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "oneStar":
+			out.Values[i] = ec._StarRating_oneStar(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -44699,6 +45101,16 @@ func (ec *executionContext) marshalNRole2githubᚗcomᚋmareesᚑgodevᚋGoCart�
 func (ec *executionContext) unmarshalNSendNotificationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐSendNotificationInput(ctx context.Context, v interface{}) (model.SendNotificationInput, error) {
 	res, err := ec.unmarshalInputSendNotificationInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNStarRating2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStarRating(ctx context.Context, sel ast.SelectionSet, v *model.StarRating) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StarRating(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNStore2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStore(ctx context.Context, sel ast.SelectionSet, v model.Store) graphql.Marshaler {

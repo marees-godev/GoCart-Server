@@ -73,7 +73,7 @@ func (h *RatingGRPCHandler) GetProductRatings(ctx context.Context, req *ratingpb
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
 
-	ratings, avg, total, err := h.service.GetProductRatings(ctx, req.GetProductId(), req.GetLimit(), req.GetOffset())
+	ratings, avg, total, stars, err := h.service.GetProductRatings(ctx, req.GetProductId(), req.GetLimit(), req.GetOffset())
 	if err != nil {
 		return nil, appErrors.ToGRPC(err)
 	}
@@ -83,10 +83,19 @@ func (h *RatingGRPCHandler) GetProductRatings(ctx context.Context, req *ratingpb
 		protoRatings = append(protoRatings, mapModelToProto(r))
 	}
 
+	starRating := &ratingpb.StarRating{
+		FiveStar:  int32(stars.FiveStar),
+		FourStar:  int32(stars.FourStar),
+		ThreeStar: int32(stars.ThreeStar),
+		TwoStar:   int32(stars.TwoStar),
+		OneStar:   int32(stars.OneStar),
+	}
+
 	return &ratingpb.GetProductRatingsResponse{
 		Ratings:       protoRatings,
 		AverageRating: avg,
 		Total:         total,
+		Stars:         starRating,
 	}, nil
 }
 

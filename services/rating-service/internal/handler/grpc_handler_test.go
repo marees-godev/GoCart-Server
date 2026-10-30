@@ -59,7 +59,7 @@ func (m *mockRatingService) GetRating(ctx context.Context, id string) (*model.Ra
 	return r, nil
 }
 
-func (m *mockRatingService) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error) {
+func (m *mockRatingService) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error) {
 	var list []*model.Rating
 	var sum float64
 	for _, r := range m.ratings {
@@ -72,7 +72,7 @@ func (m *mockRatingService) GetProductRatings(ctx context.Context, productID str
 	if len(list) > 0 {
 		avg = sum / float64(len(list))
 	}
-	return list, avg, int32(len(list)), nil
+	return list, avg, int32(len(list)), dto.StarRating{FiveStar: 1}, nil
 }
 
 func (m *mockRatingService) UpdateRating(ctx context.Context, input dto.UpdateRatingInput) (*model.Rating, error) {
@@ -158,6 +158,9 @@ func TestRatingGRPCHandler(t *testing.T) {
 		}
 		if resp.GetAverageRating() != 5.0 {
 			t.Errorf("expected average 5.0, got %f", resp.GetAverageRating())
+		}
+		if resp.GetStars() == nil || resp.GetStars().GetFiveStar() != 1 {
+			t.Errorf("expected 1 five star rating, got %v", resp.GetStars())
 		}
 	})
 

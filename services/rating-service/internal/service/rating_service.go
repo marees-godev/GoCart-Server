@@ -17,7 +17,7 @@ import (
 type RatingService interface {
 	CreateRating(ctx context.Context, input dto.CreateRatingInput) (*model.Rating, error)
 	GetRating(ctx context.Context, id string) (*model.Rating, error)
-	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error)
+	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error)
 	UpdateRating(ctx context.Context, input dto.UpdateRatingInput) (*model.Rating, error)
 	DeleteRating(ctx context.Context, input dto.DeleteRatingInput) error
 }
@@ -151,12 +151,12 @@ func (s *ratingService) GetRating(ctx context.Context, id string) (*model.Rating
 	return result, nil
 }
 
-func (s *ratingService) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error) {
+func (s *ratingService) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error) {
 	if strings.TrimSpace(productID) == "" {
-		return nil, 0, 0, appErrors.BadRequest("product id is required")
+		return nil, 0, 0, dto.StarRating{}, appErrors.BadRequest("product id is required")
 	}
 	if _, err := uuid.Parse(productID); err != nil {
-		return nil, 0, 0, appErrors.BadRequest("invalid product id format")
+		return nil, 0, 0, dto.StarRating{}, appErrors.BadRequest("invalid product id format")
 	}
 
 	if limit <= 0 {
@@ -169,13 +169,13 @@ func (s *ratingService) GetProductRatings(ctx context.Context, productID string,
 		offset = 0
 	}
 
-	ratings, avg, total, err := s.repo.GetProductRatings(ctx, productID, limit, offset)
+	ratings, avg, total, stars, err := s.repo.GetProductRatings(ctx, productID, limit, offset)
 	if err != nil {
 		s.log.Error("Failed to fetch product ratings", "product_id", productID, "error", err)
-		return nil, 0, 0, appErrors.Internal(err, "failed to fetch product ratings")
+		return nil, 0, 0, dto.StarRating{}, appErrors.Internal(err, "failed to fetch product ratings")
 	}
 
-	return ratings, avg, total, nil
+	return ratings, avg, total, stars, nil
 }
 
 func (s *ratingService) UpdateRating(ctx context.Context, input dto.UpdateRatingInput) (*model.Rating, error) {

@@ -12,10 +12,19 @@ type Rating {
   updatedAt: String
 }
 
+type StarRating {
+  fiveStar: Int!
+  fourStar: Int!
+  threeStar: Int!
+  twoStar: Int!
+  oneStar: Int!
+}
+
 type ProductRatings {
   ratings: [Rating!]!
   averageRating: Float!
   total: Int!
+  stars: StarRating!
 }
 
 type DeleteRatingResponse {
