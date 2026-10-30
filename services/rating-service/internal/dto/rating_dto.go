@@ -20,3 +20,11 @@ type DeleteRatingInput struct {
 	ID     string `json:"id"`
 	UserID string `json:"user_id"`
 }
+
+type StarRating struct {
+	FiveStar  int `json:"five_star"`
+	FourStar  int `json:"four_star"`
+	ThreeStar int `json:"three_star"`
+	TwoStar   int `json:"two_star"`
+	OneStar   int `json:"one_star"`
+}

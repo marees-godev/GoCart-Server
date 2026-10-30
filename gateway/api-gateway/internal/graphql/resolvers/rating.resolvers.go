@@ -138,6 +138,7 @@ func (r *queryResolver) ProductRatings(ctx context.Context, productID string, li
 		Ratings:       maps.MapRatings(resp.GetRatings()),
 		AverageRating: resp.GetAverageRating(),
 		Total:         int(resp.GetTotal()),
+		Stars:         maps.MapStarRating(resp.GetStars()),
 	}, nil
 }
 

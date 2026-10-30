@@ -47,6 +47,14 @@ message GetRatingResponse {
   Rating rating = 1;
 }
 
+message StarRating  {
+  int32 five_star = 1;
+  int32 four_star = 2;
+  int32 three_star = 3;
+  int32 two_star = 4;
+  int32 one_star = 5;
+}
+
 message GetProductRatingsRequest {
   string product_id = 1;
   int32 limit = 2;
@@ -57,6 +65,7 @@ message GetProductRatingsResponse {
   repeated Rating ratings = 1;
   double average_rating = 2;
   int32 total = 3;
+  StarRating stars = 4;
 }
 
 message UpdateRatingRequest {
