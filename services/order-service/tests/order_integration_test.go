@@ -142,6 +142,12 @@ func (m *inMemOrderRepo) UpdateOrderStatus(ctx context.Context, id string, order
 	}
 	prev := o.Status
 	o.Status = orderStatus
+	switch orderStatus {
+	case model.OrderStatusConfirmed, model.OrderStatusPaid:
+		o.PaymentStatus = model.PaymentStatusPaid
+	case model.OrderStatusPaymentFailed:
+		o.PaymentStatus = model.PaymentStatusFailed
+	}
 	o.UpdatedAt = time.Now().UTC()
 
 	rText := ""
@@ -192,6 +198,15 @@ func (m *inMemOrderRepo) CancelOrder(ctx context.Context, id string, envelope *e
 
 	cp := *o
 	return &cp, nil
+}
+
+func (m *inMemOrderRepo) UpdateOrderStatusWithOutbox(ctx context.Context, id string, orderStatus model.OrderStatus, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
+	if envelope != nil {
+		m.mu.Lock()
+		m.outbox = append(m.outbox, envelope)
+		m.mu.Unlock()
+	}
+	return m.UpdateOrderStatus(ctx, id, orderStatus, reason...)
 }
 
 func (m *inMemOrderRepo) GetOrderStatusHistory(ctx context.Context, orderID string) ([]*model.OrderStatusHistory, error) {

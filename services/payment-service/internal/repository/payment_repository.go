@@ -50,6 +50,13 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 		return appErrors.BadRequest("payment model cannot be nil")
 	}
 
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction in CreatePayment", "order_id", p.OrderID, "error", err)
+		return appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		INSERT INTO payments (
 			id,
@@ -105,7 +112,7 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 	}
 
 	var scannedPmID *string
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		pIDParam,
 		p.OrderID,
 		p.UserID,
@@ -132,6 +139,44 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 
 	if scannedPmID != nil && *scannedPmID != "" {
 		p.PaymentMethodID = scannedPmID
+	}
+
+	if p.Status == model.PaymentStatusInitiated {
+		initEvt := events.PaymentInitiatedEvent{
+			PaymentID:     p.ID,
+			OrderID:       p.OrderID,
+			UserID:        p.UserID,
+			Amount:        p.Amount,
+			Currency:      p.Currency,
+			PaymentMethod: p.PaymentMethod,
+			InitiatedAt:   p.CreatedAt,
+		}
+		env, envErr := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentInitiated, "payment-service", p.ID, initEvt)
+		if envErr != nil {
+			slog.ErrorContext(ctx, "failed to create outbox event envelope for PaymentInitiated", "payment_id", p.ID, "error", envErr)
+			return appErrors.Internal(envErr, "failed to create outbox event envelope")
+		}
+		payloadBytes, mErr := env.Marshal()
+		if mErr != nil {
+			slog.ErrorContext(ctx, "failed to marshal outbox event for PaymentInitiated", "payment_id", p.ID, "error", mErr)
+			return appErrors.Internal(mErr, "failed to marshal outbox event")
+		}
+		outboxQuery := `
+			INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+			SELECT 'payment', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+			WHERE NOT EXISTS (
+				SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+			)
+		`
+		if _, execErr := tx.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentInitiated, payloadBytes, events.TopicPaymentInitiated); execErr != nil {
+			slog.ErrorContext(ctx, "failed to insert outbox event in repository", "payment_id", p.ID, "error", execErr)
+			return appErrors.Internal(execErr, "failed to record outbox event")
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit transaction in CreatePayment", "payment_id", p.ID, "error", err)
+		return appErrors.Internal(err, "failed to commit transaction")
 	}
 
 	slog.InfoContext(ctx, "payment created in repository", "payment_id", p.ID, "order_id", p.OrderID, "payment_method_id", p.PaymentMethodID)

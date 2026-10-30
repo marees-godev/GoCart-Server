@@ -7,10 +7,12 @@ import (
 
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/service"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -33,6 +35,15 @@ func NewOrderGRPCHandler(svc service.OrderService, log *slog.Logger) *OrderGRPCH
 func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *orderpb.CreateOrderRequest) (*orderpb.CreateOrderResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if cids := md.Get("x-correlation-id"); len(cids) > 0 && cids[0] != "" {
+			ctx = logger.WithCorrelationID(ctx, cids[0])
+		}
+		if rids := md.Get("x-request-id"); len(rids) > 0 && rids[0] != "" {
+			ctx = logger.WithRequestID(ctx, rids[0])
+		}
 	}
 
 	result, err := h.svc.CreateOrder(ctx, dto.CreateOrderInput{

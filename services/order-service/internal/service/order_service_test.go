@@ -169,6 +169,16 @@ func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderS
 	return &cp, nil
 }
 
+func (m *mockOrderRepo) UpdateOrderStatusWithOutbox(ctx context.Context, id string, orderStatus model.OrderStatus, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
+	if envelope != nil {
+		m.mu.Lock()
+		m.outboxEnvelopes = append(m.outboxEnvelopes, envelope)
+		m.outboxTopic = topic
+		m.mu.Unlock()
+	}
+	return m.UpdateOrderStatus(ctx, id, orderStatus, reason...)
+}
+
 func (m *mockOrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -453,8 +463,8 @@ func TestOrderService_CreateOrder_SingleStore_Success(t *testing.T) {
 	if len(repo.outboxEnvelopes) != 1 {
 		t.Fatalf("expected 1 outbox event, got %d", len(repo.outboxEnvelopes))
 	}
-	if repo.outboxTopic != "gocart.orders.order-created" {
-		t.Errorf("expected outbox topic gocart.orders.order-created, got %s", repo.outboxTopic)
+	if repo.outboxTopic != events.TopicOrderCreated {
+		t.Errorf("expected outbox topic %s, got %s", events.TopicOrderCreated, repo.outboxTopic)
 	}
 	if repo.outboxEnvelopes[0].EventType != events.EventTypeOrderCreated {
 		t.Errorf("expected EventType OrderCreated, got %s", repo.outboxEnvelopes[0].EventType)

@@ -11,7 +11,8 @@ import (
 )
 
 type MockGateway struct {
-	timeout time.Duration
+	timeout     time.Duration
+	failPayment bool
 }
 
 func NewMockGateway(timeout time.Duration) *MockGateway {
@@ -21,6 +22,10 @@ func NewMockGateway(timeout time.Duration) *MockGateway {
 	return &MockGateway{
 		timeout: timeout,
 	}
+}
+
+func (m *MockGateway) SetFailPayment(fail bool) {
+	m.failPayment = fail
 }
 
 func (m *MockGateway) Provider() string {
@@ -45,8 +50,8 @@ func (m *MockGateway) ProcessPayment(ctx context.Context, req *ProcessGatewayReq
 		return nil, ErrInvalidGatewayInput
 	}
 
-	// Trigger simulation via idempotency key for testing
-	if strings.Contains(req.IdempotencyKey, "fail_gateway") {
+	// Trigger simulation via explicit configuration or idempotency key for testing
+	if m.failPayment || strings.Contains(req.IdempotencyKey, "fail_gateway") {
 		gtx := fmt.Sprintf("gtx_mock_failed_%s", uuid.New().String()[:8])
 		slog.InfoContext(ctx, "MockGateway simulated payment decline", "payment_id", req.PaymentID, "gateway_tx_id", gtx)
 		return &ProcessGatewayResponse{

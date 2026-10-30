@@ -609,4 +609,34 @@ func TestStoreEventsSerialization(t *testing.T) {
 			t.Errorf("restored payload mismatch: %+v", restored)
 		}
 	})
+
+	t.Run("OrderPaymentFailedEvent", func(t *testing.T) {
+		now := time.Now().UTC()
+		payload := events.OrderPaymentFailedEvent{
+			OrderID:   "ord-fail-999",
+			PaymentID: "pay-fail-888",
+			Reason:    "Insufficient funds",
+			FailedAt:  now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", payload.OrderID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.OrderPaymentFailedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.OrderID != "ord-fail-999" || restored.PaymentID != "pay-fail-888" || restored.Reason != "Insufficient funds" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
 }
+

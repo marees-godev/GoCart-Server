@@ -146,7 +146,8 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 	p.UpdatedAt = time.Now()
 
 	if oldStatus != status {
-		if status == model.PaymentStatusSuccess {
+		switch status {
+		case model.PaymentStatusSuccess:
 			exists := false
 			for _, rec := range m.outboxEvents {
 				if rec.AggregateID == p.ID && rec.EventType == events.EventTypePaymentSuccessful {
@@ -161,7 +162,7 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 					Topic:       events.TopicPaymentSuccessful,
 				})
 			}
-		} else if status == model.PaymentStatusFailed {
+		case model.PaymentStatusFailed:
 			exists := false
 			for _, rec := range m.outboxEvents {
 				if rec.AggregateID == p.ID && rec.EventType == events.EventTypePaymentFailed {
@@ -176,7 +177,7 @@ func (m *mockPaymentRepo) UpdatePaymentStatus(ctx context.Context, id string, st
 					Topic:       events.TopicPaymentFailed,
 				})
 			}
-		} else if status == model.PaymentStatusCancelled {
+		case model.PaymentStatusCancelled:
 			exists := false
 			for _, rec := range m.outboxEvents {
 				if rec.AggregateID == p.ID && rec.EventType == events.EventTypePaymentCancelled {
@@ -325,13 +326,14 @@ func (m *mockPaymentRepo) UpdateRefundStatus(ctx context.Context, id string, sta
 	}
 	r.UpdatedAt = time.Now()
 
-	if status == model.RefundStatusSuccess {
+	switch status {
+	case model.RefundStatusSuccess:
 		m.outboxEvents = append(m.outboxEvents, outboxRecord{
 			AggregateID: r.ID,
 			EventType:   events.EventTypeRefundCompleted,
 			Topic:       events.TopicRefundCompleted,
 		})
-	} else if status == model.RefundStatusFailed {
+	case model.RefundStatusFailed:
 		m.outboxEvents = append(m.outboxEvents, outboxRecord{
 			AggregateID: r.ID,
 			EventType:   events.EventTypeRefundFailed,
@@ -403,6 +405,96 @@ func TestProcessPayment_AuthoritativeAmountEnforced(t *testing.T) {
 
 	if payment.GatewayTransactionID == "" {
 		t.Errorf("expected non-empty gateway transaction ID")
+	}
+}
+
+func TestProcessPayment_AuthoritativeOrderUnavailable_RejectsPayment(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	// Do NOT register the order in orderClient to simulate order service error / order not found
+	orderID := "ord_unavailable_404"
+
+	dto := &service.ProcessPaymentDTO{
+		OrderID:        orderID,
+		UserID:         "usr_123",
+		PaymentMethod:  "CREDIT_CARD",
+		IdempotencyKey: "idemp_unavail_001",
+		ClientAmount:   500.00, // Client tries to supply amount as fallback
+		ClientCurrency: "USD",
+	}
+
+	payment, err := svc.ProcessPayment(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when authoritative order cannot be fetched, got payment: %+v", payment)
+	}
+
+	// Verify payment was NOT created in repository
+	existing, _ := repo.GetPaymentByIdempotencyKey(context.Background(), dto.IdempotencyKey)
+	if existing != nil {
+		t.Errorf("expected no payment record to be created on authoritative order fetch failure")
+	}
+}
+
+func TestProcessPayment_NilOrderClient_RejectsPayment(t *testing.T) {
+	repo := newMockPaymentRepo()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	// Order client is nil
+	svc := service.NewPaymentService(repo, gw, nil)
+
+	dto := &service.ProcessPaymentDTO{
+		OrderID:        "ord_any_123",
+		UserID:         "usr_123",
+		PaymentMethod:  "CREDIT_CARD",
+		IdempotencyKey: "idemp_nil_client_001",
+		ClientAmount:   100.00,
+		ClientCurrency: "USD",
+	}
+
+	payment, err := svc.ProcessPayment(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when orderClient is nil, got payment: %+v", payment)
+	}
+}
+
+func TestHandleOrderCreated_OrderWithFailSubstring_SucceedsNormally(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	orderID := "ord-fail-legitimate-id-555"
+	orderClient.orders[orderID] = &client.AuthoritativeOrder{
+		ID:          orderID,
+		UserID:      "usr_555",
+		TotalAmount: 75.00,
+		Currency:    "USD",
+		Status:      "CREATED",
+	}
+
+	event := &events.OrderCreatedEvent{
+		OrderID:     orderID,
+		UserID:      "usr_555",
+		TotalAmount: 75.00,
+		Currency:    "USD",
+	}
+
+	// Correlation ID also contains "fail"
+	payment, err := svc.HandleOrderCreated(context.Background(), event, "corr-fail-check", "trace-123")
+	if err != nil {
+		t.Fatalf("expected payment to succeed for order with 'fail' substring, got error: %v", err)
+	}
+
+	if payment.Status != model.PaymentStatusSuccess {
+		t.Errorf("expected payment status SUCCESS, got: %s (failure_reason: %s)", payment.Status, payment.FailureReason)
+	}
+
+	// Verify idempotency key is clean without '-fail_gateway' suffix
+	expectedIdempKey := "order-pay-" + orderID
+	if payment.IdempotencyKey != expectedIdempKey {
+		t.Errorf("expected idempotency key %s, got %s", expectedIdempKey, payment.IdempotencyKey)
 	}
 }
 

@@ -275,6 +275,14 @@ type OrderConfirmedEvent struct {
 	ConfirmedAt     time.Time               `json:"confirmed_at"`
 }
 
+// OrderPaymentFailedEvent represents the payload for OrderPaymentFailed domain event.
+type OrderPaymentFailedEvent struct {
+	OrderID   string    `json:"order_id"`
+	PaymentID string    `json:"payment_id,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
+	FailedAt  time.Time `json:"failed_at"`
+}
+
 // DeliveryCreatedEvent represents the payload for DeliveryCreated domain event.
 type DeliveryCreatedEvent struct {
 	DeliveryID      string    `json:"delivery_id"`
