@@ -399,7 +399,7 @@ func TestUpdateUser_DateOfBirthValidation(t *testing.T) {
 			name:        "more than 100 years old should fail",
 			dob:         &tooOldDOB,
 			expectError: true,
-			expectedMsg: "date_of_birth must be within the last 100 years",
+			expectedMsg: "please Enter a valid date of birth",
 		},
 		{
 			name:        "future date should fail",
