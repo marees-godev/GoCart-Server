@@ -361,6 +361,82 @@ func (x *GetRatingResponse) GetRating() *Rating {
 	return nil
 }
 
+type StarRating struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FiveStar      int32                  `protobuf:"varint,1,opt,name=five_star,json=fiveStar,proto3" json:"five_star,omitempty"`
+	FourStar      int32                  `protobuf:"varint,2,opt,name=four_star,json=fourStar,proto3" json:"four_star,omitempty"`
+	ThreeStar     int32                  `protobuf:"varint,3,opt,name=three_star,json=threeStar,proto3" json:"three_star,omitempty"`
+	TwoStar       int32                  `protobuf:"varint,4,opt,name=two_star,json=twoStar,proto3" json:"two_star,omitempty"`
+	OneStar       int32                  `protobuf:"varint,5,opt,name=one_star,json=oneStar,proto3" json:"one_star,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StarRating) Reset() {
+	*x = StarRating{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StarRating) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StarRating) ProtoMessage() {}
+
+func (x *StarRating) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StarRating.ProtoReflect.Descriptor instead.
+func (*StarRating) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StarRating) GetFiveStar() int32 {
+	if x != nil {
+		return x.FiveStar
+	}
+	return 0
+}
+
+func (x *StarRating) GetFourStar() int32 {
+	if x != nil {
+		return x.FourStar
+	}
+	return 0
+}
+
+func (x *StarRating) GetThreeStar() int32 {
+	if x != nil {
+		return x.ThreeStar
+	}
+	return 0
+}
+
+func (x *StarRating) GetTwoStar() int32 {
+	if x != nil {
+		return x.TwoStar
+	}
+	return 0
+}
+
+func (x *StarRating) GetOneStar() int32 {
+	if x != nil {
+		return x.OneStar
+	}
+	return 0
+}
+
 type GetProductRatingsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
@@ -372,7 +448,7 @@ type GetProductRatingsRequest struct {
 
 func (x *GetProductRatingsRequest) Reset() {
 	*x = GetProductRatingsRequest{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +460,7 @@ func (x *GetProductRatingsRequest) String() string {
 func (*GetProductRatingsRequest) ProtoMessage() {}
 
 func (x *GetProductRatingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +473,7 @@ func (x *GetProductRatingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProductRatingsRequest.ProtoReflect.Descriptor instead.
 func (*GetProductRatingsRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{5}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetProductRatingsRequest) GetProductId() string {
@@ -426,13 +502,14 @@ type GetProductRatingsResponse struct {
 	Ratings       []*Rating              `protobuf:"bytes,1,rep,name=ratings,proto3" json:"ratings,omitempty"`
 	AverageRating float64                `protobuf:"fixed64,2,opt,name=average_rating,json=averageRating,proto3" json:"average_rating,omitempty"`
 	Total         int32                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	Stars         *StarRating            `protobuf:"bytes,4,opt,name=stars,proto3" json:"stars,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetProductRatingsResponse) Reset() {
 	*x = GetProductRatingsResponse{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +521,7 @@ func (x *GetProductRatingsResponse) String() string {
 func (*GetProductRatingsResponse) ProtoMessage() {}
 
 func (x *GetProductRatingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,7 +534,7 @@ func (x *GetProductRatingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProductRatingsResponse.ProtoReflect.Descriptor instead.
 func (*GetProductRatingsResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{6}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetProductRatingsResponse) GetRatings() []*Rating {
@@ -481,6 +558,13 @@ func (x *GetProductRatingsResponse) GetTotal() int32 {
 	return 0
 }
 
+func (x *GetProductRatingsResponse) GetStars() *StarRating {
+	if x != nil {
+		return x.Stars
+	}
+	return nil
+}
+
 type UpdateRatingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -493,7 +577,7 @@ type UpdateRatingRequest struct {
 
 func (x *UpdateRatingRequest) Reset() {
 	*x = UpdateRatingRequest{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +589,7 @@ func (x *UpdateRatingRequest) String() string {
 func (*UpdateRatingRequest) ProtoMessage() {}
 
 func (x *UpdateRatingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +602,7 @@ func (x *UpdateRatingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRatingRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRatingRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{7}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateRatingRequest) GetId() string {
@@ -558,7 +642,7 @@ type UpdateRatingResponse struct {
 
 func (x *UpdateRatingResponse) Reset() {
 	*x = UpdateRatingResponse{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +654,7 @@ func (x *UpdateRatingResponse) String() string {
 func (*UpdateRatingResponse) ProtoMessage() {}
 
 func (x *UpdateRatingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +667,7 @@ func (x *UpdateRatingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRatingResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRatingResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{8}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateRatingResponse) GetRating() *Rating {
@@ -603,7 +687,7 @@ type DeleteRatingRequest struct {
 
 func (x *DeleteRatingRequest) Reset() {
 	*x = DeleteRatingRequest{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +699,7 @@ func (x *DeleteRatingRequest) String() string {
 func (*DeleteRatingRequest) ProtoMessage() {}
 
 func (x *DeleteRatingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +712,7 @@ func (x *DeleteRatingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRatingRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRatingRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{9}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteRatingRequest) GetId() string {
@@ -655,7 +739,7 @@ type DeleteRatingResponse struct {
 
 func (x *DeleteRatingResponse) Reset() {
 	*x = DeleteRatingResponse{}
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +751,7 @@ func (x *DeleteRatingResponse) String() string {
 func (*DeleteRatingResponse) ProtoMessage() {}
 
 func (x *DeleteRatingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +764,7 @@ func (x *DeleteRatingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRatingResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRatingResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{10}
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DeleteRatingResponse) GetSuccess() bool {
@@ -732,16 +816,25 @@ const file_contracts_protobuf_rating_rating_proto_rawDesc = "" +
 	"\x10GetRatingRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"E\n" +
 	"\x11GetRatingResponse\x120\n" +
-	"\x06rating\x18\x01 \x01(\v2\x18.gocart.rating.v1.RatingR\x06rating\"g\n" +
+	"\x06rating\x18\x01 \x01(\v2\x18.gocart.rating.v1.RatingR\x06rating\"\x9b\x01\n" +
+	"\n" +
+	"StarRating\x12\x1b\n" +
+	"\tfive_star\x18\x01 \x01(\x05R\bfiveStar\x12\x1b\n" +
+	"\tfour_star\x18\x02 \x01(\x05R\bfourStar\x12\x1d\n" +
+	"\n" +
+	"three_star\x18\x03 \x01(\x05R\tthreeStar\x12\x19\n" +
+	"\btwo_star\x18\x04 \x01(\x05R\atwoStar\x12\x19\n" +
+	"\bone_star\x18\x05 \x01(\x05R\aoneStar\"g\n" +
 	"\x18GetProductRatingsRequest\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x05R\x06offset\"\x8c\x01\n" +
+	"\x06offset\x18\x03 \x01(\x05R\x06offset\"\xc0\x01\n" +
 	"\x19GetProductRatingsResponse\x122\n" +
 	"\aratings\x18\x01 \x03(\v2\x18.gocart.rating.v1.RatingR\aratings\x12%\n" +
 	"\x0eaverage_rating\x18\x02 \x01(\x01R\raverageRating\x12\x14\n" +
-	"\x05total\x18\x03 \x01(\x05R\x05total\"n\n" +
+	"\x05total\x18\x03 \x01(\x05R\x05total\x122\n" +
+	"\x05stars\x18\x04 \x01(\v2\x1c.gocart.rating.v1.StarRatingR\x05stars\"n\n" +
 	"\x13UpdateRatingRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
@@ -774,40 +867,42 @@ func file_contracts_protobuf_rating_rating_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_rating_rating_proto_rawDescData
 }
 
-var file_contracts_protobuf_rating_rating_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_contracts_protobuf_rating_rating_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_contracts_protobuf_rating_rating_proto_goTypes = []any{
 	(*Rating)(nil),                    // 0: gocart.rating.v1.Rating
 	(*CreateRatingRequest)(nil),       // 1: gocart.rating.v1.CreateRatingRequest
 	(*CreateRatingResponse)(nil),      // 2: gocart.rating.v1.CreateRatingResponse
 	(*GetRatingRequest)(nil),          // 3: gocart.rating.v1.GetRatingRequest
 	(*GetRatingResponse)(nil),         // 4: gocart.rating.v1.GetRatingResponse
-	(*GetProductRatingsRequest)(nil),  // 5: gocart.rating.v1.GetProductRatingsRequest
-	(*GetProductRatingsResponse)(nil), // 6: gocart.rating.v1.GetProductRatingsResponse
-	(*UpdateRatingRequest)(nil),       // 7: gocart.rating.v1.UpdateRatingRequest
-	(*UpdateRatingResponse)(nil),      // 8: gocart.rating.v1.UpdateRatingResponse
-	(*DeleteRatingRequest)(nil),       // 9: gocart.rating.v1.DeleteRatingRequest
-	(*DeleteRatingResponse)(nil),      // 10: gocart.rating.v1.DeleteRatingResponse
+	(*StarRating)(nil),                // 5: gocart.rating.v1.StarRating
+	(*GetProductRatingsRequest)(nil),  // 6: gocart.rating.v1.GetProductRatingsRequest
+	(*GetProductRatingsResponse)(nil), // 7: gocart.rating.v1.GetProductRatingsResponse
+	(*UpdateRatingRequest)(nil),       // 8: gocart.rating.v1.UpdateRatingRequest
+	(*UpdateRatingResponse)(nil),      // 9: gocart.rating.v1.UpdateRatingResponse
+	(*DeleteRatingRequest)(nil),       // 10: gocart.rating.v1.DeleteRatingRequest
+	(*DeleteRatingResponse)(nil),      // 11: gocart.rating.v1.DeleteRatingResponse
 }
 var file_contracts_protobuf_rating_rating_proto_depIdxs = []int32{
 	0,  // 0: gocart.rating.v1.CreateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
 	0,  // 1: gocart.rating.v1.GetRatingResponse.rating:type_name -> gocart.rating.v1.Rating
 	0,  // 2: gocart.rating.v1.GetProductRatingsResponse.ratings:type_name -> gocart.rating.v1.Rating
-	0,  // 3: gocart.rating.v1.UpdateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
-	1,  // 4: gocart.rating.v1.RatingService.CreateRating:input_type -> gocart.rating.v1.CreateRatingRequest
-	3,  // 5: gocart.rating.v1.RatingService.GetRating:input_type -> gocart.rating.v1.GetRatingRequest
-	5,  // 6: gocart.rating.v1.RatingService.GetProductRatings:input_type -> gocart.rating.v1.GetProductRatingsRequest
-	7,  // 7: gocart.rating.v1.RatingService.UpdateRating:input_type -> gocart.rating.v1.UpdateRatingRequest
-	9,  // 8: gocart.rating.v1.RatingService.DeleteRating:input_type -> gocart.rating.v1.DeleteRatingRequest
-	2,  // 9: gocart.rating.v1.RatingService.CreateRating:output_type -> gocart.rating.v1.CreateRatingResponse
-	4,  // 10: gocart.rating.v1.RatingService.GetRating:output_type -> gocart.rating.v1.GetRatingResponse
-	6,  // 11: gocart.rating.v1.RatingService.GetProductRatings:output_type -> gocart.rating.v1.GetProductRatingsResponse
-	8,  // 12: gocart.rating.v1.RatingService.UpdateRating:output_type -> gocart.rating.v1.UpdateRatingResponse
-	10, // 13: gocart.rating.v1.RatingService.DeleteRating:output_type -> gocart.rating.v1.DeleteRatingResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	5,  // 3: gocart.rating.v1.GetProductRatingsResponse.stars:type_name -> gocart.rating.v1.StarRating
+	0,  // 4: gocart.rating.v1.UpdateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
+	1,  // 5: gocart.rating.v1.RatingService.CreateRating:input_type -> gocart.rating.v1.CreateRatingRequest
+	3,  // 6: gocart.rating.v1.RatingService.GetRating:input_type -> gocart.rating.v1.GetRatingRequest
+	6,  // 7: gocart.rating.v1.RatingService.GetProductRatings:input_type -> gocart.rating.v1.GetProductRatingsRequest
+	8,  // 8: gocart.rating.v1.RatingService.UpdateRating:input_type -> gocart.rating.v1.UpdateRatingRequest
+	10, // 9: gocart.rating.v1.RatingService.DeleteRating:input_type -> gocart.rating.v1.DeleteRatingRequest
+	2,  // 10: gocart.rating.v1.RatingService.CreateRating:output_type -> gocart.rating.v1.CreateRatingResponse
+	4,  // 11: gocart.rating.v1.RatingService.GetRating:output_type -> gocart.rating.v1.GetRatingResponse
+	7,  // 12: gocart.rating.v1.RatingService.GetProductRatings:output_type -> gocart.rating.v1.GetProductRatingsResponse
+	9,  // 13: gocart.rating.v1.RatingService.UpdateRating:output_type -> gocart.rating.v1.UpdateRatingResponse
+	11, // 14: gocart.rating.v1.RatingService.DeleteRating:output_type -> gocart.rating.v1.DeleteRatingResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_rating_rating_proto_init() }
@@ -821,7 +916,7 @@ func file_contracts_protobuf_rating_rating_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_rating_rating_proto_rawDesc), len(file_contracts_protobuf_rating_rating_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
+	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/model"
 )
 
@@ -20,7 +21,7 @@ var (
 type RatingRepository interface {
 	CreateRating(ctx context.Context, r *model.Rating) (*model.Rating, error)
 	GetRatingByID(ctx context.Context, id string) (*model.Rating, error)
-	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error)
+	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error)
 	UpdateRating(ctx context.Context, id string, rating int, review string) (*model.Rating, error)
 	DeleteRating(ctx context.Context, id string) error
 }
@@ -116,21 +117,31 @@ func (r *RatingRepo) GetRatingByID(ctx context.Context, id string) (*model.Ratin
 	return &rt, nil
 }
 
-func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error) {
+func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error) {
 	var total int32
 	var avg float64
+	var star dto.StarRating
 
 	summaryQuery := `
-		SELECT COUNT(*), COALESCE(AVG(rating), 0)
+		SELECT 
+		COUNT(*) AS total_ratings,
+		COALESCE(ROUND(AVG(rating)::numeric, 1), 0.0) AS average_rating,
+		COUNT(*) FILTER (WHERE rating = 5) AS five_star,
+		COUNT(*) FILTER (WHERE rating = 4) AS four_star,
+		COUNT(*) FILTER (WHERE rating = 3) AS three_star,
+		COUNT(*) FILTER (WHERE rating = 2) AS two_star,
+		COUNT(*) FILTER (WHERE rating = 1) AS one_star
 		FROM ratings
-		WHERE product_id = $1 AND is_hidden = false AND deleted_at IS NULL
+		WHERE product_id = $1 
+		AND is_hidden = false 
+		AND deleted_at IS NULL
 	`
-	if err := r.db.Pool.QueryRow(ctx, summaryQuery, productID).Scan(&total, &avg); err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to get rating summary: %w", err)
+	if err := r.db.Pool.QueryRow(ctx, summaryQuery, productID).Scan(&total, &avg, &star.FiveStar, &star.FourStar, &star.ThreeStar, &star.TwoStar, &star.OneStar); err != nil {
+		return nil, 0, 0, dto.StarRating{}, fmt.Errorf("failed to get rating summary: %w", err)
 	}
 
 	if total == 0 {
-		return []*model.Rating{}, 0, 0, nil
+		return []*model.Rating{}, 0, 0, dto.StarRating{}, nil
 	}
 
 	listQuery := `
@@ -144,7 +155,7 @@ func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, li
 	`
 	rows, err := r.db.Pool.Query(ctx, listQuery, productID, limit, offset)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to query product ratings: %w", err)
+		return nil, 0, 0, dto.StarRating{}, fmt.Errorf("failed to query product ratings: %w", err)
 	}
 	defer rows.Close()
 
@@ -156,16 +167,16 @@ func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, li
 			&rt.Rating, &rt.Review, &rt.IsVerifiedPurchase,
 			&rt.IsFlagged, &rt.IsHidden, &rt.CreatedAt, &rt.UpdatedAt,
 		); err != nil {
-			return nil, 0, 0, fmt.Errorf("failed to scan rating: %w", err)
+			return nil, 0, 0, dto.StarRating{}, fmt.Errorf("failed to scan rating: %w", err)
 		}
 		ratings = append(ratings, &rt)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, 0, fmt.Errorf("error during rating rows iteration: %w", err)
+		return nil, 0, 0, dto.StarRating{}, fmt.Errorf("error during rating rows iteration: %w", err)
 	}
 
-	return ratings, avg, total, nil
+	return ratings, avg, total, star, nil
 }
 
 func (r *RatingRepo) UpdateRating(ctx context.Context, id string, rating int, review string) (*model.Rating, error) {

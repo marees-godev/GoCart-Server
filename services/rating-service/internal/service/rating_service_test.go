@@ -60,14 +60,29 @@ func (m *mockRatingRepo) GetRatingByID(ctx context.Context, id string) (*model.R
 	return &cp, nil
 }
 
-func (m *mockRatingRepo) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, error) {
+func (m *mockRatingRepo) GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error) {
 	var matched []*model.Rating
 	var sum float64
+	var stars dto.StarRating
+
 	for _, r := range m.ratings {
 		if r.ProductID == productID && !r.IsHidden && r.DeletedAt == nil {
 			cp := *r
 			matched = append(matched, &cp)
 			sum += float64(r.Rating)
+
+			switch r.Rating {
+			case 5:
+				stars.FiveStar++
+			case 4:
+				stars.FourStar++
+			case 3:
+				stars.ThreeStar++
+			case 2:
+				stars.TwoStar++
+			case 1:
+				stars.OneStar++
+			}
 		}
 	}
 
@@ -86,7 +101,7 @@ func (m *mockRatingRepo) GetProductRatings(ctx context.Context, productID string
 		end = total
 	}
 
-	return matched[start:end], avg, total, nil
+	return matched[start:end], avg, total, stars, nil
 }
 
 func (m *mockRatingRepo) UpdateRating(ctx context.Context, id string, rating int, review string) (*model.Rating, error) {
@@ -261,7 +276,7 @@ func TestRatingService_Operations(t *testing.T) {
 	}
 
 	// 9. Soft-deleted rating excluded from product ratings list
-	ratings, avg, total, err := svc.GetProductRatings(ctx, prod1, 10, 0)
+	ratings, avg, total, _, err := svc.GetProductRatings(ctx, prod1, 10, 0)
 	if err != nil {
 		t.Fatalf("failed to get product ratings: %v", err)
 	}
@@ -432,12 +447,12 @@ func TestRatingService_Validation(t *testing.T) {
 	}
 
 	// GetProductRatings validation
-	_, _, _, err = svc.GetProductRatings(ctx, "", 10, 0)
+	_, _, _, _, err = svc.GetProductRatings(ctx, "", 10, 0)
 	if err == nil || !strings.Contains(err.Error(), "product id is required") {
 		t.Errorf("expected product id required error, got: %v", err)
 	}
 
-	_, _, _, err = svc.GetProductRatings(ctx, "invalid-uuid", 10, 0)
+	_, _, _, _, err = svc.GetProductRatings(ctx, "invalid-uuid", 10, 0)
 	if err == nil || !strings.Contains(err.Error(), "invalid product id format") {
 		t.Errorf("expected invalid product id error, got: %v", err)
 	}
@@ -491,7 +506,7 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 	}
 
 	// 2. Fetch ratings with default pagination
-	ratings, avg, total, err := svc.GetProductRatings(ctx, targetProductID, 10, 0)
+	ratings, avg, total, stars, err := svc.GetProductRatings(ctx, targetProductID, 10, 0)
 	if err != nil {
 		t.Fatalf("failed to get product ratings: %v", err)
 	}
@@ -504,9 +519,12 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 	if len(ratings) != 3 {
 		t.Errorf("expected 3 ratings in result list, got %d", len(ratings))
 	}
+	if stars.FiveStar != 1 || stars.FourStar != 1 || stars.ThreeStar != 1 {
+		t.Errorf("expected 1 of each star (5,4,3), got 5 star = %d 4 star = %d 3 star = %d", stars.FiveStar, stars.FourStar, stars.ThreeStar)
+	}
 
 	// 3. Test pagination: Limit=2, Offset=0
-	page1, _, total, err := svc.GetProductRatings(ctx, targetProductID, 2, 0)
+	page1, _, total, _, err := svc.GetProductRatings(ctx, targetProductID, 2, 0)
 	if err != nil {
 		t.Fatalf("failed page 1: %v", err)
 	}
@@ -515,7 +533,7 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 	}
 
 	// 4. Test pagination: Limit=2, Offset=2
-	page2, _, total, err := svc.GetProductRatings(ctx, targetProductID, 2, 2)
+	page2, _, total, _, err := svc.GetProductRatings(ctx, targetProductID, 2, 2)
 	if err != nil {
 		t.Fatalf("failed page 2: %v", err)
 	}
@@ -524,7 +542,7 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 	}
 
 	// 5. Test pagination clamping: Limit <= 0 clamped to 10, offset < 0 clamped to 0
-	clampedRatings, clampedAvg, clampedTotal, err := svc.GetProductRatings(ctx, targetProductID, -5, -1)
+	clampedRatings, clampedAvg, clampedTotal, _, err := svc.GetProductRatings(ctx, targetProductID, -5, -1)
 	if err != nil {
 		t.Fatalf("failed clamped ratings: %v", err)
 	}

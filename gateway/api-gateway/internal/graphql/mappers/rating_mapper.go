@@ -47,3 +47,17 @@ func MapRatings(ratings []*ratingpb.Rating) []*model.Rating {
 	}
 	return res
 }
+
+func MapStarRating(star *ratingpb.StarRating) *model.StarRating {
+	if star == nil {
+		return &model.StarRating{}
+	}
+
+	return &model.StarRating{
+		FiveStar:  int(star.FiveStar),
+		FourStar:  int(star.FourStar),
+		ThreeStar: int(star.ThreeStar),
+		TwoStar:   int(star.TwoStar),
+		OneStar:   int(star.OneStar),
+	}
+}

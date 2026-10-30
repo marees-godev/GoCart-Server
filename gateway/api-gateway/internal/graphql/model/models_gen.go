@@ -512,9 +512,10 @@ type ProductList struct {
 }
 
 type ProductRatings struct {
-	Ratings       []*Rating `json:"ratings"`
-	AverageRating float64   `json:"averageRating"`
-	Total         int       `json:"total"`
+	Ratings       []*Rating   `json:"ratings"`
+	AverageRating float64     `json:"averageRating"`
+	Total         int         `json:"total"`
+	Stars         *StarRating `json:"stars"`
 }
 
 type ProductVariant struct {
@@ -661,6 +662,14 @@ type SendNotificationInput struct {
 	Subject    string  `json:"subject"`
 	Content    string  `json:"content"`
 	TemplateID *string `json:"templateId,omitempty"`
+}
+
+type StarRating struct {
+	FiveStar  int `json:"fiveStar"`
+	FourStar  int `json:"fourStar"`
+	ThreeStar int `json:"threeStar"`
+	TwoStar   int `json:"twoStar"`
+	OneStar   int `json:"oneStar"`
 }
 
 type StockItem struct {
