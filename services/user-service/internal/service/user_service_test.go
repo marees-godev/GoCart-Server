@@ -373,6 +373,95 @@ func TestUpdateUser_Success(t *testing.T) {
 	}
 }
 
+func TestUpdateUser_DateOfBirthValidation(t *testing.T) {
+	now := time.Now()
+	tooYoungDOB := now.AddDate(-15, 0, 0).Format("2006-01-02")
+	futureDOB := now.AddDate(1, 0, 0).Format("2006-01-02")
+	validDOB := now.AddDate(-20, 0, 0).Format("2006-01-02")
+	emptyDOB := ""
+	invalidFormatDOB := "15-05-1990"
+
+	tests := []struct {
+		name        string
+		dob         *string
+		expectError bool
+		expectedMsg string
+	}{
+		{
+			name:        "under 16 years old should fail",
+			dob:         &tooYoungDOB,
+			expectError: true,
+			expectedMsg: "user must be at least 16 years old",
+		},
+		{
+			name:        "future date should fail",
+			dob:         &futureDOB,
+			expectError: true,
+			expectedMsg: "date_of_birth cannot be in the future",
+		},
+		{
+			name:        "invalid date format should fail",
+			dob:         &invalidFormatDOB,
+			expectError: true,
+			expectedMsg: "date_of_birth must be formatted as YYYY-MM-DD",
+		},
+		{
+			name:        "valid age >= 16 should succeed",
+			dob:         &validDOB,
+			expectError: false,
+		},
+		{
+			name:        "empty DOB string should reset to nil",
+			dob:         &emptyDOB,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newMockRepo()
+			svc := service.NewUserService(repo)
+			existingDOB := time.Date(1995, 1, 1, 0, 0, 0, 0, time.UTC)
+			user := &model.User{
+				ID:          "user-dob-test",
+				Email:       "user-dob@example.com",
+				FirstName:   "Dob",
+				LastName:    "Tester",
+				Status:      "active",
+				DateOfBirth: &existingDOB,
+			}
+			repo.users[user.ID] = user
+
+			req := dto.UpdateUserRequest{
+				DateOfBirth: tt.dob,
+			}
+
+			updated, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("expected error for %s, got nil", tt.name)
+				}
+				if tt.expectedMsg != "" && !strings.Contains(err.Error(), tt.expectedMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.expectedMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error for %s: %v", tt.name, err)
+				}
+				if *tt.dob == "" {
+					if updated.DateOfBirth != nil {
+						t.Errorf("expected DateOfBirth to be nil when reset, got %v", updated.DateOfBirth)
+					}
+				} else {
+					if updated.DateOfBirth == nil || updated.DateOfBirth.Format("2006-01-02") != *tt.dob {
+						t.Errorf("expected DateOfBirth %s, got %v", *tt.dob, updated.DateOfBirth)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestUpdateUser_CannotModifyAnotherUser(t *testing.T) {
 	repo := newMockRepo()
 	svc := service.NewUserService(repo)

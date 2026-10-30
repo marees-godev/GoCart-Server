@@ -244,6 +244,19 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 				slog.WarnContext(ctx, "invalid date_of_birth format in UpdateUser", "user_id", targetUserID, "error", err)
 				return nil, errors.BadRequest("invalid date_of_birth format")
 			}
+			now := time.Now()
+			if dob.After(now) {
+				slog.WarnContext(ctx, "date_of_birth cannot be in the future in UpdateUser", "user_id", targetUserID, "dob", trimmed)
+				return nil, errors.BadRequest("date_of_birth cannot be in the future")
+			}
+			age := now.Year() - dob.Year()
+			if now.Month() < dob.Month() || (now.Month() == dob.Month() && now.Day() < dob.Day()) {
+				age--
+			}
+			if age < 16 {
+				slog.WarnContext(ctx, "user age must be at least 16 in UpdateUser", "user_id", targetUserID, "dob", trimmed, "age", age)
+				return nil, errors.BadRequest("user must be at least 16 years old")
+			}
 			user.DateOfBirth = &dob
 		}
 	}
