@@ -250,7 +250,13 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 		resp, err := handler(ctx, req)
 		if err != nil {
-			logger.FromContext(ctx).Error("gRPC server handler error", "method", info.FullMethod, "error", err)
+			st, _ := status.FromError(err)
+			switch st.Code() {
+			case codes.InvalidArgument, codes.NotFound, codes.AlreadyExists, codes.Unauthenticated, codes.PermissionDenied, codes.FailedPrecondition:
+				logger.FromContext(ctx).Warn("gRPC server client error", "method", info.FullMethod, "code", st.Code().String(), "error", err)
+			default:
+				logger.FromContext(ctx).Error("gRPC server handler error", "method", info.FullMethod, "error", err)
+			}
 		}
 		return resp, err
 	}
@@ -308,6 +314,10 @@ func UnaryRoleAuthInterceptor(methodRoles map[string][]string) grpc.UnaryServerI
 		userRole := strings.ToUpper(strings.TrimSpace(GetUserRole(ctx)))
 		if userRole == "" {
 			return nil, status.Error(codes.Unauthenticated, "authentication required: missing user role in request context")
+		}
+
+		if userRole == "ADMIN" {
+			return handler(ctx, req)
 		}
 
 		for _, allowed := range requiredRoles {

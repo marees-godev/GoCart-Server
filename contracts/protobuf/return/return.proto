@@ -8,6 +8,14 @@ service ReturnService {
   rpc RequestReturn (RequestReturnRequest) returns (RequestReturnResponse);
   rpc GetReturn (GetReturnRequest) returns (GetReturnResponse);
   rpc UpdateReturnStatus (UpdateReturnStatusRequest) returns (UpdateReturnStatusResponse);
+  rpc ApproveReturn (ApproveReturnRequest) returns (ApproveReturnResponse);
+  rpc RejectReturn (RejectReturnRequest) returns (RejectReturnResponse);
+  rpc VerifyProduct (VerifyProductRequest) returns (VerifyProductResponse);
+  rpc ListReturns (ListReturnsRequest) returns (ListReturnsResponse);
+  rpc GetReturnsByOrder (GetReturnsByOrderRequest) returns (GetReturnsByOrderResponse);
+  rpc CreateExchange (CreateExchangeRequest) returns (CreateExchangeResponse);
+  rpc GetExchange (GetExchangeRequest) returns (GetExchangeResponse);
+  rpc VerifyExchangeProduct (VerifyExchangeProductRequest) returns (VerifyExchangeProductResponse);
 }
 
 message ReturnOrder {
@@ -18,13 +26,36 @@ message ReturnOrder {
   string status = 5;
   double refund_amount = 6;
   string created_at = 7;
+  string order_item_id = 8;
+  string requested_at = 9;
+  string updated_at = 10;
+  string type = 11;
+  ProductVerification verification = 12;
+  string approved_at = 13;
+  string completed_at = 14;
+  string rejection_reason = 15;
+}
+
+message ProductVerification {
+  string id = 1;
+  string return_id = 2;
+  string verified_by = 3;
+  string condition = 4;
+  bool is_approved = 5;
+  repeated string proof_images = 6;
+  string notes = 7;
+  string verified_at = 8;
+  string created_at = 9;
+  string updated_at = 10;
 }
 
 message RequestReturnRequest {
   string order_id = 1;
   string user_id = 2;
   string reason = 3;
-  repeated string item_ids = 4;
+  string item_id = 4;
+  string order_item_id = 5;
+  string type = 6;
 }
 
 message RequestReturnResponse {
@@ -42,8 +73,158 @@ message GetReturnResponse {
 message UpdateReturnStatusRequest {
   string id = 1;
   string status = 2;
+  string rejection_reason = 3;
+  string reviewer_id = 4;
 }
 
 message UpdateReturnStatusResponse {
   ReturnOrder return_order = 1;
 }
+
+message ApproveReturnRequest {
+  string id = 1;
+  string reviewer_id = 2;
+}
+
+message ApproveReturnResponse {
+  ReturnOrder return_order = 1;
+}
+
+message RejectReturnRequest {
+  string id = 1;
+  string rejection_reason = 2;
+  string reviewer_id = 3;
+}
+
+message RejectReturnResponse {
+  ReturnOrder return_order = 1;
+}
+
+message VerifyProductRequest {
+  string return_id = 1;
+  string verified_by = 2;
+  string condition = 3;
+  bool is_approved = 4;
+  repeated string proof_images = 5;
+  string notes = 6;
+}
+
+message VerifyProductResponse {
+  ReturnOrder return_order = 1;
+  ProductVerification verification = 2;
+}
+
+message ListReturnsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  string status = 3;
+  string user_id = 4;
+  string type = 5;
+}
+
+message ListReturnsResponse {
+  repeated ReturnOrder returns = 1;
+  int32 total = 2;
+}
+
+message GetReturnsByOrderRequest {
+  string order_id = 1;
+}
+
+message GetReturnsByOrderResponse {
+  repeated ReturnOrder returns = 1;
+}
+
+message ExchangeQuestionAnswer {
+  string id = 1;
+  string exchange_id = 2;
+  string question_key = 3;
+  string answer_value = 4;
+  double deduction_amount = 5;
+  string created_at = 6;
+}
+
+message ExchangeVerification {
+  string id = 1;
+  string exchange_id = 2;
+  string verified_by = 3;
+  string condition_rating = 4;
+  bool is_approved = 5;
+  bool screen_intact = 6;
+  bool body_intact = 7;
+  bool functional = 8;
+  bool serial_matches = 9;
+  double adjusted_discount = 10;
+  repeated string proof_images = 11;
+  string notes = 12;
+  string verified_at = 13;
+  string created_at = 14;
+  string updated_at = 15;
+}
+
+message Exchange {
+  string id = 1;
+  string order_id = 2;
+  string order_item_id = 3;
+  string user_id = 4;
+  string new_product_id = 5;
+  string old_brand = 6;
+  string old_model = 7;
+  string old_variant = 8;
+  string serial_or_imei = 9;
+  double base_exchange_value = 10;
+  double estimated_discount = 11;
+  double final_discount = 12;
+  double price_difference = 13;
+  string status = 14;
+  repeated ExchangeQuestionAnswer answers = 15;
+  ExchangeVerification verification = 16;
+  string created_at = 17;
+  string updated_at = 18;
+}
+
+message CreateExchangeRequest {
+  string order_id = 1;
+  string order_item_id = 2;
+  string user_id = 3;
+  string new_product_id = 4;
+  string old_brand = 5;
+  string old_model = 6;
+  string old_variant = 7;
+  string serial_or_imei = 8;
+  double base_exchange_value = 9;
+  repeated ExchangeQuestionAnswer answers = 10;
+}
+
+message CreateExchangeResponse {
+  Exchange exchange = 1;
+}
+
+message GetExchangeRequest {
+  string id = 1;
+  string order_id = 2;
+}
+
+message GetExchangeResponse {
+  Exchange exchange = 1;
+}
+
+message VerifyExchangeProductRequest {
+  string exchange_id = 1;
+  string verified_by = 2;
+  string condition_rating = 3;
+  bool is_approved = 4;
+  bool screen_intact = 5;
+  bool body_intact = 6;
+  bool functional = 7;
+  bool serial_matches = 8;
+  optional double adjusted_discount = 9;
+  repeated string proof_images = 10;
+  string notes = 11;
+}
+
+message VerifyExchangeProductResponse {
+  Exchange exchange = 1;
+  ExchangeVerification verification = 2;
+}
+

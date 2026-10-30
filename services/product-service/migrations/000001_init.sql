@@ -1,5 +1,5 @@
 DO $$ BEGIN
-    CREATE TYPE product_status AS ENUM ('IN_STOCK', 'OUT_OF_STOCK', 'LOW_STOCK', 'RESERVED', 'DISCONTINUED');
+    CREATE TYPE product_status AS ENUM ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'UNPUBLISHED', 'SUSPENDED', 'DELETED', 'IN_STOCK', 'OUT_OF_STOCK', 'LOW_STOCK', 'RESERVED', 'DISCONTINUED');
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS products (
     mrp DECIMAL(12,2) NOT NULL CHECK (mrp >= price),
     tax DECIMAL(5,2) NOT NULL DEFAULT 0.00 CHECK (tax >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    status product_status NOT NULL DEFAULT 'IN_STOCK',
+    status product_status NOT NULL DEFAULT 'DRAFT',
     image_url TEXT,
     avg_rating DECIMAL(3,2) NOT NULL DEFAULT 0.00 CHECK (avg_rating >= 0 AND avg_rating <= 5.00),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

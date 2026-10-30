@@ -17,22 +17,30 @@ type contextKey string
 const userContextKey contextKey = "auth_user_context"
 
 const (
-	RoleCustomer = "CUSTOMER"
-	RoleMerchant = "MERCHANT"
-	RoleAdmin    = "ADMIN"
+	RoleUser            = "USER"
+	RoleCustomer        = "CUSTOMER"
+	RoleMerchant        = "MERCHANT"
+	RoleDeliveryPartner = "DELIVERY_PARTNER"
+	RoleAdmin           = "ADMIN"
 )
 
 type UserContext struct {
-	UserID   string `json:"user_id"`
-	Role     string `json:"role"`
-	Email    string `json:"email,omitempty"`
-	RawToken string `json:"raw_token,omitempty"`
+	UserID     string `json:"user_id"`
+	Role       string `json:"role"`
+	Email      string `json:"email,omitempty"`
+	PartnerID  string `json:"partner_id,omitempty"`
+	MerchantID string `json:"merchant_id,omitempty"`
+	CustomerID string `json:"customer_id,omitempty"`
+	RawToken   string `json:"raw_token,omitempty"`
 }
 
 type UserClaims struct {
-	UserID string `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email,omitempty"`
+	UserID     string `json:"user_id"`
+	Role       string `json:"role"`
+	Email      string `json:"email,omitempty"`
+	PartnerID  string `json:"partner_id,omitempty"`
+	MerchantID string `json:"merchant_id,omitempty"`
+	CustomerID string `json:"customer_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -41,11 +49,33 @@ func GenerateToken(user UserContext, secret string, ttl time.Duration) (string, 
 		return "", errors.New("jwt secret cannot be empty")
 	}
 
+	partnerID := user.PartnerID
+	merchantID := user.MerchantID
+	customerID := user.CustomerID
+
+	switch strings.ToUpper(strings.TrimSpace(user.Role)) {
+	case "DELIVERY_PARTNER":
+		if partnerID == "" {
+			partnerID = user.UserID
+		}
+	case "MERCHANT":
+		if merchantID == "" {
+			merchantID = user.UserID
+		}
+	case "USER", "CUSTOMER":
+		if customerID == "" {
+			customerID = user.UserID
+		}
+	}
+
 	now := time.Now()
 	claims := UserClaims{
-		UserID: user.UserID,
-		Role:   user.Role,
-		Email:  user.Email,
+		UserID:     user.UserID,
+		Role:       user.Role,
+		Email:      user.Email,
+		PartnerID:  partnerID,
+		MerchantID: merchantID,
+		CustomerID: customerID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
 			Subject:   user.UserID,
@@ -96,10 +126,13 @@ func ValidateToken(tokenStr, secret string) (*UserContext, error) {
 	}
 
 	return &UserContext{
-		UserID:   userID,
-		Role:     claims.Role,
-		Email:    claims.Email,
-		RawToken: tokenStr,
+		UserID:     userID,
+		Role:       claims.Role,
+		Email:      claims.Email,
+		PartnerID:  claims.PartnerID,
+		MerchantID: claims.MerchantID,
+		CustomerID: claims.CustomerID,
+		RawToken:   tokenStr,
 	}, nil
 }
 
@@ -123,10 +156,13 @@ func ExtractClaimsWithoutExpiry(tokenStr, secret string) (*UserContext, error) {
 	}
 
 	return &UserContext{
-		UserID:   userID,
-		Role:     claims.Role,
-		Email:    claims.Email,
-		RawToken: tokenStr,
+		UserID:     userID,
+		Role:       claims.Role,
+		Email:      claims.Email,
+		PartnerID:  claims.PartnerID,
+		MerchantID: claims.MerchantID,
+		CustomerID: claims.CustomerID,
+		RawToken:   tokenStr,
 	}, nil
 }
 

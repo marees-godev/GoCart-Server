@@ -35,12 +35,14 @@ func NormalizePaymentMethod(rawMethod string) string {
 type PaymentStatus string
 
 const (
-	PaymentStatusInitiated PaymentStatus = "INITIATED"
-	PaymentStatusPending   PaymentStatus = "PENDING"
-	PaymentStatusSuccess   PaymentStatus = "SUCCESS"
-	PaymentStatusFailed    PaymentStatus = "FAILED"
-	PaymentStatusCancelled PaymentStatus = "CANCELLED"
-	PaymentStatusRefunded  PaymentStatus = "REFUNDED"
+	PaymentStatusInitiated        PaymentStatus = "INITIATED"
+	PaymentStatusPending          PaymentStatus = "PENDING"
+	PaymentStatusSuccess          PaymentStatus = "SUCCESS"
+	PaymentStatusFailed           PaymentStatus = "FAILED"
+	PaymentStatusCancelled        PaymentStatus = "CANCELLED"
+	PaymentStatusRefundPending    PaymentStatus = "REFUND_PENDING"
+	PaymentStatusPartiallyRefunded PaymentStatus = "PARTIALLY_REFUNDED"
+	PaymentStatusRefunded         PaymentStatus = "REFUNDED"
 )
 
 type RefundStatus string

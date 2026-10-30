@@ -183,9 +183,9 @@ func TestAuthorization_RBACMatrix(t *testing.T) {
 
 func TestPublicAdminRegistration_Constraint(t *testing.T) {
 	req := &authpb.RegisterRequest{
-		Email:      "hacker@admin.com",
-		Password:   "Password123!",
-		IsMerchant: false,
+		Email:    "hacker@admin.com",
+		Password: "Password123!",
+		Role:     authpb.Role_USER,
 	}
 
 	if req.GetEmail() != "hacker@admin.com" {
@@ -194,8 +194,8 @@ func TestPublicAdminRegistration_Constraint(t *testing.T) {
 	if req.GetPassword() != "Password123!" {
 		t.Errorf("expected password Password123!, got %s", req.GetPassword())
 	}
-	if req.IsMerchant {
-		t.Fatal("expected customer registration is_merchant=false")
+	if req.GetRole() != authpb.Role_USER {
+		t.Fatal("expected customer registration role=USER")
 	}
 }
 

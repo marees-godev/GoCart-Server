@@ -61,6 +61,13 @@ func (h *CartGRPCHandler) GetCart(ctx context.Context, req *cartpb.GetCartReques
 	}, nil
 }
 
+func toOptionalStringPtr(s string) *string {
+	if s == "" || s == "00000000-0000-0000-0000-000000000000" {
+		return nil
+	}
+	return &s
+}
+
 func (h *CartGRPCHandler) AddCartItem(ctx context.Context, req *cartpb.AddCartItemRequest) (*cartpb.AddCartItemResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request body cannot be nil")
@@ -73,8 +80,8 @@ func (h *CartGRPCHandler) AddCartItem(ctx context.Context, req *cartpb.AddCartIt
 	cart, err := h.cartService.AddCartItem(ctx, dto.AddCartItemRequest{
 		UserID:    userID,
 		ProductID: req.GetProductId(),
-		VariantID: req.GetVariantId(),
-		StoreID:   req.GetStoreId(),
+		VariantID: toOptionalStringPtr(req.GetVariantId()),
+		StoreID:   toOptionalStringPtr(req.GetStoreId()),
 		UnitPrice: req.GetUnitPrice(),
 		Quantity:  req.GetQuantity(),
 	})
@@ -99,7 +106,7 @@ func (h *CartGRPCHandler) UpdateCartItem(ctx context.Context, req *cartpb.Update
 	cart, err := h.cartService.UpdateCartItem(ctx, dto.UpdateCartItemRequest{
 		UserID:    userID,
 		ProductID: req.GetProductId(),
-		VariantID: req.GetVariantId(),
+		VariantID: toOptionalStringPtr(req.GetVariantId()),
 		Quantity:  req.GetQuantity(),
 	})
 	if err != nil {
@@ -123,7 +130,7 @@ func (h *CartGRPCHandler) RemoveCartItem(ctx context.Context, req *cartpb.Remove
 	cart, err := h.cartService.RemoveCartItem(ctx, dto.RemoveCartItemRequest{
 		UserID:    userID,
 		ProductID: req.GetProductId(),
-		VariantID: req.GetVariantId(),
+		VariantID: toOptionalStringPtr(req.GetVariantId()),
 	})
 	if err != nil {
 		return nil, appErrors.ToGRPC(err)
@@ -181,11 +188,19 @@ func (h *CartGRPCHandler) ValidateCart(ctx context.Context, req *cartpb.Validate
 	for _, g := range resp.StoreGroups {
 		pbItems := make([]*cartpb.CartItem, 0, len(g.Items))
 		for _, item := range g.Items {
+			var variantID string
+			if item.VariantID != nil {
+				variantID = *item.VariantID
+			}
+			var storeID string
+			if item.StoreID != nil {
+				storeID = *item.StoreID
+			}
 			pbItems = append(pbItems, &cartpb.CartItem{
 				Id:        item.ID,
 				ProductId: item.ProductID,
-				VariantId: item.VariantID,
-				StoreId:   item.StoreID,
+				VariantId: variantID,
+				StoreId:   storeID,
 				UnitPrice: item.UnitPrice,
 				Quantity:  item.Quantity,
 			})
@@ -235,11 +250,19 @@ func (h *CartGRPCHandler) PrepareCheckout(ctx context.Context, req *cartpb.Prepa
 	for _, o := range resp.Orders {
 		pbItems := make([]*cartpb.CartItem, 0, len(o.Items))
 		for _, item := range o.Items {
+			var variantID string
+			if item.VariantID != nil {
+				variantID = *item.VariantID
+			}
+			var storeID string
+			if item.StoreID != nil {
+				storeID = *item.StoreID
+			}
 			pbItems = append(pbItems, &cartpb.CartItem{
 				Id:        item.ID,
 				ProductId: item.ProductID,
-				VariantId: item.VariantID,
-				StoreId:   item.StoreID,
+				VariantId: variantID,
+				StoreId:   storeID,
 				UnitPrice: item.UnitPrice,
 				Quantity:  item.Quantity,
 			})
@@ -269,11 +292,19 @@ func cartToProto(c *model.Cart) *cartpb.Cart {
 	}
 	pbItems := make([]*cartpb.CartItem, 0, len(c.Items))
 	for _, item := range c.Items {
+		var variantID string
+		if item.VariantID != nil {
+			variantID = *item.VariantID
+		}
+		var storeID string
+		if item.StoreID != nil {
+			storeID = *item.StoreID
+		}
 		pbItems = append(pbItems, &cartpb.CartItem{
 			Id:        item.ID,
 			ProductId: item.ProductID,
-			VariantId: item.VariantID,
-			StoreId:   item.StoreID,
+			VariantId: variantID,
+			StoreId:   storeID,
 			UnitPrice: item.UnitPrice,
 			Quantity:  item.Quantity,
 		})

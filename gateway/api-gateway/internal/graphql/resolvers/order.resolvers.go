@@ -6,27 +6,370 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
-	panic(fmt.Errorf("not implemented: CreateOrder - createOrder"))
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" && input.UserID != nil {
+		userID = *input.UserID
+	}
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	cartID := ""
+	if input.CartID != nil {
+		cartID = *input.CartID
+	}
+	shippingAddr := ""
+	if input.ShippingAddress != nil {
+		shippingAddr = *input.ShippingAddress
+	}
+	shippingAddrID := ""
+	if input.ShippingAddressID != nil {
+		shippingAddrID = *input.ShippingAddressID
+	}
+	billingAddrID := ""
+	if input.BillingAddressID != nil {
+		billingAddrID = *input.BillingAddressID
+	}
+	currency := ""
+	if input.Currency != nil {
+		currency = *input.Currency
+	}
+	idempKey := ""
+	if input.IdempotencyKey != nil {
+		idempKey = *input.IdempotencyKey
+	}
+	var shipFee float64
+	if input.ShippingFee != nil {
+		shipFee = *input.ShippingFee
+	}
+	var discAmt float64
+	if input.DiscountAmount != nil {
+		discAmt = *input.DiscountAmount
+	}
+
+	resp, err := client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
+		UserId:            userID,
+		CartId:            cartID,
+		ShippingAddress:   shippingAddr,
+		ShippingAddressId: shippingAddrID,
+		BillingAddressId:  billingAddrID,
+		Currency:          currency,
+		IdempotencyKey:    idempKey,
+		ShippingFee:       shipFee,
+		DiscountAmount:    discAmt,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+}
+
+// Checkout is the resolver for the checkout field.
+func (r *mutationResolver) Checkout(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
+	return r.CreateOrder(ctx, input)
+}
+
+// CancelOrder is the resolver for the cancelOrder field.
+func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *string) (*model.Order, error) {
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	var reasonStr string
+	if reason != nil {
+		reasonStr = *reason
+	}
+
+	resp, err := client.CancelOrder(ctx, &orderpb.CancelOrderRequest{
+		Id:     id,
+		UserId: userID,
+		Reason: reasonStr,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
 }
 
 // UpdateOrderStatus is the resolver for the updateOrderStatus field.
 func (r *mutationResolver) UpdateOrderStatus(ctx context.Context, id string, status string) (*model.Order, error) {
-	panic(fmt.Errorf("not implemented: UpdateOrderStatus - updateOrderStatus"))
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+		Id:     id,
+		Status: status,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
 }
 
 // Order is the resolver for the order field.
 func (r *queryResolver) Order(ctx context.Context, id string) (*model.Order, error) {
-	panic(fmt.Errorf("not implemented: Order - order"))
+	return r.GetOrder(ctx, id)
+}
+
+// GetOrder is the resolver for the getOrder field.
+func (r *queryResolver) GetOrder(ctx context.Context, id string) (*model.Order, error) {
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	resp, err := client.GetOrder(ctx, &orderpb.GetOrderRequest{
+		Id:     id,
+		UserId: userID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+}
+
+// ListMyOrders is the resolver for the listMyOrders field.
+func (r *queryResolver) ListMyOrders(ctx context.Context, limit *int, offset *int) (*model.OrderList, error) {
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	var l int32 = 20
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	resp, err := client.ListOrders(ctx, &orderpb.ListOrdersRequest{
+		UserId: userID,
+		Limit:  l,
+		Offset: o,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	orders := make([]*model.Order, len(resp.GetOrders()))
+	for i, ord := range resp.GetOrders() {
+		orders[i] = mapProtoOrderToGraphQL(ord)
+	}
+
+	return &model.OrderList{
+		Orders: orders,
+		Total:  int(resp.GetTotal()),
+	}, nil
 }
 
 // Orders is the resolver for the orders field.
 func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, offset *int) (*model.OrderList, error) {
-	panic(fmt.Errorf("not implemented: Orders - orders"))
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	userCtx, _ := auth.UserFromContext(ctx)
+	if userCtx == nil || (userCtx.Role != auth.RoleAdmin && userCtx.Role != "ADMIN") {
+		if authUserID != "" {
+			userID = authUserID
+		}
+	}
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	var l, o int32
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	resp, err := client.ListOrders(ctx, &orderpb.ListOrdersRequest{
+		UserId: userID,
+		Limit:  l,
+		Offset: o,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	orders := make([]*model.Order, len(resp.GetOrders()))
+	for i, ord := range resp.GetOrders() {
+		orders[i] = mapProtoOrderToGraphQL(ord)
+	}
+
+	return &model.OrderList{
+		Orders: orders,
+		Total:  int(resp.GetTotal()),
+	}, nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *Resolver) getOrderClient() (orderpb.OrderServiceClient, error) {
+	if r.Clients != nil && r.Clients.OrderClient != nil {
+		return r.Clients.OrderClient, nil
+	}
+	if r.ClientMgr != nil && r.ClientMgr.OrderClient != nil {
+		return r.ClientMgr.OrderClient, nil
+	}
+	return nil, appErrors.Internal(nil, "order service client unavailable")
+}
+func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
+	if o == nil {
+		return nil
+	}
+
+	items := make([]*model.OrderItem, len(o.GetItems()))
+	for i, it := range o.GetItems() {
+		var storeID, sku, prodName *string
+		if it.GetStoreId() != "" {
+			s := it.GetStoreId()
+			storeID = &s
+		}
+		if it.GetSku() != "" {
+			s := it.GetSku()
+			sku = &s
+		}
+		if it.GetProductName() != "" {
+			pn := it.GetProductName()
+			prodName = &pn
+		}
+		tax := it.GetTax()
+		discount := it.GetDiscount()
+		totalPrice := it.GetTotalPrice()
+
+		items[i] = &model.OrderItem{
+			ID:          it.GetId(),
+			ProductID:   it.GetProductId(),
+			StoreID:     storeID,
+			Sku:         sku,
+			ProductName: prodName,
+			Quantity:    int(it.GetQuantity()),
+			UnitPrice:   it.GetUnitPrice(),
+			Tax:         &tax,
+			Discount:    &discount,
+			TotalPrice:  &totalPrice,
+		}
+	}
+
+	ca := o.GetCreatedAt()
+	var caPtr *string
+	if ca != "" {
+		caPtr = &ca
+	}
+	ua := o.GetUpdatedAt()
+	var uaPtr *string
+	if ua != "" {
+		uaPtr = &ua
+	}
+
+	var storeID, orderStatus, payStatus, currency, shipAddrID, billAddrID, parentOrderID, orderNumber *string
+	if o.GetStoreId() != "" {
+		s := o.GetStoreId()
+		storeID = &s
+	}
+	if o.GetOrderStatus() != "" {
+		os := o.GetOrderStatus()
+		orderStatus = &os
+	}
+	if o.GetPaymentStatus() != "" {
+		ps := o.GetPaymentStatus()
+		payStatus = &ps
+	}
+	if o.GetCurrency() != "" {
+		c := o.GetCurrency()
+		currency = &c
+	}
+	if o.GetShippingAddressId() != "" {
+		s := o.GetShippingAddressId()
+		shipAddrID = &s
+	}
+	if o.GetBillingAddressId() != "" {
+		b := o.GetBillingAddressId()
+		billAddrID = &b
+	}
+	if o.GetParentOrderId() != "" {
+		p := o.GetParentOrderId()
+		parentOrderID = &p
+	}
+	if o.GetOrderNumber() != "" {
+		num := o.GetOrderNumber()
+		orderNumber = &num
+	}
+
+	subtotal := o.GetSubtotal()
+	taxAmount := o.GetTaxAmount()
+	shippingFee := o.GetShippingFee()
+	discountAmount := o.GetDiscountAmount()
+
+	return &model.Order{
+		ID:                o.GetId(),
+		UserID:            o.GetUserId(),
+		StoreID:           storeID,
+		Status:            o.GetStatus(),
+		OrderStatus:       orderStatus,
+		PaymentStatus:     payStatus,
+		Items:             items,
+		Subtotal:          &subtotal,
+		TaxAmount:         &taxAmount,
+		ShippingFee:       &shippingFee,
+		DiscountAmount:    &discountAmount,
+		TotalAmount:       o.GetTotalAmount(),
+		Currency:          currency,
+		ShippingAddress:   o.GetShippingAddress(),
+		ShippingAddressID: shipAddrID,
+		BillingAddressID:  billAddrID,
+		ParentOrderID:     parentOrderID,
+		OrderNumber:       orderNumber,
+		CreatedAt:         caPtr,
+		UpdatedAt:         uaPtr,
+	}
 }

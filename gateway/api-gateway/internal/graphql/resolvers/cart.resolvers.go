@@ -6,27 +6,134 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
+	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // AddToCart is the resolver for the addToCart field.
 func (r *mutationResolver) AddToCart(ctx context.Context, input model.AddToCartInput) (*model.Cart, error) {
-	panic(fmt.Errorf("not implemented: AddToCart - addToCart"))
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+	if input.ProductID == "" {
+		return nil, appErrors.BadRequest("product_id is required")
+	}
+	if input.Quantity <= 0 {
+		return nil, appErrors.BadRequest("quantity must be greater than zero")
+	}
+
+	prodClient, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	prodResp, err := prodClient.GetProduct(ctx, &productpb.GetProductRequest{Id: input.ProductID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if prodResp == nil || prodResp.Product == nil {
+		return nil, appErrors.NotFound("product not found")
+	}
+
+	cartClient, err := r.getCartClient()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := cartClient.AddCartItem(ctx, &cartpb.AddCartItemRequest{
+		UserId:    userID,
+		ProductId: input.ProductID,
+		Quantity:  int32(input.Quantity),
+		UnitPrice: prodResp.Product.Price,
+		StoreId:   prodResp.Product.StoreId,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelCart(res.Cart), nil
 }
 
 // RemoveFromCart is the resolver for the removeFromCart field.
-func (r *mutationResolver) RemoveFromCart(ctx context.Context, userID string, productID string) (*model.Cart, error) {
-	panic(fmt.Errorf("not implemented: RemoveFromCart - removeFromCart"))
+func (r *mutationResolver) RemoveFromCart(ctx context.Context, userID *string, productID string) (*model.Cart, error) {
+	uid := getAuthUserIDFromCtx(ctx)
+	if userID != nil && *userID != "" {
+		uid = *userID
+	}
+	if uid == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+	if productID == "" {
+		return nil, appErrors.BadRequest("product_id is required")
+	}
+
+	cartClient, err := r.getCartClient()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := cartClient.RemoveCartItem(ctx, &cartpb.RemoveCartItemRequest{
+		UserId:    uid,
+		ProductId: productID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelCart(res.Cart), nil
 }
 
 // ClearCart is the resolver for the clearCart field.
-func (r *mutationResolver) ClearCart(ctx context.Context, userID string) (bool, error) {
-	panic(fmt.Errorf("not implemented: ClearCart - clearCart"))
+func (r *mutationResolver) ClearCart(ctx context.Context, userID *string) (bool, error) {
+	uid := getAuthUserIDFromCtx(ctx)
+	if userID != nil && *userID != "" {
+		uid = *userID
+	}
+	if uid == "" {
+		return false, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	cartClient, err := r.getCartClient()
+	if err != nil {
+		return false, err
+	}
+
+	res, err := cartClient.ClearCart(ctx, &cartpb.ClearCartRequest{
+		UserId: uid,
+	})
+	if err != nil {
+		return false, grpcclient.TranslateGRPCError(err)
+	}
+
+	return res.Success, nil
 }
 
 // Cart is the resolver for the cart field.
-func (r *queryResolver) Cart(ctx context.Context, userID string) (*model.Cart, error) {
-	panic(fmt.Errorf("not implemented: Cart - cart"))
+func (r *queryResolver) Cart(ctx context.Context, userID *string) (*model.Cart, error) {
+	uid := getAuthUserIDFromCtx(ctx)
+	if userID != nil && *userID != "" {
+		uid = *userID
+	}
+	if uid == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	cartClient, err := r.getCartClient()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := cartClient.GetCart(ctx, &cartpb.GetCartRequest{
+		UserId: uid,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelCart(res.Cart), nil
 }

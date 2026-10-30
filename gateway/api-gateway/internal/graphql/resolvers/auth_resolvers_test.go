@@ -16,34 +16,46 @@ import (
 
 type mockAuthClient struct {
 	authpb.AuthServiceClient
-	lastRegisterReq *authpb.RegisterRequest
-	lastLoginReq    *authpb.LoginRequest
+	lastRegisterReq    *authpb.RegisterRequest
+	lastLoginReq       *authpb.LoginRequest
+	lastVerifyEmailReq *authpb.VerifyEmailRequest
+	lastResendReq      *authpb.ResendVerificationEmailRequest
 }
 
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
 	m.lastRegisterReq = in
+	partnerID := ""
+	fn := in.FirstName
+	ln := in.LastName
+	switch in.Role {
+	case authpb.Role_DELIVERY_PARTNER:
+		partnerID = "partner-uuid-123"
+	case authpb.Role_MERCHANT:
+		fn = "Jane"
+		ln = "Merchant"
+	}
 	return &authpb.AuthResponse{
 		AccessToken:  "test-access-token",
 		RefreshToken: "test-refresh-token",
 		TokenType:    "Bearer",
 		ExpiresIn:    900,
 		UserId:       "user-uuid-123",
+		Role:         in.Role,
+		PartnerId:    partnerID,
+		FirstName:    fn,
+		LastName:     ln,
 	}, nil
 }
 
 func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
 	m.lastLoginReq = in
-	role := "CUSTOMER"
-	if in.IsMerchant {
-		role = "MERCHANT"
-	}
 	return &authpb.AuthResponse{
 		AccessToken:  "test-login-token",
 		RefreshToken: "test-refresh-token",
 		TokenType:    "Bearer",
 		ExpiresIn:    900,
 		UserId:       "user-uuid-123",
-		Role:         role,
+		Role:         in.Role,
 	}, nil
 }
 
@@ -54,6 +66,22 @@ func (m *mockAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, o
 	return &authpb.LogoutResponse{
 		Success: true,
 		Message: "Logged out successfully",
+	}, nil
+}
+
+func (m *mockAuthClient) VerifyEmail(ctx context.Context, in *authpb.VerifyEmailRequest, opts ...grpcPkg.CallOption) (*authpb.VerifyEmailResponse, error) {
+	m.lastVerifyEmailReq = in
+	return &authpb.VerifyEmailResponse{
+		Success: true,
+		Message: "Email verified",
+	}, nil
+}
+
+func (m *mockAuthClient) ResendVerificationEmail(ctx context.Context, in *authpb.ResendVerificationEmailRequest, opts ...grpcPkg.CallOption) (*authpb.ResendVerificationEmailResponse, error) {
+	m.lastResendReq = in
+	return &authpb.ResendVerificationEmailResponse{
+		Success: true,
+		Message: "Verification sent",
 	}, nil
 }
 
@@ -92,13 +120,12 @@ func TestRegisterResolver_Customer(t *testing.T) {
 
 	fn := "John"
 	ln := "Doe"
-	isMerchCust := false
 	input := model.RegisterInput{
-		Email:      "customer@example.com",
-		Password:   "Password123!",
-		FirstName:  &fn,
-		LastName:   &ln,
-		IsMerchant: isMerchCust,
+		Email:     "customer@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleUser,
+		FirstName: &fn,
+		LastName:  &ln,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -110,28 +137,12 @@ func TestRegisterResolver_Customer(t *testing.T) {
 		t.Errorf("expected token 'test-access-token', got '%s'", payload.Token)
 	}
 
-	// Verify AuthClient called with IsMerchant == false
+	// Verify AuthClient called with Role == USER
 	if authMock.lastRegisterReq == nil {
 		t.Fatal("expected AuthClient.Register to be called")
 	}
-	if authMock.lastRegisterReq.IsMerchant != false {
-		t.Errorf("expected IsMerchant to be false, got true")
-	}
-
-	// Verify UserClient.GetUser was called
-	if userMock.lastGetUserReq == nil || userMock.lastGetUserReq.Id != "user-uuid-123" {
-		t.Errorf("expected UserClient.GetUser to be called with user-uuid-123")
-	}
-
-	// Verify payload.User is populated
-	if payload.User == nil || payload.User.ID != "user-uuid-123" {
-		t.Errorf("expected payload user with ID 'user-uuid-123', got %+v", payload.User)
-	}
-	if payload.User.CreatedAt == nil || *payload.User.CreatedAt != "2026-09-23T10:00:00Z" {
-		t.Errorf("expected payload user with CreatedAt '2026-09-23T10:00:00Z', got %+v", payload.User)
-	}
-	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
-		t.Errorf("expected payload user role 'CUSTOMER', got %v", payload.User.Role)
+	if authMock.lastRegisterReq.Role != authpb.Role_USER {
+		t.Errorf("expected Role to be USER, got %v", authMock.lastRegisterReq.Role)
 	}
 }
 
@@ -150,15 +161,14 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 		},
 	}
 
-	fn := "Jane"
-	ln := "Merchant"
-	isMerchTrue := true
+	mFn := "Jane"
+	mLn := "Merchant"
 	input := model.RegisterInput{
-		Email:      "merchant@example.com",
-		Password:   "Password123!",
-		FirstName:  &fn,
-		LastName:   &ln,
-		IsMerchant: isMerchTrue,
+		Email:     "merchant@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleMerchant,
+		FirstName: &mFn,
+		LastName:  &mLn,
 	}
 
 	payload, err := r.Register(context.Background(), input)
@@ -170,31 +180,12 @@ func TestRegisterResolver_Merchant(t *testing.T) {
 		t.Errorf("expected token 'test-access-token', got '%s'", payload.Token)
 	}
 
-	// Verify AuthClient called with IsMerchant == true
+	// Verify AuthClient called with Role == MERCHANT
 	if authMock.lastRegisterReq == nil {
 		t.Fatal("expected AuthClient.Register to be called")
 	}
-	if authMock.lastRegisterReq.IsMerchant != true {
-		t.Errorf("expected IsMerchant to be true, got false")
-	}
-
-	// Verify UserClient.GetUser was NOT called for merchant
-	if userMock.lastGetUserReq != nil {
-		t.Errorf("expected UserClient.GetUser not to be called for merchant")
-	}
-
-	// Verify payload.User is populated and not null
-	if payload.User == nil {
-		t.Fatal("expected non-null user in AuthPayload")
-	}
-	if payload.User.ID != "user-uuid-123" {
-		t.Errorf("expected user ID 'user-uuid-123', got '%s'", payload.User.ID)
-	}
-	if payload.User.Email != "merchant@example.com" {
-		t.Errorf("expected email 'merchant@example.com', got '%s'", payload.User.Email)
-	}
-	if payload.User.FirstName == nil || *payload.User.FirstName != "Jane" || payload.User.LastName == nil || *payload.User.LastName != "Merchant" {
-		t.Errorf("expected name Jane Merchant, got %v %v", payload.User.FirstName, payload.User.LastName)
+	if authMock.lastRegisterReq.Role != authpb.Role_MERCHANT {
+		t.Errorf("expected Role to be MERCHANT, got %v", authMock.lastRegisterReq.Role)
 	}
 }
 
@@ -214,9 +205,9 @@ func TestLoginResolver_Customer(t *testing.T) {
 	}
 
 	input := model.LoginInput{
-		Email:      "customer@example.com",
-		Password:   "Password123!",
-		IsMerchant: false,
+		Email:    "customer@example.com",
+		Password: "Password123!",
+		Role:     model.AuthRoleUser,
 	}
 
 	payload, err := r.Login(context.Background(), input)
@@ -233,14 +224,8 @@ func TestLoginResolver_Customer(t *testing.T) {
 	if authMock.lastLoginReq == nil {
 		t.Fatal("expected AuthClient.Login to be called")
 	}
-	if authMock.lastLoginReq.IsMerchant != false {
-		t.Errorf("expected IsMerchant to be false, got true")
-	}
-	if userMock.lastGetUserReq == nil || userMock.lastGetUserReq.Id != "user-uuid-123" {
-		t.Errorf("expected UserClient.GetUser to be called for customer")
-	}
-	if payload.User.Role == nil || *payload.User.Role != "CUSTOMER" {
-		t.Errorf("expected role CUSTOMER, got %v", payload.User.Role)
+	if authMock.lastLoginReq.Role != authpb.Role_USER {
+		t.Errorf("expected Role to be USER, got %v", authMock.lastLoginReq.Role)
 	}
 }
 
@@ -260,9 +245,9 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	}
 
 	input := model.LoginInput{
-		Email:      "merchant@example.com",
-		Password:   "Password123!",
-		IsMerchant: true,
+		Email:    "merchant@example.com",
+		Password: "Password123!",
+		Role:     model.AuthRoleMerchant,
 	}
 
 	payload, err := r.Login(context.Background(), input)
@@ -276,14 +261,8 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	if authMock.lastLoginReq == nil {
 		t.Fatal("expected AuthClient.Login to be called")
 	}
-	if authMock.lastLoginReq.IsMerchant != true {
-		t.Errorf("expected IsMerchant to be true, got false")
-	}
-	if userMock.lastGetUserReq != nil {
-		t.Errorf("expected UserClient.GetUser NOT to be called for merchant")
-	}
-	if payload.User.Role == nil || *payload.User.Role != "MERCHANT" {
-		t.Errorf("expected role MERCHANT, got %v", payload.User.Role)
+	if authMock.lastLoginReq.Role != authpb.Role_MERCHANT {
+		t.Errorf("expected Role to be MERCHANT, got %v", authMock.lastLoginReq.Role)
 	}
 }
 
@@ -295,7 +274,7 @@ func (m *mockAuthClient) RefreshToken(ctx context.Context, in *authpb.RefreshTok
 			TokenType:    "Bearer",
 			ExpiresIn:    900,
 			UserId:       "user-123",
-			Role:         "CUSTOMER",
+			Role:         authpb.Role_USER,
 		}, nil
 	}
 	return nil, appErrors.MapAppErrorToGRPC(appErrors.Unauthorized("invalid refresh token"))
@@ -417,8 +396,8 @@ func TestForgotPasswordResolver(t *testing.T) {
 
 	// 1. Success
 	resp, err := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
-		Email:      "user@example.com",
-		IsMerchant: false,
+		Email: "user@example.com",
+		Role:  model.AuthRoleUser,
 	})
 	if err != nil {
 		t.Fatalf("expected successful forgotPassword, got: %v", err)
@@ -429,8 +408,8 @@ func TestForgotPasswordResolver(t *testing.T) {
 
 	// 2. Missing email
 	_, errMissing := r.ForgotPassword(context.Background(), model.ForgotPasswordInput{
-		Email:      "",
-		IsMerchant: false,
+		Email: "",
+		Role:  model.AuthRoleUser,
 	})
 	if errMissing == nil {
 		t.Errorf("expected error for empty email, got nil")
@@ -454,7 +433,7 @@ func TestResetPasswordWithOtpResolver(t *testing.T) {
 		Email:       "user@example.com",
 		Otp:         "123456",
 		NewPassword: "NewPassword123!",
-		IsMerchant:  false,
+		Role:        model.AuthRoleUser,
 	})
 	if err != nil {
 		t.Fatalf("expected successful resetPasswordWithOtp, got: %v", err)
@@ -468,7 +447,7 @@ func TestResetPasswordWithOtpResolver(t *testing.T) {
 		Email:       "user@example.com",
 		Otp:         "invalid-otp",
 		NewPassword: "NewPassword123!",
-		IsMerchant:  false,
+		Role:        model.AuthRoleUser,
 	})
 	if errInvalid == nil {
 		t.Errorf("expected error for invalid otp, got nil")
@@ -527,3 +506,213 @@ func TestChangePasswordResolver(t *testing.T) {
 		t.Errorf("expected success true, got false")
 	}
 }
+
+func TestRegisterResolver_DeliveryPartner_Alone(t *testing.T) {
+	authMock := &mockAuthClient{}
+	userMock := &mockUserClient{}
+	deliveryMock := &mockDeliveryClient{}
+
+	clients := &grpc.Clients{
+		AuthClient:     authMock,
+		UserClient:     userMock,
+		DeliveryClient: deliveryMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	fn := "Fast"
+	ln := "Logistics"
+	input := model.RegisterInput{
+		Email:     "deliverypartner@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleDeliveryPartner,
+		FirstName: &fn,
+		LastName:  &ln,
+	}
+
+	payload, err := r.Register(context.Background(), input)
+	if err != nil {
+		t.Fatalf("expected successful delivery partner registration, got err: %v", err)
+	}
+
+	if payload.Token != "test-access-token" {
+		t.Errorf("expected token 'test-access-token', got '%s'", payload.Token)
+	}
+	if payload.Role == nil || *payload.Role != model.RoleDeliveryPartner {
+		t.Errorf("expected role DELIVERY_PARTNER, got %v", payload.Role)
+	}
+
+	if deliveryMock.lastCreatePartnerReq == nil {
+		t.Fatalf("expected CreatePartnerProfile to be recorded in DeliveryService")
+	}
+	if deliveryMock.lastCreatePartnerReq.PartnerId != "user-uuid-123" {
+		t.Errorf("expected partnerId user-uuid-123, got %s", deliveryMock.lastCreatePartnerReq.PartnerId)
+	}
+	if deliveryMock.lastCreatePartnerReq.CompanyName != "" {
+		t.Errorf("expected empty companyName upon registration, got %s", deliveryMock.lastCreatePartnerReq.CompanyName)
+	}
+	if deliveryMock.lastCreatePartnerReq.Email != "deliverypartner@example.com" {
+		t.Errorf("expected email deliverypartner@example.com, got %s", deliveryMock.lastCreatePartnerReq.Email)
+	}
+}
+
+func TestRegisterResolver_DeliveryPartner_DeliveryClientUnavailable(t *testing.T) {
+	authMock := &mockAuthClient{}
+	userMock := &mockUserClient{}
+
+	// DeliveryClient is nil
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+		UserClient: userMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	fn := "Fast"
+	ln := "Logistics"
+	input := model.RegisterInput{
+		Email:     "deliverypartner@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleDeliveryPartner,
+		FirstName: &fn,
+		LastName:  &ln,
+	}
+
+	_, err := r.Register(context.Background(), input)
+	if err == nil {
+		t.Fatalf("expected error when delivery client is unavailable for delivery partner registration, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Errorf("expected ServiceUnavailable error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "delivery service unavailable") {
+		t.Errorf("expected 'delivery service unavailable' in error message, got: %s", err.Error())
+	}
+}
+
+func TestAuthResolvers_ClientUnavailable(t *testing.T) {
+	rNilClients := &mutationResolver{
+		Resolver: &Resolver{},
+	}
+
+	loginInput := model.LoginInput{
+		Email:    "test@example.com",
+		Password: "Password123!",
+		Role:     model.AuthRoleUser,
+	}
+
+	_, errLogin := rNilClients.Login(context.Background(), loginInput)
+	if errLogin == nil || !strings.Contains(errLogin.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil clients, got: %v", errLogin)
+	}
+
+	fn := "John"
+	registerInput := model.RegisterInput{
+		Email:     "test@example.com",
+		Password:  "Password123!",
+		Role:      model.AuthRoleUser,
+		FirstName: &fn,
+	}
+
+	_, errRegister := rNilClients.Register(context.Background(), registerInput)
+	if errRegister == nil || !strings.Contains(errRegister.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil clients, got: %v", errRegister)
+	}
+
+	rNilAuth := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{},
+		},
+	}
+
+	_, errLogin2 := rNilAuth.Login(context.Background(), loginInput)
+	if errLogin2 == nil || !strings.Contains(errLogin2.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil AuthClient, got: %v", errLogin2)
+	}
+
+	_, errRegister2 := rNilAuth.Register(context.Background(), registerInput)
+	if errRegister2 == nil || !strings.Contains(errRegister2.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil AuthClient, got: %v", errRegister2)
+	}
+
+	var rNilResolver *mutationResolver
+	_, errLogin3 := rNilResolver.Login(context.Background(), loginInput)
+	if errLogin3 == nil || !strings.Contains(errLogin3.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Login with nil resolver, got: %v", errLogin3)
+	}
+
+	_, errRegister3 := rNilResolver.Register(context.Background(), registerInput)
+	if errRegister3 == nil || !strings.Contains(errRegister3.Error(), "auth client unavailable") {
+		t.Errorf("expected 'auth client unavailable' error on Register with nil resolver, got: %v", errRegister3)
+	}
+}
+
+func TestVerifyEmail_Resolver(t *testing.T) {
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+		},
+	}
+
+	success, err := r.VerifyEmail(context.Background(), "user@example.com", "123456", model.AuthRoleMerchant)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !success {
+		t.Errorf("expected success to be true")
+	}
+	if authCli.lastVerifyEmailReq == nil {
+		t.Fatal("expected lastVerifyEmailReq to not be nil")
+	}
+	if authCli.lastVerifyEmailReq.Email != "user@example.com" {
+		t.Errorf("expected email 'user@example.com', got '%s'", authCli.lastVerifyEmailReq.Email)
+	}
+	if authCli.lastVerifyEmailReq.Otp != "123456" {
+		t.Errorf("expected otp '123456', got '%s'", authCli.lastVerifyEmailReq.Otp)
+	}
+	if authCli.lastVerifyEmailReq.Role != authpb.Role_MERCHANT {
+		t.Errorf("expected role MERCHANT, got %v", authCli.lastVerifyEmailReq.Role)
+	}
+}
+
+func TestResendVerificationEmail_Resolver(t *testing.T) {
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+		},
+	}
+
+	success, err := r.ResendVerificationEmail(context.Background(), "delivery@example.com", model.AuthRoleDeliveryPartner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !success {
+		t.Errorf("expected success to be true")
+	}
+	if authCli.lastResendReq == nil {
+		t.Fatal("expected lastResendReq to not be nil")
+	}
+	if authCli.lastResendReq.Email != "delivery@example.com" {
+		t.Errorf("expected email 'delivery@example.com', got '%s'", authCli.lastResendReq.Email)
+	}
+	if authCli.lastResendReq.Role != authpb.Role_DELIVERY_PARTNER {
+		t.Errorf("expected role DELIVERY_PARTNER, got %v", authCli.lastResendReq.Role)
+	}
+}
+

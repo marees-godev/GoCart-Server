@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -38,6 +40,7 @@ type SecurityConfig struct {
 
 type ServicesConfig struct {
 	MerchantServiceURL string
+	DeliveryServiceURL string
 }
 
 type AppConfig struct {
@@ -51,7 +54,8 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Port string
+	Port          string
+	ClientTimeout time.Duration
 }
 
 type DatabaseConfig struct {
@@ -122,7 +126,8 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "9451"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50051"),
+			Port:          GetEnv("GRPC_PORT", "50051"),
+			ClientTimeout: GetEnvAsDuration("GRPC_DEFAULT_TIMEOUT", 30*time.Second),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("AUTH_SERVICE_DATABASE_URL", ""),
@@ -171,8 +176,33 @@ func LoadEnv() *Config {
 		UserServiceAddr: GetEnv("USER_SERVICE_GRPC_ADDR", GetEnv("USER_SERVICE_ADDR", "localhost:50052")),
 		Services: ServicesConfig{
 			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),
+			DeliveryServiceURL: GetEnv("DELIVERY_SERVICE_GRPC_URL", "localhost:50061"),
 		},
 	}
+}
+
+// Validate validates critical configuration requirements.
+// In deployed environments (production, staging, etc.), JWT_SECRET must be configured
+// through environment variables or secret manager, and must not use insecure defaults.
+func (c *Config) Validate() error {
+	isDev := strings.EqualFold(c.App.Environment, "development") ||
+		strings.EqualFold(c.App.Environment, "dev") ||
+		strings.EqualFold(c.App.Environment, "local") ||
+		strings.EqualFold(c.App.Environment, "test")
+
+	secret := strings.TrimSpace(c.JWT.Secret)
+	if !isDev {
+		if secret == "" {
+			return errors.New("JWT_SECRET is required in deployed environment (" + c.App.Environment + ")")
+		}
+		if secret == "super-secret-key-change-in-production" ||
+			secret == "gocart-secret-key-change-in-production" ||
+			secret == "your-jwt-secret-key" ||
+			secret == "your-secret-key" {
+			return errors.New("JWT_SECRET must not use insecure default value in deployed environment (" + c.App.Environment + ")")
+		}
+	}
+	return nil
 }
 
 func GetEnv(key, defaultValue string) string {

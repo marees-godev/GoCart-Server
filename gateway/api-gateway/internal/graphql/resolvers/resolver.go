@@ -3,10 +3,21 @@ package resolvers
 import (
 	"context"
 
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 )
+
+func (r *Resolver) getUserClient() userpb.UserServiceClient {
+	if r.Clients != nil && r.Clients.UserClient != nil {
+		return r.Clients.UserClient
+	}
+	if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
+		return r.ClientMgr.UserClient
+	}
+	return nil
+}
 
 type Resolver struct {
 	Clients   *grpc.Clients

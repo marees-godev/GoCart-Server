@@ -126,6 +126,10 @@ func (r *mutationResolver) CreateInventory(ctx context.Context, input model.Crea
 	if input.VariantID != nil {
 		variantID = *input.VariantID
 	}
+	var warehouseID string
+	if input.WarehouseID != nil {
+		warehouseID = *input.WarehouseID
+	}
 	var sku string
 	if input.Sku != nil {
 		sku = *input.Sku
@@ -137,6 +141,7 @@ func (r *mutationResolver) CreateInventory(ctx context.Context, input model.Crea
 
 	res, err := r.Clients.InventoryClient.CreateInventory(ctx, &inventorypb.CreateInventoryRequest{
 		MerchantId:        merchantID,
+		WarehouseId:       warehouseID,
 		ProductId:         input.ProductID,
 		VariantId:         variantID,
 		Sku:               sku,
@@ -198,6 +203,93 @@ func (r *mutationResolver) RestockInventory(ctx context.Context, input model.Res
 	}, nil
 }
 
+// CreateWarehouse is the resolver for the createWarehouse field.
+func (r *mutationResolver) CreateWarehouse(ctx context.Context, input model.CreateWarehouseInput) (*model.Warehouse, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	partnerID, err := resolveDeliveryPartnerID(ctx, &input.DeliveryPartnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
+	res, err := r.Clients.InventoryClient.CreateWarehouse(ctx, &inventorypb.CreateWarehouseRequest{
+		DeliveryPartnerId: partnerID,
+		Name:              input.Name,
+		Code:              input.Code,
+		Street:            input.Street,
+		City:              input.City,
+		State:             input.State,
+		PostalCode:        input.PostalCode,
+		IsActive:          isActive,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelWarehouse(res.Warehouse), nil
+}
+
+// UpdateWarehouse is the resolver for the updateWarehouse field.
+func (r *mutationResolver) UpdateWarehouse(ctx context.Context, input model.UpdateWarehouseInput) (*model.Warehouse, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	partnerID, err := resolveDeliveryPartnerID(ctx, &input.DeliveryPartnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.Clients.InventoryClient.UpdateWarehouse(ctx, &inventorypb.UpdateWarehouseRequest{
+		DeliveryPartnerId: partnerID,
+		Id:                input.ID,
+		Name:              input.Name,
+		Code:              input.Code,
+		Street:            input.Street,
+		City:              input.City,
+		State:             input.State,
+		PostalCode:        input.PostalCode,
+		IsActive:          input.IsActive,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelWarehouse(res.Warehouse), nil
+}
+
+// DeleteWarehouse is the resolver for the deleteWarehouse field.
+func (r *mutationResolver) DeleteWarehouse(ctx context.Context, id string, deliveryPartnerID *string) (*model.DeleteWarehouseResponse, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	partnerID, err := resolveDeliveryPartnerID(ctx, deliveryPartnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.Clients.InventoryClient.DeleteWarehouse(ctx, &inventorypb.DeleteWarehouseRequest{
+		DeliveryPartnerId: partnerID,
+		Id:                id,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteWarehouseResponse{
+		Success: res.Success,
+		Message: res.Message,
+	}, nil
+}
+
 // Stock is the resolver for the stock field.
 func (r *queryResolver) Stock(ctx context.Context, productID string) (*model.StockItem, error) {
 	if r.Clients == nil || r.Clients.InventoryClient == nil {
@@ -223,7 +315,7 @@ func (r *queryResolver) Stock(ctx context.Context, productID string) (*model.Sto
 }
 
 // Inventory is the resolver for the inventory field.
-func (r *queryResolver) Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string) (*model.InventoryItem, error) {
+func (r *queryResolver) Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string, warehouseID *string) (*model.InventoryItem, error) {
 	if r.Clients == nil || r.Clients.InventoryClient == nil {
 		return nil, appErrors.Internal(nil, "inventory service client unavailable")
 	}
@@ -234,7 +326,7 @@ func (r *queryResolver) Inventory(ctx context.Context, productID *string, varian
 		merchantID = userCtx.UserID
 	}
 
-	var pID, vID, iID string
+	var pID, vID, iID, wID string
 	if productID != nil {
 		pID = *productID
 	}
@@ -244,11 +336,15 @@ func (r *queryResolver) Inventory(ctx context.Context, productID *string, varian
 	if inventoryID != nil {
 		iID = *inventoryID
 	}
+	if warehouseID != nil {
+		wID = *warehouseID
+	}
 
 	res, err := r.Clients.InventoryClient.GetInventory(ctx, &inventorypb.GetInventoryRequest{
 		ProductId:   pID,
 		VariantId:   vID,
 		InventoryId: iID,
+		WarehouseId: wID,
 		MerchantId:  merchantID,
 	})
 	if err != nil {
@@ -256,4 +352,51 @@ func (r *queryResolver) Inventory(ctx context.Context, productID *string, varian
 	}
 
 	return mapInventoryItem(res.Inventory), nil
+}
+
+// Warehouse is the resolver for the warehouse field.
+func (r *queryResolver) Warehouse(ctx context.Context, id string, deliveryPartnerID *string) (*model.Warehouse, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	partnerID, err := resolveDeliveryPartnerID(ctx, deliveryPartnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.Clients.InventoryClient.GetWarehouse(ctx, &inventorypb.GetWarehouseRequest{
+		DeliveryPartnerId: partnerID,
+		Id:                id,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelWarehouse(res.Warehouse), nil
+}
+
+// MyWarehouses is the resolver for the myWarehouses field.
+func (r *queryResolver) MyWarehouses(ctx context.Context, deliveryPartnerID *string) ([]*model.Warehouse, error) {
+	if r.Clients == nil || r.Clients.InventoryClient == nil {
+		return nil, appErrors.Internal(nil, "inventory service client unavailable")
+	}
+
+	partnerID, err := resolveDeliveryPartnerID(ctx, deliveryPartnerID)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.Clients.InventoryClient.ListWarehouses(ctx, &inventorypb.ListWarehousesRequest{
+		DeliveryPartnerId: partnerID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := make([]*model.Warehouse, len(res.Warehouses))
+	for i, w := range res.Warehouses {
+		result[i] = toModelWarehouse(w)
+	}
+	return result, nil
 }

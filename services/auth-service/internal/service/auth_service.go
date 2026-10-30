@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	pkgotp "github.com/marees-godev/GoCart-Server/pkg/otp"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/redis"
@@ -37,6 +40,10 @@ const (
 	RefreshTokenTTL        = 7 * 24 * time.Hour
 	dummyBcryptHash        = "$2a$10$e8N7z.0O2w9tP/V1O8m1o.7Hq6G3V3HkX/N1.1.1.1.1.1.1.1"
 )
+
+type EventPublisher interface {
+	Publish(ctx context.Context, topic string, eventType string, aggregateID string, data any) error
+}
 
 type AuthService interface {
 	Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error)
@@ -61,6 +68,9 @@ type authService struct {
 	logger         *slog.Logger
 	userClient     userpb.UserServiceClient
 	merchantClient merchantpb.MerchantServiceClient
+	deliveryClient deliverypb.DeliveryServiceClient
+	eventPublisher EventPublisher
+	kafkaProducer  *kafka.Producer
 }
 
 func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger, clients ...any) AuthService {
@@ -90,6 +100,8 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 			s.userClient = client
 		case merchantpb.MerchantServiceClient:
 			s.merchantClient = client
+		case deliverypb.DeliveryServiceClient:
+			s.deliveryClient = client
 		case otp.Store:
 			s.otpStore = client
 		case otp.PasswordResetStore:
@@ -100,6 +112,10 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 				s.otpStore = otp.NewRedisStore(client)
 				s.resetStore = otp.NewRedisPasswordResetStore(client)
 			}
+		case EventPublisher:
+			s.eventPublisher = client
+		case *kafka.Producer:
+			s.kafkaProducer = client
 		}
 	}
 	if s.otpStore == nil {
@@ -148,8 +164,10 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	}
 
 	email := cleanEmail(req.Email)
-	role := model.RoleCustomer
-	if req.IsMerchant {
+	role := model.RoleUser
+	if req.Role != "" {
+		role = model.NormalizeRole(req.Role)
+	} else if req.IsMerchant {
 		role = model.RoleMerchant
 	}
 
@@ -209,7 +227,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, appErrors.Forbidden("email is not verified, please verify your email first and then login")
 	}
 
-	if cred.Role != "" && cred.Role != role {
+	if cred.Role != "" && model.NormalizeRole(cred.Role.String()) != role {
 		s.logger.Warn("Login attempt failed: role mismatch", "user_id", cred.UserID.String(), "email", cred.Email, "role", cred.Role.String(), "expected_role", role.String())
 		return nil, appErrors.Unauthorized("Invalid email or password")
 	}
@@ -278,7 +296,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		mClient := s.merchantClient
 		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
 			var err error
-			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 30*time.Second)
 			if err == nil {
 				s.merchantClient = mClient
 			}
@@ -314,10 +332,25 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	}
 	accessTTL := time.Duration(ttlMinutes) * time.Minute
 
+	var partnerID, customerID string
+	switch role {
+	case model.RoleDeliveryPartner:
+		partnerID = cred.UserID.String()
+	case model.RoleMerchant:
+		if merchantID == "" {
+			merchantID = cred.UserID.String()
+		}
+	case model.RoleUser:
+		customerID = cred.UserID.String()
+	}
+
 	accessToken, err := auth.GenerateToken(auth.UserContext{
-		UserID: cred.UserID.String(),
-		Role:   cred.Role.String(),
-		Email:  cred.Email,
+		UserID:     cred.UserID.String(),
+		Role:       cred.Role.String(),
+		Email:      cred.Email,
+		PartnerID:  partnerID,
+		MerchantID: merchantID,
+		CustomerID: customerID,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
 		s.logger.Error("Login failed: access token generation error", "user_id", cred.UserID.String(), "error", err)
@@ -367,6 +400,8 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		UserID:        cred.UserID.String(),
 		Role:          cred.Role.String(),
 		MerchantID:    merchantID,
+		PartnerID:     partnerID,
+		CustomerID:    customerID,
 		BusinessEmail: businessEmail,
 		FirstName:     firstName,
 		LastName:      lastName,
@@ -379,9 +414,26 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	}
 
 	email := cleanEmail(req.Email)
-	role := model.RoleCustomer
-	if req.IsMerchant {
+	role := model.RoleUser
+	if req.Role != "" {
+		role = model.NormalizeRole(req.Role)
+	} else if req.IsMerchant {
 		role = model.RoleMerchant
+	}
+
+	firstName := req.FirstName
+	lastName := req.LastName
+	if firstName == "" && lastName == "" && req.Name != "" {
+		parts := strings.SplitN(strings.TrimSpace(req.Name), " ", 2)
+		firstName = parts[0]
+		if len(parts) > 1 {
+			lastName = parts[1]
+		}
+	}
+	var phone *string
+	if req.ContactNumber != "" {
+		p := strings.TrimSpace(req.ContactNumber)
+		phone = &p
 	}
 
 	existing, err := s.repo.GetByEmailAndRole(ctx, email, role)
@@ -402,13 +454,14 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		ID:            credID,
 		UserID:        userID,
 		Email:         email,
+		Phone:         phone,
 		PasswordHash:  string(hashedPassword),
 		Role:          role,
 		EmailVerified: false,
 		IsActive:      true,
 	}
 
-	if s.userClient == nil {
+	if role == model.RoleUser && s.userClient == nil {
 		s.logger.Error("Registration failed: user service client is not available")
 		return nil, appErrors.ServiceUnavailable("user service unavailable")
 	}
@@ -426,7 +479,8 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 		otpHash := hashToken(rawOTP)
 		ttl := time.Duration(ttlMinutes) * time.Minute
-		if err := s.otpStore.SetOTP(ctx, email, otpHash, ttl); err == nil {
+		otpKey := emailVerificationKey(email, role)
+		if err := s.otpStore.SetOTP(ctx, otpKey, otpHash, ttl); err == nil {
 			go func(toEmail, otp string) {
 				_ = s.mailer.SendVerificationEmail(context.Background(), toEmail, otp)
 			}(email, rawOTP)
@@ -437,11 +491,18 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	var merchantID string
 	var businessEmail string
-	if role == model.RoleMerchant {
+	var partnerID string
+	var customerID string
+	var eventType string
+	var topic string
+	var eventPayload []byte
+
+	switch role {
+	case model.RoleMerchant:
 		mClient := s.merchantClient
 		if mClient == nil && s.cfg != nil && s.cfg.Services.MerchantServiceURL != "" {
 			var err error
-			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 5*time.Second)
+			mClient, _, err = grpcclient.NewMerchantClient(s.cfg.Services.MerchantServiceURL, 30*time.Second)
 			if err != nil {
 				s.logger.Error("Failed to connect to merchant service", "error", err)
 				_ = s.repo.DeleteCredential(ctx, credID)
@@ -463,8 +524,8 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 			createReq := &merchantpb.CreateMerchantRequest{
 				Id:            userID.String(),
-				FirstName:     req.FirstName,
-				LastName:      req.LastName,
+				FirstName:     firstName,
+				LastName:      lastName,
 				BusinessEmail: req.Email,
 			}
 
@@ -479,26 +540,101 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 				businessEmail = mResp.Merchant.BusinessEmail
 			}
 		}
-	} else {
-		_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-			Id:        userID.String(),
-			Email:     cred.Email,
-			FirstName: req.FirstName,
-			LastName:  req.LastName,
-		})
-		if err != nil {
-			_ = s.repo.DeleteCredential(ctx, credID)
-			if st, ok := status.FromError(err); ok {
-				switch st.Code() {
-				case codes.AlreadyExists:
-					return nil, appErrors.Conflict("user with this email already exists")
-				case codes.InvalidArgument:
-					return nil, appErrors.BadRequest(st.Message())
-				}
-			}
-			return nil, appErrors.Internal(err, "failed to create user record in user service")
+
+		if merchantID == "" {
+			merchantID = userID.String()
 		}
+		eventType = "MerchantRegistered"
+		topic = "auth.merchant.registered"
+		eventPayload, _ = json.Marshal(map[string]any{
+			"merchant_id":   merchantID,
+			"user_id":       userID.String(),
+			"email":         cred.Email,
+			"role":          cred.Role.String(),
+			"registered_at": time.Now().UTC(),
+		})
+
+	case model.RoleDeliveryPartner:
+		partnerID = userID.String()
+		companyName := ""
+		contactNumber := req.ContactNumber
+		if contactNumber == "" && cred.Phone != nil {
+			contactNumber = *cred.Phone
+		}
+
+		dClient := s.deliveryClient
+		if dClient == nil && s.cfg != nil && s.cfg.Services.DeliveryServiceURL != "" {
+			if c, _, err := grpcclient.NewDeliveryClient(s.cfg.Services.DeliveryServiceURL, 30*time.Second); err == nil {
+				s.deliveryClient = c
+				dClient = c
+			}
+		}
+		if dClient != nil {
+			_, err := dClient.CreatePartnerProfile(ctx, &deliverypb.CreatePartnerProfileRequest{
+				PartnerId:     partnerID,
+				CompanyName:   companyName,
+				Email:         cred.Email,
+				ContactNumber: contactNumber,
+			})
+			if err != nil {
+				s.logger.Warn("Failed to create delivery partner profile via gRPC", "partner_id", partnerID, "error", err)
+			}
+		}
+
+		partnerEvt := events.PartnerRegisteredEvent{
+			PartnerID:     partnerID,
+			CompanyName:   companyName,
+			Email:         cred.Email,
+			ContactNumber: contactNumber,
+		}
+		eventPayload, _ = json.Marshal(partnerEvt)
+		eventType = events.EventTypePartnerRegistered
+		topic = events.TopicPartnerRegistered
+
+		// Publish to Kafka message broker if available
+		if s.kafkaProducer != nil {
+			if env, err := events.NewEventEnvelopeWithAggregate(events.EventTypePartnerRegistered, "auth-service", partnerID, partnerEvt); err == nil {
+				_ = s.kafkaProducer.Publish(ctx, topic, partnerID, env)
+			}
+		}
+		if s.eventPublisher != nil {
+			_ = s.eventPublisher.Publish(ctx, topic, eventType, partnerID, partnerEvt)
+		}
+
+	default: // RoleUser / CUSTOMER
+		if s.userClient != nil {
+			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+				Id:        userID.String(),
+				Email:     cred.Email,
+				FirstName: firstName,
+				LastName:  lastName,
+			})
+			if err != nil {
+				_ = s.repo.DeleteCredential(ctx, credID)
+				if st, ok := status.FromError(err); ok {
+					switch st.Code() {
+					case codes.AlreadyExists:
+						return nil, appErrors.Conflict("user with this email already exists")
+					case codes.InvalidArgument:
+						return nil, appErrors.BadRequest(st.Message())
+					}
+				}
+				return nil, appErrors.Internal(err, "failed to create user record in user service")
+			}
+		}
+
+		customerID = userID.String()
+		eventType = "UserRegistered"
+		topic = "auth.user.registered"
+		eventPayload, _ = json.Marshal(map[string]any{
+			"customer_id":   customerID,
+			"user_id":       userID.String(),
+			"email":         cred.Email,
+			"role":          cred.Role.String(),
+			"registered_at": time.Now().UTC(),
+		})
 	}
+
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
 	if ttlMinutes <= 0 {
 		ttlMinutes = 15
@@ -506,9 +642,12 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	accessTTL := time.Duration(ttlMinutes) * time.Minute
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
-		UserID: userID.String(),
-		Role:   cred.Role.String(),
-		Email:  cred.Email,
+		UserID:     userID.String(),
+		Role:       cred.Role.String(),
+		Email:      cred.Email,
+		PartnerID:  partnerID,
+		MerchantID: merchantID,
+		CustomerID: customerID,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
 		s.logger.Error("Registration failed: generate token error", "user_id", userID.String(), "error", err)
@@ -528,20 +667,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		TokenHash: tokenHash,
 		ExpiresAt: time.Now().Add(RefreshTokenTTL),
 		Revoked:   false,
-	}
-
-	eventPayload, _ := json.Marshal(map[string]any{
-		"user_id":       userID.String(),
-		"email":         cred.Email,
-		"role":          cred.Role.String(),
-		"registered_at": time.Now().UTC(),
-	})
-
-	eventType := "UserRegistered"
-	topic := "auth.user.registered"
-	if role == model.RoleMerchant {
-		eventType = "MerchantRegistered"
-		topic = "auth.merchant.registered"
 	}
 
 	outboxEvt := &outbox.Event{
@@ -565,9 +690,11 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		UserID:        userID.String(),
 		Role:          cred.Role.String(),
 		MerchantID:    merchantID,
+		PartnerID:     partnerID,
+		CustomerID:    customerID,
 		BusinessEmail: businessEmail,
-		FirstName:     req.FirstName,
-		LastName:      req.LastName,
+		FirstName:     firstName,
+		LastName:      lastName,
 	}, nil
 }
 
@@ -661,10 +788,24 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	}
 	accessTTL := time.Duration(ttlMinutes) * time.Minute
 
+	role := model.NormalizeRole(cred.Role.String())
+	var partnerID, merchantID, customerID string
+	switch role {
+	case model.RoleDeliveryPartner:
+		partnerID = cred.UserID.String()
+	case model.RoleMerchant:
+		merchantID = cred.UserID.String()
+	case model.RoleUser:
+		customerID = cred.UserID.String()
+	}
+
 	accessToken, err := auth.GenerateToken(auth.UserContext{
-		UserID: cred.UserID.String(),
-		Email:  cred.Email,
-		Role:   cred.Role.String(),
+		UserID:     cred.UserID.String(),
+		Email:      cred.Email,
+		Role:       cred.Role.String(),
+		PartnerID:  partnerID,
+		MerchantID: merchantID,
+		CustomerID: customerID,
 	}, s.cfg.JWT.Secret, accessTTL)
 	if err != nil {
 		s.logger.Error("Refresh token failed: generate access token error", "user_id", cred.UserID.String(), "error", err)
@@ -698,6 +839,9 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		ExpiresIn:    int(accessTTL.Seconds()),
 		UserID:       cred.UserID.String(),
 		Role:         cred.Role.String(),
+		PartnerID:    partnerID,
+		MerchantID:   merchantID,
+		CustomerID:   customerID,
 	}, nil
 }
 
@@ -718,10 +862,22 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		return nil, appErrors.BadRequest("email is required")
 	}
 
-	cred, err := s.repo.GetByEmail(ctx, email)
+	var cred *model.AuthCredential
+	var err error
+	var otpKey string
+
+	if req.Role != "" {
+		role := model.NormalizeRole(req.Role)
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		otpKey = emailVerificationKey(email, role)
+	} else {
+		cred, err = s.repo.GetByEmail(ctx, email)
+		otpKey = email
+	}
+
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Verify email failed: user not found", "email", email)
+			s.logger.Warn("Verify email failed: user not found", "email", email, "role", req.Role)
 			return nil, appErrors.NotFound("user not found")
 		}
 		s.logger.Error("Verify email failed: database query error", "error", err)
@@ -735,9 +891,9 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 		}, nil
 	}
 
-	storedHash, err := s.otpStore.GetOTP(ctx, email)
+	storedHash, err := s.otpStore.GetOTP(ctx, otpKey)
 	if err != nil {
-		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email)
+		s.logger.Warn("Verify email failed: OTP expired or not found", "email", email, "role", req.Role)
 		return nil, appErrors.BadRequest("verification code has expired or is invalid")
 	}
 
@@ -747,14 +903,14 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 	}
 
 	// Delete from Redis so OTP cannot be reused
-	_ = s.otpStore.DeleteOTP(ctx, email)
+	_ = s.otpStore.DeleteOTP(ctx, otpKey)
 
 	// Update user in PostgreSQL
 	if err := s.repo.MarkEmailVerified(ctx, cred.UserID); err != nil {
 		return nil, appErrors.Internal(err, "failed to update email verification status")
 	}
 
-	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email)
+	s.logger.Info("Email verified successfully with OTP", "user_id", cred.UserID.String(), "email", email, "role", cred.Role)
 	return &dto.VerifyEmailResponse{
 		Success: true,
 		Message: "Email address verified successfully",
@@ -768,18 +924,30 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	}
 
 	email := cleanEmail(req.Email)
-	cred, err := s.repo.GetByEmail(ctx, email)
+	var cred *model.AuthCredential
+	var err error
+	var otpKey string
+
+	if req.Role != "" {
+		role := model.NormalizeRole(req.Role)
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		otpKey = emailVerificationKey(email, role)
+	} else {
+		cred, err = s.repo.GetByEmail(ctx, email)
+		otpKey = email
+	}
+
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
-			s.logger.Warn("Resend verification email failed: user not found", "email", email)
+			s.logger.Warn("Resend verification email failed: user not found", "email", email, "role", req.Role)
 			return nil, appErrors.NotFound("user not found")
 		}
 		return nil, appErrors.Internal(err, "failed to query user credentials")
 	}
 
 	if cred.EmailVerified {
-		s.logger.Warn("Resend verification email failed: email already verified", "email", email)
-		return nil, appErrors.BadRequest("email is already verified")
+		s.logger.Warn("Resend verification email failed: email already verified", "email", email, "role", cred.Role)
+		return nil, appErrors.Conflict("email is already verified")
 	}
 
 	ttlMinutes := s.cfg.Email.TokenTTLMinutes
@@ -795,7 +963,9 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	cooldown := time.Duration(cooldownSec) * time.Second
 
 	// Enforce minimum cooldown period by checking remaining TTL in store before issuing a new OTP
-	if remainingTTL, err := s.otpStore.GetTTL(ctx, email); err == nil && remainingTTL > 0 {
+	remainingTTL, err := s.otpStore.GetTTL(ctx, otpKey)
+
+	if err == nil && remainingTTL > 0 {
 		timeElapsed := totalTTL - remainingTTL
 		if timeElapsed < cooldown {
 			waitSec := int((cooldown - timeElapsed + time.Second - 1) / time.Second)
@@ -804,6 +974,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 			}
 			s.logger.Warn("Resend verification email rate limited: cooldown active",
 				"email", email,
+				"role", cred.Role,
 				"wait_seconds", waitSec,
 			)
 			return nil, appErrors.TooManyRequests(fmt.Sprintf("please wait %d seconds before requesting a new verification code", waitSec))
@@ -818,7 +989,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, req *dto.Rese
 	}
 
 	otpHash := hashToken(rawOTP)
-	if err := s.otpStore.SetOTP(ctx, email, otpHash, totalTTL); err != nil {
+	if err := s.otpStore.SetOTP(ctx, otpKey, otpHash, totalTTL); err != nil {
 		return nil, appErrors.Internal(err, "failed to store verification OTP in store")
 	}
 
@@ -898,6 +1069,15 @@ func cleanEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+func emailVerificationKey(email string, role model.Role) string {
+	normalizedRole := model.NormalizeRole(role.String())
+	r := strings.ToLower(strings.TrimSpace(normalizedRole.String()))
+	if r == "" {
+		return cleanEmail(email)
+	}
+	return fmt.Sprintf("%s:%s", cleanEmail(email), r)
+}
+
 func generateOTP() (string, error) {
 	return pkgotp.GenerateNumeric(6)
 }
@@ -924,8 +1104,10 @@ func (s *authService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 	email := cleanEmail(req.Email)
 	clientIP := strings.TrimSpace(req.ClientIP)
 
-	role := model.RoleCustomer
-	if req.IsMerchant {
+	role := model.RoleUser
+	if req.Role != "" {
+		role = model.NormalizeRole(req.Role)
+	} else if req.IsMerchant {
 		role = model.RoleMerchant
 	}
 	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))
@@ -1031,8 +1213,10 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 		return nil, appErrors.BadRequest("new password is required")
 	}
 
-	role := model.RoleCustomer
-	if req.IsMerchant {
+	role := model.RoleUser
+	if req.Role != "" {
+		role = model.NormalizeRole(req.Role)
+	} else if req.IsMerchant {
 		role = model.RoleMerchant
 	}
 	accountKey := fmt.Sprintf("%s:%s", email, strings.ToLower(role.String()))

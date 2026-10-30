@@ -26,17 +26,31 @@ type InventoryService interface {
 	CommitStock(ctx context.Context, input dto.CommitStockInput) error
 	ReleaseExpiredReservations(ctx context.Context) (int, error)
 	StartExpirationWorker(ctx context.Context, interval time.Duration)
+
+	// Warehouse Management
+	CreateWarehouse(ctx context.Context, partnerID string, req *dto.CreateWarehouseRequest) (*model.Warehouse, error)
+	UpdateWarehouse(ctx context.Context, partnerID string, warehouseID string, req *dto.UpdateWarehouseRequest) (*model.Warehouse, error)
+	DeleteWarehouse(ctx context.Context, partnerID string, warehouseID string) error
+	GetWarehouseByID(ctx context.Context, partnerID string, warehouseID string) (*model.Warehouse, error)
+	GetPartnerWarehouses(ctx context.Context, partnerID string) ([]*model.Warehouse, error)
+	GetAvailableWarehouses(ctx context.Context) ([]*model.Warehouse, error)
 }
 
 type inventoryService struct {
 	repo          repository.InventoryRepository
 	productClient client.ProductClient
+	whRepo        repository.WarehouseRepository
 }
 
-func NewInventoryService(repo repository.InventoryRepository, productClient client.ProductClient) InventoryService {
+func NewInventoryService(repo repository.InventoryRepository, productClient client.ProductClient, whRepo ...repository.WarehouseRepository) InventoryService {
+	var warehouseRepo repository.WarehouseRepository
+	if len(whRepo) > 0 {
+		warehouseRepo = whRepo[0]
+	}
 	return &inventoryService{
 		repo:          repo,
 		productClient: productClient,
+		whRepo:        warehouseRepo,
 	}
 }
 
@@ -101,7 +115,17 @@ func (s *inventoryService) CreateInventory(ctx context.Context, input dto.Create
 		threshold = 5
 	}
 
+	var warehouseID *string
+	if input.WarehouseID != nil && strings.TrimSpace(*input.WarehouseID) != "" {
+		cleanedWH := strings.TrimSpace(*input.WarehouseID)
+		if !isValidUUID(cleanedWH) {
+			return nil, appErrors.BadRequest("invalid warehouse id: must be a valid UUID")
+		}
+		warehouseID = &cleanedWH
+	}
+
 	inv := &model.Inventory{
+		WarehouseID:       warehouseID,
 		ProductID:         input.ProductID,
 		VariantID:         variantID,
 		SKU:               sku,

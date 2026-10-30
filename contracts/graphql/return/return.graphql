@@ -1,25 +1,188 @@
+enum ReturnStatus {
+  RETURN_REQUESTED
+  REQUESTED
+  REPLACEMENT_REQUESTED
+  EXCHANGE_REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  RECEIVED
+  ITEM_RECEIVED
+  VERIFIED
+  REFUND_INITIATED
+  REPLACEMENT_INITIATED
+  EXCHANGE_INITIATED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReturnType {
+  RETURN
+  REPLACEMENT
+  EXCHANGE
+}
+
+enum VerificationCondition {
+  GOOD
+  DEFECTIVE
+  DAMAGED
+  WRONG_ITEM
+  OPEN_BOX
+}
+
+type ProductVerification {
+  id: ID!
+  returnId: ID!
+  verifiedBy: String!
+  condition: String!
+  isApproved: Boolean!
+  proofImages: [String!]
+  notes: String
+  verifiedAt: String!
+  createdAt: String
+  updatedAt: String
+}
+
 type ReturnOrder {
   id: ID!
   orderId: String!
+  orderItemId: String
   userId: String!
   reason: String!
   status: String!
+  type: String!
   refundAmount: Float!
+  verification: ProductVerification
+  requestedAt: String
+  approvedAt: String
+  completedAt: String
+  rejectionReason: String
   createdAt: String
+  updatedAt: String
 }
 
 input RequestReturnInput {
   orderId: String!
-  userId: String!
+  userId: String
+  orderItemId: String
+  itemId: String
   reason: String!
-  itemIds: [String!]!
+  type: ReturnType
+}
+
+input RequestReplacementInput {
+  orderId: String!
+  userId: String
+  orderItemId: String
+  itemId: String
+  reason: String!
+}
+
+input VerifyProductInput {
+  returnId: ID!
+  condition: String!
+  isApproved: Boolean!
+  proofImages: [String!]
+  imagesUpload: [Upload!]
+  notes: String
+}
+
+type ExchangeQuestionAnswer {
+  id: ID!
+  exchangeId: ID!
+  questionKey: String!
+  answerValue: String!
+  deductionAmount: Float!
+  createdAt: String
+}
+
+type ExchangeVerification {
+  id: ID!
+  exchangeId: ID!
+  verifiedBy: String!
+  conditionRating: String!
+  isApproved: Boolean!
+  screenIntact: Boolean!
+  bodyIntact: Boolean!
+  functional: Boolean!
+  serialMatches: Boolean!
+  adjustedDiscount: Float!
+  proofImages: [String!]
+  notes: String
+  verifiedAt: String!
+  createdAt: String
+  updatedAt: String
+}
+
+type Exchange {
+  id: ID!
+  orderId: String!
+  orderItemId: String!
+  userId: String!
+  newProductId: String!
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  baseExchangeValue: Float!
+  estimatedDiscount: Float!
+  finalDiscount: Float
+  priceDifference: Float
+  status: String!
+  answers: [ExchangeQuestionAnswer!]
+  verification: ExchangeVerification
+  createdAt: String
+  updatedAt: String
+}
+
+input ExchangeQuestionAnswerInput {
+  questionKey: String!
+  answerValue: String!
+  deductionAmount: Float
+}
+
+input CreateExchangeInput {
+  orderId: String!
+  userId: String
+  orderItemId: String!
+  newProductId: String!
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  baseExchangeValue: Float!
+  answers: [ExchangeQuestionAnswerInput!]
+}
+
+input VerifyExchangeProductInput {
+  exchangeId: ID!
+  conditionRating: String!
+  isApproved: Boolean!
+  screenIntact: Boolean!
+  bodyIntact: Boolean!
+  functional: Boolean!
+  serialMatches: Boolean!
+  adjustedDiscount: Float
+  notes: String
 }
 
 extend type Query {
   returnOrder(id: ID!): ReturnOrder @auth
+  returnOrdersByOrder(orderId: String!): [ReturnOrder!]! @auth
+  listReturns(limit: Int, offset: Int, status: String): [ReturnOrder!]! @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
+  exchange(id: ID!): Exchange @auth
 }
 
 extend type Mutation {
   requestReturn(input: RequestReturnInput!): ReturnOrder @auth
-  updateReturnStatus(id: ID!, status: String!): ReturnOrder @auth(requires: [ADMIN, MERCHANT])
+  requestReplacement(input: RequestReplacementInput!): ReturnOrder @auth
+  verifyProduct(input: VerifyProductInput!): ReturnOrder @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  updateReturnStatus(id: ID!, status: String!, rejectionReason: String): ReturnOrder @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
+  approveReturn(id: ID!): ReturnOrder @auth(requires: [ADMIN])
+  rejectReturn(id: ID!, reason: String!): ReturnOrder @auth(requires: [ADMIN])
+  createExchange(input: CreateExchangeInput!): Exchange @auth
+  verifyExchangeProduct(input: VerifyExchangeProductInput!): Exchange @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
+

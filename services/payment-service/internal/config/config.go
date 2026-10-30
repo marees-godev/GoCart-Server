@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -17,10 +19,22 @@ type Config struct {
 	Gateway  GatewayConfig
 	Services ServicesConfig
 	Kafka    KafkaConfig
+	Outbox   OutboxConfig
 }
 
 type KafkaConfig struct {
 	Brokers []string
+	Enabled bool
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 type AppConfig struct {
@@ -85,7 +99,7 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "8888"),
 		},
 		GRPC: GRPCConfig{
-			Port: GetEnv("GRPC_PORT", "50055"),
+			Port: GetEnv("GRPC_PORT", "50060"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("PAYMENT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
@@ -112,10 +126,20 @@ func LoadEnv() *Config {
 			Timeout:               GetEnvAsInt("PAYMENT_GATEWAY_TIMEOUT_SECONDS", 10),
 		},
 		Services: ServicesConfig{
-			OrderServiceURL: GetEnv("ORDER_SERVICE_URL", "localhost:50054"),
+			OrderServiceURL: GetEnv("ORDER_SERVICE_URL", "localhost:50059"),
 		},
 		Kafka: KafkaConfig{
-			Brokers: []string{GetEnv("KAFKA_BROKERS", "localhost:9092")},
+			Brokers: strings.Split(GetEnv("KAFKA_BROKERS", "localhost:9092"), ","),
+			Enabled: GetEnvAsBool("KAFKA_ENABLED", true),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   time.Duration(GetEnvAsInt("OUTBOX_POLL_INTERVAL_MS", 2000)) * time.Millisecond,
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 1000)) * time.Millisecond,
+			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.payment.dlq"),
 		},
 	}
 }

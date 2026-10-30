@@ -6,22 +6,305 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"strings"
 
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // CreateDelivery is the resolver for the createDelivery field.
 func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: CreateDelivery - createDelivery"))
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	orderID := strings.TrimSpace(input.OrderID)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("orderId is required")
+	}
+
+	partnerID := strings.TrimSpace(input.DeliveryPartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("deliveryPartnerId is required")
+	}
+
+	var partnerName string
+	profileResp, err := r.Clients.DeliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+		PartnerId: partnerID,
+	})
+	if err == nil && profileResp != nil && profileResp.Profile != nil && strings.TrimSpace(profileResp.Profile.CompanyName) != "" {
+		partnerName = strings.TrimSpace(profileResp.Profile.CompanyName)
+	} else {
+		partnerName = partnerID
+	}
+
+	shippingAddressID := strings.TrimSpace(input.ShippingAddressID)
+
+	var contactNum string
+	if input.ContactNumber != nil {
+		contactNum = strings.TrimSpace(*input.ContactNumber)
+	}
+
+	var shippingAddr string
+
+	orderClient, oErr := r.getOrderClient()
+	var ord *orderpb.Order
+	if oErr == nil && orderClient != nil {
+		orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
+		if err == nil && orderResp != nil && orderResp.Order != nil {
+			ord = orderResp.Order
+			if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
+				shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
+			}
+		}
+	}
+
+	if shippingAddressID == "" && (ord == nil || strings.TrimSpace(ord.ShippingAddress) == "") {
+		return nil, appErrors.BadRequest("shippingAddressId is required")
+	}
+
+	userClient := r.getUserClient()
+	if userClient != nil {
+		customerID := ""
+		if ord != nil && strings.TrimSpace(ord.UserId) != "" {
+			customerID = ord.UserId
+		}
+		if customerID == "" {
+			customerID = authID
+		}
+
+		addrResp, addrErr := userClient.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+			UserId:    customerID,
+			AddressId: shippingAddressID,
+		})
+		if addrErr == nil && addrResp != nil && addrResp.Address != nil {
+			ua := addrResp.Address
+			if ua.City != "" || ua.State != "" {
+				addrMap := map[string]string{
+					"street":      ua.AddressLine,
+					"city":        ua.City,
+					"state":       ua.State,
+					"postal_code": ua.PostalCode,
+					"country":     ua.Country,
+				}
+				if bytes, mErr := json.Marshal(addrMap); mErr == nil {
+					shippingAddr = string(bytes)
+				}
+			} else {
+				shippingAddr = strings.TrimSpace(ua.AddressLine)
+			}
+			if contactNum == "" && strings.TrimSpace(ua.PhoneNumber) != "" {
+				contactNum = strings.TrimSpace(ua.PhoneNumber)
+			}
+		}
+	}
+
+	if shippingAddr == "" && ord != nil && strings.TrimSpace(ord.ShippingAddress) != "" {
+		shippingAddr = strings.TrimSpace(ord.ShippingAddress)
+	}
+
+	if contactNum == "" && ord != nil {
+		if strings.TrimSpace(ord.ShippingAddress) != "" {
+			var rawMap map[string]interface{}
+			if err := json.Unmarshal([]byte(ord.ShippingAddress), &rawMap); err == nil {
+				for _, k := range []string{"contact_number", "contactNumber", "phone_number", "phoneNumber", "phone"} {
+					if v, ok := rawMap[k].(string); ok && strings.TrimSpace(v) != "" {
+						contactNum = strings.TrimSpace(v)
+						break
+					}
+				}
+			}
+		}
+		if contactNum == "" && ord.UserId != "" && userClient != nil {
+			uResp, uErr := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: ord.UserId})
+			if uErr == nil && uResp != nil && uResp.User != nil && strings.TrimSpace(uResp.User.Phone) != "" {
+				contactNum = strings.TrimSpace(uResp.User.Phone)
+			}
+		}
+	}
+
+	if shippingAddr == "" {
+		return nil, appErrors.BadRequest("shippingAddress is required and could not be resolved from order")
+	}
+	if contactNum == "" {
+		return nil, appErrors.BadRequest("contactNumber is required and could not be resolved from customer profile")
+	}
+
+	req := &deliverypb.CreateDeliveryRequest{
+		OrderId:         orderID,
+		DeliveryPartner: partnerName,
+		ShippingAddress: shippingAddr,
+		ContactNumber:   contactNum,
+	}
+
+	res, err := r.Clients.DeliveryClient.CreateDelivery(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
 }
 
 // UpdateDeliveryStatus is the resolver for the updateDeliveryStatus field.
-func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, status string, location *string) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: UpdateDeliveryStatus - updateDeliveryStatus"))
+func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, status model.DeliveryStatus, location *string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	loc := ""
+	if location != nil {
+		loc = *location
+	}
+
+	res, err := r.Clients.DeliveryClient.UpdateDeliveryStatus(ctx, &deliverypb.UpdateDeliveryStatusRequest{
+		Id:       id,
+		Status:   string(status),
+		Location: loc,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// UpdateDeliveryPartnerProfile is the resolver for the updateDeliveryPartnerProfile field.
+func (r *mutationResolver) UpdateDeliveryPartnerProfile(ctx context.Context, input model.UpdateDeliveryPartnerProfileInput) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	partnerID := strings.TrimSpace(input.PartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+		}
+	}
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	userPartnerID := userCtx.PartnerID
+	if userPartnerID == "" {
+		userPartnerID = userCtx.UserID
+	}
+
+	if role != "ADMIN" && (role != "DELIVERY_PARTNER" || (!strings.EqualFold(userCtx.UserID, partnerID) && !strings.EqualFold(userPartnerID, partnerID))) {
+		return nil, appErrors.Forbidden("you can only update your own delivery partner profile")
+	}
+
+	req := &deliverypb.UpdatePartnerProfileRequest{
+		PartnerId:     partnerID,
+		CompanyName:   input.CompanyName,
+		Email:         input.Email,
+		ContactNumber: input.ContactNumber,
+	}
+
+	res, err := r.Clients.DeliveryClient.UpdatePartnerProfile(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
 }
 
 // Delivery is the resolver for the delivery field.
 func (r *queryResolver) Delivery(ctx context.Context, id string) (*model.Delivery, error) {
-	panic(fmt.Errorf("not implemented: Delivery - delivery"))
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDelivery(ctx, &deliverypb.GetDeliveryRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryByTracking is the resolver for the deliveryByTracking field.
+func (r *queryResolver) DeliveryByTracking(ctx context.Context, trackingNumber string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDeliveryByTracking(ctx, &deliverypb.GetDeliveryByTrackingRequest{TrackingNumber: trackingNumber})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryByOrder is the resolver for the deliveryByOrder field.
+func (r *queryResolver) DeliveryByOrder(ctx context.Context, orderID string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetDeliveryByOrder(ctx, &deliverypb.GetDeliveryByOrderRequest{OrderId: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// DeliveryPartnerProfile is the resolver for the deliveryPartnerProfile field.
+func (r *queryResolver) DeliveryPartnerProfile(ctx context.Context, partnerID *string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			userCtx = u
+			ok = true
+		}
+	}
+	if !ok || userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	targetPartnerID := userCtx.PartnerID
+	if targetPartnerID == "" && strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
+		targetPartnerID = userCtx.UserID
+	}
+
+	if partnerID != nil && strings.TrimSpace(*partnerID) != "" {
+		if strings.EqualFold(userCtx.Role, auth.RoleAdmin) || targetPartnerID == "" || strings.EqualFold(targetPartnerID, strings.TrimSpace(*partnerID)) {
+			targetPartnerID = strings.TrimSpace(*partnerID)
+		}
+	}
+
+	if strings.TrimSpace(targetPartnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+		PartnerId: targetPartnerID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
 }

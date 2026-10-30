@@ -5,28 +5,54 @@ package gocart.rating.v1;
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating;rating";
 
 service RatingService {
-  rpc AddRating (AddRatingRequest) returns (AddRatingResponse);
+  rpc CreateRating (CreateRatingRequest) returns (CreateRatingResponse);
+  rpc GetRating (GetRatingRequest) returns (GetRatingResponse);
   rpc GetProductRatings (GetProductRatingsRequest) returns (GetProductRatingsResponse);
+  rpc UpdateRating (UpdateRatingRequest) returns (UpdateRatingResponse);
+  rpc DeleteRating (DeleteRatingRequest) returns (DeleteRatingResponse);
 }
 
 message Rating {
   string id = 1;
-  string product_id = 2;
-  string user_id = 3;
-  int32 rating = 4;
-  string comment = 5;
-  string created_at = 6;
-}
-
-message AddRatingRequest {
-  string product_id = 1;
   string user_id = 2;
-  int32 rating = 3;
-  string comment = 4;
+  string product_id = 3;
+  string order_id = 4;
+  string order_item_id = 5;
+  int32 rating = 6;
+  string review = 7;
+  bool is_flagged = 8;
+  bool is_hidden = 9;
+  string created_at = 10;
+  string updated_at = 11;
 }
 
-message AddRatingResponse {
+message CreateRatingRequest {
+  string product_id = 1;
+  string order_id = 2;
+  string order_item_id = 3;
+  string user_id = 4;
+  int32 rating = 5;
+  string review = 6;
+}
+
+message CreateRatingResponse {
   Rating rating = 1;
+}
+
+message GetRatingRequest {
+  string id = 1;
+}
+
+message GetRatingResponse {
+  Rating rating = 1;
+}
+
+message StarRating  {
+  int32 five_star = 1;
+  int32 four_star = 2;
+  int32 three_star = 3;
+  int32 two_star = 4;
+  int32 one_star = 5;
 }
 
 message GetProductRatingsRequest {
@@ -39,4 +65,26 @@ message GetProductRatingsResponse {
   repeated Rating ratings = 1;
   double average_rating = 2;
   int32 total = 3;
+  StarRating stars = 4;
+}
+
+message UpdateRatingRequest {
+  string id = 1;
+  string user_id = 2;
+  int32 rating = 3;
+  string review = 4;
+}
+
+message UpdateRatingResponse {
+  Rating rating = 1;
+}
+
+message DeleteRatingRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message DeleteRatingResponse {
+  bool success = 1;
+  string message = 2;
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/inventory-service/internal/service"
 )
@@ -25,6 +26,11 @@ func NewInventoryEventConsumer(inventoryService service.InventoryService) *Inven
 func (c *InventoryEventConsumer) HandleEvent(ctx context.Context, envelope *events.EventEnvelope) error {
 	if envelope == nil {
 		return appErrors.BadRequest("event envelope is nil")
+	}
+
+	if envelope.CorrelationID != "" {
+		ctx = logger.WithCorrelationID(ctx, envelope.CorrelationID)
+		ctx = logger.WithRequestID(ctx, envelope.CorrelationID)
 	}
 
 	switch envelope.EventType {

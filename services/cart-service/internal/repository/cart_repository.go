@@ -22,8 +22,8 @@ type CartRepository interface {
 	GetCartByUserID(ctx context.Context, userID string) (*model.Cart, error)
 	CreateCart(ctx context.Context, userID string) (*model.Cart, error)
 	AddOrUpdateItem(ctx context.Context, cartID string, item *model.CartItem) (*model.Cart, error)
-	UpdateItemQuantity(ctx context.Context, cartID string, productID, variantID string, quantity int32) (*model.Cart, error)
-	RemoveItem(ctx context.Context, cartID string, productID, variantID string) (*model.Cart, error)
+	UpdateItemQuantity(ctx context.Context, cartID string, productID string, variantID *string, quantity int32) (*model.Cart, error)
+	RemoveItem(ctx context.Context, cartID string, productID string, variantID *string) (*model.Cart, error)
 	ClearCart(ctx context.Context, cartID string) error
 
 	GetCartFromCache(ctx context.Context, userID string) (*model.Cart, error)
@@ -65,7 +65,7 @@ func (r *pgCartRepository) GetCartByUserID(ctx context.Context, userID string) (
 	}
 
 	itemsQuery := `
-		SELECT id, cart_id, product_id, COALESCE(variant_id::text, ''), COALESCE(store_id::text, ''), quantity, unit_price, created_at, updated_at
+		SELECT id, cart_id, product_id, variant_id, store_id, quantity, unit_price, created_at, updated_at
 		FROM cart_items
 		WHERE cart_id = $1
 		ORDER BY created_at ASC
@@ -144,12 +144,17 @@ func (r *pgCartRepository) AddOrUpdateItem(ctx context.Context, cartID string, i
 	var existingQty int32
 	var checkQuery string
 
-	if item.VariantID != "" {
+	if item.VariantID != nil && *item.VariantID != "" && *item.VariantID != "00000000-0000-0000-0000-000000000000" {
 		checkQuery = `SELECT id, quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND variant_id = $3`
-		err = tx.QueryRow(ctx, checkQuery, cartID, item.ProductID, item.VariantID).Scan(&existingID, &existingQty)
+		err = tx.QueryRow(ctx, checkQuery, cartID, item.ProductID, *item.VariantID).Scan(&existingID, &existingQty)
 	} else {
-		checkQuery = `SELECT id, quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND (variant_id IS NULL OR variant_id::text = '')`
+		item.VariantID = nil
+		checkQuery = `SELECT id, quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND variant_id IS NULL`
 		err = tx.QueryRow(ctx, checkQuery, cartID, item.ProductID).Scan(&existingID, &existingQty)
+	}
+
+	if item.StoreID != nil && (*item.StoreID == "" || *item.StoreID == "00000000-0000-0000-0000-000000000000") {
+		item.StoreID = nil
 	}
 
 	if err == nil {
@@ -159,21 +164,8 @@ func (r *pgCartRepository) AddOrUpdateItem(ctx context.Context, cartID string, i
 			return nil, fmt.Errorf("failed to update cart item quantity: %w", err)
 		}
 	} else if errors.Is(err, pgx.ErrNoRows) {
-		var insertQuery string
-		if item.VariantID != "" && item.StoreID != "" {
-			insertQuery = `INSERT INTO cart_items (cart_id, product_id, variant_id, store_id, quantity, unit_price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`
-			_, err = tx.Exec(ctx, insertQuery, cartID, item.ProductID, item.VariantID, item.StoreID, item.Quantity, item.UnitPrice)
-		} else if item.VariantID != "" {
-			insertQuery = `INSERT INTO cart_items (cart_id, product_id, variant_id, quantity, unit_price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`
-			_, err = tx.Exec(ctx, insertQuery, cartID, item.ProductID, item.VariantID, item.Quantity, item.UnitPrice)
-		} else if item.StoreID != "" {
-			insertQuery = `INSERT INTO cart_items (cart_id, product_id, store_id, quantity, unit_price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`
-			_, err = tx.Exec(ctx, insertQuery, cartID, item.ProductID, item.StoreID, item.Quantity, item.UnitPrice)
-		} else {
-			insertQuery = `INSERT INTO cart_items (cart_id, product_id, quantity, unit_price, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())`
-			_, err = tx.Exec(ctx, insertQuery, cartID, item.ProductID, item.Quantity, item.UnitPrice)
-		}
-		if err != nil {
+		insertQuery := `INSERT INTO cart_items (cart_id, product_id, variant_id, store_id, quantity, unit_price, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`
+		if _, err = tx.Exec(ctx, insertQuery, cartID, item.ProductID, item.VariantID, item.StoreID, item.Quantity, item.UnitPrice); err != nil {
 			return nil, fmt.Errorf("failed to insert cart item: %w", err)
 		}
 	} else {
@@ -191,24 +183,21 @@ func (r *pgCartRepository) AddOrUpdateItem(ctx context.Context, cartID string, i
 	return r.GetCartByUserID(ctx, userID)
 }
 
-func (r *pgCartRepository) UpdateItemQuantity(ctx context.Context, cartID string, productID, variantID string, quantity int32) (*model.Cart, error) {
+func (r *pgCartRepository) UpdateItemQuantity(ctx context.Context, cartID string, productID string, variantID *string, quantity int32) (*model.Cart, error) {
 	if r.db == nil {
 		return nil, errors.New("database pool is not initialized")
 	}
 
 	var updateQuery string
-	var tag pgx.Row
-	_ = tag
-
 	var commandTag any
 	var err error
-	if variantID != "" {
+	if variantID != nil && *variantID != "" && *variantID != "00000000-0000-0000-0000-000000000000" {
 		updateQuery = `UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE cart_id = $2 AND product_id = $3 AND variant_id = $4`
-		res, execErr := r.db.Exec(ctx, updateQuery, quantity, cartID, productID, variantID)
+		res, execErr := r.db.Exec(ctx, updateQuery, quantity, cartID, productID, *variantID)
 		commandTag = res
 		err = execErr
 	} else {
-		updateQuery = `UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE cart_id = $2 AND product_id = $3 AND (variant_id IS NULL OR variant_id::text = '')`
+		updateQuery = `UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE cart_id = $2 AND product_id = $3 AND variant_id IS NULL`
 		res, execErr := r.db.Exec(ctx, updateQuery, quantity, cartID, productID)
 		commandTag = res
 		err = execErr
@@ -229,7 +218,7 @@ func (r *pgCartRepository) UpdateItemQuantity(ctx context.Context, cartID string
 	return r.GetCartByUserID(ctx, userID)
 }
 
-func (r *pgCartRepository) RemoveItem(ctx context.Context, cartID string, productID, variantID string) (*model.Cart, error) {
+func (r *pgCartRepository) RemoveItem(ctx context.Context, cartID string, productID string, variantID *string) (*model.Cart, error) {
 	if r.db == nil {
 		return nil, errors.New("database pool is not initialized")
 	}
@@ -238,13 +227,13 @@ func (r *pgCartRepository) RemoveItem(ctx context.Context, cartID string, produc
 	var commandTag any
 	var err error
 
-	if variantID != "" {
+	if variantID != nil && *variantID != "" && *variantID != "00000000-0000-0000-0000-000000000000" {
 		deleteQuery = `DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND variant_id = $3`
-		res, execErr := r.db.Exec(ctx, deleteQuery, cartID, productID, variantID)
+		res, execErr := r.db.Exec(ctx, deleteQuery, cartID, productID, *variantID)
 		commandTag = res
 		err = execErr
 	} else {
-		deleteQuery = `DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND (variant_id IS NULL OR variant_id::text = '')`
+		deleteQuery = `DELETE FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND variant_id IS NULL`
 		res, execErr := r.db.Exec(ctx, deleteQuery, cartID, productID)
 		commandTag = res
 		err = execErr

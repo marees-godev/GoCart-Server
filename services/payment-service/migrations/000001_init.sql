@@ -1,6 +1,6 @@
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
-        CREATE TYPE payment_status AS ENUM ('INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED');
+        CREATE TYPE payment_status AS ENUM ('INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUND_PENDING', 'PARTIALLY_REFUNDED', 'REFUNDED');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'refund_status') THEN
         CREATE TYPE refund_status AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
@@ -91,4 +91,5 @@ CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 CREATE INDEX IF NOT EXISTS idx_refunds_payment_id ON refunds(payment_id);
 CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);
 CREATE INDEX IF NOT EXISTS idx_payment_outbox_status_created ON outbox_events(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_outbox_aggregate ON outbox_events(aggregate_id, event_type);
 

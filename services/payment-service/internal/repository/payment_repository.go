@@ -25,6 +25,9 @@ type PaymentRepository interface {
 	CreateRefund(ctx context.Context, refund *model.Refund) error
 	GetRefundByID(ctx context.Context, id string) (*model.Refund, error)
 	GetRefundByGatewayRefundID(ctx context.Context, gatewayRefundID string) (*model.Refund, error)
+	GetRefundByIdempotencyKey(ctx context.Context, key string) (*model.Refund, error)
+	GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error)
+	GetTotalRefundedAmount(ctx context.Context, paymentID string) (float64, error)
 	UpdateRefundStatus(ctx context.Context, id string, status model.RefundStatus, gatewayRefundID string) (*model.Refund, error)
 	SaveWebhookEvent(ctx context.Context, w *model.PaymentWebhook) error
 	IsWebhookProcessed(ctx context.Context, eventID string) (bool, error)
@@ -46,6 +49,13 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 		slog.WarnContext(ctx, "payment model is nil in CreatePayment")
 		return appErrors.BadRequest("payment model cannot be nil")
 	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction in CreatePayment", "order_id", p.OrderID, "error", err)
+		return appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := `
 		INSERT INTO payments (
@@ -102,7 +112,7 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 	}
 
 	var scannedPmID *string
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		pIDParam,
 		p.OrderID,
 		p.UserID,
@@ -129,6 +139,44 @@ func (r *pgPaymentRepository) CreatePayment(ctx context.Context, p *model.Paymen
 
 	if scannedPmID != nil && *scannedPmID != "" {
 		p.PaymentMethodID = scannedPmID
+	}
+
+	if p.Status == model.PaymentStatusInitiated {
+		initEvt := events.PaymentInitiatedEvent{
+			PaymentID:     p.ID,
+			OrderID:       p.OrderID,
+			UserID:        p.UserID,
+			Amount:        p.Amount,
+			Currency:      p.Currency,
+			PaymentMethod: p.PaymentMethod,
+			InitiatedAt:   p.CreatedAt,
+		}
+		env, envErr := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentInitiated, "payment-service", p.ID, initEvt)
+		if envErr != nil {
+			slog.ErrorContext(ctx, "failed to create outbox event envelope for PaymentInitiated", "payment_id", p.ID, "error", envErr)
+			return appErrors.Internal(envErr, "failed to create outbox event envelope")
+		}
+		payloadBytes, mErr := env.Marshal()
+		if mErr != nil {
+			slog.ErrorContext(ctx, "failed to marshal outbox event for PaymentInitiated", "payment_id", p.ID, "error", mErr)
+			return appErrors.Internal(mErr, "failed to marshal outbox event")
+		}
+		outboxQuery := `
+			INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+			SELECT 'payment', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+			WHERE NOT EXISTS (
+				SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+			)
+		`
+		if _, execErr := tx.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentInitiated, payloadBytes, events.TopicPaymentInitiated); execErr != nil {
+			slog.ErrorContext(ctx, "failed to insert outbox event in repository", "payment_id", p.ID, "error", execErr)
+			return appErrors.Internal(execErr, "failed to record outbox event")
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit transaction in CreatePayment", "payment_id", p.ID, "error", err)
+		return appErrors.Internal(err, "failed to commit transaction")
 	}
 
 	slog.InfoContext(ctx, "payment created in repository", "payment_id", p.ID, "order_id", p.OrderID, "payment_method_id", p.PaymentMethodID)
@@ -385,6 +433,30 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 		}
 	}
 
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction in UpdatePaymentStatus", "payment_id", targetID, "error", err)
+		return nil, appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var oldStatus model.PaymentStatus
+	lookupQuery := `SELECT status FROM payments WHERE id = $1::uuid FOR UPDATE`
+	errLookup := tx.QueryRow(ctx, lookupQuery, targetID).Scan(&oldStatus)
+	if errLookup != nil {
+		if errors.Is(errLookup, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "payment not found for status update in repository", "payment_id", id)
+			return nil, appErrors.NotFound(fmt.Sprintf("payment %s not found for status update", id))
+		}
+		slog.ErrorContext(ctx, "failed to query payment status in repository", "payment_id", id, "error", errLookup)
+		return nil, appErrors.Internal(errLookup, "failed to query payment status")
+	}
+
+	if oldStatus != status && !model.CanTransitionPayment(oldStatus, status) {
+		slog.WarnContext(ctx, "illegal payment status transition rejected in repository", "payment_id", targetID, "from", oldStatus, "to", status)
+		return nil, appErrors.BadRequest(fmt.Sprintf("cannot transition payment from %s to %s", oldStatus, status))
+	}
+
 	query := `
 		UPDATE payments
 		SET status = $2,
@@ -417,7 +489,7 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 
 	var p model.Payment
 	var pmID *string
-	err := r.pool.QueryRow(ctx, query, targetID, status, gatewayTxID, failureReason, pm).Scan(
+	err = tx.QueryRow(ctx, query, targetID, status, gatewayTxID, failureReason, pm).Scan(
 		&p.ID,
 		&p.OrderID,
 		&p.UserID,
@@ -445,71 +517,109 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 
 	p.PaymentMethodID = pmID
 
-	// Insert Outbox Event on status updates (PaymentSuccessful or PaymentFailed)
-	if status == model.PaymentStatusSuccess {
-		env, envErr := events.NewEventEnvelope(events.EventTypePaymentSuccessful, "payment-service", events.PaymentSuccessfulEvent{
-			PaymentID:     p.ID,
-			OrderID:       p.OrderID,
-			UserID:        p.UserID,
-			Amount:        p.Amount,
-			Currency:      p.Currency,
-			PaymentMethod: p.PaymentMethod,
-			PaidAt:        p.UpdatedAt,
-		})
-		if envErr == nil {
-			payloadBytes, _ := env.Marshal()
-			outboxQuery := `
-				INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
-				VALUES ('payment', $1, $2, $3, $4, 'PENDING', 0, NOW())
-			`
-			_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentSuccessful, payloadBytes, "gocart.payment.payment-successful")
+	// Insert Outbox Event only on genuine status transitions to prevent duplicate events
+	if oldStatus != status {
+		var eventType, topic string
+		var eventPayload interface{}
+
+		switch status {
+		case model.PaymentStatusSuccess:
+			eventType = events.EventTypePaymentSuccessful
+			topic = events.TopicPaymentSuccessful
+			eventPayload = events.PaymentSuccessfulEvent{
+				PaymentID:     p.ID,
+				OrderID:       p.OrderID,
+				UserID:        p.UserID,
+				Amount:        p.Amount,
+				Currency:      p.Currency,
+				PaymentMethod: p.PaymentMethod,
+				PaidAt:        p.UpdatedAt,
+			}
+		case model.PaymentStatusFailed:
+			eventType = events.EventTypePaymentFailed
+			topic = events.TopicPaymentFailed
+			eventPayload = events.PaymentFailedEvent{
+				PaymentID: p.ID,
+				OrderID:   p.OrderID,
+				UserID:    p.UserID,
+				Amount:    p.Amount,
+				Reason:    p.FailureReason,
+				FailedAt:  p.UpdatedAt,
+			}
+		case model.PaymentStatusPending:
+			eventType = events.EventTypePaymentPending
+			topic = events.TopicPaymentPending
+			eventPayload = events.PaymentPendingEvent{
+				PaymentID:            p.ID,
+				OrderID:              p.OrderID,
+				UserID:               p.UserID,
+				Amount:               p.Amount,
+				Currency:             p.Currency,
+				GatewayTransactionID: p.GatewayTransactionID,
+				PendingAt:            p.UpdatedAt,
+			}
+		case model.PaymentStatusCancelled:
+			eventType = events.EventTypePaymentCancelled
+			topic = events.TopicPaymentCancelled
+			eventPayload = events.PaymentCancelledEvent{
+				PaymentID:   p.ID,
+				OrderID:     p.OrderID,
+				UserID:      p.UserID,
+				Amount:      p.Amount,
+				Currency:    p.Currency,
+				Reason:      p.FailureReason,
+				CancelledAt: p.UpdatedAt,
+			}
 		}
-	} else if status == model.PaymentStatusFailed {
-		env, envErr := events.NewEventEnvelope(events.EventTypePaymentFailed, "payment-service", events.PaymentFailedEvent{
-			PaymentID: p.ID,
-			OrderID:   p.OrderID,
-			UserID:    p.UserID,
-			Amount:    p.Amount,
-			Reason:    p.FailureReason,
-			FailedAt:  p.UpdatedAt,
-		})
-		if envErr == nil {
-			payloadBytes, _ := env.Marshal()
+
+		if eventType != "" && eventPayload != nil {
+			env, envErr := events.NewEventEnvelopeWithAggregate(eventType, "payment-service", p.ID, eventPayload)
+			if envErr != nil {
+				slog.ErrorContext(ctx, "failed to create outbox event envelope in repository", "payment_id", p.ID, "error", envErr)
+				return nil, appErrors.Internal(envErr, "failed to create outbox event envelope")
+			}
+			payloadBytes, mErr := env.Marshal()
+			if mErr != nil {
+				slog.ErrorContext(ctx, "failed to marshal outbox event in repository", "payment_id", p.ID, "error", mErr)
+				return nil, appErrors.Internal(mErr, "failed to marshal outbox event")
+			}
+
 			outboxQuery := `
 				INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
-				VALUES ('payment', $1, $2, $3, $4, 'PENDING', 0, NOW())
+				SELECT 'payment', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+				WHERE NOT EXISTS (
+					SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+				)
 			`
-			_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentFailed, payloadBytes, events.TopicPaymentFailed)
-		}
-	} else if status == model.PaymentStatusPending {
-		env, envErr := events.NewEventEnvelope(events.EventTypePaymentPending, "payment-service", events.PaymentPendingEvent{
-			PaymentID:            p.ID,
-			OrderID:              p.OrderID,
-			UserID:               p.UserID,
-			Amount:               p.Amount,
-			Currency:             p.Currency,
-			GatewayTransactionID: p.GatewayTransactionID,
-			PendingAt:            p.UpdatedAt,
-		})
-		if envErr == nil {
-			payloadBytes, _ := env.Marshal()
-			outboxQuery := `
-				INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
-				VALUES ('payment', $1, $2, $3, $4, 'PENDING', 0, NOW())
-			`
-			_, _ = r.pool.Exec(ctx, outboxQuery, p.ID, events.EventTypePaymentPending, payloadBytes, events.TopicPaymentPending)
+			if _, execErr := tx.Exec(ctx, outboxQuery, p.ID, eventType, payloadBytes, topic); execErr != nil {
+				slog.ErrorContext(ctx, "failed to insert outbox event in repository", "payment_id", p.ID, "error", execErr)
+				return nil, appErrors.Internal(execErr, "failed to record outbox event")
+			}
 		}
 	}
 
-	slog.InfoContext(ctx, "payment status updated in repository", "payment_id", p.ID, "status", p.Status)
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit transaction in UpdatePaymentStatus", "payment_id", p.ID, "error", err)
+		return nil, appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	slog.InfoContext(ctx, "payment status updated in repository", "payment_id", p.ID, "old_status", oldStatus, "new_status", p.Status)
 	return &p, nil
 }
+
 
 func (r *pgPaymentRepository) CreateRefund(ctx context.Context, ref *model.Refund) error {
 	if ref == nil {
 		slog.WarnContext(ctx, "refund model is nil in CreateRefund")
 		return appErrors.BadRequest("refund model cannot be nil")
 	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction in CreateRefund", "payment_id", ref.PaymentID, "error", err)
+		return appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := `
 		INSERT INTO refunds (
@@ -536,7 +646,7 @@ func (r *pgPaymentRepository) CreateRefund(ctx context.Context, ref *model.Refun
 		RETURNING id, created_at, updated_at
 	`
 
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		ref.PaymentID,
 		ref.OrderID,
 		ref.Amount,
@@ -554,6 +664,42 @@ func (r *pgPaymentRepository) CreateRefund(ctx context.Context, ref *model.Refun
 		}
 		slog.ErrorContext(ctx, "failed to create refund in repository", "payment_id", ref.PaymentID, "error", err)
 		return appErrors.Internal(err, "failed to create refund record")
+	}
+
+	// Insert Outbox Event for RefundInitiated
+	env, envErr := events.NewEventEnvelopeWithAggregate(events.EventTypeRefundInitiated, "payment-service", ref.ID, events.RefundInitiatedEvent{
+		RefundID:    ref.ID,
+		PaymentID:   ref.PaymentID,
+		OrderID:     ref.OrderID,
+		Amount:      ref.Amount,
+		Reason:      ref.Reason,
+		InitiatedAt: ref.CreatedAt,
+	})
+	if envErr != nil {
+		slog.ErrorContext(ctx, "failed to create outbox event envelope for RefundInitiated", "refund_id", ref.ID, "error", envErr)
+		return appErrors.Internal(envErr, "failed to create outbox event envelope")
+	}
+	payloadBytes, mErr := env.Marshal()
+	if mErr != nil {
+		slog.ErrorContext(ctx, "failed to marshal outbox event for RefundInitiated", "refund_id", ref.ID, "error", mErr)
+		return appErrors.Internal(mErr, "failed to marshal outbox event")
+	}
+
+	outboxQuery := `
+		INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+		SELECT 'refund', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+		WHERE NOT EXISTS (
+			SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+		)
+	`
+	if _, execErr := tx.Exec(ctx, outboxQuery, ref.ID, events.EventTypeRefundInitiated, payloadBytes, events.TopicRefundInitiated); execErr != nil {
+		slog.ErrorContext(ctx, "failed to insert outbox event in repository", "refund_id", ref.ID, "error", execErr)
+		return appErrors.Internal(execErr, "failed to record outbox event")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit transaction in CreateRefund", "refund_id", ref.ID, "error", err)
+		return appErrors.Internal(err, "failed to commit transaction")
 	}
 
 	slog.InfoContext(ctx, "refund created in repository", "refund_id", ref.ID, "payment_id", ref.PaymentID)
@@ -674,6 +820,25 @@ func (r *pgPaymentRepository) GetRefundByGatewayRefundID(ctx context.Context, ga
 }
 
 func (r *pgPaymentRepository) UpdateRefundStatus(ctx context.Context, id string, status model.RefundStatus, gatewayRefundID string) (*model.Refund, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to begin transaction in UpdateRefundStatus", "refund_id", id, "error", err)
+		return nil, appErrors.Internal(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var oldStatus model.RefundStatus
+	lookupQuery := `SELECT status FROM refunds WHERE id = $1::uuid FOR UPDATE`
+	errLookup := tx.QueryRow(ctx, lookupQuery, id).Scan(&oldStatus)
+	if errLookup != nil {
+		if errors.Is(errLookup, pgx.ErrNoRows) {
+			slog.WarnContext(ctx, "refund not found for status update in repository", "refund_id", id)
+			return nil, appErrors.NotFound(fmt.Sprintf("refund %s not found for status update", id))
+		}
+		slog.ErrorContext(ctx, "failed to query refund status in repository", "refund_id", id, "error", errLookup)
+		return nil, appErrors.Internal(errLookup, "failed to query refund status")
+	}
+
 	query := `
 		UPDATE refunds
 		SET status = $2,
@@ -683,7 +848,7 @@ func (r *pgPaymentRepository) UpdateRefundStatus(ctx context.Context, id string,
 		RETURNING id, payment_id, order_id, amount, COALESCE(reason, ''), status, COALESCE(gateway_refund_id, ''), COALESCE(idempotency_key, ''), created_at, updated_at
 	`
 	var ref model.Refund
-	err := r.pool.QueryRow(ctx, query, id, status, gatewayRefundID).Scan(
+	err = tx.QueryRow(ctx, query, id, status, gatewayRefundID).Scan(
 		&ref.ID, &ref.PaymentID, &ref.OrderID, &ref.Amount, &ref.Reason, &ref.Status, &ref.GatewayRefundID, &ref.IdempotencyKey, &ref.CreatedAt, &ref.UpdatedAt,
 	)
 	if err != nil {
@@ -692,5 +857,153 @@ func (r *pgPaymentRepository) UpdateRefundStatus(ctx context.Context, id string,
 		}
 		return nil, appErrors.Internal(err, "failed to update refund status")
 	}
+
+	if oldStatus != status {
+		var eventType, topic string
+		var eventPayload interface{}
+
+		switch status {
+		case model.RefundStatusSuccess:
+			eventType = events.EventTypeRefundCompleted
+			topic = events.TopicRefundCompleted
+			eventPayload = events.RefundCompletedEvent{
+				RefundID:        ref.ID,
+				PaymentID:       ref.PaymentID,
+				OrderID:         ref.OrderID,
+				Amount:          ref.Amount,
+				GatewayRefundID: ref.GatewayRefundID,
+				CompletedAt:     ref.UpdatedAt,
+			}
+		case model.RefundStatusFailed:
+			eventType = events.EventTypeRefundFailed
+			topic = events.TopicRefundFailed
+			eventPayload = events.RefundFailedEvent{
+				RefundID:  ref.ID,
+				PaymentID: ref.PaymentID,
+				OrderID:   ref.OrderID,
+				Amount:    ref.Amount,
+				Reason:    "refund failed at gateway",
+				FailedAt:  ref.UpdatedAt,
+			}
+		}
+
+		if eventType != "" && eventPayload != nil {
+			env, envErr := events.NewEventEnvelopeWithAggregate(eventType, "payment-service", ref.ID, eventPayload)
+			if envErr != nil {
+				slog.ErrorContext(ctx, "failed to create outbox event envelope in UpdateRefundStatus", "refund_id", ref.ID, "error", envErr)
+				return nil, appErrors.Internal(envErr, "failed to create outbox event envelope")
+			}
+			payloadBytes, mErr := env.Marshal()
+			if mErr != nil {
+				slog.ErrorContext(ctx, "failed to marshal outbox event in UpdateRefundStatus", "refund_id", ref.ID, "error", mErr)
+				return nil, appErrors.Internal(mErr, "failed to marshal outbox event")
+			}
+
+			outboxQuery := `
+				INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload, topic, status, retry_count, created_at)
+				SELECT 'refund', $1::text, $2::text, $3::jsonb, $4::text, 'PENDING'::outbox_status, 0, NOW()
+				WHERE NOT EXISTS (
+					SELECT 1 FROM outbox_events WHERE aggregate_id = $1::text AND event_type = $2::text
+				)
+			`
+			if _, execErr := tx.Exec(ctx, outboxQuery, ref.ID, eventType, payloadBytes, topic); execErr != nil {
+				slog.ErrorContext(ctx, "failed to insert outbox event in UpdateRefundStatus", "refund_id", ref.ID, "error", execErr)
+				return nil, appErrors.Internal(execErr, "failed to record outbox event")
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to commit transaction in UpdateRefundStatus", "refund_id", ref.ID, "error", err)
+		return nil, appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	slog.InfoContext(ctx, "refund status updated in repository", "refund_id", ref.ID, "old_status", oldStatus, "new_status", ref.Status)
 	return &ref, nil
 }
+
+func (r *pgPaymentRepository) GetRefundByIdempotencyKey(ctx context.Context, key string) (*model.Refund, error) {
+	if key == "" {
+		return nil, appErrors.BadRequest("idempotency key cannot be empty")
+	}
+	query := `
+		SELECT
+			id,
+			payment_id,
+			order_id,
+			amount,
+			COALESCE(reason, ''),
+			status,
+			COALESCE(gateway_refund_id, ''),
+			COALESCE(idempotency_key, ''),
+			created_at,
+			updated_at
+		FROM refunds
+		WHERE idempotency_key = $1
+	`
+	var ref model.Refund
+	err := r.pool.QueryRow(ctx, query, key).Scan(
+		&ref.ID, &ref.PaymentID, &ref.OrderID, &ref.Amount, &ref.Reason, &ref.Status, &ref.GatewayRefundID, &ref.IdempotencyKey, &ref.CreatedAt, &ref.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("refund not found by idempotency key")
+		}
+		return nil, appErrors.Internal(err, "failed to query refund by idempotency key")
+	}
+	return &ref, nil
+}
+
+func (r *pgPaymentRepository) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
+	query := `
+		SELECT
+			id,
+			payment_id,
+			order_id,
+			amount,
+			COALESCE(reason, ''),
+			status,
+			COALESCE(gateway_refund_id, ''),
+			COALESCE(idempotency_key, ''),
+			created_at,
+			updated_at
+		FROM refunds
+		WHERE payment_id = $1::uuid
+		ORDER BY created_at ASC
+	`
+	rows, err := r.pool.Query(ctx, query, paymentID)
+	if err != nil {
+		return nil, appErrors.Internal(err, "failed to query refunds by payment id")
+	}
+	defer rows.Close()
+
+	var refunds []*model.Refund
+	for rows.Next() {
+		var ref model.Refund
+		if err := rows.Scan(
+			&ref.ID, &ref.PaymentID, &ref.OrderID, &ref.Amount, &ref.Reason, &ref.Status, &ref.GatewayRefundID, &ref.IdempotencyKey, &ref.CreatedAt, &ref.UpdatedAt,
+		); err != nil {
+			return nil, appErrors.Internal(err, "failed to scan refund row")
+		}
+		refunds = append(refunds, &ref)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, appErrors.Internal(err, "error reading refund rows")
+	}
+	return refunds, nil
+}
+
+func (r *pgPaymentRepository) GetTotalRefundedAmount(ctx context.Context, paymentID string) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(amount), 0.00)
+		FROM refunds
+		WHERE payment_id = $1::uuid AND status = 'SUCCESS'
+	`
+	var total float64
+	err := r.pool.QueryRow(ctx, query, paymentID).Scan(&total)
+	if err != nil {
+		return 0, appErrors.Internal(err, "failed to calculate total refunded amount")
+	}
+	return total, nil
+}
+

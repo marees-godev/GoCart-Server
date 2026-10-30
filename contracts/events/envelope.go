@@ -13,10 +13,15 @@ const (
 	EventTypeOrderCreated               = "OrderCreated"
 	EventTypeOrderCancelled             = "OrderCancelled"
 	EventTypeOrderConfirmed             = "OrderConfirmed"
+	EventTypeOrderPaymentFailed         = "OrderPaymentFailed"
 	EventTypePaymentSuccessful          = "PaymentSuccessful"
 	EventTypePaymentFailed              = "PaymentFailed"
 	EventTypePaymentInitiated           = "PaymentInitiated"
 	EventTypePaymentPending             = "PaymentPending"
+	EventTypePaymentCancelled           = "PaymentCancelled"
+	EventTypeRefundInitiated            = "RefundInitiated"
+	EventTypeRefundCompleted            = "RefundCompleted"
+	EventTypeRefundFailed               = "RefundFailed"
 	EventTypeInventoryReserved          = "InventoryReserved"
 	EventTypeInventoryReleased          = "InventoryReleased"
 	EventTypeInventoryCommitted         = "InventoryCommitted"
@@ -26,6 +31,7 @@ const (
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
+ 	EventTypePartnerRegistered          = "PartnerRegistered"
 
 	// Store Service Events
 	EventTypeStoreCreated     = "StoreCreated"
@@ -40,18 +46,44 @@ const (
 	EventTypeMerchantRegistered = "MerchantRegistered"
 	EventTypeMerchantActivated  = "MerchantActivated"
 	EventTypeMerchantSuspended  = "MerchantSuspended"
+
+	// Delivery Service Events
+	EventTypeDeliveryCreated       = "DeliveryCreated"
+	EventTypeDeliveryStatusUpdated = "DeliveryStatusUpdated"
+	EventTypeDeliveryStatusChanged = "DeliveryStatusChanged"
+
+	// Product Service Events
+	EventTypeProductCreated   = "ProductCreated"
+	EventTypeProductUpdated   = "ProductUpdated"
+	EventTypeProductPublished = "ProductPublished"
+	EventTypeProductDeleted   = "ProductDeleted"
+
+	// Return Service Events
+	EventTypeReturnRequested     = "ReturnRequested"
+	EventTypeReturnApproved      = "ReturnApproved"
+	EventTypeReturnRejected      = "ReturnRejected"
+	EventTypeReturnVerified      = "ReturnVerified"
+	EventTypeReturnStatusUpdated = "ReturnStatusUpdated"
+	EventTypeExchangeCreated     = "ExchangeCreated"
+	EventTypeExchangeVerified    = "ExchangeVerified"
 )
 
 // Standard Topic Constants
 const (
 	TopicUserRegistered     = "gocart.auth.user-registered"
+	TopicPartnerRegistered  = "gocart.auth.partner-registered"
 	TopicOrderCreated       = "gocart.order.order-created"
 	TopicOrderCancelled     = "gocart.order.order-cancelled"
 	TopicOrderConfirmed     = "gocart.order.order-confirmed"
+	TopicOrderPaymentFailed = "gocart.order.order-payment-failed"
 	TopicPaymentSuccessful  = "gocart.payment.payment-successful"
 	TopicPaymentFailed      = "gocart.payment.payment-failed"
 	TopicPaymentInitiated   = "gocart.payment.payment-initiated"
 	TopicPaymentPending     = "gocart.payment.payment-pending"
+	TopicPaymentCancelled   = "gocart.payment.payment-cancelled"
+	TopicRefundInitiated    = "gocart.payment.refund-initiated"
+	TopicRefundCompleted    = "gocart.payment.refund-completed"
+	TopicRefundFailed       = "gocart.payment.refund-failed"
 	TopicInventoryReserved  = "gocart.inventory.inventory-reserved"
 	TopicInventoryReleased  = "gocart.inventory.inventory-released"
 	TopicInventoryCommitted = "gocart.inventory.inventory-committed"
@@ -72,6 +104,27 @@ const (
 	TopicMerchantRegistered = "gocart.merchant.merchant-registered"
 	TopicMerchantActivated  = "gocart.merchant.merchant-activated"
 	TopicMerchantSuspended  = "gocart.merchant.merchant-suspended"
+
+	// Delivery Service Topics
+	TopicDeliveryCreated       = "gocart.delivery.delivery-created"
+	TopicDeliveryDispatched    = "gocart.delivery.delivery-dispatched"
+	TopicDeliveryStatusUpdated = "gocart.delivery.delivery-status-updated"
+	TopicDeliveryStatusChanged = "gocart.delivery.delivery-status-changed"
+
+	// Product Service Topics
+	TopicProductCreated   = "gocart.product.product-created"
+	TopicProductUpdated   = "gocart.product.product-updated"
+	TopicProductPublished = "gocart.product.product-published"
+	TopicProductDeleted   = "gocart.product.product-deleted"
+
+	// Return Service Topics
+	TopicReturnRequested     = "gocart.return.return-requested"
+	TopicReturnApproved      = "gocart.return.return-approved"
+	TopicReturnRejected      = "gocart.return.return-rejected"
+	TopicReturnVerified      = "gocart.return.return-verified"
+	TopicReturnStatusUpdated = "gocart.return.return-status-updated"
+	TopicExchangeCreated     = "gocart.return.exchange-created"
+	TopicExchangeVerified    = "gocart.return.exchange-verified"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.

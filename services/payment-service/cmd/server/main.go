@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -23,6 +25,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/consumer"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	paymentGRPC "github.com/marees-godev/GoCart-Server/services/payment-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/handler"
@@ -92,13 +95,30 @@ func main() {
 	}
 
 	// 5. Initialize Outbox Publisher background worker for Kafka event streaming
-	kafkaProducer := kafka.NewProducer(kafka.Config{
-		Brokers: cfg.Kafka.Brokers,
-	})
-	defer kafkaProducer.Close()
+	var kafkaProducer *kafka.Producer
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		kafkaProducer = kafka.NewProducer(kafka.Config{
+			Brokers:       cfg.Kafka.Brokers,
+			MaxRetries:    3,
+			RetryInterval: 1 * time.Second,
+		})
+		defer func() { _ = kafkaProducer.Close() }()
 
-	outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outbox.NewStore(), outbox.DefaultConfig())
-	go outboxPublisher.Start(ctx)
+		if cfg.Outbox.Enabled {
+			outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outbox.NewStore(), outbox.Config{
+				ServiceName:    cfg.App.Name,
+				PollInterval:   cfg.Outbox.PollInterval,
+				BatchSize:      cfg.Outbox.BatchSize,
+				MaxRetries:     cfg.Outbox.MaxRetries,
+				BaseRetryDelay: cfg.Outbox.BaseRetryDelay,
+				MaxRetryDelay:  cfg.Outbox.MaxRetryDelay,
+				DLQTopic:       cfg.Outbox.DLQTopic,
+			})
+			go outboxPublisher.Start(ctx)
+		}
+	} else {
+		log.Info("Outbox publisher or Kafka disabled via configuration")
+	}
 
 	// 6. Initialize domain dependencies & Payment Service
 	paymentRepo := repository.NewPaymentRepository(db.Pool)
@@ -114,6 +134,34 @@ func main() {
 
 	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
 	paymentService := service.NewPaymentService(paymentRepo, paymentGW, orderClient, gwConfig.Timeout)
+
+	// 6b. Start Kafka Event Consumer for OrderCreated events
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && kafkaProducer != nil {
+		consumerCfg := kafka.ConsumerConfig{
+			GroupID: "payment-service-group",
+			Topics: []string{
+				events.TopicOrderCreated,
+			},
+		}
+		paymentKafkaConsumer := kafka.NewConsumer(kafka.Config{
+			Brokers:       cfg.Kafka.Brokers,
+			MaxRetries:    3,
+			RetryInterval: 1 * time.Second,
+		}, consumerCfg, kafkaProducer)
+
+		paymentEvtConsumer := consumer.NewPaymentEventConsumer(paymentService)
+		go func() {
+			log.Info("Starting Payment Kafka Event Consumer...")
+			if err := paymentKafkaConsumer.Start(ctx, paymentEvtConsumer.HandleEvent); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Payment Kafka event consumer failed", "error", err)
+			}
+		}()
+		defer func() {
+			if err := paymentKafkaConsumer.Close(); err != nil {
+				log.Error("Failed to close Payment Kafka consumer", "error", err)
+			}
+		}()
+	}
 
 	paymentGRPCServer := paymentGRPC.NewPaymentGRPCServer(paymentService)
 

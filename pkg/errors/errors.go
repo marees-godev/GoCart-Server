@@ -170,6 +170,10 @@ func TooManyRequests(message string) *AppError {
 	return New(CodeTooManyRequests, message, http.StatusTooManyRequests)
 }
 
+type appErrorProvider interface {
+	ToAppError() *AppError
+}
+
 func AsAppError(err error) *AppError {
 	if err == nil {
 		return nil
@@ -178,9 +182,13 @@ func AsAppError(err error) *AppError {
 	if errors.As(err, &appErr) {
 		return appErr
 	}
+	var provider appErrorProvider
+	if errors.As(err, &provider) {
+		return provider.ToAppError()
+	}
 	if st, ok := status.FromError(err); ok {
 		switch st.Code() {
-		case codes.InvalidArgument:
+		case codes.InvalidArgument, codes.FailedPrecondition:
 			return BadRequest(st.Message())
 		case codes.NotFound:
 			return NotFound(st.Message())

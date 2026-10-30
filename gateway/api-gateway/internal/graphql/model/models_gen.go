@@ -16,18 +16,9 @@ type AccountActionResponse struct {
 	Status  string `json:"status"`
 }
 
-type AddRatingInput struct {
-	ProductID string  `json:"productId"`
-	UserID    string  `json:"userId"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment,omitempty"`
-}
-
 type AddToCartInput struct {
-	UserID    string  `json:"userId"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ProductID string `json:"productId"`
+	Quantity  int    `json:"quantity"`
 }
 
 type Address struct {
@@ -48,12 +39,11 @@ type Address struct {
 }
 
 type AuthPayload struct {
-	Token        string    `json:"token"`
-	RefreshToken *string   `json:"refreshToken,omitempty"`
-	TokenType    *string   `json:"tokenType,omitempty"`
-	ExpiresIn    *int      `json:"expiresIn,omitempty"`
-	User         *User     `json:"user"`
-	Merchant     *Merchant `json:"merchant,omitempty"`
+	Token        string  `json:"token"`
+	RefreshToken *string `json:"refreshToken,omitempty"`
+	Role         *Role   `json:"role,omitempty"`
+	TokenType    *string `json:"tokenType,omitempty"`
+	ExpiresIn    *int    `json:"expiresIn,omitempty"`
 }
 
 type BankAccount struct {
@@ -77,13 +67,15 @@ type Cart struct {
 	UserID      string      `json:"userId"`
 	Items       []*CartItem `json:"items"`
 	TotalAmount float64     `json:"totalAmount"`
+	TotalItems  int         `json:"totalItems"`
 }
 
 type CartItem struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ID         string  `json:"id"`
+	ProductID  string  `json:"productId"`
+	Quantity   int     `json:"quantity"`
+	UnitPrice  float64 `json:"unitPrice"`
+	TotalPrice float64 `json:"totalPrice"`
 }
 
 type Category struct {
@@ -132,12 +124,27 @@ type CreateCategoryInput struct {
 }
 
 type CreateDeliveryInput struct {
-	OrderID         string `json:"orderId"`
-	CourierName     string `json:"courierName"`
-	ShippingAddress string `json:"shippingAddress"`
+	OrderID           string  `json:"orderId"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	ShippingAddressID string  `json:"shippingAddressId"`
+	ContactNumber     *string `json:"contactNumber,omitempty"`
+}
+
+type CreateExchangeInput struct {
+	OrderID           string                         `json:"orderId"`
+	UserID            *string                        `json:"userId,omitempty"`
+	OrderItemID       string                         `json:"orderItemId"`
+	NewProductID      string                         `json:"newProductId"`
+	OldBrand          string                         `json:"oldBrand"`
+	OldModel          string                         `json:"oldModel"`
+	OldVariant        *string                        `json:"oldVariant,omitempty"`
+	SerialOrImei      *string                        `json:"serialOrImei,omitempty"`
+	BaseExchangeValue float64                        `json:"baseExchangeValue"`
+	Answers           []*ExchangeQuestionAnswerInput `json:"answers,omitempty"`
 }
 
 type CreateInventoryInput struct {
+	WarehouseID       *string `json:"warehouseId,omitempty"`
 	ProductID         string  `json:"productId"`
 	VariantID         *string `json:"variantId,omitempty"`
 	Sku               *string `json:"sku,omitempty"`
@@ -146,9 +153,15 @@ type CreateInventoryInput struct {
 }
 
 type CreateOrderInput struct {
-	UserID          string `json:"userId"`
-	CartID          string `json:"cartId"`
-	ShippingAddress string `json:"shippingAddress"`
+	UserID            *string  `json:"userId,omitempty"`
+	CartID            *string  `json:"cartId,omitempty"`
+	ShippingAddress   *string  `json:"shippingAddress,omitempty"`
+	ShippingAddressID *string  `json:"shippingAddressId,omitempty"`
+	BillingAddressID  *string  `json:"billingAddressId,omitempty"`
+	Currency          *string  `json:"currency,omitempty"`
+	IdempotencyKey    *string  `json:"idempotencyKey,omitempty"`
+	ShippingFee       *float64 `json:"shippingFee,omitempty"`
+	DiscountAmount    *float64 `json:"discountAmount,omitempty"`
 }
 
 type CreateProductInput struct {
@@ -176,6 +189,14 @@ type CreateProductVariantInput struct {
 	AttributesJSON *string `json:"attributesJson,omitempty"`
 }
 
+type CreateRatingInput struct {
+	ProductID   string  `json:"productId"`
+	OrderID     string  `json:"orderId"`
+	OrderItemID string  `json:"orderItemId"`
+	Rating      int     `json:"rating"`
+	Review      *string `json:"review,omitempty"`
+}
+
 type CreateStoreInput struct {
 	Name          string            `json:"name"`
 	Slug          *string           `json:"slug,omitempty"`
@@ -186,6 +207,17 @@ type CreateStoreInput struct {
 	LogoURL       *string           `json:"logoUrl,omitempty"`
 	Address       *string           `json:"address,omitempty"`
 	BankAccount   *BankAccountInput `json:"bankAccount,omitempty"`
+}
+
+type CreateWarehouseInput struct {
+	DeliveryPartnerID string `json:"deliveryPartnerId"`
+	Name              string `json:"name"`
+	Code              string `json:"code"`
+	Street            string `json:"street"`
+	City              string `json:"city"`
+	State             string `json:"state"`
+	PostalCode        string `json:"postalCode"`
+	IsActive          *bool  `json:"isActive,omitempty"`
 }
 
 type DeactivateAccountInput struct {
@@ -211,19 +243,98 @@ type DeleteProductVariantResponse struct {
 	Message string `json:"message"`
 }
 
+type DeleteRatingResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type DeleteWarehouseResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type Delivery struct {
-	ID                  string  `json:"id"`
-	OrderID             string  `json:"orderId"`
-	TrackingNumber      *string `json:"trackingNumber,omitempty"`
-	CourierName         string  `json:"courierName"`
-	Status              string  `json:"status"`
-	EstimatedDeliveryAt *string `json:"estimatedDeliveryAt,omitempty"`
-	DeliveredAt         *string `json:"deliveredAt,omitempty"`
+	ID                  string         `json:"id"`
+	OrderID             string         `json:"orderId"`
+	TrackingNumber      *string        `json:"trackingNumber,omitempty"`
+	Status              DeliveryStatus `json:"status"`
+	EstimatedDeliveryAt *string        `json:"estimatedDeliveryAt,omitempty"`
+	DeliveredAt         *string        `json:"deliveredAt,omitempty"`
+	DeliveryPartner     string         `json:"deliveryPartner"`
+	ShippingAddress     *string        `json:"shippingAddress,omitempty"`
+	ContactNumber       *string        `json:"contactNumber,omitempty"`
+	CreatedAt           *string        `json:"createdAt,omitempty"`
+	UpdatedAt           *string        `json:"updatedAt,omitempty"`
+}
+
+type DeliveryPartnerProfile struct {
+	ID            string  `json:"id"`
+	PartnerID     string  `json:"partnerId"`
+	CompanyName   *string `json:"companyName,omitempty"`
+	Email         string  `json:"email"`
+	ContactNumber *string `json:"contactNumber,omitempty"`
+	IsActive      bool    `json:"isActive"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type Exchange struct {
+	ID                string                    `json:"id"`
+	OrderID           string                    `json:"orderId"`
+	OrderItemID       string                    `json:"orderItemId"`
+	UserID            string                    `json:"userId"`
+	NewProductID      string                    `json:"newProductId"`
+	OldBrand          string                    `json:"oldBrand"`
+	OldModel          string                    `json:"oldModel"`
+	OldVariant        *string                   `json:"oldVariant,omitempty"`
+	SerialOrImei      *string                   `json:"serialOrImei,omitempty"`
+	BaseExchangeValue float64                   `json:"baseExchangeValue"`
+	EstimatedDiscount float64                   `json:"estimatedDiscount"`
+	FinalDiscount     *float64                  `json:"finalDiscount,omitempty"`
+	PriceDifference   *float64                  `json:"priceDifference,omitempty"`
+	Status            string                    `json:"status"`
+	Answers           []*ExchangeQuestionAnswer `json:"answers,omitempty"`
+	Verification      *ExchangeVerification     `json:"verification,omitempty"`
+	CreatedAt         *string                   `json:"createdAt,omitempty"`
+	UpdatedAt         *string                   `json:"updatedAt,omitempty"`
+}
+
+type ExchangeQuestionAnswer struct {
+	ID              string  `json:"id"`
+	ExchangeID      string  `json:"exchangeId"`
+	QuestionKey     string  `json:"questionKey"`
+	AnswerValue     string  `json:"answerValue"`
+	DeductionAmount float64 `json:"deductionAmount"`
+	CreatedAt       *string `json:"createdAt,omitempty"`
+}
+
+type ExchangeQuestionAnswerInput struct {
+	QuestionKey     string   `json:"questionKey"`
+	AnswerValue     string   `json:"answerValue"`
+	DeductionAmount *float64 `json:"deductionAmount,omitempty"`
+}
+
+type ExchangeVerification struct {
+	ID               string   `json:"id"`
+	ExchangeID       string   `json:"exchangeId"`
+	VerifiedBy       string   `json:"verifiedBy"`
+	ConditionRating  string   `json:"conditionRating"`
+	IsApproved       bool     `json:"isApproved"`
+	ScreenIntact     bool     `json:"screenIntact"`
+	BodyIntact       bool     `json:"bodyIntact"`
+	Functional       bool     `json:"functional"`
+	SerialMatches    bool     `json:"serialMatches"`
+	AdjustedDiscount float64  `json:"adjustedDiscount"`
+	ProofImages      []string `json:"proofImages,omitempty"`
+	Notes            *string  `json:"notes,omitempty"`
+	VerifiedAt       string   `json:"verifiedAt"`
+	CreatedAt        *string  `json:"createdAt,omitempty"`
+	UpdatedAt        *string  `json:"updatedAt,omitempty"`
 }
 
 type ForgotPasswordInput struct {
-	Email      string `json:"email"`
-	IsMerchant bool   `json:"isMerchant"`
+	Email string   `json:"email"`
+	Role  AuthRole `json:"role"`
 }
 
 type ForgotPasswordPayload struct {
@@ -239,6 +350,7 @@ type GenerateStoreUploadURLInput struct {
 
 type InventoryItem struct {
 	InventoryID       string  `json:"inventoryId"`
+	WarehouseID       *string `json:"warehouseId,omitempty"`
 	ProductID         string  `json:"productId"`
 	VariantID         *string `json:"variantId,omitempty"`
 	Sku               string  `json:"sku"`
@@ -250,9 +362,9 @@ type InventoryItem struct {
 }
 
 type LoginInput struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	IsMerchant bool   `json:"isMerchant"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Role     AuthRole `json:"role"`
 }
 
 type LogoutPayload struct {
@@ -310,20 +422,39 @@ type NotificationList struct {
 }
 
 type Order struct {
-	ID              string       `json:"id"`
-	UserID          string       `json:"userId"`
-	Status          string       `json:"status"`
-	Items           []*OrderItem `json:"items"`
-	TotalAmount     float64      `json:"totalAmount"`
-	ShippingAddress string       `json:"shippingAddress"`
-	CreatedAt       *string      `json:"createdAt,omitempty"`
+	ID                string       `json:"id"`
+	UserID            string       `json:"userId"`
+	StoreID           *string      `json:"storeId,omitempty"`
+	Status            string       `json:"status"`
+	OrderStatus       *string      `json:"orderStatus,omitempty"`
+	PaymentStatus     *string      `json:"paymentStatus,omitempty"`
+	Items             []*OrderItem `json:"items"`
+	Subtotal          *float64     `json:"subtotal,omitempty"`
+	TaxAmount         *float64     `json:"taxAmount,omitempty"`
+	ShippingFee       *float64     `json:"shippingFee,omitempty"`
+	DiscountAmount    *float64     `json:"discountAmount,omitempty"`
+	TotalAmount       float64      `json:"totalAmount"`
+	Currency          *string      `json:"currency,omitempty"`
+	ShippingAddress   string       `json:"shippingAddress"`
+	ShippingAddressID *string      `json:"shippingAddressId,omitempty"`
+	BillingAddressID  *string      `json:"billingAddressId,omitempty"`
+	ParentOrderID     *string      `json:"parentOrderId,omitempty"`
+	OrderNumber       *string      `json:"orderNumber,omitempty"`
+	CreatedAt         *string      `json:"createdAt,omitempty"`
+	UpdatedAt         *string      `json:"updatedAt,omitempty"`
 }
 
 type OrderItem struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	Quantity  int     `json:"quantity"`
-	UnitPrice float64 `json:"unitPrice"`
+	ID          string   `json:"id"`
+	ProductID   string   `json:"productId"`
+	StoreID     *string  `json:"storeId,omitempty"`
+	Sku         *string  `json:"sku,omitempty"`
+	ProductName *string  `json:"productName,omitempty"`
+	Quantity    int      `json:"quantity"`
+	UnitPrice   float64  `json:"unitPrice"`
+	Tax         *float64 `json:"tax,omitempty"`
+	Discount    *float64 `json:"discount,omitempty"`
+	TotalPrice  *float64 `json:"totalPrice,omitempty"`
 }
 
 type OrderList struct {
@@ -381,9 +512,10 @@ type ProductList struct {
 }
 
 type ProductRatings struct {
-	Ratings       []*Rating `json:"ratings"`
-	AverageRating float64   `json:"averageRating"`
-	Total         int       `json:"total"`
+	Ratings       []*Rating   `json:"ratings"`
+	AverageRating float64     `json:"averageRating"`
+	Total         int         `json:"total"`
+	Stars         *StarRating `json:"stars"`
 }
 
 type ProductVariant struct {
@@ -401,16 +533,34 @@ type ProductVariant struct {
 	DeletedAt      *string       `json:"deletedAt,omitempty"`
 }
 
+type ProductVerification struct {
+	ID          string   `json:"id"`
+	ReturnID    string   `json:"returnId"`
+	VerifiedBy  string   `json:"verifiedBy"`
+	Condition   string   `json:"condition"`
+	IsApproved  bool     `json:"isApproved"`
+	ProofImages []string `json:"proofImages,omitempty"`
+	Notes       *string  `json:"notes,omitempty"`
+	VerifiedAt  string   `json:"verifiedAt"`
+	CreatedAt   *string  `json:"createdAt,omitempty"`
+	UpdatedAt   *string  `json:"updatedAt,omitempty"`
+}
+
 type Query struct {
 }
 
 type Rating struct {
-	ID        string  `json:"id"`
-	ProductID string  `json:"productId"`
-	UserID    string  `json:"userId"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment,omitempty"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID          string  `json:"id"`
+	ProductID   string  `json:"productId"`
+	UserID      string  `json:"userId"`
+	OrderID     string  `json:"orderId"`
+	OrderItemID string  `json:"orderItemId"`
+	Rating      int     `json:"rating"`
+	Review      string  `json:"review"`
+	IsFlagged   bool    `json:"isFlagged"`
+	IsHidden    bool    `json:"isHidden"`
+	CreatedAt   *string `json:"createdAt,omitempty"`
+	UpdatedAt   *string `json:"updatedAt,omitempty"`
 }
 
 type RefreshTokenInput struct {
@@ -426,18 +576,28 @@ type RefundPayload struct {
 }
 
 type RegisterInput struct {
-	Email      string  `json:"email"`
-	Password   string  `json:"password"`
-	FirstName  *string `json:"firstName,omitempty"`
-	LastName   *string `json:"lastName,omitempty"`
-	IsMerchant bool    `json:"isMerchant"`
+	Email     string   `json:"email"`
+	Password  string   `json:"password"`
+	Role      AuthRole `json:"role"`
+	FirstName *string  `json:"firstName,omitempty"`
+	LastName  *string  `json:"lastName,omitempty"`
+}
+
+type RequestReplacementInput struct {
+	OrderID     string  `json:"orderId"`
+	UserID      *string `json:"userId,omitempty"`
+	OrderItemID *string `json:"orderItemId,omitempty"`
+	ItemID      *string `json:"itemId,omitempty"`
+	Reason      string  `json:"reason"`
 }
 
 type RequestReturnInput struct {
-	OrderID string   `json:"orderId"`
-	UserID  string   `json:"userId"`
-	Reason  string   `json:"reason"`
-	ItemIds []string `json:"itemIds"`
+	OrderID     string      `json:"orderId"`
+	UserID      *string     `json:"userId,omitempty"`
+	OrderItemID *string     `json:"orderItemId,omitempty"`
+	ItemID      *string     `json:"itemId,omitempty"`
+	Reason      string      `json:"reason"`
+	Type        *ReturnType `json:"type,omitempty"`
 }
 
 type ReservationItemInput struct {
@@ -458,10 +618,10 @@ type ResetPasswordPayload struct {
 }
 
 type ResetPasswordWithOtpInput struct {
-	Email       string `json:"email"`
-	Otp         string `json:"otp"`
-	NewPassword string `json:"newPassword"`
-	IsMerchant  bool   `json:"isMerchant"`
+	Email       string   `json:"email"`
+	Otp         string   `json:"otp"`
+	NewPassword string   `json:"newPassword"`
+	Role        AuthRole `json:"role"`
 }
 
 type RestockInventoryInput struct {
@@ -479,13 +639,21 @@ type RestockInventoryPayload struct {
 }
 
 type ReturnOrder struct {
-	ID           string  `json:"id"`
-	OrderID      string  `json:"orderId"`
-	UserID       string  `json:"userId"`
-	Reason       string  `json:"reason"`
-	Status       string  `json:"status"`
-	RefundAmount float64 `json:"refundAmount"`
-	CreatedAt    *string `json:"createdAt,omitempty"`
+	ID              string               `json:"id"`
+	OrderID         string               `json:"orderId"`
+	OrderItemID     *string              `json:"orderItemId,omitempty"`
+	UserID          string               `json:"userId"`
+	Reason          string               `json:"reason"`
+	Status          string               `json:"status"`
+	Type            string               `json:"type"`
+	RefundAmount    float64              `json:"refundAmount"`
+	Verification    *ProductVerification `json:"verification,omitempty"`
+	RequestedAt     *string              `json:"requestedAt,omitempty"`
+	ApprovedAt      *string              `json:"approvedAt,omitempty"`
+	CompletedAt     *string              `json:"completedAt,omitempty"`
+	RejectionReason *string              `json:"rejectionReason,omitempty"`
+	CreatedAt       *string              `json:"createdAt,omitempty"`
+	UpdatedAt       *string              `json:"updatedAt,omitempty"`
 }
 
 type SendNotificationInput struct {
@@ -494,6 +662,14 @@ type SendNotificationInput struct {
 	Subject    string  `json:"subject"`
 	Content    string  `json:"content"`
 	TemplateID *string `json:"templateId,omitempty"`
+}
+
+type StarRating struct {
+	FiveStar  int `json:"fiveStar"`
+	FourStar  int `json:"fourStar"`
+	ThreeStar int `json:"threeStar"`
+	TwoStar   int `json:"twoStar"`
+	OneStar   int `json:"oneStar"`
 }
 
 type StockItem struct {
@@ -577,6 +753,13 @@ type UpdateCategoryInput struct {
 	IsActive         *bool   `json:"isActive,omitempty"`
 }
 
+type UpdateDeliveryPartnerProfileInput struct {
+	PartnerID     string  `json:"partnerId"`
+	CompanyName   *string `json:"companyName,omitempty"`
+	Email         *string `json:"email,omitempty"`
+	ContactNumber *string `json:"contactNumber,omitempty"`
+}
+
 type UpdateMerchantInput struct {
 	BusinessName  *string `json:"businessName,omitempty"`
 	FirstName     *string `json:"firstName,omitempty"`
@@ -610,6 +793,12 @@ type UpdateProductVariantInput struct {
 	Status         *ProductStatus `json:"status,omitempty"`
 }
 
+type UpdateRatingInput struct {
+	ID     string  `json:"id"`
+	Rating int     `json:"rating"`
+	Review *string `json:"review,omitempty"`
+}
+
 type UpdateStoreInput struct {
 	ID             *string           `json:"id,omitempty"`
 	Name           *string           `json:"name,omitempty"`
@@ -637,6 +826,18 @@ type UpdateUserInput struct {
 	Avatar         *graphql.Upload `json:"avatar,omitempty"`
 }
 
+type UpdateWarehouseInput struct {
+	ID                string  `json:"id"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	Name              *string `json:"name,omitempty"`
+	Code              *string `json:"code,omitempty"`
+	Street            *string `json:"street,omitempty"`
+	City              *string `json:"city,omitempty"`
+	State             *string `json:"state,omitempty"`
+	PostalCode        *string `json:"postalCode,omitempty"`
+	IsActive          *bool   `json:"isActive,omitempty"`
+}
+
 type User struct {
 	ID             string  `json:"id"`
 	Email          string  `json:"email"`
@@ -659,6 +860,135 @@ type ValidateCategoryResponse struct {
 	IsValid  bool      `json:"isValid"`
 	Message  string    `json:"message"`
 	Category *Category `json:"category,omitempty"`
+}
+
+type VerifyExchangeProductInput struct {
+	ExchangeID       string   `json:"exchangeId"`
+	ConditionRating  string   `json:"conditionRating"`
+	IsApproved       bool     `json:"isApproved"`
+	ScreenIntact     bool     `json:"screenIntact"`
+	BodyIntact       bool     `json:"bodyIntact"`
+	Functional       bool     `json:"functional"`
+	SerialMatches    bool     `json:"serialMatches"`
+	AdjustedDiscount *float64 `json:"adjustedDiscount,omitempty"`
+	Notes            *string  `json:"notes,omitempty"`
+}
+
+type VerifyProductInput struct {
+	ReturnID     string            `json:"returnId"`
+	Condition    string            `json:"condition"`
+	IsApproved   bool              `json:"isApproved"`
+	ProofImages  []string          `json:"proofImages,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
+	Notes        *string           `json:"notes,omitempty"`
+}
+
+type Warehouse struct {
+	ID                string  `json:"id"`
+	DeliveryPartnerID string  `json:"deliveryPartnerId"`
+	Name              string  `json:"name"`
+	Code              string  `json:"code"`
+	Street            string  `json:"street"`
+	City              string  `json:"city"`
+	State             string  `json:"state"`
+	PostalCode        string  `json:"postalCode"`
+	IsActive          bool    `json:"isActive"`
+	CreatedAt         *string `json:"createdAt,omitempty"`
+	UpdatedAt         *string `json:"updatedAt,omitempty"`
+}
+
+type AuthRole string
+
+const (
+	AuthRoleUser            AuthRole = "USER"
+	AuthRoleMerchant        AuthRole = "MERCHANT"
+	AuthRoleDeliveryPartner AuthRole = "DELIVERY_PARTNER"
+)
+
+var AllAuthRole = []AuthRole{
+	AuthRoleUser,
+	AuthRoleMerchant,
+	AuthRoleDeliveryPartner,
+}
+
+func (e AuthRole) IsValid() bool {
+	switch e {
+	case AuthRoleUser, AuthRoleMerchant, AuthRoleDeliveryPartner:
+		return true
+	}
+	return false
+}
+
+func (e AuthRole) String() string {
+	return string(e)
+}
+
+func (e *AuthRole) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AuthRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AuthRole", str)
+	}
+	return nil
+}
+
+func (e AuthRole) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type DeliveryStatus string
+
+const (
+	DeliveryStatusCreated        DeliveryStatus = "CREATED"
+	DeliveryStatusPickedUp       DeliveryStatus = "PICKED_UP"
+	DeliveryStatusInTransit      DeliveryStatus = "IN_TRANSIT"
+	DeliveryStatusOutForDelivery DeliveryStatus = "OUT_FOR_DELIVERY"
+	DeliveryStatusDelivered      DeliveryStatus = "DELIVERED"
+	DeliveryStatusFailed         DeliveryStatus = "FAILED"
+	DeliveryStatusCancelled      DeliveryStatus = "CANCELLED"
+)
+
+var AllDeliveryStatus = []DeliveryStatus{
+	DeliveryStatusCreated,
+	DeliveryStatusPickedUp,
+	DeliveryStatusInTransit,
+	DeliveryStatusOutForDelivery,
+	DeliveryStatusDelivered,
+	DeliveryStatusFailed,
+	DeliveryStatusCancelled,
+}
+
+func (e DeliveryStatus) IsValid() bool {
+	switch e {
+	case DeliveryStatusCreated, DeliveryStatusPickedUp, DeliveryStatusInTransit, DeliveryStatusOutForDelivery, DeliveryStatusDelivered, DeliveryStatusFailed, DeliveryStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e DeliveryStatus) String() string {
+	return string(e)
+}
+
+func (e *DeliveryStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = DeliveryStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid DeliveryStatus", str)
+	}
+	return nil
+}
+
+func (e DeliveryStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Gender string
@@ -799,14 +1129,26 @@ func (e MerchantStatus) MarshalGQL(w io.Writer) {
 type ProductStatus string
 
 const (
-	ProductStatusInStock      ProductStatus = "IN_STOCK"
-	ProductStatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
-	ProductStatusLowStock     ProductStatus = "LOW_STOCK"
-	ProductStatusReserved     ProductStatus = "RESERVED"
-	ProductStatusDiscontinued ProductStatus = "DISCONTINUED"
+	ProductStatusDraft         ProductStatus = "DRAFT"
+	ProductStatusPendingReview ProductStatus = "PENDING_REVIEW"
+	ProductStatusPublished     ProductStatus = "PUBLISHED"
+	ProductStatusUnpublished   ProductStatus = "UNPUBLISHED"
+	ProductStatusSuspended     ProductStatus = "SUSPENDED"
+	ProductStatusDeleted       ProductStatus = "DELETED"
+	ProductStatusInStock       ProductStatus = "IN_STOCK"
+	ProductStatusOutOfStock    ProductStatus = "OUT_OF_STOCK"
+	ProductStatusLowStock      ProductStatus = "LOW_STOCK"
+	ProductStatusReserved      ProductStatus = "RESERVED"
+	ProductStatusDiscontinued  ProductStatus = "DISCONTINUED"
 )
 
 var AllProductStatus = []ProductStatus{
+	ProductStatusDraft,
+	ProductStatusPendingReview,
+	ProductStatusPublished,
+	ProductStatusUnpublished,
+	ProductStatusSuspended,
+	ProductStatusDeleted,
 	ProductStatusInStock,
 	ProductStatusOutOfStock,
 	ProductStatusLowStock,
@@ -816,7 +1158,7 @@ var AllProductStatus = []ProductStatus{
 
 func (e ProductStatus) IsValid() bool {
 	switch e {
-	case ProductStatusInStock, ProductStatusOutOfStock, ProductStatusLowStock, ProductStatusReserved, ProductStatusDiscontinued:
+	case ProductStatusDraft, ProductStatusPendingReview, ProductStatusPublished, ProductStatusUnpublished, ProductStatusSuspended, ProductStatusDeleted, ProductStatusInStock, ProductStatusOutOfStock, ProductStatusLowStock, ProductStatusReserved, ProductStatusDiscontinued:
 		return true
 	}
 	return false
@@ -843,23 +1185,139 @@ func (e ProductStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type ReturnStatus string
+
+const (
+	ReturnStatusReturnRequested      ReturnStatus = "RETURN_REQUESTED"
+	ReturnStatusRequested            ReturnStatus = "REQUESTED"
+	ReturnStatusReplacementRequested ReturnStatus = "REPLACEMENT_REQUESTED"
+	ReturnStatusExchangeRequested    ReturnStatus = "EXCHANGE_REQUESTED"
+	ReturnStatusUnderReview          ReturnStatus = "UNDER_REVIEW"
+	ReturnStatusApproved             ReturnStatus = "APPROVED"
+	ReturnStatusRejected             ReturnStatus = "REJECTED"
+	ReturnStatusPickupScheduled      ReturnStatus = "PICKUP_SCHEDULED"
+	ReturnStatusPickedUp             ReturnStatus = "PICKED_UP"
+	ReturnStatusReceived             ReturnStatus = "RECEIVED"
+	ReturnStatusItemReceived         ReturnStatus = "ITEM_RECEIVED"
+	ReturnStatusVerified             ReturnStatus = "VERIFIED"
+	ReturnStatusRefundInitiated      ReturnStatus = "REFUND_INITIATED"
+	ReturnStatusReplacementInitiated ReturnStatus = "REPLACEMENT_INITIATED"
+	ReturnStatusExchangeInitiated    ReturnStatus = "EXCHANGE_INITIATED"
+	ReturnStatusCompleted            ReturnStatus = "COMPLETED"
+	ReturnStatusCancelled            ReturnStatus = "CANCELLED"
+)
+
+var AllReturnStatus = []ReturnStatus{
+	ReturnStatusReturnRequested,
+	ReturnStatusRequested,
+	ReturnStatusReplacementRequested,
+	ReturnStatusExchangeRequested,
+	ReturnStatusUnderReview,
+	ReturnStatusApproved,
+	ReturnStatusRejected,
+	ReturnStatusPickupScheduled,
+	ReturnStatusPickedUp,
+	ReturnStatusReceived,
+	ReturnStatusItemReceived,
+	ReturnStatusVerified,
+	ReturnStatusRefundInitiated,
+	ReturnStatusReplacementInitiated,
+	ReturnStatusExchangeInitiated,
+	ReturnStatusCompleted,
+	ReturnStatusCancelled,
+}
+
+func (e ReturnStatus) IsValid() bool {
+	switch e {
+	case ReturnStatusReturnRequested, ReturnStatusRequested, ReturnStatusReplacementRequested, ReturnStatusExchangeRequested, ReturnStatusUnderReview, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusPickupScheduled, ReturnStatusPickedUp, ReturnStatusReceived, ReturnStatusItemReceived, ReturnStatusVerified, ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusExchangeInitiated, ReturnStatusCompleted, ReturnStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e ReturnStatus) String() string {
+	return string(e)
+}
+
+func (e *ReturnStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReturnStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReturnStatus", str)
+	}
+	return nil
+}
+
+func (e ReturnStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ReturnType string
+
+const (
+	ReturnTypeReturn      ReturnType = "RETURN"
+	ReturnTypeReplacement ReturnType = "REPLACEMENT"
+	ReturnTypeExchange    ReturnType = "EXCHANGE"
+)
+
+var AllReturnType = []ReturnType{
+	ReturnTypeReturn,
+	ReturnTypeReplacement,
+	ReturnTypeExchange,
+}
+
+func (e ReturnType) IsValid() bool {
+	switch e {
+	case ReturnTypeReturn, ReturnTypeReplacement, ReturnTypeExchange:
+		return true
+	}
+	return false
+}
+
+func (e ReturnType) String() string {
+	return string(e)
+}
+
+func (e *ReturnType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ReturnType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ReturnType", str)
+	}
+	return nil
+}
+
+func (e ReturnType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type Role string
 
 const (
-	RoleAdmin    Role = "ADMIN"
-	RoleMerchant Role = "MERCHANT"
-	RoleCustomer Role = "CUSTOMER"
+	RoleAdmin           Role = "ADMIN"
+	RoleUser            Role = "USER"
+	RoleMerchant        Role = "MERCHANT"
+	RoleDeliveryPartner Role = "DELIVERY_PARTNER"
 )
 
 var AllRole = []Role{
 	RoleAdmin,
+	RoleUser,
 	RoleMerchant,
-	RoleCustomer,
+	RoleDeliveryPartner,
 }
 
 func (e Role) IsValid() bool {
 	switch e {
-	case RoleAdmin, RoleMerchant, RoleCustomer:
+	case RoleAdmin, RoleUser, RoleMerchant, RoleDeliveryPartner:
 		return true
 	}
 	return false
@@ -883,5 +1341,52 @@ func (e *Role) UnmarshalGQL(v interface{}) error {
 }
 
 func (e Role) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type VerificationCondition string
+
+const (
+	VerificationConditionGood      VerificationCondition = "GOOD"
+	VerificationConditionDefective VerificationCondition = "DEFECTIVE"
+	VerificationConditionDamaged   VerificationCondition = "DAMAGED"
+	VerificationConditionWrongItem VerificationCondition = "WRONG_ITEM"
+	VerificationConditionOpenBox   VerificationCondition = "OPEN_BOX"
+)
+
+var AllVerificationCondition = []VerificationCondition{
+	VerificationConditionGood,
+	VerificationConditionDefective,
+	VerificationConditionDamaged,
+	VerificationConditionWrongItem,
+	VerificationConditionOpenBox,
+}
+
+func (e VerificationCondition) IsValid() bool {
+	switch e {
+	case VerificationConditionGood, VerificationConditionDefective, VerificationConditionDamaged, VerificationConditionWrongItem, VerificationConditionOpenBox:
+		return true
+	}
+	return false
+}
+
+func (e VerificationCondition) String() string {
+	return string(e)
+}
+
+func (e *VerificationCondition) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = VerificationCondition(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid VerificationCondition", str)
+	}
+	return nil
+}
+
+func (e VerificationCondition) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

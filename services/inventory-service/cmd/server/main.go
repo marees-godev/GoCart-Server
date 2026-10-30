@@ -116,9 +116,10 @@ func main() {
 	}
 
 	productClient := client.NewGRPCProductClient(prodGRPCClient, storeGRPCClient)
-
+	
 	invRepo := repository.NewInventoryRepository(db.Pool)
-	invService := service.NewInventoryService(invRepo, productClient)
+	whRepo := repository.NewWarehouseRepository(db.Pool)
+	invService := service.NewInventoryService(invRepo, productClient, whRepo)
 	cleanupInterval := time.Duration(cfg.Reservation.ExpirationCleanupIntervalSeconds) * time.Second
 	invService.StartExpirationWorker(ctx, cleanupInterval)
 	invGRPCServer := inventoryGRPC.NewInventoryGRPCServer(invService)

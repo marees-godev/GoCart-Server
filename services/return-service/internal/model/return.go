@@ -1,0 +1,224 @@
+package model
+
+import "time"
+
+type ReturnType string
+
+const (
+	ReturnTypeReturn      ReturnType = "RETURN"
+	ReturnTypeReplacement ReturnType = "REPLACEMENT"
+	ReturnTypeExchange    ReturnType = "EXCHANGE"
+)
+
+func (t ReturnType) IsValid() bool {
+	switch t {
+	case ReturnTypeReturn, ReturnTypeReplacement, ReturnTypeExchange:
+		return true
+	default:
+		return false
+	}
+}
+
+type ReturnStatus string
+
+const (
+	ReturnStatusRequested            ReturnStatus = "RETURN_REQUESTED"
+	ReturnStatusRequestedAlias       ReturnStatus = "REQUESTED"
+	ReturnStatusReplacementRequested ReturnStatus = "REPLACEMENT_REQUESTED"
+	ReturnStatusExchangeRequested    ReturnStatus = "EXCHANGE_REQUESTED"
+	ReturnStatusUnderReview          ReturnStatus = "UNDER_REVIEW"
+	ReturnStatusApproved             ReturnStatus = "APPROVED"
+	ReturnStatusRejected             ReturnStatus = "REJECTED"
+	ReturnStatusPickupScheduled      ReturnStatus = "PICKUP_SCHEDULED"
+	ReturnStatusPickedUp             ReturnStatus = "PICKED_UP"
+	ReturnStatusReceived             ReturnStatus = "RECEIVED"
+	ReturnStatusItemReceived         ReturnStatus = "ITEM_RECEIVED"
+	ReturnStatusVerified             ReturnStatus = "VERIFIED"
+	ReturnStatusRefundInitiated      ReturnStatus = "REFUND_INITIATED"
+	ReturnStatusReplacementInitiated ReturnStatus = "REPLACEMENT_INITIATED"
+	ReturnStatusExchangeInitiated    ReturnStatus = "EXCHANGE_INITIATED"
+	ReturnStatusCompleted            ReturnStatus = "COMPLETED"
+	ReturnStatusCancelled            ReturnStatus = "CANCELLED"
+)
+
+func (s ReturnStatus) IsValid() bool {
+	switch s {
+	case ReturnStatusRequested, ReturnStatusRequestedAlias, ReturnStatusReplacementRequested, ReturnStatusExchangeRequested,
+		ReturnStatusUnderReview, ReturnStatusApproved, ReturnStatusRejected, ReturnStatusPickupScheduled,
+		ReturnStatusPickedUp, ReturnStatusReceived, ReturnStatusItemReceived, ReturnStatusVerified,
+		ReturnStatusRefundInitiated, ReturnStatusReplacementInitiated, ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted, ReturnStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// AllowedStatusTransitions defines permitted state transitions for ReturnStatus.
+var AllowedStatusTransitions = map[ReturnStatus][]ReturnStatus{
+	ReturnStatusRequested: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusRequestedAlias: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusReplacementRequested: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusExchangeRequested: {
+		ReturnStatusUnderReview,
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusVerified,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusUnderReview: {
+		ReturnStatusApproved,
+		ReturnStatusRejected,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusApproved: {
+		ReturnStatusPickupScheduled,
+		ReturnStatusPickedUp,
+		ReturnStatusItemReceived,
+		ReturnStatusReceived,
+		ReturnStatusVerified,
+		ReturnStatusRejected,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusPickupScheduled: {
+		ReturnStatusPickedUp,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusPickedUp: {
+		ReturnStatusReceived,
+		ReturnStatusItemReceived,
+		ReturnStatusVerified,
+	},
+	ReturnStatusReceived: {
+		ReturnStatusVerified,
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusItemReceived: {
+		ReturnStatusVerified,
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusVerified: {
+		ReturnStatusReceived,
+		ReturnStatusItemReceived,
+		ReturnStatusRefundInitiated,
+		ReturnStatusReplacementInitiated,
+		ReturnStatusExchangeInitiated,
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusRefundInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusRejected,
+	},
+	ReturnStatusReplacementInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusExchangeInitiated: {
+		ReturnStatusCompleted,
+		ReturnStatusCancelled,
+	},
+	ReturnStatusCompleted: {},
+	ReturnStatusRejected:  {},
+	ReturnStatusCancelled: {},
+}
+
+func (s ReturnStatus) CanTransitionTo(target ReturnStatus) bool {
+	if s == target {
+		return true
+	}
+	allowed, ok := AllowedStatusTransitions[s]
+	if !ok {
+		return false
+	}
+	for _, a := range allowed {
+		if a == target {
+			return true
+		}
+	}
+	return false
+}
+
+type VerificationCondition string
+
+const (
+	ConditionGood      VerificationCondition = "GOOD"
+	ConditionDefective VerificationCondition = "DEFECTIVE"
+	ConditionDamaged   VerificationCondition = "DAMAGED"
+	ConditionWrongItem VerificationCondition = "WRONG_ITEM"
+	ConditionOpenBox   VerificationCondition = "OPEN_BOX"
+)
+
+func (c VerificationCondition) IsValid() bool {
+	switch c {
+	case ConditionGood, ConditionDefective, ConditionDamaged, ConditionWrongItem, ConditionOpenBox:
+		return true
+	default:
+		return false
+	}
+}
+
+type ProductVerification struct {
+	ID          string                `json:"id" db:"id"`
+	ReturnID    string                `json:"return_id" db:"return_id"`
+	VerifiedBy  string                `json:"verified_by" db:"verified_by"`
+	Condition   VerificationCondition `json:"condition" db:"condition"`
+	IsApproved  bool                  `json:"is_approved" db:"is_approved"`
+	ProofImages []string              `json:"proof_images,omitempty"`
+	Notes       string                `json:"notes,omitempty" db:"notes"`
+	VerifiedAt  time.Time             `json:"verified_at" db:"verified_at"`
+	CreatedAt   time.Time             `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at" db:"updated_at"`
+}
+
+type VerificationImage struct {
+	ID             string    `json:"id" db:"id"`
+	VerificationID string    `json:"verification_id" db:"verification_id"`
+	ImageURL       string    `json:"image_url" db:"image_url"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+}
+
+type Return struct {
+	ID              string               `json:"id" db:"id"`
+	OrderID         string               `json:"order_id" db:"order_id"`
+	OrderItemID     string               `json:"order_item_id" db:"order_item_id"`
+	UserID          string               `json:"user_id" db:"user_id"`
+	Reason          string               `json:"reason" db:"reason"`
+	Status          ReturnStatus         `json:"status" db:"status"`
+	Type            ReturnType           `json:"type" db:"type"`
+	RefundAmount    float64              `json:"refund_amount" db:"refund_amount"`
+	Verification    *ProductVerification `json:"verification,omitempty"`
+	RequestedAt     time.Time            `json:"requested_at" db:"requested_at"`
+	ApprovedAt      *time.Time           `json:"approved_at,omitempty" db:"approved_at"`
+	CompletedAt     *time.Time           `json:"completed_at,omitempty" db:"completed_at"`
+	RejectionReason string               `json:"rejection_reason,omitempty" db:"rejection_reason"`
+	CreatedAt       time.Time            `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at" db:"updated_at"`
+}
+

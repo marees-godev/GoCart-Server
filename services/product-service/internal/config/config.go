@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -24,6 +26,23 @@ type Config struct {
 	Storage  StorageConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Kafka    KafkaConfig
+	Outbox   OutboxConfig
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 type AppConfig struct {
@@ -40,6 +59,7 @@ type GRPCConfig struct {
 	Port                string
 	StoreServiceAddr    string
 	CategoryServiceAddr string
+	MerchantServiceAddr string
 }
 
 type DatabaseConfig struct {
@@ -80,6 +100,7 @@ func LoadEnv() *Config {
 			Port:                GetEnv("PRODUCT_SERVICE_GRPC_PORT", GetEnv("GRPC_PORT", "50053")),
 			StoreServiceAddr:    GetEnv("STORE_SERVICE_GRPC_ADDR", "localhost:50055"),
 			CategoryServiceAddr: GetEnv("CATEGORY_SERVICE_GRPC_ADDR", "localhost:50054"),
+			MerchantServiceAddr: GetEnv("MERCHANT_SERVICE_GRPC_ADDR", "localhost:50056"),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("PRODUCT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),
@@ -104,6 +125,19 @@ func LoadEnv() *Config {
 			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
+		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "product-service"),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   time.Duration(GetEnvAsInt("OUTBOX_POLL_INTERVAL_MS", 1000)) * time.Millisecond,
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 1000)) * time.Millisecond,
+			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.product.dlq"),
 		},
 	}
 }
@@ -137,4 +171,22 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			result = append(result, t)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
 }

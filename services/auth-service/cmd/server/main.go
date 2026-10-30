@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	pb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -41,7 +42,13 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
-	// 2. Initialize distributed tracing
+	// 2. Validate configuration and JWT secret before starting servers
+	if err := cfg.Validate(); err != nil {
+		log.Error("Startup validation failed: JWT secret misconfigured", "error", err)
+		os.Exit(1)
+	}
+
+	// 3. Initialize distributed tracing
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
 		Environment: cfg.App.Environment,
@@ -60,7 +67,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// 3. Initialize database connection pool
+	// 4. Initialize database connection pool
 	db, err := database.New(ctx, database.Config{
 		URL:            cfg.Database.URL,
 		MaxConns:       cfg.Database.MaxConns,
@@ -75,7 +82,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// 4. Run auto migrations if enabled
+	// 5. Run auto migrations if enabled
 	if cfg.Database.AutoMigrate {
 		migrator, err := database.NewMigrator(db.Pool, cfg.Database.MigrationsPath)
 		if err != nil {
@@ -88,7 +95,7 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 6. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -104,8 +111,12 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	// 6. Initialize business logic layers & gRPC handler
-	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, 5*time.Second)
+	// 7. Initialize business logic layers & gRPC handler
+	clientTimeout := cfg.GRPC.ClientTimeout
+	if clientTimeout <= 0 {
+		clientTimeout = 30 * time.Second
+	}
+	userClient, userConn, err := grpcclient.NewUserClient(cfg.UserServiceAddr, clientTimeout)
 	if err != nil {
 		log.Error("Failed to initialize required user service client", "addr", cfg.UserServiceAddr, "error", err)
 		os.Exit(1)
@@ -114,12 +125,23 @@ func main() {
 
 	var merchantClient merchantpb.MerchantServiceClient
 	if cfg.Services.MerchantServiceURL != "" {
-		mClient, conn, err := grpcclient.NewMerchantClient(cfg.Services.MerchantServiceURL, 5*time.Second)
+		mClient, conn, err := grpcclient.NewMerchantClient(cfg.Services.MerchantServiceURL, clientTimeout)
 		if err != nil {
 			log.Warn("Failed to initialize merchant service gRPC client", "error", err)
 		} else {
 			defer conn.Close()
 			merchantClient = mClient
+		}
+	}
+
+	var deliveryClient deliverypb.DeliveryServiceClient
+	if cfg.Services.DeliveryServiceURL != "" {
+		dClient, conn, err := grpcclient.NewDeliveryClient(cfg.Services.DeliveryServiceURL, clientTimeout)
+		if err != nil {
+			log.Warn("Failed to initialize delivery service gRPC client", "error", err)
+		} else {
+			defer conn.Close()
+			deliveryClient = dClient
 		}
 	}
 
@@ -134,9 +156,9 @@ func main() {
 	}
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, otpStore, redisClient)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, deliveryClient, otpStore, redisClient)
 
-	// 7. Initialize gRPC server for all Auth operations
+	// 8. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))
 	grpcHandler := authGRPC.NewAuthGRPCHandler(authSvc, log)
 	pb.RegisterAuthServiceServer(grpcServer, grpcHandler)
@@ -178,4 +200,3 @@ func main() {
 
 	log.Info("Service stopped", "service", cfg.App.Name)
 }
-

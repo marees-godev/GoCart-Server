@@ -3,6 +3,7 @@ type CartItem {
   productId: String!
   quantity: Int!
   unitPrice: Float!
+  totalPrice: Float!
 }
 
 type Cart {
@@ -10,21 +11,20 @@ type Cart {
   userId: String!
   items: [CartItem!]!
   totalAmount: Float!
+  totalItems: Int!
 }
 
 input AddToCartInput {
-  userId: String!
   productId: String!
   quantity: Int!
-  unitPrice: Float!
 }
 
 extend type Query {
-  cart(userId: ID!): Cart @auth
+  cart(userId: ID): Cart @auth
 }
 
 extend type Mutation {
   addToCart(input: AddToCartInput!): Cart @auth
-  removeFromCart(userId: ID!, productId: ID!): Cart @auth
-  clearCart(userId: ID!): Boolean! @auth
+  removeFromCart(userId: ID, productId: ID!): Cart @auth
+  clearCart(userId: ID): Boolean! @auth
 }

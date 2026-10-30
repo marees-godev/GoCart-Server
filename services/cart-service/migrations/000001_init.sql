@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_unique_variant ON cart_items(cart_id, product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_unique_variant ON cart_items(cart_id, product_id, variant_id) NULLS NOT DISTINCT;
 
 CREATE TABLE IF NOT EXISTS outbox_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

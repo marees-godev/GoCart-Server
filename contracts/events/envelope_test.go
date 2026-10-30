@@ -351,5 +351,292 @@ func TestStoreEventsSerialization(t *testing.T) {
 			t.Errorf("restored payload mismatch: %+v", restored)
 		}
 	})
+
+	t.Run("PaymentCancelledEvent", func(t *testing.T) {
+		payload := events.PaymentCancelledEvent{
+			PaymentID:   "pay-cancelled-1",
+			OrderID:     "ord-cancelled-1",
+			UserID:      "usr-1",
+			Amount:      100.0,
+			Currency:    "USD",
+			Reason:      "User requested cancellation",
+			CancelledAt: now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentCancelled, "payment-service", payload.PaymentID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.PaymentCancelledEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.PaymentID != "pay-cancelled-1" || restored.Reason != "User requested cancellation" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("RefundInitiatedEvent", func(t *testing.T) {
+		payload := events.RefundInitiatedEvent{
+			RefundID:    "ref-init-1",
+			PaymentID:   "pay-ref-1",
+			OrderID:     "ord-ref-1",
+			Amount:      45.50,
+			Currency:    "USD",
+			Reason:      "Return approved",
+			InitiatedAt: now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeRefundInitiated, "payment-service", payload.RefundID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.RefundInitiatedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.RefundID != "ref-init-1" || restored.Amount != 45.50 {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("RefundCompletedEvent", func(t *testing.T) {
+		payload := events.RefundCompletedEvent{
+			RefundID:        "ref-comp-1",
+			PaymentID:       "pay-ref-1",
+			OrderID:         "ord-ref-1",
+			Amount:          45.50,
+			Currency:        "USD",
+			GatewayRefundID: "gw_ref_123",
+			IsPartial:       true,
+			PaymentStatus:   "PARTIALLY_REFUNDED",
+			CompletedAt:     now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeRefundCompleted, "payment-service", payload.RefundID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.RefundCompletedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.RefundID != "ref-comp-1" || !restored.IsPartial || restored.GatewayRefundID != "gw_ref_123" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("RefundFailedEvent", func(t *testing.T) {
+		payload := events.RefundFailedEvent{
+			RefundID:  "ref-fail-1",
+			PaymentID: "pay-ref-1",
+			OrderID:   "ord-ref-1",
+			Amount:    45.50,
+			Reason:    "Gateway timeout",
+			FailedAt:  now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeRefundFailed, "payment-service", payload.RefundID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.RefundFailedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.RefundID != "ref-fail-1" || restored.Reason != "Gateway timeout" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+	t.Run("ProductCreatedEvent", func(t *testing.T) {
+		payload := events.ProductCreatedEvent{
+			ProductID:   "prod-101",
+			StoreID:     "store-202",
+			CategoryID:  "cat-303",
+			SKU:         "SKU-ABC-1",
+			Name:        "Wireless Mechanical Keyboard",
+			Description: "High-performance wireless keyboard",
+			Price:       89.99,
+			Currency:    "USD",
+			Status:      "DRAFT",
+			CreatedAt:   now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeProductCreated, "product-service", payload.ProductID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		if env.EventType != events.EventTypeProductCreated {
+			t.Errorf("expected EventType %s, got %s", events.EventTypeProductCreated, env.EventType)
+		}
+		if env.AggregateID != "prod-101" {
+			t.Errorf("expected aggregate_id prod-101, got %s", env.AggregateID)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.ProductCreatedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.ProductID != "prod-101" || restored.StoreID != "store-202" || restored.Price != 89.99 {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("ProductUpdatedEvent", func(t *testing.T) {
+		payload := events.ProductUpdatedEvent{
+			ProductID:   "prod-101",
+			StoreID:     "store-202",
+			CategoryID:  "cat-303",
+			SKU:         "SKU-ABC-1",
+			Name:        "Wireless Mechanical Keyboard Pro",
+			Description: "Updated high-performance wireless keyboard",
+			Price:       99.99,
+			Currency:    "USD",
+			Status:      "DRAFT",
+			UpdatedAt:   now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeProductUpdated, "product-service", payload.ProductID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.ProductUpdatedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.ProductID != "prod-101" || restored.StoreID != "store-202" || restored.Price != 99.99 {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("ProductPublishedEvent", func(t *testing.T) {
+		payload := events.ProductPublishedEvent{
+			ProductID:   "prod-101",
+			StoreID:     "store-202",
+			CategoryID:  "cat-303",
+			SKU:         "SKU-ABC-1",
+			Name:        "Wireless Mechanical Keyboard Pro",
+			Price:       99.99,
+			Currency:    "USD",
+			PublishedAt: now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeProductPublished, "product-service", payload.ProductID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.ProductPublishedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.ProductID != "prod-101" || restored.StoreID != "store-202" || restored.Price != 99.99 {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("ProductDeletedEvent", func(t *testing.T) {
+		payload := events.ProductDeletedEvent{
+			ProductID: "prod-101",
+			StoreID:   "store-202",
+			Status:    "DELETED",
+			DeletedAt: now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeProductDeleted, "product-service", payload.ProductID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.ProductDeletedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.ProductID != "prod-101" || restored.StoreID != "store-202" || restored.Status != "DELETED" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
+
+	t.Run("OrderPaymentFailedEvent", func(t *testing.T) {
+		now := time.Now().UTC()
+		payload := events.OrderPaymentFailedEvent{
+			OrderID:   "ord-fail-999",
+			PaymentID: "pay-fail-888",
+			Reason:    "Insufficient funds",
+			FailedAt:  now,
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", payload.OrderID, payload)
+		if err != nil {
+			t.Fatalf("failed creating envelope: %v", err)
+		}
+		bytes, err := env.Marshal()
+		if err != nil {
+			t.Fatalf("failed marshaling envelope: %v", err)
+		}
+		unmarshaled, err := events.UnmarshalEnvelope(bytes)
+		if err != nil {
+			t.Fatalf("failed unmarshaling envelope: %v", err)
+		}
+		var restored events.OrderPaymentFailedEvent
+		if err := unmarshaled.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed unmarshaling data: %v", err)
+		}
+		if restored.OrderID != "ord-fail-999" || restored.PaymentID != "pay-fail-888" || restored.Reason != "Insufficient funds" {
+			t.Errorf("restored payload mismatch: %+v", restored)
+		}
+	})
 }
 

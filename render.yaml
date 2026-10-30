@@ -13,6 +13,9 @@ services:
     dockerContext: .
     healthCheckPath: /health
     envVars:
+      # ==============================================================================
+      # Core Application & Global Process Configuration
+      # ==============================================================================
       - key: APP_NAME
         value: gocart-backend
       - key: APP_ENV
@@ -21,60 +24,314 @@ services:
         value: info
       - key: LOG_FORMAT
         value: json
+      - key: GOMEMLIMIT
+        value: 25MiB
+      - key: GOGC
+        value: "50"
       - key: DB_AUTO_MIGRATE
         value: "true"
-      # External PostgreSQL Connection URL (Neon / Supabase / etc.)
+      - key: DB_MAX_CONNS
+        value: "5"
+      - key: DB_MIN_CONNS
+        value: "1"
+
+      # ==============================================================================
+      # 14 Microservice Databases (PostgreSQL / Aiven)
+      # ==============================================================================
       - key: DATABASE_URL
-        # value injected via Render secret; keep key only
-        sync: true
+        sync: false
       - key: AUTH_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: PAYMENT_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: ORDER_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: DELIVERY_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: RETURNS_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: PRODUCT_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: CATEGORY_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: STORE_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: MERCHANT_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      - key: CART_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
+        sync: false
       - key: USER_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
+        sync: false
+      - key: PRODUCT_SERVICE_DATABASE_URL
+        sync: false
+      - key: CATEGORY_SERVICE_DATABASE_URL
+        sync: false
+      - key: STORE_SERVICE_DATABASE_URL
+        sync: false
+      - key: MERCHANT_SERVICE_DATABASE_URL
+        sync: false
+      - key: CART_SERVICE_DATABASE_URL
+        sync: false
       - key: INVENTORY_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
+        sync: false
+      - key: ORDER_SERVICE_DATABASE_URL
+        sync: false
+      - key: PAYMENT_SERVICE_DATABASE_URL
+        sync: false
+      - key: DELIVERY_SERVICE_DATABASE_URL
+        sync: false
+      - key: RETURN_SERVICE_DATABASE_URL
+        sync: false
       - key: RATINGS_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
+        sync: false
       - key: NOTIFICATIONS_SERVICE_DATABASE_URL
-        # value injected via Render secret; keep key only
-      # Store Service S3 Storage Configuration
+        sync: false
+
+      # ==============================================================================
+      # S3 / Object Storage (Supabase Storage / AWS S3)
+      # ==============================================================================
+      # 1. Store Service S3 Storage (Store banners & logos)
       - key: STORE_S3_ENDPOINT
+        value: https://cljkfzbiywvhzpmlbbuy.storage.supabase.co/storage/v1/s3
       - key: STORE_S3_REGION
+        value: ap-south-1
       - key: STORE_S3_ACCESS_KEY_ID
+        sync: false
       - key: STORE_S3_SECRET_ACCESS_KEY
+        sync: false
       - key: STORE_S3_BUCKET
+        value: store-bucket
       - key: STORE_S3_PUBLIC_URL_PREFIX
-      # External Redis Connection URL / Addr (Upstash / etc.)
+        value: https://cljkfzbiywvhzpmlbbuy.supabase.co/storage/v1/object/public/store-bucket
+
+      # 2. User Service S3 Storage (User avatars)
+      - key: USER_S3_ENDPOINT
+        value: https://skqvtkreczfavalydinl.storage.supabase.co/storage/v1/s3
+      - key: USER_S3_REGION
+        value: ap-south-1
+      - key: USER_S3_ACCESS_KEY_ID
+        sync: false
+      - key: USER_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: USER_S3_BUCKET
+        value: users-bucket
+      - key: USER_S3_PUBLIC_URL_PREFIX
+        value: https://skqvtkreczfavalydinl.supabase.co/storage/v1/object/public/users-bucket
+
+      # 3. Product Service S3 Storage (Product catalog images)
+      - key: PRODUCT_S3_ENDPOINT
+        value: https://evgotinlxjijpglixpmn.storage.supabase.co/storage/v1/s3
+      - key: PRODUCT_S3_REGION
+        value: ap-south-1
+      - key: PRODUCT_S3_ACCESS_KEY_ID
+        sync: false
+      - key: PRODUCT_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: PRODUCT_S3_BUCKET
+        value: products-bucket
+      - key: PRODUCT_S3_PUBLIC_URL_PREFIX
+        value: https://evgotinlxjijpglixpmn.supabase.co/storage/v1/object/public/products-bucket
+
+      # ==============================================================================
+      # Email & OTP Providers (Auth Service)
+      # ==============================================================================
+      - key: EMAIL_FROM
+        value: onboarding@resend.dev
+      - key: EMAIL_VERIFY_BASE_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: onboarding@resend.dev
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        value: nikotest122@gmail.com
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_OTP_TTL_MINUTES
+        value: "5"
+      - key: EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+        value: "60"
+
+      # ==============================================================================
+      # Auth Security & Lockout Policies (Auth Service)
+      # ==============================================================================
+      - key: JWT_EXPIRY_MINUTES
+        value: "60"
+      - key: MAX_LOGIN_ATTEMPTS
+        value: "5"
+      - key: LOGIN_ATTEMPT_WINDOW
+        value: 15m
+      - key: ACCOUNT_LOCK_DURATION
+        value: 15m
+      - key: PASSWORD_RESET_OTP_TTL_MINUTES
+        value: "15"
+      - key: PASSWORD_RESET_MAX_REQUESTS
+        value: "3"
+      - key: PASSWORD_RESET_REQUEST_WINDOW
+        value: 15m
+      - key: PASSWORD_RESET_MAX_ATTEMPTS
+        value: "5"
+      - key: PASSWORD_RESET_LOCKOUT_DURATION
+        value: 1h
+
+      # ==============================================================================
+      # Account Retention Policy (User Service)
+      # ==============================================================================
+      - key: RETENTION_WORKER_INTERVAL
+        value: 1h
+      - key: ACCOUNT_RETENTION_PERIOD
+        value: 720h
+
+      # ==============================================================================
+      # Inventory Reservation Cleaner (Inventory Service)
+      # ==============================================================================
+      - key: DEFAULT_RESERVATION_EXPIRATION_MINUTES
+        value: "15"
+      - key: RESERVATION_EXPIRATION_CLEANUP_INTERVAL_SECONDS
+        value: "30"
+
+      # ==============================================================================
+      # Payment Gateway Configuration (Payment Service)
+      # ==============================================================================
+      - key: PAYMENT_GATEWAY_PROVIDER
+        value: mock
+      - key: PAYMENT_GATEWAY_API_KEY
+        value: mock_key
+      - key: PAYMENT_GATEWAY_TIMEOUT_SECONDS
+        value: "10"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # ==============================================================================
+      # Merchant GSTIN Verification (Store Service)
+      # ==============================================================================
+      - key: GSTIN_VERIFICATION_ENABLED
+        value: "true"
+      - key: GSTIN_API_KEY
+        sync: false
+      - key: GSTIN_API_BASE_URL
+        value: https://www.gstinapi.in/v1
+      - key: GSTIN_API_TIMEOUT_SECONDS
+        value: "10"
+
+      # ==============================================================================
+      # Cache & Redis Configuration (Auth & Cart Services)
+      # ==============================================================================
       - key: REDIS_URL
         sync: false
-      # Security & JWT Configuration
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PORT
+        value: "6379"
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_DB
+        value: "0"
+      - key: REDIS_ENABLE_TLS
+        value: "false"
+      - key: REDIS_POOL_SIZE
+        value: "20"
+      - key: REDIS_MIN_IDLE_CONNS
+        value: "5"
+      - key: REDIS_CONNECT_TIMEOUT
+        value: 5s
+
+      # ==============================================================================
+      # Event Streaming & Transactional Outbox (Kafka)
+      # ==============================================================================
+      - key: KAFKA_ENABLED
+        value: "false"
+      - key: KAFKA_BROKERS
+        value: localhost:9092
+      - key: KAFKA_CLIENT_ID
+        value: gocart-service
+      - key: OUTBOX_ENABLED
+        value: "true"
+      - key: OUTBOX_POLL_INTERVAL_MS
+        value: "2000"
+      - key: OUTBOX_BATCH_SIZE
+        value: "50"
+      - key: OUTBOX_MAX_RETRIES
+        value: "5"
+      - key: OUTBOX_BASE_RETRY_DELAY_MS
+        value: "1000"
+      - key: OUTBOX_MAX_RETRY_DELAY_MS
+        value: "60000"
+      - key: OUTBOX_DLQ_TOPIC
+        value: gocart.dlq
+
+      # ==============================================================================
+      # API Gateway Security, CORS & Rate Limiting
+      # ==============================================================================
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_ISSUER
         value: gocart-api-gateway
-      # GraphQL settings
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: ADMIN_USER_ID
+        value: super-admin-identity
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+      - key: CORS_ALLOWED_METHODS
+        value: GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD
+      - key: CORS_ALLOWED_HEADERS
+        value: Origin,Content-Type,Accept,Authorization,X-Requested-With,X-Request-ID,X-Admin-Key
+      - key: CORS_EXPOSED_HEADERS
+        value: Content-Length,Access-Control-Allow-Origin,Access-Control-Allow-Headers
+      - key: CORS_ALLOW_CREDENTIALS
+        value: "true"
+      - key: CORS_MAX_AGE
+        value: "86400"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "1000"
+      - key: RATE_LIMIT_WINDOW
+        value: 1m
       - key: GRAPHQL_PLAYGROUND_ENABLED
         value: "true"
       - key: GRAPHQL_INTROSPECTION_ENABLED
         value: "true"
-      # Observability
       - key: TRACING_ENABLED
         value: "false"
+      - key: TRACING_EXPORTER
+        value: stdout
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: localhost:4317
+
+      # ==============================================================================
+      # Internal Microservice Inter-Communication (gRPC inside container)
+      # ==============================================================================
+      - key: GRPC_DEFAULT_TIMEOUT
+        value: 30s
+      - key: AUTH_SERVICE_GRPC_ADDR
+        value: localhost:50051
+      - key: USER_SERVICE_GRPC_ADDR
+        value: localhost:50052
+      - key: PRODUCT_SERVICE_GRPC_ADDR
+        value: localhost:50053
+      - key: CATEGORY_SERVICE_GRPC_ADDR
+        value: localhost:50054
+      - key: STORE_SERVICE_GRPC_ADDR
+        value: localhost:50055
+      - key: MERCHANT_SERVICE_GRPC_ADDR
+        value: localhost:50056
+      - key: CART_SERVICE_GRPC_ADDR
+        value: localhost:50057
+      - key: INVENTORY_SERVICE_GRPC_ADDR
+        value: localhost:50058
+      - key: ORDER_SERVICE_GRPC_ADDR
+        value: localhost:50059
+      - key: PAYMENT_SERVICE_GRPC_ADDR
+        value: localhost:50060
+      - key: DELIVERY_SERVICE_GRPC_ADDR
+        value: localhost:50061
+      - key: RETURN_SERVICE_GRPC_ADDR
+        value: localhost:50062
+      - key: RATING_SERVICE_GRPC_ADDR
+        value: localhost:50063
+      - key: NOTIFICATION_SERVICE_GRPC_ADDR
+        value: localhost:50064
+      - key: MERCHANT_SERVICE_GRPC_URL
+        value: localhost:50056
+      - key: DELIVERY_SERVICE_GRPC_URL
+        value: localhost:50061
+      - key: MERCHANT_SERVICE_URL
+        value: http://localhost:7600
+      - key: ORDER_SERVICE_URL
+        value: localhost:50059

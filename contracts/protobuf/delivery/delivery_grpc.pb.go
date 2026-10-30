@@ -19,9 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DeliveryService_CreateDelivery_FullMethodName       = "/gocart.delivery.v1.DeliveryService/CreateDelivery"
-	DeliveryService_GetDelivery_FullMethodName          = "/gocart.delivery.v1.DeliveryService/GetDelivery"
-	DeliveryService_UpdateDeliveryStatus_FullMethodName = "/gocart.delivery.v1.DeliveryService/UpdateDeliveryStatus"
+	DeliveryService_CreateDelivery_FullMethodName        = "/gocart.delivery.v1.DeliveryService/CreateDelivery"
+	DeliveryService_GetDelivery_FullMethodName           = "/gocart.delivery.v1.DeliveryService/GetDelivery"
+	DeliveryService_GetDeliveryByTracking_FullMethodName = "/gocart.delivery.v1.DeliveryService/GetDeliveryByTracking"
+	DeliveryService_GetDeliveryByOrder_FullMethodName    = "/gocart.delivery.v1.DeliveryService/GetDeliveryByOrder"
+	DeliveryService_UpdateDeliveryStatus_FullMethodName  = "/gocart.delivery.v1.DeliveryService/UpdateDeliveryStatus"
+	DeliveryService_CreatePartnerProfile_FullMethodName  = "/gocart.delivery.v1.DeliveryService/CreatePartnerProfile"
+	DeliveryService_GetPartnerProfile_FullMethodName     = "/gocart.delivery.v1.DeliveryService/GetPartnerProfile"
+	DeliveryService_UpdatePartnerProfile_FullMethodName  = "/gocart.delivery.v1.DeliveryService/UpdatePartnerProfile"
 )
 
 // DeliveryServiceClient is the client API for DeliveryService service.
@@ -30,7 +35,12 @@ const (
 type DeliveryServiceClient interface {
 	CreateDelivery(ctx context.Context, in *CreateDeliveryRequest, opts ...grpc.CallOption) (*CreateDeliveryResponse, error)
 	GetDelivery(ctx context.Context, in *GetDeliveryRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error)
+	GetDeliveryByTracking(ctx context.Context, in *GetDeliveryByTrackingRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error)
+	GetDeliveryByOrder(ctx context.Context, in *GetDeliveryByOrderRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error)
 	UpdateDeliveryStatus(ctx context.Context, in *UpdateDeliveryStatusRequest, opts ...grpc.CallOption) (*UpdateDeliveryStatusResponse, error)
+	CreatePartnerProfile(ctx context.Context, in *CreatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	GetPartnerProfile(ctx context.Context, in *GetPartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	UpdatePartnerProfile(ctx context.Context, in *UpdatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
 }
 
 type deliveryServiceClient struct {
@@ -61,10 +71,60 @@ func (c *deliveryServiceClient) GetDelivery(ctx context.Context, in *GetDelivery
 	return out, nil
 }
 
+func (c *deliveryServiceClient) GetDeliveryByTracking(ctx context.Context, in *GetDeliveryByTrackingRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDeliveryResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_GetDeliveryByTracking_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) GetDeliveryByOrder(ctx context.Context, in *GetDeliveryByOrderRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDeliveryResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_GetDeliveryByOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *deliveryServiceClient) UpdateDeliveryStatus(ctx context.Context, in *UpdateDeliveryStatusRequest, opts ...grpc.CallOption) (*UpdateDeliveryStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateDeliveryStatusResponse)
 	err := c.cc.Invoke(ctx, DeliveryService_UpdateDeliveryStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) CreatePartnerProfile(ctx context.Context, in *CreatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_CreatePartnerProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) GetPartnerProfile(ctx context.Context, in *GetPartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_GetPartnerProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) UpdatePartnerProfile(ctx context.Context, in *UpdatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_UpdatePartnerProfile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +137,12 @@ func (c *deliveryServiceClient) UpdateDeliveryStatus(ctx context.Context, in *Up
 type DeliveryServiceServer interface {
 	CreateDelivery(context.Context, *CreateDeliveryRequest) (*CreateDeliveryResponse, error)
 	GetDelivery(context.Context, *GetDeliveryRequest) (*GetDeliveryResponse, error)
+	GetDeliveryByTracking(context.Context, *GetDeliveryByTrackingRequest) (*GetDeliveryResponse, error)
+	GetDeliveryByOrder(context.Context, *GetDeliveryByOrderRequest) (*GetDeliveryResponse, error)
 	UpdateDeliveryStatus(context.Context, *UpdateDeliveryStatusRequest) (*UpdateDeliveryStatusResponse, error)
+	CreatePartnerProfile(context.Context, *CreatePartnerProfileRequest) (*PartnerProfileResponse, error)
+	GetPartnerProfile(context.Context, *GetPartnerProfileRequest) (*PartnerProfileResponse, error)
+	UpdatePartnerProfile(context.Context, *UpdatePartnerProfileRequest) (*PartnerProfileResponse, error)
 	mustEmbedUnimplementedDeliveryServiceServer()
 }
 
@@ -94,8 +159,23 @@ func (UnimplementedDeliveryServiceServer) CreateDelivery(context.Context, *Creat
 func (UnimplementedDeliveryServiceServer) GetDelivery(context.Context, *GetDeliveryRequest) (*GetDeliveryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDelivery not implemented")
 }
+func (UnimplementedDeliveryServiceServer) GetDeliveryByTracking(context.Context, *GetDeliveryByTrackingRequest) (*GetDeliveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDeliveryByTracking not implemented")
+}
+func (UnimplementedDeliveryServiceServer) GetDeliveryByOrder(context.Context, *GetDeliveryByOrderRequest) (*GetDeliveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDeliveryByOrder not implemented")
+}
 func (UnimplementedDeliveryServiceServer) UpdateDeliveryStatus(context.Context, *UpdateDeliveryStatusRequest) (*UpdateDeliveryStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateDeliveryStatus not implemented")
+}
+func (UnimplementedDeliveryServiceServer) CreatePartnerProfile(context.Context, *CreatePartnerProfileRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePartnerProfile not implemented")
+}
+func (UnimplementedDeliveryServiceServer) GetPartnerProfile(context.Context, *GetPartnerProfileRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPartnerProfile not implemented")
+}
+func (UnimplementedDeliveryServiceServer) UpdatePartnerProfile(context.Context, *UpdatePartnerProfileRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdatePartnerProfile not implemented")
 }
 func (UnimplementedDeliveryServiceServer) mustEmbedUnimplementedDeliveryServiceServer() {}
 func (UnimplementedDeliveryServiceServer) testEmbeddedByValue()                         {}
@@ -154,6 +234,42 @@ func _DeliveryService_GetDelivery_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeliveryService_GetDeliveryByTracking_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDeliveryByTrackingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).GetDeliveryByTracking(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_GetDeliveryByTracking_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).GetDeliveryByTracking(ctx, req.(*GetDeliveryByTrackingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_GetDeliveryByOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDeliveryByOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).GetDeliveryByOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_GetDeliveryByOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).GetDeliveryByOrder(ctx, req.(*GetDeliveryByOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DeliveryService_UpdateDeliveryStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateDeliveryStatusRequest)
 	if err := dec(in); err != nil {
@@ -168,6 +284,60 @@ func _DeliveryService_UpdateDeliveryStatus_Handler(srv interface{}, ctx context.
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DeliveryServiceServer).UpdateDeliveryStatus(ctx, req.(*UpdateDeliveryStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_CreatePartnerProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePartnerProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).CreatePartnerProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_CreatePartnerProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).CreatePartnerProfile(ctx, req.(*CreatePartnerProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_GetPartnerProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPartnerProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).GetPartnerProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_GetPartnerProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).GetPartnerProfile(ctx, req.(*GetPartnerProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_UpdatePartnerProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePartnerProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).UpdatePartnerProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_UpdatePartnerProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).UpdatePartnerProfile(ctx, req.(*UpdatePartnerProfileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -188,8 +358,28 @@ var DeliveryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DeliveryService_GetDelivery_Handler,
 		},
 		{
+			MethodName: "GetDeliveryByTracking",
+			Handler:    _DeliveryService_GetDeliveryByTracking_Handler,
+		},
+		{
+			MethodName: "GetDeliveryByOrder",
+			Handler:    _DeliveryService_GetDeliveryByOrder_Handler,
+		},
+		{
 			MethodName: "UpdateDeliveryStatus",
 			Handler:    _DeliveryService_UpdateDeliveryStatus_Handler,
+		},
+		{
+			MethodName: "CreatePartnerProfile",
+			Handler:    _DeliveryService_CreatePartnerProfile_Handler,
+		},
+		{
+			MethodName: "GetPartnerProfile",
+			Handler:    _DeliveryService_GetPartnerProfile_Handler,
+		},
+		{
+			MethodName: "UpdatePartnerProfile",
+			Handler:    _DeliveryService_UpdatePartnerProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

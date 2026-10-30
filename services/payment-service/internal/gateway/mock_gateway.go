@@ -11,7 +11,8 @@ import (
 )
 
 type MockGateway struct {
-	timeout time.Duration
+	timeout     time.Duration
+	failPayment bool
 }
 
 func NewMockGateway(timeout time.Duration) *MockGateway {
@@ -21,6 +22,10 @@ func NewMockGateway(timeout time.Duration) *MockGateway {
 	return &MockGateway{
 		timeout: timeout,
 	}
+}
+
+func (m *MockGateway) SetFailPayment(fail bool) {
+	m.failPayment = fail
 }
 
 func (m *MockGateway) Provider() string {
@@ -45,8 +50,8 @@ func (m *MockGateway) ProcessPayment(ctx context.Context, req *ProcessGatewayReq
 		return nil, ErrInvalidGatewayInput
 	}
 
-	// Trigger simulation via idempotency key for testing
-	if strings.Contains(req.IdempotencyKey, "fail_gateway") {
+	// Trigger simulation via explicit configuration or idempotency key for testing
+	if m.failPayment || strings.Contains(req.IdempotencyKey, "fail_gateway") {
 		gtx := fmt.Sprintf("gtx_mock_failed_%s", uuid.New().String()[:8])
 		slog.InfoContext(ctx, "MockGateway simulated payment decline", "payment_id", req.PaymentID, "gateway_tx_id", gtx)
 		return &ProcessGatewayResponse{
@@ -87,6 +92,28 @@ func (m *MockGateway) RefundPayment(ctx context.Context, req *RefundGatewayReque
 	if req == nil || req.PaymentID == "" || req.Amount <= 0 {
 		slog.WarnContext(ctx, "MockGateway RefundPayment received invalid input", "refund_id", req.RefundID)
 		return nil, ErrInvalidGatewayInput
+	}
+
+	// Trigger simulation via idempotency key or reason for testing
+	if strings.Contains(req.IdempotencyKey, "fail_gateway") || strings.Contains(req.Reason, "fail_gateway") {
+		gtx := fmt.Sprintf("ref_mock_failed_%s", uuid.New().String()[:8])
+		slog.InfoContext(ctx, "MockGateway simulated refund decline", "refund_id", req.RefundID, "gateway_refund_id", gtx)
+		return &RefundGatewayResponse{
+			GatewayRefundID: gtx,
+			Status:          "FAILED",
+			FailureReason:   "Refund declined by mock gateway",
+		}, nil
+	}
+
+	if strings.Contains(req.IdempotencyKey, "error_gateway") || strings.Contains(req.Reason, "error_gateway") {
+		slog.InfoContext(ctx, "MockGateway simulated refund error", "refund_id", req.RefundID)
+		return nil, ErrGatewayUnavailable
+	}
+
+	if strings.Contains(req.IdempotencyKey, "timeout_gateway") {
+		slog.InfoContext(ctx, "MockGateway simulating timeout", "refund_id", req.RefundID)
+		time.Sleep(m.timeout + 10*time.Millisecond)
+		return nil, ErrGatewayTimeout
 	}
 
 	refundID := fmt.Sprintf("ref_mock_%s", uuid.New().String())

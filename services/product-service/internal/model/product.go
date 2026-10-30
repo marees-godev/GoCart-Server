@@ -2,26 +2,28 @@ package model
 
 import (
 	"time"
+
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 )
 
-type ProductStatus string
+type ProductStatus = productpb.ProductStatus
 
 const (
-	StatusInStock      ProductStatus = "IN_STOCK"
-	StatusOutOfStock   ProductStatus = "OUT_OF_STOCK"
-	StatusLowStock     ProductStatus = "LOW_STOCK"
-	StatusReserved     ProductStatus = "RESERVED"
-	StatusDiscontinued ProductStatus = "DISCONTINUED"
-)
+	StatusDraft         = productpb.StatusDraft
+	StatusPendingReview = productpb.StatusPendingReview
+	StatusPublished     = productpb.StatusPublished
+	StatusUnpublished   = productpb.StatusUnpublished
+	StatusSuspended     = productpb.StatusSuspended
+	StatusDeleted       = productpb.StatusDeleted
 
-func (s ProductStatus) IsValid() bool {
-	switch s {
-	case StatusInStock, StatusOutOfStock, StatusLowStock, StatusReserved, StatusDiscontinued:
-		return true
-	default:
-		return false
-	}
-}
+	// Legacy / Inventory compatibility statuses
+	StatusInStock      = productpb.StatusInStock
+	StatusOutOfStock   = productpb.StatusOutOfStock
+	StatusLowStock     = productpb.StatusLowStock
+	StatusReserved     = productpb.StatusReserved
+	StatusDiscontinued = productpb.StatusDiscontinued
+)
 
 type Product struct {
 	ID          string           `json:"id" db:"id"`
@@ -42,6 +44,25 @@ type Product struct {
 	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
 	DeletedAt   *time.Time       `json:"deleted_at,omitempty" db:"deleted_at"`
+}
+
+func (p *Product) ValidateForPublishing() error {
+	if p == nil {
+		return appErrors.BadRequest("product is nil")
+	}
+	if p.Name == "" {
+		return appErrors.BadRequest("product name is required for publishing")
+	}
+	if p.Price <= 0 {
+		return appErrors.BadRequest("product price must be greater than zero for publishing")
+	}
+	if p.CategoryID == "" {
+		return appErrors.BadRequest("product category is required for publishing")
+	}
+	if p.ImageURL == "" && len(p.Images) == 0 {
+		return appErrors.BadRequest("at least one product image is required for publishing")
+	}
+	return nil
 }
 
 type ProductImage struct {

@@ -35,7 +35,13 @@ func main() {
 		Format:      cfg.Logger.Format,
 	})
 
-	// 2. Initialize distributed tracing if enabled
+	// 2. Validate configuration and JWT secret before starting servers
+	if err := cfg.Validate(); err != nil {
+		log.Error("Startup validation failed: JWT secret misconfigured", "error", err)
+		os.Exit(1)
+	}
+
+	// 3. Initialize distributed tracing if enabled
 	tp, err := tracing.Init(tracing.Config{
 		ServiceName: cfg.App.Name,
 		Environment: cfg.App.Environment,
@@ -54,7 +60,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// 3. Setup Fiber HTTP server with observability and CORS middleware
+	// 4. Setup Fiber HTTP server with observability and CORS middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -83,12 +89,12 @@ func main() {
 		app.Use(adaptor.HTTPMiddleware(rateLimiter.Middleware))
 	}
 
-	// 4. Register Health and Readiness endpoints
+	// 5. Register Health and Readiness endpoints
 	healthHandler := health.NewHandler(cfg.App.Name)
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	// 5. Initialize gRPC client manager
+	// 6. Initialize gRPC client manager
 	clientMgr, err := client.NewClientManager(cfg)
 	if err != nil {
 		log.Error("Failed to initialize gRPC client manager", "error", err)
@@ -96,7 +102,7 @@ func main() {
 	}
 	defer clientMgr.Close()
 
-	// 6. Initialize gRPC clients and GraphQL server
+	// 7. Initialize gRPC clients and GraphQL server
 	grpcClients, err := gatewayGRPC.NewClients(cfg)
 	if err != nil {
 		log.Warn("Failed to initialize gRPC clients", "error", err)
@@ -113,10 +119,6 @@ func main() {
 
 	gqlHandler := gwGraphQL.NewHandler(gqlSchema, cfg)
 	gqlHandler.RegisterRoutes(app)
-
-	// Additional endpoint aliases for backward compatibility
-	legacyServer := gwGraphQL.NewServer(gqlResolver)
-	app.All("/graphql", adaptor.HTTPHandler(legacyServer))
 
 	if cfg.GraphQL.PlaygroundEnabled {
 		playgroundHandler := gwGraphQL.PlaygroundHandler("GoCart API Gateway GraphQL", "/graphql")
