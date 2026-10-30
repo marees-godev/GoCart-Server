@@ -162,6 +162,10 @@ func (r *UpdateUserRequest) Validate() error {
 			if dob.After(now) {
 				return errors.BadRequest("date_of_birth cannot be in the future")
 			}
+			hundredYearsAgo := time.Date(now.Year()-100, now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+			if dob.Before(hundredYearsAgo) {
+				return errors.BadRequest("please Enter a valid date of birth")
+			}
 			age := now.Year() - dob.Year()
 			if now.Month() < dob.Month() || (now.Month() == dob.Month() && now.Day() < dob.Day()) {
 				age--
