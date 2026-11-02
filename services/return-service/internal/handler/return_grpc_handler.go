@@ -9,6 +9,7 @@ import (
 
 	returns "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/repository"
@@ -106,7 +107,27 @@ func (h *ReturnGRPCHandler) ApproveReturn(ctx context.Context, req *returns.Appr
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
 
-	ret, err := h.svc.ApproveReturn(ctx, req.GetId(), req.GetReviewerId())
+	id := strings.TrimSpace(req.GetId())
+	if id == "" {
+		return nil, status.Error(codes.InvalidArgument, "return id is required")
+	}
+
+	reviewerID := strings.TrimSpace(req.GetReviewerId())
+	if reviewerID == "" {
+		reviewerID = grpcclient.GetUserID(ctx)
+		if reviewerID == "" {
+			if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+				reviewerID = u.UserID
+			}
+		}
+	}
+	if reviewerID == "" {
+		return nil, status.Error(codes.InvalidArgument, "reviewer id is required")
+	}
+
+	ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+
+	ret, err := h.svc.ApproveReturn(ctx, id, reviewerID)
 	if err != nil {
 		return nil, mapErrorToGRPC(err)
 	}
@@ -121,7 +142,32 @@ func (h *ReturnGRPCHandler) RejectReturn(ctx context.Context, req *returns.Rejec
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
 
-	ret, err := h.svc.RejectReturn(ctx, req.GetId(), req.GetRejectionReason(), req.GetReviewerId())
+	id := strings.TrimSpace(req.GetId())
+	if id == "" {
+		return nil, status.Error(codes.InvalidArgument, "return id is required")
+	}
+
+	reason := strings.TrimSpace(req.GetRejectionReason())
+	if reason == "" {
+		return nil, status.Error(codes.InvalidArgument, "rejection reason is required")
+	}
+
+	reviewerID := strings.TrimSpace(req.GetReviewerId())
+	if reviewerID == "" {
+		reviewerID = grpcclient.GetUserID(ctx)
+		if reviewerID == "" {
+			if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+				reviewerID = u.UserID
+			}
+		}
+	}
+	if reviewerID == "" {
+		return nil, status.Error(codes.InvalidArgument, "reviewer id is required")
+	}
+
+	ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+
+	ret, err := h.svc.RejectReturn(ctx, id, reason, reviewerID)
 	if err != nil {
 		return nil, mapErrorToGRPC(err)
 	}
@@ -414,6 +460,8 @@ func mapErrorToGRPC(err error) error {
 	}
 	switch {
 	case errors.Is(err, service.ErrReturnReasonRequired),
+		errors.Is(err, service.ErrReturnIDRequired),
+		errors.Is(err, service.ErrReviewerIDRequired),
 		errors.Is(err, service.ErrOrderItemRequired),
 		errors.Is(err, service.ErrOrderIDRequired),
 		errors.Is(err, service.ErrUserIDRequired),

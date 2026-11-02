@@ -159,7 +159,8 @@ func (r *RazorpayGateway) RefundPayment(ctx context.Context, req *RefundGatewayR
 	amountInSubunits := int64(math.Round(req.Amount * 100))
 
 	refundReqBody := model.RazorpayRefundRequest{
-		Amount: fmt.Sprintf("%d", amountInSubunits),
+		Amount: amountInSubunits,
+		Speed:  "normal",
 		Notes: map[string]string{
 			"reason":          req.Reason,
 			"idempotency_key": req.IdempotencyKey,
@@ -222,6 +223,19 @@ func (r *RazorpayGateway) RefundPayment(ctx context.Context, req *RefundGatewayR
 	var refundResp model.RazorpayRefundResponse
 	if err := json.Unmarshal(bodyBytes, &refundResp); err != nil {
 		return nil, SanitizeGatewayError(fmt.Errorf("failed to parse razorpay refund response: %w", err))
+	}
+
+	if strings.ToLower(refundResp.Status) == "failed" {
+		failReason := "razorpay refund marked failed"
+		if refundResp.Error != nil && refundResp.Error.Description != "" {
+			failReason = refundResp.Error.Description
+		}
+		slog.WarnContext(ctx, "razorpay refund response status failed", "refund_id", refundResp.ID, "reason", failReason)
+		return &RefundGatewayResponse{
+			GatewayRefundID: refundResp.ID,
+			Status:          "FAILED",
+			FailureReason:   failReason,
+		}, nil
 	}
 
 	slog.InfoContext(ctx, "razorpay refund processed successfully", "razorpay_refund_id", refundResp.ID, "status", refundResp.Status)

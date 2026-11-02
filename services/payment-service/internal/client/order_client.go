@@ -10,12 +10,21 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
+type AuthoritativeOrderItem struct {
+	ID         string
+	ProductID  string
+	Quantity   int32
+	UnitPrice  float64
+	TotalPrice float64
+}
+
 type AuthoritativeOrder struct {
 	ID          string
 	UserID      string
 	TotalAmount float64
 	Currency    string
 	Status      string
+	Items       []AuthoritativeOrderItem
 }
 
 type OrderClient interface {
@@ -54,12 +63,29 @@ func (c *grpcOrderClient) GetOrder(ctx context.Context, orderID string) (*Author
 		return nil, appErrors.NotFound(fmt.Sprintf("authoritative order %s is empty", orderID))
 	}
 
+	var items []AuthoritativeOrderItem
+	if len(resp.Order.Items) > 0 {
+		for _, it := range resp.Order.Items {
+			items = append(items, AuthoritativeOrderItem{
+				ID:         it.Id,
+				ProductID:  it.ProductId,
+				Quantity:   it.Quantity,
+				UnitPrice:  it.UnitPrice,
+				TotalPrice: it.TotalPrice,
+			})
+		}
+	}
+
 	currency := "INR" // Default currency if not present in proto
+	if resp.Order.Currency != "" {
+		currency = resp.Order.Currency
+	}
 	return &AuthoritativeOrder{
 		ID:          resp.Order.Id,
 		UserID:      resp.Order.UserId,
 		TotalAmount: resp.Order.TotalAmount,
 		Currency:    currency,
 		Status:      resp.Order.Status,
+		Items:       items,
 	}, nil
 }

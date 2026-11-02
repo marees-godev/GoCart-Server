@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
@@ -146,9 +147,18 @@ func main() {
 		log.Warn("Failed to dial Product Service", slog.Any("error", prodErr))
 	}
 
+	var paymentClient client.PaymentClient
+	paymentConn, payErr := grpc.NewClient(cfg.GRPC.PaymentServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if payErr == nil {
+		paymentClient = client.NewPaymentClient(paymentpb.NewPaymentServiceClient(paymentConn))
+		defer paymentConn.Close()
+	} else {
+		log.Warn("Failed to dial Payment Service", slog.Any("error", payErr))
+	}
+
 	// 7. Initialize business layers
 	returnRepo := repository.NewReturnRepository(db, outboxStore, log)
-	returnService := service.NewReturnService(returnRepo, orderClient, productClient, cfg.Return.ReturnWindowDays, log)
+	returnService := service.NewReturnService(returnRepo, orderClient, productClient, cfg.Return.ReturnWindowDays, log, paymentClient)
 	returnGRPCHandler := handler.NewReturnGRPCHandler(returnService, log)
 
 	// 8. Setup gRPC Server

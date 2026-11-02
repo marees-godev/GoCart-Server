@@ -15,6 +15,10 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
 )
 
+var (
+	ErrRefundNotFound = errors.New("refund not found")
+)
+
 type PaymentRepository interface {
 	CreatePayment(ctx context.Context, payment *model.Payment) error
 	GetPaymentByID(ctx context.Context, id string) (*model.Payment, error)
@@ -607,7 +611,6 @@ func (r *pgPaymentRepository) UpdatePaymentStatus(ctx context.Context, id string
 	return &p, nil
 }
 
-
 func (r *pgPaymentRepository) CreateRefund(ctx context.Context, ref *model.Refund) error {
 	if ref == nil {
 		slog.WarnContext(ctx, "refund model is nil in CreateRefund")
@@ -947,7 +950,7 @@ func (r *pgPaymentRepository) GetRefundByIdempotencyKey(ctx context.Context, key
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, appErrors.NotFound("refund not found by idempotency key")
+			return nil, ErrRefundNotFound
 		}
 		return nil, appErrors.Internal(err, "failed to query refund by idempotency key")
 	}
@@ -1006,4 +1009,3 @@ func (r *pgPaymentRepository) GetTotalRefundedAmount(ctx context.Context, paymen
 	}
 	return total, nil
 }
-

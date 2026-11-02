@@ -35,6 +35,7 @@ type GRPCConfig struct {
 	Port               string
 	OrderServiceAddr   string
 	ProductServiceAddr string
+	PaymentServiceAddr string
 	TimeoutSeconds     time.Duration
 }
 
@@ -93,6 +94,7 @@ func LoadEnv() *Config {
 			Port:               GetEnv("GRPC_PORT", "50062"),
 			OrderServiceAddr:   GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059")),
 			ProductServiceAddr: GetEnv("PRODUCT_SERVICE_GRPC_ADDR", GetEnv("PRODUCT_SERVICE_ADDR", "localhost:50053")),
+			PaymentServiceAddr: GetEnv("PAYMENT_SERVICE_GRPC_ADDR", GetEnv("PAYMENT_SERVICE_ADDR", "localhost:50060")),
 			TimeoutSeconds:     time.Duration(GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 5)) * time.Second,
 		},
 		Return: ReturnConfig{
