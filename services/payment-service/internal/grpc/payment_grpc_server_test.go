@@ -126,6 +126,17 @@ func (m *mockPaymentService) HandleOrderCreated(ctx context.Context, event *even
 	return nil, nil
 }
 
+func (m *mockPaymentService) ProcessReturnRefund(ctx context.Context, dto *service.ProcessReturnRefundDTO) (*model.Refund, error) {
+	if dto == nil || dto.ReturnID == "" {
+		return nil, appErrors.BadRequest("return_id is required")
+	}
+	return m.CreateRefund(ctx, &service.CreateRefundDTO{
+		PaymentID: "pay_grpc_123",
+		Amount:    dto.RefundAmount,
+		Reason:    dto.Reason,
+	})
+}
+
 func TestPaymentGRPCServer_ProcessPayment(t *testing.T) {
 	mockSvc := newMockPaymentService()
 	server := paymentGRPC.NewPaymentGRPCServer(mockSvc)

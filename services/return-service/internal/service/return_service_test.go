@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
@@ -17,6 +19,54 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/service"
 )
+
+type mockPaymentClient struct {
+	mu                    sync.Mutex
+	payment               *paymentpb.Payment
+	getPaymentErr         error
+	createRefundResp      *paymentpb.CreateRefundResponse
+	createRefundErr       error
+	getPaymentCalls       int
+	createRefundCalls     int
+	lastGetPaymentOrderID string
+	lastCreateRefundReq   *paymentpb.CreateRefundRequest
+}
+
+func (m *mockPaymentClient) GetPaymentByOrderID(ctx context.Context, orderID string) (*paymentpb.Payment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.getPaymentCalls++
+	m.lastGetPaymentOrderID = orderID
+	if m.getPaymentErr != nil {
+		return nil, m.getPaymentErr
+	}
+	if m.payment == nil {
+		return nil, errors.New("payment not found")
+	}
+	return m.payment, nil
+}
+
+func (m *mockPaymentClient) CreateRefund(ctx context.Context, req *paymentpb.CreateRefundRequest) (*paymentpb.CreateRefundResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.createRefundCalls++
+	m.lastCreateRefundReq = req
+	if m.createRefundErr != nil {
+		return nil, m.createRefundErr
+	}
+	if m.createRefundResp != nil {
+		return m.createRefundResp, nil
+	}
+	return &paymentpb.CreateRefundResponse{
+		RefundId:        "ref-mock-12345",
+		Status:          "SUCCESS",
+		Amount:          req.Amount,
+		GatewayRefundId: "rfnd_test_gateway_999",
+		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
+		PaymentId:       req.PaymentId,
+		OrderId:         "order-1",
+	}, nil
+}
 
 type mockReturnRepo struct {
 	mu           sync.RWMutex
@@ -112,7 +162,6 @@ func (m *mockReturnRepo) UpdateReturnStatusWithOutbox(ctx context.Context, id st
 	return &cp, nil
 }
 
-
 func (m *mockReturnRepo) ListReturns(ctx context.Context, limit, offset int, status, userID, returnType string) ([]*model.Return, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -133,7 +182,7 @@ func (m *mockReturnRepo) ListReturns(ctx context.Context, limit, offset int, sta
 	return list, len(list), nil
 }
 
-func (m *mockReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvent *outbox.Event) error {
+func (m *mockReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvents ...*outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ret, ok := m.returns[v.ReturnID]
@@ -143,8 +192,10 @@ func (m *mockReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *mo
 	ret.Status = newStatus
 	ret.Verification = v
 	ret.UpdatedAt = time.Now().UTC()
-	if outboxEvent != nil {
-		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	for _, outboxEvent := range outboxEvents {
+		if outboxEvent != nil {
+			m.outboxEvents = append(m.outboxEvents, outboxEvent)
+		}
 	}
 	return nil
 }
@@ -235,7 +286,6 @@ func (m *mockReturnRepo) GetExchangeQuestionAnswers(ctx context.Context, exchang
 	}
 	return exc.Answers, nil
 }
-
 
 type mockOrderClient struct {
 	order *orderpb.Order
@@ -684,7 +734,6 @@ func TestReturnService_RequestReturn_MissingOrderItemIDRejected(t *testing.T) {
 	}
 }
 
-
 func TestReturnService_GetReturn_AndUpdateReturnStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockReturnRepo()
@@ -980,6 +1029,38 @@ func TestReturnService_VerifyProduct_Workflow(t *testing.T) {
 		t.Errorf("expected 0 proof images, got: %v", noImgVerification)
 	}
 
+	retWithNilImages := &model.Return{
+		ID:           "ret-verify-nil-img",
+		OrderID:      "order-verify",
+		OrderItemID:  "item-verify-nil-img",
+		UserID:       "user-verify",
+		Reason:       "Wrong item",
+		Status:       model.ReturnStatusRequested,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 100.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, retWithNilImages, nil)
+
+	nilImgRet, nilImgVerification, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+		ReturnID:    retWithNilImages.ID,
+		VerifiedBy:  "delivery-partner-1",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: nil,
+	})
+	if err != nil {
+		t.Fatalf("expected verification with nil proof images to succeed, got: %v", err)
+	}
+	if nilImgRet.Status != model.ReturnStatusVerified {
+		t.Errorf("expected status VERIFIED, got: %s", nilImgRet.Status)
+	}
+	if nilImgVerification == nil || len(nilImgVerification.ProofImages) != 0 {
+		t.Errorf("expected 0 proof images, got: %v", nilImgVerification)
+	}
+
 	// 2. Missing verifiedBy -> must fail
 	_, _, err = svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
 		ReturnID:    ret.ID,
@@ -1018,6 +1099,9 @@ func TestReturnService_VerifyProduct_Workflow(t *testing.T) {
 	}
 	if updatedRet.Status != model.ReturnStatusVerified {
 		t.Errorf("expected status VERIFIED, got: %s", updatedRet.Status)
+	}
+	if updatedRet.ApprovedAt == nil {
+		t.Errorf("expected ApprovedAt to be set upon approval")
 	}
 	if verification == nil || len(verification.ProofImages) != 2 {
 		t.Fatalf("expected 2 proof images, got: %v", verification)
@@ -1819,3 +1903,627 @@ func TestReturnService_VerifyExchangeProduct_InvalidConditionRating(t *testing.T
 	}
 }
 
+func TestReturnService_TriggerRefund_SuccessFromVerified(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-ver-1",
+		OrderID:      "order-100",
+		OrderItemID:  "item-100",
+		UserID:       "user-100",
+		Reason:       "Damaged in transit",
+		Status:       model.ReturnStatusVerified,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 50.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-100",
+			OrderId:  "order-100",
+			Amount:   100.0,
+			Currency: "INR",
+			Status:   "COMPLETED",
+		},
+	}
+
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	completedRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("expected TriggerRefund to succeed, got: %v", err)
+	}
+
+	if completedRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected status %s, got %s", model.ReturnStatusCompleted, completedRet.Status)
+	}
+	if completedRet.CompletedAt == nil {
+		t.Errorf("expected CompletedAt to be set")
+	}
+
+	if paymentClient.getPaymentCalls != 1 {
+		t.Errorf("expected 1 getPayment call, got %d", paymentClient.getPaymentCalls)
+	}
+	if paymentClient.lastGetPaymentOrderID != ret.OrderID {
+		t.Errorf("expected GetPaymentByOrderID for %s, got %s", ret.OrderID, paymentClient.lastGetPaymentOrderID)
+	}
+
+	if paymentClient.createRefundCalls != 1 {
+		t.Fatalf("expected 1 CreateRefund call, got %d", paymentClient.createRefundCalls)
+	}
+	if paymentClient.lastCreateRefundReq.PaymentId != "pmt-100" {
+		t.Errorf("expected PaymentId pmt-100, got %s", paymentClient.lastCreateRefundReq.PaymentId)
+	}
+	if paymentClient.lastCreateRefundReq.Amount != 50.0 {
+		t.Errorf("expected Amount 50.0, got %f", paymentClient.lastCreateRefundReq.Amount)
+	}
+	expectedKey := fmt.Sprintf("refund_%s_%s", ret.ID, ret.OrderID)
+	if paymentClient.lastCreateRefundReq.IdempotencyKey != expectedKey {
+		t.Errorf("expected IdempotencyKey %s, got %s", expectedKey, paymentClient.lastCreateRefundReq.IdempotencyKey)
+	}
+
+	var hasRefundInitiated, hasReturnCompleted bool
+	for _, evt := range repo.outboxEvents {
+		if evt.EventType == events.EventTypeRefundInitiated {
+			hasRefundInitiated = true
+			if evt.Topic != events.TopicRefundInitiated {
+				t.Errorf("expected topic %s, got %s", events.TopicRefundInitiated, evt.Topic)
+			}
+		}
+		if evt.EventType == events.EventTypeReturnCompleted {
+			hasReturnCompleted = true
+			if evt.Topic != events.TopicReturnCompleted {
+				t.Errorf("expected topic %s, got %s", events.TopicReturnCompleted, evt.Topic)
+			}
+			var env events.EventEnvelope
+			if err := json.Unmarshal(evt.Payload, &env); err == nil {
+				var payload events.ReturnCompletedEvent
+				if err := env.UnmarshalData(&payload); err == nil {
+					if payload.ReturnID != ret.ID {
+						t.Errorf("expected ReturnID %s, got %s", ret.ID, payload.ReturnID)
+					}
+					if payload.RefundAmount != 50.0 {
+						t.Errorf("expected RefundAmount 50.0, got %f", payload.RefundAmount)
+					}
+				}
+			}
+		}
+	}
+	if !hasRefundInitiated {
+		t.Errorf("expected RefundInitiated event in outbox")
+	}
+	if !hasReturnCompleted {
+		t.Errorf("expected ReturnCompleted event in outbox")
+	}
+}
+
+func TestReturnService_TriggerRefund_SuccessFromReceived(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-rec-1",
+		OrderID:      "order-200",
+		OrderItemID:  "item-200",
+		UserID:       "user-200",
+		Reason:       "Defective unit",
+		Status:       model.ReturnStatusReceived,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 75.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-200",
+			OrderId:  "order-200",
+			Amount:   150.0,
+			Currency: "USD",
+			Status:   "COMPLETED",
+		},
+	}
+
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	completedRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("expected TriggerRefund from RECEIVED to succeed, got: %v", err)
+	}
+	if completedRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected status %s, got %s", model.ReturnStatusCompleted, completedRet.Status)
+	}
+	if paymentClient.createRefundCalls != 1 {
+		t.Errorf("expected 1 CreateRefund call, got %d", paymentClient.createRefundCalls)
+	}
+}
+
+func TestReturnService_TriggerRefund_RejectsIfNotInVerifiedOrReceived(t *testing.T) {
+	ctx := context.Background()
+	ineligibleStatuses := []model.ReturnStatus{
+		model.ReturnStatusRequested,
+		model.ReturnStatusUnderReview,
+		model.ReturnStatusApproved,
+		model.ReturnStatusPickupScheduled,
+		model.ReturnStatusPickedUp,
+	}
+
+	for _, st := range ineligibleStatuses {
+		t.Run(string(st), func(t *testing.T) {
+			repo := newMockReturnRepo()
+			now := time.Now().UTC()
+			ret := &model.Return{
+				ID:           fmt.Sprintf("ret-inelig-%s", st),
+				OrderID:      "order-inelig",
+				OrderItemID:  "item-inelig",
+				UserID:       "user-inelig",
+				Status:       st,
+				Type:         model.ReturnTypeReturn,
+				RefundAmount: 30.0,
+				RequestedAt:  now,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}
+			_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+			paymentClient := &mockPaymentClient{
+				payment: &paymentpb.Payment{
+					Id:     "pmt-inelig",
+					Amount: 100.0,
+				},
+			}
+			svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+			_, err := svc.TriggerRefund(ctx, ret.ID)
+			if !errors.Is(err, service.ErrReturnNotEligibleForRefund) {
+				t.Fatalf("expected ErrReturnNotEligibleForRefund for status %s, got: %v", st, err)
+			}
+			if paymentClient.createRefundCalls != 0 {
+				t.Errorf("expected 0 CreateRefund calls, got %d", paymentClient.createRefundCalls)
+			}
+		})
+	}
+}
+
+func TestReturnService_TriggerRefund_NonMonetaryReturnsBypassPaymentRefund(t *testing.T) {
+	ctx := context.Background()
+	nonMonetaryTypes := []model.ReturnType{
+		model.ReturnTypeReplacement,
+		model.ReturnTypeExchange,
+	}
+
+	for _, rType := range nonMonetaryTypes {
+		t.Run(string(rType), func(t *testing.T) {
+			repo := newMockReturnRepo()
+			now := time.Now().UTC()
+			ret := &model.Return{
+				ID:           fmt.Sprintf("ret-nonmon-%s", rType),
+				OrderID:      "order-nonmon",
+				OrderItemID:  "item-nonmon",
+				UserID:       "user-nonmon",
+				Status:       model.ReturnStatusVerified,
+				Type:         rType,
+				RefundAmount: 0.0,
+				RequestedAt:  now,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}
+			_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+			paymentClient := &mockPaymentClient{
+				payment: &paymentpb.Payment{Id: "pmt-nonmon", Amount: 100.0},
+			}
+			svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+			res, err := svc.TriggerRefund(ctx, ret.ID)
+			if err != nil {
+				t.Fatalf("expected non-monetary return to succeed without error, got: %v", err)
+			}
+			if res == nil {
+				t.Fatalf("expected non-nil return response")
+			}
+			if paymentClient.createRefundCalls != 0 {
+				t.Errorf("expected 0 CreateRefund calls for %s, got %d", rType, paymentClient.createRefundCalls)
+			}
+			if paymentClient.getPaymentCalls != 0 {
+				t.Errorf("expected 0 GetPaymentByOrderID calls for %s, got %d", rType, paymentClient.getPaymentCalls)
+			}
+		})
+	}
+}
+
+func TestReturnService_TriggerRefund_DeriveAmountAndExceedsPaidAmountRejected(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("DerivesFromPaymentWhenRefundAmountZero", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		now := time.Now().UTC()
+		ret := &model.Return{
+			ID:           "ret-zero-amt",
+			OrderID:      "order-zero",
+			OrderItemID:  "item-zero",
+			UserID:       "user-zero",
+			Status:       model.ReturnStatusVerified,
+			Type:         model.ReturnTypeReturn,
+			RefundAmount: 0.0,
+			RequestedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+		paymentClient := &mockPaymentClient{
+			payment: &paymentpb.Payment{
+				Id:       "pmt-zero",
+				OrderId:  "order-zero",
+				Amount:   85.5,
+				Currency: "INR",
+			},
+		}
+		svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+		_, err := svc.TriggerRefund(ctx, ret.ID)
+		if err != nil {
+			t.Fatalf("expected success deriving refund amount, got: %v", err)
+		}
+		if paymentClient.lastCreateRefundReq == nil {
+			t.Fatalf("expected CreateRefund to be called")
+		}
+		if paymentClient.lastCreateRefundReq.Amount != 85.5 {
+			t.Errorf("expected derived refund amount 85.5, got %f", paymentClient.lastCreateRefundReq.Amount)
+		}
+	})
+
+	t.Run("ExceedsPaidAmountRejected", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		now := time.Now().UTC()
+		ret := &model.Return{
+			ID:           "ret-exceed",
+			OrderID:      "order-exceed",
+			OrderItemID:  "item-exceed",
+			UserID:       "user-exceed",
+			Status:       model.ReturnStatusVerified,
+			Type:         model.ReturnTypeReturn,
+			RefundAmount: 120.0,
+			RequestedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+		paymentClient := &mockPaymentClient{
+			payment: &paymentpb.Payment{
+				Id:       "pmt-exceed",
+				OrderId:  "order-exceed",
+				Amount:   100.0,
+				Currency: "INR",
+			},
+		}
+		svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+		_, err := svc.TriggerRefund(ctx, ret.ID)
+		if !errors.Is(err, service.ErrRefundExceedsPaidAmount) {
+			t.Fatalf("expected ErrRefundExceedsPaidAmount, got: %v", err)
+		}
+		if paymentClient.createRefundCalls != 0 {
+			t.Errorf("expected 0 CreateRefund calls, got %d", paymentClient.createRefundCalls)
+		}
+	})
+}
+
+func TestReturnService_TriggerRefund_DeterministicIdempotencyKeyAndTerminalCompleted(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-idemp-1",
+		OrderID:      "order-idemp-1",
+		OrderItemID:  "item-idemp-1",
+		UserID:       "user-idemp-1",
+		Status:       model.ReturnStatusVerified,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 40.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-idemp-1",
+			OrderId:  "order-idemp-1",
+			Amount:   100.0,
+			Currency: "INR",
+		},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	firstCallRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("first TriggerRefund failed: %v", err)
+	}
+	if firstCallRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected COMPLETED, got %s", firstCallRet.Status)
+	}
+	expectedIdempKey := fmt.Sprintf("refund_%s_%s", ret.ID, ret.OrderID)
+	if paymentClient.lastCreateRefundReq.IdempotencyKey != expectedIdempKey {
+		t.Errorf("expected key %s, got %s", expectedIdempKey, paymentClient.lastCreateRefundReq.IdempotencyKey)
+	}
+	if paymentClient.createRefundCalls != 1 {
+		t.Errorf("expected exactly 1 CreateRefund call, got %d", paymentClient.createRefundCalls)
+	}
+
+	repeatedRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("repeated TriggerRefund failed: %v", err)
+	}
+	if repeatedRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected COMPLETED on repeat, got %s", repeatedRet.Status)
+	}
+	if paymentClient.createRefundCalls != 1 {
+		t.Errorf("expected createRefundCalls to remain 1 on repeated call, got %d", paymentClient.createRefundCalls)
+	}
+}
+
+func TestReturnService_VerifyProduct_AutoTriggersRefundWhenApproved(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-auto-ref",
+		OrderID:      "order-auto-ref",
+		OrderItemID:  "item-auto-ref",
+		UserID:       "user-auto-ref",
+		Reason:       "Wrong model delivered",
+		Status:       model.ReturnStatusReceived,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 60.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-auto-ref",
+			OrderId:  "order-auto-ref",
+			Amount:   120.0,
+			Currency: "INR",
+		},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	updatedRet, v, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+		ReturnID:    ret.ID,
+		VerifiedBy:  "warehouse-agent-1",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: []string{"https://storage.gocart.com/proof.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("VerifyProduct failed: %v", err)
+	}
+	if v == nil || !v.IsApproved {
+		t.Fatalf("expected verification approved")
+	}
+	if updatedRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected return status COMPLETED after auto-refund, got %s", updatedRet.Status)
+	}
+	if updatedRet.CompletedAt == nil {
+		t.Errorf("expected CompletedAt to be populated")
+	}
+	if paymentClient.createRefundCalls != 1 {
+		t.Errorf("expected Payment Service CreateRefund to be called once, got %d", paymentClient.createRefundCalls)
+	}
+}
+
+func TestReturnService_VerifyProduct_DoesNotTriggerRefundForReplacement(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-auto-rep",
+		OrderID:      "order-auto-rep",
+		OrderItemID:  "item-auto-rep",
+		UserID:       "user-auto-rep",
+		Reason:       "Size replacement",
+		Status:       model.ReturnStatusReceived,
+		Type:         model.ReturnTypeReplacement,
+		RefundAmount: 0.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{Id: "pmt-rep", Amount: 100.0},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	updatedRet, _, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+		ReturnID:    ret.ID,
+		VerifiedBy:  "warehouse-agent-1",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: []string{},
+	})
+	if err != nil {
+		t.Fatalf("VerifyProduct failed: %v", err)
+	}
+	if updatedRet.Status != model.ReturnStatusVerified {
+		t.Errorf("expected status VERIFIED for replacement, got %s", updatedRet.Status)
+	}
+	if paymentClient.createRefundCalls != 0 {
+		t.Errorf("expected 0 CreateRefund calls for replacement, got %d", paymentClient.createRefundCalls)
+	}
+}
+
+func TestReturnService_TriggerRefund_FailedRefundRetainsRefundInitiated(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-rfnd-failed",
+		OrderID:      "order-rfnd-failed",
+		OrderItemID:  "item-rfnd-failed",
+		UserID:       "user-rfnd-failed",
+		Reason:       "Defective item",
+		Status:       model.ReturnStatusVerified,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 50.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-rfnd-failed",
+			OrderId:  "order-rfnd-failed",
+			Amount:   100.0,
+			Currency: "INR",
+		},
+		createRefundResp: &paymentpb.CreateRefundResponse{
+			RefundId: "ref-failed-123",
+			Status:   "FAILED",
+			Amount:   50.0,
+		},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	resRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if !errors.Is(err, service.ErrRefundFailed) {
+		t.Fatalf("expected ErrRefundFailed, got: %v", err)
+	}
+	if resRet == nil {
+		t.Fatalf("expected non-nil return model returned with error")
+	}
+	if resRet.Status != model.ReturnStatusRefundInitiated {
+		t.Errorf("expected return status to retain REFUND_INITIATED, got %s", resRet.Status)
+	}
+	if resRet.CompletedAt != nil {
+		t.Errorf("expected CompletedAt to be nil when refund failed")
+	}
+
+	persisted, getErr := repo.GetReturnByID(ctx, ret.ID)
+	if getErr != nil {
+		t.Fatalf("failed to get persisted return: %v", getErr)
+	}
+	if persisted.Status != model.ReturnStatusRefundInitiated {
+		t.Errorf("expected persisted return status to be REFUND_INITIATED, got %s", persisted.Status)
+	}
+	if persisted.CompletedAt != nil {
+		t.Errorf("expected persisted CompletedAt to be nil")
+	}
+}
+
+func TestReturnService_TriggerRefund_PendingRefundRetainsRefundInitiated(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-rfnd-pending",
+		OrderID:      "order-rfnd-pending",
+		OrderItemID:  "item-rfnd-pending",
+		UserID:       "user-rfnd-pending",
+		Reason:       "Defective item",
+		Status:       model.ReturnStatusVerified,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 50.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-rfnd-pending",
+			OrderId:  "order-rfnd-pending",
+			Amount:   100.0,
+			Currency: "INR",
+		},
+		createRefundResp: &paymentpb.CreateRefundResponse{
+			RefundId: "ref-pending-123",
+			Status:   "PENDING",
+			Amount:   50.0,
+		},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	resRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("expected nil error for pending refund, got: %v", err)
+	}
+	if resRet.Status != model.ReturnStatusRefundInitiated {
+		t.Errorf("expected return status to retain REFUND_INITIATED, got %s", resRet.Status)
+	}
+	if resRet.CompletedAt != nil {
+		t.Errorf("expected CompletedAt to be nil when refund is pending")
+	}
+}
+
+func TestReturnService_TriggerRefund_ProcessedRefundTransitionsToCompleted(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	now := time.Now().UTC()
+
+	ret := &model.Return{
+		ID:           "ret-rfnd-proc",
+		OrderID:      "order-rfnd-proc",
+		OrderItemID:  "item-rfnd-proc",
+		UserID:       "user-rfnd-proc",
+		Reason:       "Wrong item",
+		Status:       model.ReturnStatusVerified,
+		Type:         model.ReturnTypeReturn,
+		RefundAmount: 75.0,
+		RequestedAt:  now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+
+	paymentClient := &mockPaymentClient{
+		payment: &paymentpb.Payment{
+			Id:       "pmt-rfnd-proc",
+			OrderId:  "order-rfnd-proc",
+			Amount:   100.0,
+			Currency: "INR",
+		},
+		createRefundResp: &paymentpb.CreateRefundResponse{
+			RefundId: "ref-proc-123",
+			Status:   "PROCESSED",
+			Amount:   75.0,
+		},
+	}
+	svc := service.NewReturnService(repo, nil, nil, 7, paymentClient)
+
+	resRet, err := svc.TriggerRefund(ctx, ret.ID)
+	if err != nil {
+		t.Fatalf("expected nil error for processed refund, got: %v", err)
+	}
+	if resRet.Status != model.ReturnStatusCompleted {
+		t.Errorf("expected return status COMPLETED, got %s", resRet.Status)
+	}
+	if resRet.CompletedAt == nil {
+		t.Errorf("expected CompletedAt to be populated")
+	}
+}

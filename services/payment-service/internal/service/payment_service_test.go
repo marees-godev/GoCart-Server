@@ -2,8 +2,11 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
@@ -253,7 +257,7 @@ func (m *mockPaymentRepo) GetRefundByIdempotencyKey(ctx context.Context, key str
 			return &rCopy, nil
 		}
 	}
-	return nil, appErrors.NotFound("refund not found")
+	return nil, repository.ErrRefundNotFound
 }
 
 func (m *mockPaymentRepo) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
@@ -2096,5 +2100,612 @@ func TestHandleRazorpayWebhook_RefundFailed_SafelyHandled(t *testing.T) {
 	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
 	if pUpdated.Status != model.PaymentStatusSuccess {
 		t.Errorf("expected payment status to revert back to SUCCESS, got: %s", pUpdated.Status)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_RazorpaySuccess(t *testing.T) {
+	var razorpayCalled bool
+	var capturedSpeed string
+	var capturedAmount float64
+	var capturedIdempHeader string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/payments/pay_rzp_orig_123/refund" {
+			razorpayCalled = true
+			capturedIdempHeader = r.Header.Get("X-Razorpay-Idempotency-Key")
+
+			user, pass, ok := r.BasicAuth()
+			if !ok || user != "rzp_test_key" || pass != "rzp_test_secret" {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			if speed, ok := body["speed"].(string); ok {
+				capturedSpeed = speed
+			}
+			if amt, ok := body["amount"].(float64); ok {
+				capturedAmount = amt
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"id": "rfnd_rzp_normal_001",
+				"entity": "refund",
+				"amount": 4500,
+				"currency": "INR",
+				"payment_id": "pay_rzp_orig_123",
+				"status": "processed"
+			}`))
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_ret_001",
+		UserID:               "usr_001",
+		Amount:               100.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusSuccess,
+		GatewayTransactionID: "pay_rzp_orig_123",
+		IdempotencyKey:       "idemp_pay_001",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_001",
+		OrderID:      "ord_ret_001",
+		UserID:       "usr_001",
+		Type:         "RETURN",
+		RefundAmount: 45.00,
+		Reason:       "Customer return approved",
+	}
+
+	ref, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("expected ProcessReturnRefund to succeed, got: %v", err)
+	}
+
+	if !razorpayCalled {
+		t.Errorf("expected Razorpay refund API to be called")
+	}
+	if capturedSpeed != "normal" {
+		t.Errorf("expected speed 'normal', got '%s'", capturedSpeed)
+	}
+	if capturedAmount != 4500 {
+		t.Errorf("expected amount in paise 4500, got %.0f", capturedAmount)
+	}
+	expectedIdemp := "refund_ret_001_ord_ret_001"
+	if capturedIdempHeader != expectedIdemp {
+		t.Errorf("expected idempotency header %s, got %s", expectedIdemp, capturedIdempHeader)
+	}
+
+	if ref.Status != model.RefundStatusSuccess {
+		t.Errorf("expected refund status SUCCESS, got: %s", ref.Status)
+	}
+	if ref.GatewayRefundID != "rfnd_rzp_normal_001" {
+		t.Errorf("expected gateway refund id rfnd_rzp_normal_001, got: %s", ref.GatewayRefundID)
+	}
+	if ref.Amount != 45.00 {
+		t.Errorf("expected refund amount 45.00, got: %.2f", ref.Amount)
+	}
+
+	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if pUpdated.Status != model.PaymentStatusPartiallyRefunded {
+		t.Errorf("expected payment status PARTIALLY_REFUNDED, got: %s", pUpdated.Status)
+	}
+
+	var hasInitiated, hasCompleted bool
+	for _, rec := range repo.outboxEvents {
+		if rec.AggregateID == ref.ID && rec.EventType == events.EventTypeRefundInitiated {
+			hasInitiated = true
+		}
+		if rec.AggregateID == ref.ID && rec.EventType == events.EventTypeRefundCompleted {
+			hasCompleted = true
+		}
+	}
+	if !hasInitiated {
+		t.Errorf("expected outbox event RefundInitiated for refund %s", ref.ID)
+	}
+	if !hasCompleted {
+		t.Errorf("expected outbox event RefundCompleted for refund %s", ref.ID)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_IdempotentDuplicateEvent(t *testing.T) {
+	var callCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "rfnd_rzp_idemp_001",
+			"entity": "refund",
+			"amount": 5000,
+			"status": "processed"
+		}`))
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_idemp_dup",
+		Amount:               100.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusSuccess,
+		GatewayTransactionID: "pay_rzp_idemp_orig",
+		IdempotencyKey:       "idemp_pay_dup",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_dup_001",
+		OrderID:      "ord_idemp_dup",
+		UserID:       "usr_dup",
+		Type:         "RETURN",
+		RefundAmount: 50.00,
+	}
+
+	ref1, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("first call failed: %v", err)
+	}
+
+	ref2, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("second call (duplicate event) failed: %v", err)
+	}
+
+	if ref1.ID != ref2.ID {
+		t.Errorf("expected same refund ID on retry, got %s and %s", ref1.ID, ref2.ID)
+	}
+	if callCount != 1 {
+		t.Errorf("expected Razorpay API to be called only once, called %d times", callCount)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_PaymentValidation_NotCaptured(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:        "ord_not_captured",
+		Amount:         100.00,
+		Currency:       "INR",
+		Status:         model.PaymentStatusPending,
+		IdempotencyKey: "idemp_pending_ref",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_nc_001",
+		OrderID:      "ord_not_captured",
+		Type:         "RETURN",
+		RefundAmount: 50.00,
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error for uncaptured payment, got nil")
+	}
+
+	var appErr *appErrors.AppError
+	if !errors.As(err, &appErr) || appErr.Code != appErrors.CodeBadRequest {
+		t.Errorf("expected BadRequest app error, got: %v", err)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_PaymentValidation_NotFound(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_nf_001",
+		OrderID:      "ord_does_not_exist",
+		Type:         "RETURN",
+		RefundAmount: 50.00,
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error for missing payment, got nil")
+	}
+
+	var appErr *appErrors.AppError
+	if !errors.As(err, &appErr) || appErr.Code != appErrors.CodeNotFound {
+		t.Errorf("expected NotFound app error, got: %v", err)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_NonMonetaryBypass(t *testing.T) {
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewMockGateway(2 * time.Second)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	types := []string{"REPLACEMENT", "EXCHANGE"}
+	for _, returnType := range types {
+		dto := &service.ProcessReturnRefundDTO{
+			ReturnID:     "ret_non_monetary",
+			OrderID:      "ord_replacement",
+			Type:         returnType,
+			RefundAmount: 100.00,
+		}
+
+		ref, err := svc.ProcessReturnRefund(context.Background(), dto)
+		if err != nil {
+			t.Errorf("expected nil error for %s return, got: %v", returnType, err)
+		}
+		if ref != nil {
+			t.Errorf("expected nil refund for %s return, got: %v", returnType, ref)
+		}
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_AmountCalculation_FromOrderItem(t *testing.T) {
+	var requestedPaise float64
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if amt, ok := body["amount"].(float64); ok {
+			requestedPaise = amt
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "rfnd_rzp_calc_001",
+			"entity": "refund",
+			"amount": 7500,
+			"status": "processed"
+		}`))
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	orderClient.orders["ord_item_calc"] = &client.AuthoritativeOrder{
+		ID:          "ord_item_calc",
+		UserID:      "usr_calc",
+		TotalAmount: 200.00,
+		Currency:    "INR",
+		Items: []client.AuthoritativeOrderItem{
+			{
+				ProductID:  "prod_widget_99",
+				Quantity:   3,
+				UnitPrice:  25.00,
+				TotalPrice: 75.00,
+			},
+		},
+	}
+
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_item_calc",
+		Amount:               200.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusSuccess,
+		GatewayTransactionID: "pay_rzp_calc_orig",
+		IdempotencyKey:       "idemp_pay_calc",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_item_calc",
+		OrderID:      "ord_item_calc",
+		OrderItemID:  "prod_widget_99",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	ref, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("expected calculation from order item to succeed, got: %v", err)
+	}
+
+	if ref.Amount != 75.00 {
+		t.Errorf("expected refund amount 75.00, got %.2f", ref.Amount)
+	}
+	if requestedPaise != 7500 {
+		t.Errorf("expected 7500 paise sent to Razorpay, got %.0f", requestedPaise)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_AmountCalculation_CappedToRemainingBalance(t *testing.T) {
+	var requestedPaise float64
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if amt, ok := body["amount"].(float64); ok {
+			requestedPaise = amt
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "rfnd_rzp_cap_001",
+			"entity": "refund",
+			"amount": 4000,
+			"status": "processed"
+		}`))
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_cap_test",
+		Amount:               100.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusPartiallyRefunded,
+		GatewayTransactionID: "pay_rzp_cap_orig",
+		IdempotencyKey:       "idemp_cap_orig",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	prevRef := &model.Refund{
+		PaymentID:       pmt.ID,
+		OrderID:         pmt.OrderID,
+		Amount:          60.00,
+		Status:          model.RefundStatusSuccess,
+		GatewayRefundID: "rfnd_prior_60",
+		IdempotencyKey:  "ref_prior_60",
+	}
+	_ = repo.CreateRefund(context.Background(), prevRef)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_cap_001",
+		OrderID:      "ord_cap_test",
+		RefundAmount: 60.00,
+		Type:         "RETURN",
+	}
+
+	ref, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("expected capped refund to succeed, got: %v", err)
+	}
+
+	if ref.Amount != 40.00 {
+		t.Errorf("expected capped amount 40.00, got: %.2f", ref.Amount)
+	}
+	if requestedPaise != 4000 {
+		t.Errorf("expected 4000 paise sent to Razorpay, got %.0f", requestedPaise)
+	}
+
+	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if pUpdated.Status != model.PaymentStatusRefunded {
+		t.Errorf("expected payment status REFUNDED after full amount exhausted, got: %s", pUpdated.Status)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_GatewayFailure(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{
+			"error": {
+				"code": "BAD_REQUEST_ERROR",
+				"description": "Payment already refunded or invalid"
+			}
+		}`))
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_gw_fail",
+		Amount:               100.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusSuccess,
+		GatewayTransactionID: "pay_rzp_fail_tx",
+		IdempotencyKey:       "idemp_gw_fail",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_gw_fail",
+		OrderID:      "ord_gw_fail",
+		RefundAmount: 50.00,
+		Type:         "RETURN",
+	}
+
+	ref, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err != nil {
+		t.Fatalf("unexpected error from declined refund: %v", err)
+	}
+	if ref == nil || ref.Status != model.RefundStatusFailed {
+		t.Errorf("expected refund status FAILED, got: %v", ref)
+	}
+
+	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if pUpdated.Status != model.PaymentStatusSuccess {
+		t.Errorf("expected payment to remain SUCCESS after refund failure, got: %s", pUpdated.Status)
+	}
+
+	var hasFailedEvent bool
+	for _, rec := range repo.outboxEvents {
+		if rec.EventType == events.EventTypeRefundFailed {
+			hasFailedEvent = true
+			break
+		}
+	}
+	if !hasFailedEvent {
+		t.Errorf("expected RefundFailed outbox event to be recorded")
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_GatewayTimeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id": "rfnd_timeout", "status": "processed"}`))
+	}))
+	defer ts.Close()
+
+	repo := newMockPaymentRepo()
+	orderClient := newMockOrderClient()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 10*time.Millisecond, ts.URL)
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	pmt := &model.Payment{
+		OrderID:              "ord_timeout",
+		Amount:               100.00,
+		Currency:             "INR",
+		Status:               model.PaymentStatusSuccess,
+		GatewayTransactionID: "pay_rzp_timeout",
+		IdempotencyKey:       "idemp_timeout",
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_timeout",
+		OrderID:      "ord_timeout",
+		RefundAmount: 50.00,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error on gateway timeout, got nil")
+	}
+
+	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
+	if pUpdated.Status != model.PaymentStatusSuccess {
+		t.Errorf("expected payment to revert to SUCCESS after timeout, got: %s", pUpdated.Status)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_UnsupportedReturnType(t *testing.T) {
+	repo := newMockPaymentRepo()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, nil)
+
+	for _, invalidType := range []string{"", "UNKNOWN", "STORE_CREDIT", "CANCEL"} {
+		dto := &service.ProcessReturnRefundDTO{
+			ReturnID:     "ret_invalid_type",
+			OrderID:      "ord_invalid_type",
+			Type:         invalidType,
+			RefundAmount: 50.00,
+		}
+		_, err := svc.ProcessReturnRefund(context.Background(), dto)
+		if err == nil {
+			t.Errorf("expected error for invalid return type %q, got nil", invalidType)
+		}
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_MissingOrderItemIDWhenAmountZero(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_missing_item",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, newMockOrderClient())
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_missing_item",
+		OrderID:      "ord_missing_item",
+		OrderItemID:  "",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when order_item_id is missing and refund amount is 0, got nil")
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_ItemNotFoundInOrder_NeverFallsBackToTotalAmount(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_item_not_found",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	orderClient := newMockOrderClient()
+	orderClient.orders["ord_item_not_found"] = &client.AuthoritativeOrder{
+		ID:          "ord_item_not_found",
+		TotalAmount: 100.00,
+		Items: []client.AuthoritativeOrderItem{
+			{
+				ID:         "item_other",
+				ProductID:  "prod_other",
+				TotalPrice: 50.00,
+			},
+		},
+	}
+
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_not_found",
+		OrderID:      "ord_item_not_found",
+		OrderItemID:  "item_nonexistent",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when item is not found in order, got nil (never fall back to total amount)")
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_OrderClientError_NeverFallsBackToTotalAmount(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_client_err",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	orderClient := newMockOrderClient()
+	// order is not added to orderClient.orders, so GetOrder returns "order not found" error
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_client_err",
+		OrderID:      "ord_client_err",
+		OrderItemID:  "item_123",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when order client fails, got nil (never fall back to total amount)")
 	}
 }

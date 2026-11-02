@@ -14,6 +14,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/consumer"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
@@ -180,7 +181,7 @@ func (m *mockPaymentRepo) GetRefundByGatewayRefundID(ctx context.Context, gatewa
 }
 
 func (m *mockPaymentRepo) GetRefundByIdempotencyKey(ctx context.Context, key string) (*model.Refund, error) {
-	return nil, appErrors.NotFound("refund not found")
+	return nil, repository.ErrRefundNotFound
 }
 
 func (m *mockPaymentRepo) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
@@ -494,6 +495,9 @@ func (s *contextCheckService) GetRefundsByPaymentID(ctx context.Context, payment
 func (s *contextCheckService) HandleRazorpayWebhook(ctx context.Context, body []byte) error {
 	return nil
 }
+func (s *contextCheckService) ProcessReturnRefund(ctx context.Context, dto *service.ProcessReturnRefundDTO) (*model.Refund, error) {
+	return nil, nil
+}
 
 func TestPaymentEventConsumer_PropagatesCorrelationID(t *testing.T) {
 	mockSvc := &contextCheckService{
@@ -517,5 +521,219 @@ func TestPaymentEventConsumer_PropagatesCorrelationID(t *testing.T) {
 
 	if !mockSvc.handledCalled {
 		t.Error("expected HandleOrderCreated to be called")
+	}
+}
+
+type mockPaymentServiceForConsumer struct {
+	processReturnRefundCalls int
+	lastDTO                  *service.ProcessReturnRefundDTO
+	processReturnRefundErr   error
+	refundToReturn           *model.Refund
+}
+
+func (m *mockPaymentServiceForConsumer) ProcessPayment(ctx context.Context, dto *service.ProcessPaymentDTO) (*model.Payment, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) GetPaymentByID(ctx context.Context, id string) (*model.Payment, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) GetPaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) CreateRefund(ctx context.Context, dto *service.CreateRefundDTO) (*model.Refund, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) CancelPayment(ctx context.Context, dto *service.CancelPaymentDTO) (*model.Payment, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) HandleRazorpayWebhook(ctx context.Context, body []byte) error {
+	return nil
+}
+func (m *mockPaymentServiceForConsumer) HandleOrderCreated(ctx context.Context, event *events.OrderCreatedEvent, correlationID, traceID string) (*model.Payment, error) {
+	return nil, nil
+}
+func (m *mockPaymentServiceForConsumer) ProcessReturnRefund(ctx context.Context, dto *service.ProcessReturnRefundDTO) (*model.Refund, error) {
+	m.processReturnRefundCalls++
+	m.lastDTO = dto
+	if m.processReturnRefundErr != nil {
+		return nil, m.processReturnRefundErr
+	}
+	if m.refundToReturn != nil {
+		return m.refundToReturn, nil
+	}
+	return &model.Refund{
+		ID:              "ref_consumer_test_1",
+		PaymentID:       "pay_consumer_test_1",
+		OrderID:         dto.OrderID,
+		Amount:          dto.RefundAmount,
+		Status:          model.RefundStatusSuccess,
+		GatewayRefundID: "rfnd_rzp_mock_123",
+	}, nil
+}
+
+func TestPaymentEventConsumer_HandleReturnApproved_Success(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID:     "ret-1001",
+		OrderID:      "ord-1001",
+		OrderItemID:  "item-1001",
+		UserID:       "usr-1001",
+		Type:         "RETURN",
+		RefundAmount: 75.50,
+		EligibleAt:   time.Now().UTC(),
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-1001", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Fatalf("expected HandleEvent to succeed, got: %v", err)
+	}
+
+	if mockSvc.processReturnRefundCalls != 1 {
+		t.Errorf("expected 1 call to ProcessReturnRefund, got %d", mockSvc.processReturnRefundCalls)
+	}
+	if mockSvc.lastDTO == nil {
+		t.Fatalf("expected lastDTO to be populated")
+	}
+	if mockSvc.lastDTO.ReturnID != "ret-1001" {
+		t.Errorf("expected ReturnID ret-1001, got %s", mockSvc.lastDTO.ReturnID)
+	}
+	if mockSvc.lastDTO.OrderID != "ord-1001" {
+		t.Errorf("expected OrderID ord-1001, got %s", mockSvc.lastDTO.OrderID)
+	}
+	if mockSvc.lastDTO.RefundAmount != 75.50 {
+		t.Errorf("expected RefundAmount 75.50, got %f", mockSvc.lastDTO.RefundAmount)
+	}
+}
+
+func TestPaymentEventConsumer_ReturnApproved_DoesNotTriggerRefund(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnApprovedEvent{
+		ReturnID:     "ret-app-1",
+		OrderID:      "ord-app-1",
+		OrderItemID:  "item-app-1",
+		UserID:       "usr-app-1",
+		ApprovedBy:   "admin-1",
+		ApprovedAt:   time.Now().UTC(),
+		Type:         "RETURN",
+		RefundAmount: 50.0,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-app-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Fatalf("expected HandleEvent to silently succeed for ReturnApproved, got: %v", err)
+	}
+
+	if mockSvc.processReturnRefundCalls != 0 {
+		t.Errorf("expected 0 calls to ProcessReturnRefund for ReturnApproved, got %d", mockSvc.processReturnRefundCalls)
+	}
+}
+
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonMonetaryBypass(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID:     "ret-rep-1",
+		OrderID:      "ord-rep-1",
+		OrderItemID:  "item-rep-1",
+		UserID:       "usr-rep-1",
+		Type:         "REPLACEMENT",
+		RefundAmount: 0,
+		EligibleAt:   time.Now().UTC(),
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-rep-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Fatalf("expected HandleEvent to succeed for replacement, got: %v", err)
+	}
+	if mockSvc.lastDTO.Type != "REPLACEMENT" {
+		t.Errorf("expected type REPLACEMENT, got %s", mockSvc.lastDTO.Type)
+	}
+}
+
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonRetryableBadRequestAcknowledged(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{
+		processReturnRefundErr: appErrors.BadRequest("cannot refund payment: status is CANCELLED"),
+	}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID: "ret-bad-1",
+		OrderID:  "ord-bad-1",
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-bad-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	// Should not return an error to Kafka, acknowledging bad message so it does not loop infinitely
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Errorf("expected bad request to be acknowledged without error, got: %v", err)
+	}
+}
+
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonRetryableNotFoundAcknowledged(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{
+		processReturnRefundErr: appErrors.NotFound("payment for order not found"),
+	}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID: "ret-nf-1",
+		OrderID:  "ord-nf-1",
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-nf-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Errorf("expected not found error to be safely acknowledged without error, got: %v", err)
+	}
+}
+
+func TestPaymentEventConsumer_NilEnvelopeOrUnknownEvent(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	// Nil envelope returns error
+	if err := c.HandleEvent(ctx, nil); err == nil {
+		t.Errorf("expected error for nil envelope")
+	}
+
+	// Unknown event type is safely ignored
+	unknownEnv, _ := events.NewEventEnvelopeWithAggregate("UnknownEventType", "some-service", "agg-1", map[string]string{})
+	if err := c.HandleEvent(ctx, unknownEnv); err != nil {
+		t.Errorf("expected unknown event to be ignored without error, got: %v", err)
+	}
+	if mockSvc.processReturnRefundCalls != 0 {
+		t.Errorf("expected 0 calls for unknown event, got %d", mockSvc.processReturnRefundCalls)
 	}
 }

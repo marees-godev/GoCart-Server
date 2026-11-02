@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/marees-godev/GoCart-Server/contracts/events"
@@ -45,8 +47,77 @@ func (c *PaymentEventConsumer) HandleEvent(ctx context.Context, envelope *events
 		_, err := c.paymentService.HandleOrderCreated(ctx, &payload, envelope.CorrelationID, envelope.TraceID)
 		return err
 
+	case events.EventTypeReturnRefundEligible:
+		return c.handleReturnRefundEligible(ctx, envelope)
+
+	case events.EventTypeReturnApproved:
+		// ReturnApproved only authorizes return pickup; refunds are initiated when return becomes eligible after verification
+		return nil
+
 	default:
 		// Silently acknowledge unhandled events
 		return nil
 	}
+}
+
+func (c *PaymentEventConsumer) handleReturnRefundEligible(ctx context.Context, envelope *events.EventEnvelope) error {
+	var evt events.ReturnRefundEligibleEvent
+	if err := envelope.UnmarshalData(&evt); err != nil {
+		slog.ErrorContext(ctx, "failed to unmarshal ReturnRefundEligible event payload", "error", err)
+		return fmt.Errorf("failed to unmarshal ReturnRefundEligible payload: %w", err)
+	}
+
+	returnID := strings.TrimSpace(evt.ReturnID)
+	if returnID == "" {
+		returnID = strings.TrimSpace(envelope.AggregateID)
+	}
+	orderID := strings.TrimSpace(evt.OrderID)
+
+	if returnID == "" || orderID == "" {
+		slog.WarnContext(ctx, "missing return_id or order_id in ReturnRefundEligible event",
+			"return_id", returnID,
+			"order_id", orderID,
+		)
+		return nil // Acknowledge bad message to avoid poisoning the queue
+	}
+
+	reason := strings.TrimSpace(evt.Reason)
+	if reason == "" {
+		reason = fmt.Sprintf("Refund for eligible return %s", returnID)
+	}
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     returnID,
+		OrderID:      orderID,
+		OrderItemID:  evt.OrderItemID,
+		UserID:       evt.UserID,
+		Type:         evt.Type,
+		RefundAmount: evt.RefundAmount,
+		Reason:       reason,
+	}
+
+	_, err := c.paymentService.ProcessReturnRefund(ctx, dto)
+	if err != nil {
+		var appErr *appErrors.AppError
+		if errors.As(err, &appErr) && (appErr.Code == appErrors.CodeBadRequest || appErr.Code == appErrors.CodeConflict || appErr.Code == appErrors.CodeNotFound) {
+			slog.WarnContext(ctx, "non-retryable error in handleReturnRefundEligible",
+				"return_id", returnID,
+				"order_id", orderID,
+				"error", err,
+			)
+			return nil
+		}
+		slog.ErrorContext(ctx, "failed to process return refund in event consumer",
+			"return_id", returnID,
+			"order_id", orderID,
+			"error", err,
+		)
+		return err
+	}
+
+	slog.InfoContext(ctx, "successfully processed return refund from ReturnRefundEligible event",
+		"return_id", returnID,
+		"order_id", orderID,
+	)
+	return nil
 }
