@@ -297,6 +297,74 @@ func (r *memoryDeliveryRepo) GetPartnerProfileByCompanyName(ctx context.Context,
 	return nil, appErrors.NotFound("partner profile not found")
 }
 
+func (r *memoryDeliveryRepo) GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	clean := strings.ToUpper(strings.TrimSpace(gstin))
+	for _, p := range r.partnerProfiles {
+		if p.GSTIN != nil && strings.ToUpper(strings.TrimSpace(*p.GSTIN)) == clean && p.DeletedAt == nil {
+			cp := *p
+			return &cp, nil
+		}
+	}
+	return nil, appErrors.NotFound("delivery partner profile not found")
+}
+
+func (r *memoryDeliveryRepo) ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.DeliveryPartnerProfile, 0)
+	for _, p := range r.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusAppealed && p.DeletedAt == nil {
+			cp := *p
+			res = append(res, &cp)
+		}
+	}
+	return res, len(res), nil
+}
+
+func (r *memoryDeliveryRepo) ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.DeliveryPartnerProfile, 0)
+	for _, p := range r.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusApproved && p.IsActive && p.DeletedAt == nil {
+			cp := *p
+			res = append(res, &cp)
+		}
+	}
+	return res, len(res), nil
+}
+
+func (r *memoryDeliveryRepo) SoftDeletePartnerProfile(ctx context.Context, partnerID uuid.UUID, deletedAt time.Time, reason ...string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, ok := r.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return appErrors.NotFound("partner profile not found")
+	}
+	p.DeletedAt = &deletedAt
+	p.IsActive = false
+	if len(reason) > 0 && reason[0] != "" {
+		p.DeletionReason = &reason[0]
+	}
+	return nil
+}
+
+func (r *memoryDeliveryRepo) SoftDeleteExpiredDeactivatedPartners(ctx context.Context, cutoff time.Time) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	now := time.Now().UTC()
+	for _, p := range r.partnerProfiles {
+		if !p.IsActive && p.DeactivatedAt != nil && (p.DeactivatedAt.Before(cutoff) || p.DeactivatedAt.Equal(cutoff)) && p.DeletedAt == nil {
+			p.DeletedAt = &now
+			count++
+		}
+	}
+	return count, nil
+}
+
 
 
 

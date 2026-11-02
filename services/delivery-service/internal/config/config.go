@@ -19,7 +19,21 @@ type Config struct {
 	Tracing  TracingConfig
 	Kafka    KafkaConfig
 	Outbox   OutboxConfig
-	Services ServicesConfig
+	Services  ServicesConfig
+	GSTIN     GSTINConfig
+	Retention RetentionConfig
+}
+
+type RetentionConfig struct {
+	Period   time.Duration
+	Interval time.Duration
+}
+
+type GSTINConfig struct {
+	APIKey  string
+	BaseURL string
+	Enabled bool
+	Timeout time.Duration
 }
 
 type ServicesConfig struct {
@@ -82,6 +96,8 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
+	timeoutSec := GetEnvAsInt("GSTIN_API_TIMEOUT_SECONDS", 10)
+
 	return &Config{
 		App: AppConfig{
 			Name:        GetEnv("APP_NAME", "delivery-service"),
@@ -99,14 +115,14 @@ func LoadEnv() *Config {
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
-			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "migrations"),
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),
 			Format: GetEnv("LOG_FORMAT", "json"),
 		},
 		Tracing: TracingConfig{
-			Enabled:      GetEnvAsBool("TRACING_ENABLED", true),
+			Enabled:      GetEnvAsBool("TRACING_ENABLED", false),
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
@@ -127,6 +143,16 @@ func LoadEnv() *Config {
 		Services: ServicesConfig{
 			OrderServiceURL:          GetEnv("ORDER_SERVICE_GRPC_URL", GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059")),
 			InventoryServiceGRPCAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
+		},
+		GSTIN: GSTINConfig{
+			APIKey:  GetEnv("GSTIN_API_KEY", ""),
+			BaseURL: GetEnv("GSTIN_API_BASE_URL", "https://www.gstinapi.in/v1"),
+			Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", true),
+			Timeout: time.Duration(timeoutSec) * time.Second,
+		},
+		Retention: RetentionConfig{
+			Period:   time.Duration(GetEnvAsInt("DEACTIVATION_RETENTION_DAYS", 30)) * 24 * time.Hour,
+			Interval: time.Duration(GetEnvAsInt("DEACTIVATION_CHECK_INTERVAL_HOURS", 1)) * time.Hour,
 		},
 	}
 }

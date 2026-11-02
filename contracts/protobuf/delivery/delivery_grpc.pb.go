@@ -19,14 +19,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DeliveryService_CreateDelivery_FullMethodName        = "/gocart.delivery.v1.DeliveryService/CreateDelivery"
-	DeliveryService_GetDelivery_FullMethodName           = "/gocart.delivery.v1.DeliveryService/GetDelivery"
-	DeliveryService_GetDeliveryByTracking_FullMethodName = "/gocart.delivery.v1.DeliveryService/GetDeliveryByTracking"
-	DeliveryService_GetDeliveryByOrder_FullMethodName    = "/gocart.delivery.v1.DeliveryService/GetDeliveryByOrder"
-	DeliveryService_UpdateDeliveryStatus_FullMethodName  = "/gocart.delivery.v1.DeliveryService/UpdateDeliveryStatus"
-	DeliveryService_CreatePartnerProfile_FullMethodName  = "/gocart.delivery.v1.DeliveryService/CreatePartnerProfile"
-	DeliveryService_GetPartnerProfile_FullMethodName     = "/gocart.delivery.v1.DeliveryService/GetPartnerProfile"
-	DeliveryService_UpdatePartnerProfile_FullMethodName  = "/gocart.delivery.v1.DeliveryService/UpdatePartnerProfile"
+	DeliveryService_CreateDelivery_FullMethodName              = "/gocart.delivery.v1.DeliveryService/CreateDelivery"
+	DeliveryService_GetDelivery_FullMethodName                 = "/gocart.delivery.v1.DeliveryService/GetDelivery"
+	DeliveryService_GetDeliveryByTracking_FullMethodName       = "/gocart.delivery.v1.DeliveryService/GetDeliveryByTracking"
+	DeliveryService_GetDeliveryByOrder_FullMethodName          = "/gocart.delivery.v1.DeliveryService/GetDeliveryByOrder"
+	DeliveryService_UpdateDeliveryStatus_FullMethodName        = "/gocart.delivery.v1.DeliveryService/UpdateDeliveryStatus"
+	DeliveryService_CreatePartnerProfile_FullMethodName        = "/gocart.delivery.v1.DeliveryService/CreatePartnerProfile"
+	DeliveryService_GetPartnerProfile_FullMethodName           = "/gocart.delivery.v1.DeliveryService/GetPartnerProfile"
+	DeliveryService_UpdatePartnerProfile_FullMethodName        = "/gocart.delivery.v1.DeliveryService/UpdatePartnerProfile"
+	DeliveryService_VerifyGSTIN_FullMethodName                 = "/gocart.delivery.v1.DeliveryService/VerifyGSTIN"
+	DeliveryService_ActivatePartner_FullMethodName             = "/gocart.delivery.v1.DeliveryService/ActivatePartner"
+	DeliveryService_DeactivatePartner_FullMethodName           = "/gocart.delivery.v1.DeliveryService/DeactivatePartner"
+	DeliveryService_DeletePartnerProfile_FullMethodName        = "/gocart.delivery.v1.DeliveryService/DeletePartnerProfile"
+	DeliveryService_ApprovePartner_FullMethodName              = "/gocart.delivery.v1.DeliveryService/ApprovePartner"
+	DeliveryService_RejectPartner_FullMethodName               = "/gocart.delivery.v1.DeliveryService/RejectPartner"
+	DeliveryService_AppealRejection_FullMethodName             = "/gocart.delivery.v1.DeliveryService/AppealRejection"
+	DeliveryService_ListAppealedPartners_FullMethodName        = "/gocart.delivery.v1.DeliveryService/ListAppealedPartners"
+	DeliveryService_ListApprovedPartners_FullMethodName        = "/gocart.delivery.v1.DeliveryService/ListApprovedPartners"
+	DeliveryService_ProcessExpiredDeactivations_FullMethodName = "/gocart.delivery.v1.DeliveryService/ProcessExpiredDeactivations"
 )
 
 // DeliveryServiceClient is the client API for DeliveryService service.
@@ -41,6 +51,16 @@ type DeliveryServiceClient interface {
 	CreatePartnerProfile(ctx context.Context, in *CreatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
 	GetPartnerProfile(ctx context.Context, in *GetPartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
 	UpdatePartnerProfile(ctx context.Context, in *UpdatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	VerifyGSTIN(ctx context.Context, in *VerifyPartnerGSTINRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	ActivatePartner(ctx context.Context, in *ActivatePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	DeactivatePartner(ctx context.Context, in *DeactivatePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	DeletePartnerProfile(ctx context.Context, in *DeletePartnerProfileRequest, opts ...grpc.CallOption) (*DeletePartnerProfileResponse, error)
+	ApprovePartner(ctx context.Context, in *ApprovePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	RejectPartner(ctx context.Context, in *RejectPartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	AppealRejection(ctx context.Context, in *AppealRejectionRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
+	ListAppealedPartners(ctx context.Context, in *ListAppealedPartnersRequest, opts ...grpc.CallOption) (*ListAppealedPartnersResponse, error)
+	ListApprovedPartners(ctx context.Context, in *ListApprovedPartnersRequest, opts ...grpc.CallOption) (*ListApprovedPartnersResponse, error)
+	ProcessExpiredDeactivations(ctx context.Context, in *ProcessExpiredDeactivationsRequest, opts ...grpc.CallOption) (*ProcessExpiredDeactivationsResponse, error)
 }
 
 type deliveryServiceClient struct {
@@ -131,6 +151,106 @@ func (c *deliveryServiceClient) UpdatePartnerProfile(ctx context.Context, in *Up
 	return out, nil
 }
 
+func (c *deliveryServiceClient) VerifyGSTIN(ctx context.Context, in *VerifyPartnerGSTINRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_VerifyGSTIN_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) ActivatePartner(ctx context.Context, in *ActivatePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_ActivatePartner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) DeactivatePartner(ctx context.Context, in *DeactivatePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_DeactivatePartner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) DeletePartnerProfile(ctx context.Context, in *DeletePartnerProfileRequest, opts ...grpc.CallOption) (*DeletePartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeletePartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_DeletePartnerProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) ApprovePartner(ctx context.Context, in *ApprovePartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_ApprovePartner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) RejectPartner(ctx context.Context, in *RejectPartnerRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_RejectPartner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) AppealRejection(ctx context.Context, in *AppealRejectionRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartnerProfileResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_AppealRejection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) ListAppealedPartners(ctx context.Context, in *ListAppealedPartnersRequest, opts ...grpc.CallOption) (*ListAppealedPartnersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAppealedPartnersResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_ListAppealedPartners_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) ListApprovedPartners(ctx context.Context, in *ListApprovedPartnersRequest, opts ...grpc.CallOption) (*ListApprovedPartnersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListApprovedPartnersResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_ListApprovedPartners_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) ProcessExpiredDeactivations(ctx context.Context, in *ProcessExpiredDeactivationsRequest, opts ...grpc.CallOption) (*ProcessExpiredDeactivationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProcessExpiredDeactivationsResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_ProcessExpiredDeactivations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DeliveryServiceServer is the server API for DeliveryService service.
 // All implementations must embed UnimplementedDeliveryServiceServer
 // for forward compatibility.
@@ -143,6 +263,16 @@ type DeliveryServiceServer interface {
 	CreatePartnerProfile(context.Context, *CreatePartnerProfileRequest) (*PartnerProfileResponse, error)
 	GetPartnerProfile(context.Context, *GetPartnerProfileRequest) (*PartnerProfileResponse, error)
 	UpdatePartnerProfile(context.Context, *UpdatePartnerProfileRequest) (*PartnerProfileResponse, error)
+	VerifyGSTIN(context.Context, *VerifyPartnerGSTINRequest) (*PartnerProfileResponse, error)
+	ActivatePartner(context.Context, *ActivatePartnerRequest) (*PartnerProfileResponse, error)
+	DeactivatePartner(context.Context, *DeactivatePartnerRequest) (*PartnerProfileResponse, error)
+	DeletePartnerProfile(context.Context, *DeletePartnerProfileRequest) (*DeletePartnerProfileResponse, error)
+	ApprovePartner(context.Context, *ApprovePartnerRequest) (*PartnerProfileResponse, error)
+	RejectPartner(context.Context, *RejectPartnerRequest) (*PartnerProfileResponse, error)
+	AppealRejection(context.Context, *AppealRejectionRequest) (*PartnerProfileResponse, error)
+	ListAppealedPartners(context.Context, *ListAppealedPartnersRequest) (*ListAppealedPartnersResponse, error)
+	ListApprovedPartners(context.Context, *ListApprovedPartnersRequest) (*ListApprovedPartnersResponse, error)
+	ProcessExpiredDeactivations(context.Context, *ProcessExpiredDeactivationsRequest) (*ProcessExpiredDeactivationsResponse, error)
 	mustEmbedUnimplementedDeliveryServiceServer()
 }
 
@@ -176,6 +306,36 @@ func (UnimplementedDeliveryServiceServer) GetPartnerProfile(context.Context, *Ge
 }
 func (UnimplementedDeliveryServiceServer) UpdatePartnerProfile(context.Context, *UpdatePartnerProfileRequest) (*PartnerProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePartnerProfile not implemented")
+}
+func (UnimplementedDeliveryServiceServer) VerifyGSTIN(context.Context, *VerifyPartnerGSTINRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyGSTIN not implemented")
+}
+func (UnimplementedDeliveryServiceServer) ActivatePartner(context.Context, *ActivatePartnerRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ActivatePartner not implemented")
+}
+func (UnimplementedDeliveryServiceServer) DeactivatePartner(context.Context, *DeactivatePartnerRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeactivatePartner not implemented")
+}
+func (UnimplementedDeliveryServiceServer) DeletePartnerProfile(context.Context, *DeletePartnerProfileRequest) (*DeletePartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeletePartnerProfile not implemented")
+}
+func (UnimplementedDeliveryServiceServer) ApprovePartner(context.Context, *ApprovePartnerRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApprovePartner not implemented")
+}
+func (UnimplementedDeliveryServiceServer) RejectPartner(context.Context, *RejectPartnerRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RejectPartner not implemented")
+}
+func (UnimplementedDeliveryServiceServer) AppealRejection(context.Context, *AppealRejectionRequest) (*PartnerProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AppealRejection not implemented")
+}
+func (UnimplementedDeliveryServiceServer) ListAppealedPartners(context.Context, *ListAppealedPartnersRequest) (*ListAppealedPartnersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAppealedPartners not implemented")
+}
+func (UnimplementedDeliveryServiceServer) ListApprovedPartners(context.Context, *ListApprovedPartnersRequest) (*ListApprovedPartnersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListApprovedPartners not implemented")
+}
+func (UnimplementedDeliveryServiceServer) ProcessExpiredDeactivations(context.Context, *ProcessExpiredDeactivationsRequest) (*ProcessExpiredDeactivationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ProcessExpiredDeactivations not implemented")
 }
 func (UnimplementedDeliveryServiceServer) mustEmbedUnimplementedDeliveryServiceServer() {}
 func (UnimplementedDeliveryServiceServer) testEmbeddedByValue()                         {}
@@ -342,6 +502,186 @@ func _DeliveryService_UpdatePartnerProfile_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DeliveryService_VerifyGSTIN_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyPartnerGSTINRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).VerifyGSTIN(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_VerifyGSTIN_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).VerifyGSTIN(ctx, req.(*VerifyPartnerGSTINRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_ActivatePartner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActivatePartnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).ActivatePartner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_ActivatePartner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).ActivatePartner(ctx, req.(*ActivatePartnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_DeactivatePartner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivatePartnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).DeactivatePartner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_DeactivatePartner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).DeactivatePartner(ctx, req.(*DeactivatePartnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_DeletePartnerProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePartnerProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).DeletePartnerProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_DeletePartnerProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).DeletePartnerProfile(ctx, req.(*DeletePartnerProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_ApprovePartner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApprovePartnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).ApprovePartner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_ApprovePartner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).ApprovePartner(ctx, req.(*ApprovePartnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_RejectPartner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectPartnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).RejectPartner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_RejectPartner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).RejectPartner(ctx, req.(*RejectPartnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_AppealRejection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppealRejectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).AppealRejection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_AppealRejection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).AppealRejection(ctx, req.(*AppealRejectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_ListAppealedPartners_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAppealedPartnersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).ListAppealedPartners(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_ListAppealedPartners_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).ListAppealedPartners(ctx, req.(*ListAppealedPartnersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_ListApprovedPartners_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListApprovedPartnersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).ListApprovedPartners(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_ListApprovedPartners_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).ListApprovedPartners(ctx, req.(*ListApprovedPartnersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_ProcessExpiredDeactivations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessExpiredDeactivationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).ProcessExpiredDeactivations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_ProcessExpiredDeactivations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).ProcessExpiredDeactivations(ctx, req.(*ProcessExpiredDeactivationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DeliveryService_ServiceDesc is the grpc.ServiceDesc for DeliveryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +720,46 @@ var DeliveryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePartnerProfile",
 			Handler:    _DeliveryService_UpdatePartnerProfile_Handler,
+		},
+		{
+			MethodName: "VerifyGSTIN",
+			Handler:    _DeliveryService_VerifyGSTIN_Handler,
+		},
+		{
+			MethodName: "ActivatePartner",
+			Handler:    _DeliveryService_ActivatePartner_Handler,
+		},
+		{
+			MethodName: "DeactivatePartner",
+			Handler:    _DeliveryService_DeactivatePartner_Handler,
+		},
+		{
+			MethodName: "DeletePartnerProfile",
+			Handler:    _DeliveryService_DeletePartnerProfile_Handler,
+		},
+		{
+			MethodName: "ApprovePartner",
+			Handler:    _DeliveryService_ApprovePartner_Handler,
+		},
+		{
+			MethodName: "RejectPartner",
+			Handler:    _DeliveryService_RejectPartner_Handler,
+		},
+		{
+			MethodName: "AppealRejection",
+			Handler:    _DeliveryService_AppealRejection_Handler,
+		},
+		{
+			MethodName: "ListAppealedPartners",
+			Handler:    _DeliveryService_ListAppealedPartners_Handler,
+		},
+		{
+			MethodName: "ListApprovedPartners",
+			Handler:    _DeliveryService_ListApprovedPartners_Handler,
+		},
+		{
+			MethodName: "ProcessExpiredDeactivations",
+			Handler:    _DeliveryService_ProcessExpiredDeactivations_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

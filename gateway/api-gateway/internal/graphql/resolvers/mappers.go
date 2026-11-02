@@ -242,6 +242,9 @@ func toModelDelivery(d *deliverypb.Delivery) *model.Delivery {
 	if d.ShippingAddress != "" {
 		res.ShippingAddress = &d.ShippingAddress
 	}
+	if d.ShippingAddressId != "" {
+		res.ShippingAddressID = &d.ShippingAddressId
+	}
 	if d.ContactNumber != "" {
 		res.ContactNumber = &d.ContactNumber
 	}
@@ -268,13 +271,50 @@ func toModelDeliveryPartnerProfile(p *deliverypb.DeliveryPartnerProfile) *model.
 		c := strings.TrimSpace(p.ContactNumber)
 		contactNumber = &c
 	}
+	status := model.PartnerApprovalStatus(p.ApprovalStatus)
+	if !status.IsValid() {
+		status = model.PartnerApprovalStatusPending
+	}
+	var gstin *string
+	if strings.TrimSpace(p.Gstin) != "" {
+		g := strings.TrimSpace(p.Gstin)
+		gstin = &g
+	}
 	res := &model.DeliveryPartnerProfile{
-		ID:            p.Id,
-		PartnerID:     p.PartnerId,
-		CompanyName:   companyName,
-		Email:         p.Email,
-		ContactNumber: contactNumber,
-		IsActive:      p.IsActive,
+		ID:              p.Id,
+		PartnerID:       p.PartnerId,
+		CompanyName:     companyName,
+		Email:           p.Email,
+		ContactNumber:   contactNumber,
+		Gstin:           gstin,
+		IsGstinVerified: p.IsGstinVerified,
+		IsActive:        p.IsActive,
+		ApprovalStatus:  status,
+	}
+	if strings.TrimSpace(p.RejectionReason) != "" {
+		r := strings.TrimSpace(p.RejectionReason)
+		res.RejectionReason = &r
+	}
+	if strings.TrimSpace(p.AppealReason) != "" {
+		a := strings.TrimSpace(p.AppealReason)
+		res.AppealReason = &a
+	}
+	if strings.TrimSpace(p.DeactivationReason) != "" {
+		dr := strings.TrimSpace(p.DeactivationReason)
+		res.DeactivationReason = &dr
+	}
+	if p.DeletionReason != nil && strings.TrimSpace(*p.DeletionReason) != "" {
+		dr := strings.TrimSpace(*p.DeletionReason)
+		res.DeletionReason = &dr
+	}
+	if p.AppealedAt != "" {
+		res.AppealedAt = &p.AppealedAt
+	}
+	if p.DeactivatedAt != "" {
+		res.DeactivatedAt = &p.DeactivatedAt
+	}
+	if p.DeletedAt != "" {
+		res.DeletedAt = &p.DeletedAt
 	}
 	if p.CreatedAt != "" {
 		res.CreatedAt = &p.CreatedAt
