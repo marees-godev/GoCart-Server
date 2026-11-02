@@ -296,7 +296,7 @@ func TestUpdatePartnerProfile_ErrorHandling(t *testing.T) {
 		}
 
 		// 2. Caller matches Profile ID
-		res, err = svc.UpdatePartnerProfile(ctx, profileID.String(), &newComp, nil, nil, nil, partnerUUID.String())
+		_, err = svc.UpdatePartnerProfile(ctx, profileID.String(), &newComp, nil, nil, nil, partnerUUID.String())
 		if err != nil {
 			t.Fatalf("expected success when caller is partner_id and target is profile ID, got %v", err)
 		}
