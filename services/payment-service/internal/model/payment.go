@@ -48,9 +48,10 @@ const (
 type RefundStatus string
 
 const (
-	RefundStatusPending RefundStatus = "PENDING"
-	RefundStatusSuccess RefundStatus = "SUCCESS"
-	RefundStatusFailed  RefundStatus = "FAILED"
+	RefundStatusPending   RefundStatus = "PENDING"
+	RefundStatusSuccess   RefundStatus = "SUCCESS"
+	RefundStatusProcessed RefundStatus = "PROCESSED"
+	RefundStatusFailed    RefundStatus = "FAILED"
 )
 
 type Payment struct {

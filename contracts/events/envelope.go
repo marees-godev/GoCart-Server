@@ -59,13 +59,15 @@ const (
 	EventTypeProductDeleted   = "ProductDeleted"
 
 	// Return Service Events
-	EventTypeReturnRequested     = "ReturnRequested"
-	EventTypeReturnApproved      = "ReturnApproved"
-	EventTypeReturnRejected      = "ReturnRejected"
-	EventTypeReturnVerified      = "ReturnVerified"
-	EventTypeReturnStatusUpdated = "ReturnStatusUpdated"
-	EventTypeExchangeCreated     = "ExchangeCreated"
-	EventTypeExchangeVerified    = "ExchangeVerified"
+	EventTypeReturnRequested      = "ReturnRequested"
+	EventTypeReturnApproved       = "ReturnApproved"
+	EventTypeReturnRejected       = "ReturnRejected"
+	EventTypeReturnVerified       = "ReturnVerified"
+	EventTypeReturnRefundEligible = "ReturnRefundEligible"
+	EventTypeReturnStatusUpdated  = "ReturnStatusUpdated"
+	EventTypeReturnCompleted      = "ReturnCompleted"
+	EventTypeExchangeCreated      = "ExchangeCreated"
+	EventTypeExchangeVerified     = "ExchangeVerified"
 )
 
 // Standard Topic Constants
@@ -118,13 +120,15 @@ const (
 	TopicProductDeleted   = "gocart.product.product-deleted"
 
 	// Return Service Topics
-	TopicReturnRequested     = "gocart.return.return-requested"
-	TopicReturnApproved      = "gocart.return.return-approved"
-	TopicReturnRejected      = "gocart.return.return-rejected"
-	TopicReturnVerified      = "gocart.return.return-verified"
-	TopicReturnStatusUpdated = "gocart.return.return-status-updated"
-	TopicExchangeCreated     = "gocart.return.exchange-created"
-	TopicExchangeVerified    = "gocart.return.exchange-verified"
+	TopicReturnRequested      = "gocart.return.return-requested"
+	TopicReturnApproved       = "gocart.return.return-approved"
+	TopicReturnRejected       = "gocart.return.return-rejected"
+	TopicReturnVerified       = "gocart.return.return-verified"
+	TopicReturnRefundEligible = "gocart.return.return-refund-eligible"
+	TopicReturnStatusUpdated  = "gocart.return.return-status-updated"
+	TopicReturnCompleted      = "gocart.return.return-completed"
+	TopicExchangeCreated      = "gocart.return.exchange-created"
+	TopicExchangeVerified     = "gocart.return.exchange-verified"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.

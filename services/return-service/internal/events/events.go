@@ -1,6 +1,9 @@
 package events
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/model"
@@ -47,12 +50,14 @@ func BuildReturnApprovedOutboxEvent(ret *model.Return, reviewerID string) (*outb
 		approvedAt = *ret.ApprovedAt
 	}
 	payload := events.ReturnApprovedEvent{
-		ReturnID:    ret.ID,
-		OrderID:     ret.OrderID,
-		OrderItemID: ret.OrderItemID,
-		UserID:      ret.UserID,
-		ApprovedBy:  reviewerID,
-		ApprovedAt:  approvedAt,
+		ReturnID:     ret.ID,
+		OrderID:      ret.OrderID,
+		OrderItemID:  ret.OrderItemID,
+		UserID:       ret.UserID,
+		ApprovedBy:   reviewerID,
+		ApprovedAt:   approvedAt,
+		Type:         string(ret.Type),
+		RefundAmount: ret.RefundAmount,
 	}
 
 	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, SourceReturnService, ret.ID, payload)
@@ -136,6 +141,40 @@ func BuildReturnVerifiedOutboxEvent(ret *model.Return, v *model.ProductVerificat
 	}, nil
 }
 
+func BuildReturnRefundEligibleOutboxEvent(ret *model.Return, reason string) (*outbox.Event, error) {
+	if reason == "" {
+		reason = fmt.Sprintf("Return %s verified and eligible for refund", ret.ID)
+	}
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID:     ret.ID,
+		OrderID:      ret.OrderID,
+		OrderItemID:  ret.OrderItemID,
+		UserID:       ret.UserID,
+		Type:         string(ret.Type),
+		RefundAmount: ret.RefundAmount,
+		Reason:       reason,
+		EligibleAt:   time.Now().UTC(),
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, SourceReturnService, ret.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "return",
+		AggregateID:   ret.ID,
+		EventType:     events.EventTypeReturnRefundEligible,
+		Payload:       bytes,
+		Topic:         events.TopicReturnRefundEligible,
+	}, nil
+}
+
 func BuildReturnStatusUpdatedOutboxEvent(ret *model.Return, prevStatus, newStatus model.ReturnStatus) (*outbox.Event, error) {
 	payload := events.ReturnStatusUpdatedEvent{
 		ReturnID:       ret.ID,
@@ -167,19 +206,19 @@ func BuildReturnStatusUpdatedOutboxEvent(ret *model.Return, prevStatus, newStatu
 
 func BuildExchangeCreatedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
 	payload := map[string]interface{}{
-		"exchange_id":           exc.ID,
-		"order_id":              exc.OrderID,
-		"order_item_id":         exc.OrderItemID,
-		"user_id":               exc.UserID,
-		"new_product_id":        exc.NewProductID,
-		"old_brand":             exc.OldBrand,
-		"old_model":             exc.OldModel,
-		"old_variant":           exc.OldVariant,
-		"serial_or_imei":        exc.SerialOrIMEI,
-		"base_exchange_value":   exc.BaseExchangeValue,
-		"estimated_discount":    exc.EstimatedDiscount,
-		"status":                string(exc.Status),
-		"created_at":            exc.CreatedAt,
+		"exchange_id":         exc.ID,
+		"order_id":            exc.OrderID,
+		"order_item_id":       exc.OrderItemID,
+		"user_id":             exc.UserID,
+		"new_product_id":      exc.NewProductID,
+		"old_brand":           exc.OldBrand,
+		"old_model":           exc.OldModel,
+		"old_variant":         exc.OldVariant,
+		"serial_or_imei":      exc.SerialOrIMEI,
+		"base_exchange_value": exc.BaseExchangeValue,
+		"estimated_discount":  exc.EstimatedDiscount,
+		"status":              string(exc.Status),
+		"created_at":          exc.CreatedAt,
 	}
 
 	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeCreated, SourceReturnService, exc.ID, payload)
@@ -236,3 +275,69 @@ func BuildExchangeVerifiedOutboxEvent(exc *model.Exchange, v *model.ExchangeVeri
 	}, nil
 }
 
+func BuildReturnCompletedOutboxEvent(ret *model.Return) (*outbox.Event, error) {
+	completedAt := ret.UpdatedAt
+	if ret.CompletedAt != nil {
+		completedAt = *ret.CompletedAt
+	}
+	payload := events.ReturnCompletedEvent{
+		ReturnID:     ret.ID,
+		OrderID:      ret.OrderID,
+		OrderItemID:  ret.OrderItemID,
+		UserID:       ret.UserID,
+		RefundAmount: ret.RefundAmount,
+		CompletedAt:  completedAt,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnCompleted, SourceReturnService, ret.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "return",
+		AggregateID:   ret.ID,
+		EventType:     events.EventTypeReturnCompleted,
+		Payload:       bytes,
+		Topic:         events.TopicReturnCompleted,
+	}, nil
+}
+
+func BuildRefundInitiatedOutboxEvent(ret *model.Return, paymentID string, amount float64, currency string) (*outbox.Event, error) {
+	if currency == "" {
+		currency = "INR"
+	}
+	now := time.Now().UTC()
+	payload := events.RefundInitiatedEvent{
+		RefundID:    fmt.Sprintf("ref-%s", ret.ID),
+		PaymentID:   paymentID,
+		OrderID:     ret.OrderID,
+		Amount:      amount,
+		Currency:    currency,
+		Reason:      ret.Reason,
+		InitiatedAt: now,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeRefundInitiated, SourceReturnService, ret.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "return",
+		AggregateID:   ret.ID,
+		EventType:     events.EventTypeRefundInitiated,
+		Payload:       bytes,
+		Topic:         events.TopicRefundInitiated,
+	}, nil
+}
