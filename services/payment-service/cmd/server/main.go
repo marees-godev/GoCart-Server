@@ -12,7 +12,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
@@ -202,18 +201,12 @@ func main() {
 	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
 	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Razorpay-Signature, X-Razorpay-Idempotency-Key",
-		AllowMethods: "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS",
-	}))
-
 	// Metrics, Health and Readiness endpoints
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log, paymentService)
+	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log)
 	paymentHandler.RegisterRoutes(app)
 
 	// Webhook endpoints
