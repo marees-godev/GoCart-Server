@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -339,7 +340,10 @@ func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO)
 	// 1. Idempotency check: prevent duplicate refund requests
 	if dto.IdempotencyKey != "" {
 		existingRef, err := s.repo.GetRefundByIdempotencyKey(ctx, dto.IdempotencyKey)
-		if err == nil && existingRef != nil {
+		if err != nil && !errors.Is(err, repository.ErrRefundNotFound) && !appErrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to check existing refund: %w", err)
+		}
+		if existingRef != nil {
 			if existingRef.PaymentID == dto.PaymentID {
 				slog.InfoContext(ctx, "returning existing refund for duplicate idempotency key", "idempotency_key", dto.IdempotencyKey, "refund_id", existingRef.ID)
 				return existingRef, nil
@@ -873,15 +877,25 @@ func (s *paymentService) ProcessReturnRefund(ctx context.Context, dto *ProcessRe
 		return nil, appErrors.BadRequest("order_id is required")
 	}
 
-	// 1. Non-monetary return types (REPLACEMENT, EXCHANGE) bypass payment refund calls
+	// 1. Return type validation: supported types are RETURN, REPLACEMENT, EXCHANGE
 	normType := strings.ToUpper(strings.TrimSpace(dto.Type))
-	if normType == "REPLACEMENT" || normType == "EXCHANGE" {
+	switch normType {
+	case "REPLACEMENT", "EXCHANGE":
 		slog.InfoContext(ctx, "non-monetary return type bypasses payment refund calls",
 			"return_id", dto.ReturnID,
 			"order_id", dto.OrderID,
 			"type", normType,
 		)
 		return nil, nil
+	case "RETURN":
+		// Supported monetary return type
+	default:
+		slog.WarnContext(ctx, "unsupported return type rejected",
+			"return_id", dto.ReturnID,
+			"order_id", dto.OrderID,
+			"type", dto.Type,
+		)
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid or unsupported return type: %q (supported: RETURN, REPLACEMENT, EXCHANGE)", dto.Type))
 	}
 
 	// 2. Deterministic idempotency key based on return ID and order ID
@@ -889,7 +903,11 @@ func (s *paymentService) ProcessReturnRefund(ctx context.Context, dto *ProcessRe
 
 	// Idempotency check: prevent duplicate refunds when events are retried or processed multiple times
 	existingRef, err := s.repo.GetRefundByIdempotencyKey(ctx, idempotencyKey)
-	if err == nil && existingRef != nil {
+	if err != nil && !errors.Is(err, repository.ErrRefundNotFound) && !appErrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to check existing refund: %w", err)
+	}
+
+	if existingRef != nil {
 		slog.InfoContext(ctx, "returning existing refund for idempotent duplicate return event",
 			"return_id", dto.ReturnID,
 			"idempotency_key", idempotencyKey,
@@ -921,27 +939,73 @@ func (s *paymentService) ProcessReturnRefund(ctx context.Context, dto *ProcessRe
 
 	// 4. Refund amount calculation based on returned item and applicable refund rules
 	refundAmount := dto.RefundAmount
-	if refundAmount <= 0 && s.orderClient != nil {
+	if refundAmount <= 0 {
+		orderItemID := strings.TrimSpace(dto.OrderItemID)
+		if orderItemID == "" {
+			slog.WarnContext(ctx, "missing order_item_id when calculating item-level return refund",
+				"return_id", dto.ReturnID,
+				"order_id", dto.OrderID,
+			)
+			return nil, appErrors.BadRequest("order_item_id is required to resolve refundable amount for item-level return")
+		}
+
+		if s.orderClient == nil {
+			slog.ErrorContext(ctx, "order client unavailable to resolve refundable amount",
+				"return_id", dto.ReturnID,
+				"order_id", dto.OrderID,
+				"order_item_id", orderItemID,
+			)
+			return nil, fmt.Errorf("order client unavailable to resolve refundable amount for item %s", orderItemID)
+		}
+
 		order, oErr := s.orderClient.GetOrder(ctx, dto.OrderID)
-		if oErr == nil && order != nil && len(order.Items) > 0 {
-			for _, it := range order.Items {
-				if it.ID == dto.OrderItemID || it.ProductID == dto.OrderItemID {
-					if it.TotalPrice > 0 {
-						refundAmount = it.TotalPrice
-					} else if it.UnitPrice > 0 {
-						qty := it.Quantity
-						if qty <= 0 {
-							qty = 1
-						}
-						refundAmount = it.UnitPrice * float64(qty)
+		if oErr != nil {
+			slog.ErrorContext(ctx, "failed to get order to resolve item refundable amount",
+				"return_id", dto.ReturnID,
+				"order_id", dto.OrderID,
+				"order_item_id", orderItemID,
+				"error", oErr,
+			)
+			return nil, fmt.Errorf("failed to retrieve order %s to resolve item refundable amount: %w", dto.OrderID, oErr)
+		}
+		if order == nil || len(order.Items) == 0 {
+			slog.WarnContext(ctx, "order not found or has no items",
+				"return_id", dto.ReturnID,
+				"order_id", dto.OrderID,
+				"order_item_id", orderItemID,
+			)
+			return nil, fmt.Errorf("order %s has no items to resolve refundable amount", dto.OrderID)
+		}
+
+		itemFound := false
+		for _, it := range order.Items {
+			if it.ID == orderItemID || it.ProductID == orderItemID {
+				itemFound = true
+				if it.TotalPrice > 0 {
+					refundAmount = it.TotalPrice
+				} else if it.UnitPrice > 0 {
+					qty := it.Quantity
+					if qty <= 0 {
+						qty = 1
 					}
-					break
+					refundAmount = it.UnitPrice * float64(qty)
 				}
+				break
 			}
 		}
+
+		if !itemFound || refundAmount <= 0 {
+			slog.WarnContext(ctx, "could not resolve valid refundable amount for order item",
+				"return_id", dto.ReturnID,
+				"order_id", dto.OrderID,
+				"order_item_id", orderItemID,
+			)
+			return nil, fmt.Errorf("could not resolve refundable amount for item %s in order %s", orderItemID, dto.OrderID)
+		}
 	}
+
 	if refundAmount <= 0 {
-		refundAmount = payment.Amount
+		return nil, appErrors.BadRequest("refundable amount must be greater than zero")
 	}
 
 	totalRefunded, err := s.repo.GetTotalRefundedAmount(ctx, payment.ID)

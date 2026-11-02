@@ -16,6 +16,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
@@ -256,7 +257,7 @@ func (m *mockPaymentRepo) GetRefundByIdempotencyKey(ctx context.Context, key str
 			return &rCopy, nil
 		}
 	}
-	return nil, appErrors.NotFound("refund not found")
+	return nil, repository.ErrRefundNotFound
 }
 
 func (m *mockPaymentRepo) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
@@ -2387,9 +2388,9 @@ func TestPaymentService_ProcessReturnRefund_AmountCalculation_FromOrderItem(t *t
 		Currency:    "INR",
 		Items: []client.AuthoritativeOrderItem{
 			{
-				ProductID: "prod_widget_99",
-				Quantity:  3,
-				UnitPrice: 25.00,
+				ProductID:  "prod_widget_99",
+				Quantity:   3,
+				UnitPrice:  25.00,
 				TotalPrice: 75.00,
 			},
 		},
@@ -2594,5 +2595,117 @@ func TestPaymentService_ProcessReturnRefund_GatewayTimeout(t *testing.T) {
 	pUpdated, _ := repo.GetPaymentByID(context.Background(), pmt.ID)
 	if pUpdated.Status != model.PaymentStatusSuccess {
 		t.Errorf("expected payment to revert to SUCCESS after timeout, got: %s", pUpdated.Status)
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_UnsupportedReturnType(t *testing.T) {
+	repo := newMockPaymentRepo()
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, nil)
+
+	for _, invalidType := range []string{"", "UNKNOWN", "STORE_CREDIT", "CANCEL"} {
+		dto := &service.ProcessReturnRefundDTO{
+			ReturnID:     "ret_invalid_type",
+			OrderID:      "ord_invalid_type",
+			Type:         invalidType,
+			RefundAmount: 50.00,
+		}
+		_, err := svc.ProcessReturnRefund(context.Background(), dto)
+		if err == nil {
+			t.Errorf("expected error for invalid return type %q, got nil", invalidType)
+		}
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_MissingOrderItemIDWhenAmountZero(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_missing_item",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, newMockOrderClient())
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_missing_item",
+		OrderID:      "ord_missing_item",
+		OrderItemID:  "",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when order_item_id is missing and refund amount is 0, got nil")
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_ItemNotFoundInOrder_NeverFallsBackToTotalAmount(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_item_not_found",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	orderClient := newMockOrderClient()
+	orderClient.orders["ord_item_not_found"] = &client.AuthoritativeOrder{
+		ID:          "ord_item_not_found",
+		TotalAmount: 100.00,
+		Items: []client.AuthoritativeOrderItem{
+			{
+				ID:         "item_other",
+				ProductID:  "prod_other",
+				TotalPrice: 50.00,
+			},
+		},
+	}
+
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_not_found",
+		OrderID:      "ord_item_not_found",
+		OrderItemID:  "item_nonexistent",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when item is not found in order, got nil (never fall back to total amount)")
+	}
+}
+
+func TestPaymentService_ProcessReturnRefund_OrderClientError_NeverFallsBackToTotalAmount(t *testing.T) {
+	repo := newMockPaymentRepo()
+	pmt := &model.Payment{
+		OrderID: "ord_client_err",
+		Amount:  100.00,
+		Status:  model.PaymentStatusSuccess,
+	}
+	_ = repo.CreatePayment(context.Background(), pmt)
+
+	orderClient := newMockOrderClient()
+	// order is not added to orderClient.orders, so GetOrder returns "order not found" error
+	gw := gateway.NewRazorpayGateway("rzp_test_key", "rzp_test_secret", 2*time.Second, "")
+	svc := service.NewPaymentService(repo, gw, orderClient)
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     "ret_client_err",
+		OrderID:      "ord_client_err",
+		OrderItemID:  "item_123",
+		RefundAmount: 0,
+		Type:         "RETURN",
+	}
+
+	_, err := svc.ProcessReturnRefund(context.Background(), dto)
+	if err == nil {
+		t.Fatalf("expected error when order client fails, got nil (never fall back to total amount)")
 	}
 }

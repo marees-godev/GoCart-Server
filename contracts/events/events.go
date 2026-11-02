@@ -423,6 +423,18 @@ type ReturnVerifiedEvent struct {
 	VerifiedAt  time.Time `json:"verified_at"`
 }
 
+// ReturnRefundEligibleEvent represents the payload when a return is verified and eligible for a refund.
+type ReturnRefundEligibleEvent struct {
+	ReturnID     string    `json:"return_id"`
+	OrderID      string    `json:"order_id"`
+	OrderItemID  string    `json:"order_item_id"`
+	UserID       string    `json:"user_id"`
+	Type         string    `json:"type,omitempty"`
+	RefundAmount float64   `json:"refund_amount,omitempty"`
+	Reason       string    `json:"reason,omitempty"`
+	EligibleAt   time.Time `json:"eligible_at"`
+}
+
 // ReturnStatusUpdatedEvent represents the payload for ReturnStatusUpdated domain event.
 type ReturnStatusUpdatedEvent struct {
 	ReturnID       string    `json:"return_id"`

@@ -14,6 +14,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/consumer"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
@@ -180,7 +181,7 @@ func (m *mockPaymentRepo) GetRefundByGatewayRefundID(ctx context.Context, gatewa
 }
 
 func (m *mockPaymentRepo) GetRefundByIdempotencyKey(ctx context.Context, key string) (*model.Refund, error) {
-	return nil, appErrors.NotFound("refund not found")
+	return nil, repository.ErrRefundNotFound
 }
 
 func (m *mockPaymentRepo) GetRefundsByPaymentID(ctx context.Context, paymentID string) ([]*model.Refund, error) {
@@ -578,18 +579,17 @@ func TestPaymentEventConsumer_HandleReturnApproved_Success(t *testing.T) {
 	mockSvc := &mockPaymentServiceForConsumer{}
 	c := consumer.NewPaymentEventConsumer(mockSvc)
 
-	payload := events.ReturnApprovedEvent{
+	payload := events.ReturnRefundEligibleEvent{
 		ReturnID:     "ret-1001",
 		OrderID:      "ord-1001",
 		OrderItemID:  "item-1001",
 		UserID:       "usr-1001",
-		ApprovedBy:   "admin-1",
-		ApprovedAt:   time.Now().UTC(),
 		Type:         "RETURN",
 		RefundAmount: 75.50,
+		EligibleAt:   time.Now().UTC(),
 	}
 
-	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-1001", payload)
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-1001", payload)
 	if err != nil {
 		t.Fatalf("failed to create envelope: %v", err)
 	}
@@ -615,21 +615,52 @@ func TestPaymentEventConsumer_HandleReturnApproved_Success(t *testing.T) {
 	}
 }
 
-func TestPaymentEventConsumer_HandleReturnApproved_NonMonetaryBypass(t *testing.T) {
+func TestPaymentEventConsumer_ReturnApproved_DoesNotTriggerRefund(t *testing.T) {
 	ctx := context.Background()
 	mockSvc := &mockPaymentServiceForConsumer{}
 	c := consumer.NewPaymentEventConsumer(mockSvc)
 
 	payload := events.ReturnApprovedEvent{
+		ReturnID:     "ret-app-1",
+		OrderID:      "ord-app-1",
+		OrderItemID:  "item-app-1",
+		UserID:       "usr-app-1",
+		ApprovedBy:   "admin-1",
+		ApprovedAt:   time.Now().UTC(),
+		Type:         "RETURN",
+		RefundAmount: 50.0,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-app-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Fatalf("expected HandleEvent to silently succeed for ReturnApproved, got: %v", err)
+	}
+
+	if mockSvc.processReturnRefundCalls != 0 {
+		t.Errorf("expected 0 calls to ProcessReturnRefund for ReturnApproved, got %d", mockSvc.processReturnRefundCalls)
+	}
+}
+
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonMonetaryBypass(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.ReturnRefundEligibleEvent{
 		ReturnID:     "ret-rep-1",
 		OrderID:      "ord-rep-1",
 		OrderItemID:  "item-rep-1",
 		UserID:       "usr-rep-1",
 		Type:         "REPLACEMENT",
 		RefundAmount: 0,
+		EligibleAt:   time.Now().UTC(),
 	}
 
-	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-rep-1", payload)
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-rep-1", payload)
 	if err != nil {
 		t.Fatalf("failed to create envelope: %v", err)
 	}
@@ -642,19 +673,19 @@ func TestPaymentEventConsumer_HandleReturnApproved_NonMonetaryBypass(t *testing.
 	}
 }
 
-func TestPaymentEventConsumer_HandleReturnApproved_NonRetryableBadRequestAcknowledged(t *testing.T) {
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonRetryableBadRequestAcknowledged(t *testing.T) {
 	ctx := context.Background()
 	mockSvc := &mockPaymentServiceForConsumer{
 		processReturnRefundErr: appErrors.BadRequest("cannot refund payment: status is CANCELLED"),
 	}
 	c := consumer.NewPaymentEventConsumer(mockSvc)
 
-	payload := events.ReturnApprovedEvent{
+	payload := events.ReturnRefundEligibleEvent{
 		ReturnID: "ret-bad-1",
 		OrderID:  "ord-bad-1",
 	}
 
-	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-bad-1", payload)
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-bad-1", payload)
 	if err != nil {
 		t.Fatalf("failed to create envelope: %v", err)
 	}
@@ -665,19 +696,19 @@ func TestPaymentEventConsumer_HandleReturnApproved_NonRetryableBadRequestAcknowl
 	}
 }
 
-func TestPaymentEventConsumer_HandleReturnApproved_NonRetryableNotFoundAcknowledged(t *testing.T) {
+func TestPaymentEventConsumer_HandleReturnRefundEligible_NonRetryableNotFoundAcknowledged(t *testing.T) {
 	ctx := context.Background()
 	mockSvc := &mockPaymentServiceForConsumer{
 		processReturnRefundErr: appErrors.NotFound("payment for order not found"),
 	}
 	c := consumer.NewPaymentEventConsumer(mockSvc)
 
-	payload := events.ReturnApprovedEvent{
+	payload := events.ReturnRefundEligibleEvent{
 		ReturnID: "ret-nf-1",
 		OrderID:  "ord-nf-1",
 	}
 
-	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnApproved, "return-service", "ret-nf-1", payload)
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, "return-service", "ret-nf-1", payload)
 	if err != nil {
 		t.Fatalf("failed to create envelope: %v", err)
 	}

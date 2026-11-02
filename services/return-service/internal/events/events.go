@@ -141,6 +141,40 @@ func BuildReturnVerifiedOutboxEvent(ret *model.Return, v *model.ProductVerificat
 	}, nil
 }
 
+func BuildReturnRefundEligibleOutboxEvent(ret *model.Return, reason string) (*outbox.Event, error) {
+	if reason == "" {
+		reason = fmt.Sprintf("Return %s verified and eligible for refund", ret.ID)
+	}
+	payload := events.ReturnRefundEligibleEvent{
+		ReturnID:     ret.ID,
+		OrderID:      ret.OrderID,
+		OrderItemID:  ret.OrderItemID,
+		UserID:       ret.UserID,
+		Type:         string(ret.Type),
+		RefundAmount: ret.RefundAmount,
+		Reason:       reason,
+		EligibleAt:   time.Now().UTC(),
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeReturnRefundEligible, SourceReturnService, ret.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "return",
+		AggregateID:   ret.ID,
+		EventType:     events.EventTypeReturnRefundEligible,
+		Payload:       bytes,
+		Topic:         events.TopicReturnRefundEligible,
+	}, nil
+}
+
 func BuildReturnStatusUpdatedOutboxEvent(ret *model.Return, prevStatus, newStatus model.ReturnStatus) (*outbox.Event, error) {
 	payload := events.ReturnStatusUpdatedEvent{
 		ReturnID:       ret.ID,
@@ -172,19 +206,19 @@ func BuildReturnStatusUpdatedOutboxEvent(ret *model.Return, prevStatus, newStatu
 
 func BuildExchangeCreatedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
 	payload := map[string]interface{}{
-		"exchange_id":           exc.ID,
-		"order_id":              exc.OrderID,
-		"order_item_id":         exc.OrderItemID,
-		"user_id":               exc.UserID,
-		"new_product_id":        exc.NewProductID,
-		"old_brand":             exc.OldBrand,
-		"old_model":             exc.OldModel,
-		"old_variant":           exc.OldVariant,
-		"serial_or_imei":        exc.SerialOrIMEI,
-		"base_exchange_value":   exc.BaseExchangeValue,
-		"estimated_discount":    exc.EstimatedDiscount,
-		"status":                string(exc.Status),
-		"created_at":            exc.CreatedAt,
+		"exchange_id":         exc.ID,
+		"order_id":            exc.OrderID,
+		"order_item_id":       exc.OrderItemID,
+		"user_id":             exc.UserID,
+		"new_product_id":      exc.NewProductID,
+		"old_brand":           exc.OldBrand,
+		"old_model":           exc.OldModel,
+		"old_variant":         exc.OldVariant,
+		"serial_or_imei":      exc.SerialOrIMEI,
+		"base_exchange_value": exc.BaseExchangeValue,
+		"estimated_discount":  exc.EstimatedDiscount,
+		"status":              string(exc.Status),
+		"created_at":          exc.CreatedAt,
 	}
 
 	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeCreated, SourceReturnService, exc.ID, payload)
@@ -307,4 +341,3 @@ func BuildRefundInitiatedOutboxEvent(ret *model.Return, paymentID string, amount
 		Topic:         events.TopicRefundInitiated,
 	}, nil
 }
-

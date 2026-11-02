@@ -28,7 +28,7 @@ type ReturnRepository interface {
 	ListReturns(ctx context.Context, limit, offset int, status, userID, returnType string) ([]*model.Return, int, error)
 	UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus) (*model.Return, error)
 	UpdateReturnStatusWithOutbox(ctx context.Context, id string, status model.ReturnStatus, rejectionReason string, outboxEvents ...*outbox.Event) (*model.Return, error)
-	CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvent *outbox.Event) error
+	CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvents ...*outbox.Event) error
 	GetVerificationByReturnID(ctx context.Context, returnID string) (*model.ProductVerification, error)
 
 	CreateExchangeWithOutbox(ctx context.Context, exc *model.Exchange, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error
@@ -327,7 +327,7 @@ func (r *returnRepository) UpdateReturnStatusWithOutbox(ctx context.Context, id 
 	return updatedReturn, nil
 }
 
-func (r *returnRepository) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvent *outbox.Event) error {
+func (r *returnRepository) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvents ...*outbox.Event) error {
 	return r.db.WithTransaction(ctx, func(tx pgx.Tx) error {
 		vQuery := `
 			INSERT INTO return_verifications (
@@ -379,9 +379,11 @@ func (r *returnRepository) CreateVerificationWithOutbox(ctx context.Context, v *
 			return fmt.Errorf("failed to update return status during verification: %w", err)
 		}
 
-		if outboxEvent != nil {
-			if err := r.outboxStore.Insert(ctx, tx, outboxEvent); err != nil {
-				return fmt.Errorf("failed to insert outbox event: %w", err)
+		for _, outboxEvent := range outboxEvents {
+			if outboxEvent != nil {
+				if err := r.outboxStore.Insert(ctx, tx, outboxEvent); err != nil {
+					return fmt.Errorf("failed to insert outbox event: %w", err)
+				}
 			}
 		}
 		return nil

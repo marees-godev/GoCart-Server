@@ -135,13 +135,13 @@ func main() {
 	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
 	paymentService := service.NewPaymentService(paymentRepo, paymentGW, orderClient, gwConfig.Timeout)
 
-	// 6b. Start Kafka Event Consumer for OrderCreated and ReturnApproved events
+	// 6b. Start Kafka Event Consumer for OrderCreated and ReturnRefundEligible events
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && kafkaProducer != nil {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "payment-service-group",
 			Topics: []string{
 				events.TopicOrderCreated,
-				events.TopicReturnApproved,
+				events.TopicReturnRefundEligible,
 			},
 		}
 		paymentKafkaConsumer := kafka.NewConsumer(kafka.Config{

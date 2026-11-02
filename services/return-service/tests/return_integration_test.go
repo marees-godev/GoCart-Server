@@ -119,7 +119,7 @@ func (m *inMemReturnRepo) UpdateReturnStatusWithOutbox(ctx context.Context, id s
 	return &cp, nil
 }
 
-func (m *inMemReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvent *outbox.Event) error {
+func (m *inMemReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *model.ProductVerification, newStatus model.ReturnStatus, outboxEvents ...*outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ret, ok := m.returns[v.ReturnID]
@@ -129,8 +129,10 @@ func (m *inMemReturnRepo) CreateVerificationWithOutbox(ctx context.Context, v *m
 	ret.Status = newStatus
 	ret.Verification = v
 	ret.UpdatedAt = time.Now().UTC()
-	if outboxEvent != nil {
-		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	for _, outboxEvent := range outboxEvents {
+		if outboxEvent != nil {
+			m.outboxEvents = append(m.outboxEvents, outboxEvent)
+		}
 	}
 	return nil
 }
@@ -241,7 +243,6 @@ func (m *inMemReturnRepo) ListReturns(ctx context.Context, limit, offset int, st
 	}
 	return list, len(list), nil
 }
-
 
 type inMemOrderClient struct {
 	mu     sync.RWMutex

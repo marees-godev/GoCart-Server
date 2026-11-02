@@ -22,40 +22,41 @@ import (
 )
 
 var (
-	ErrReturnReasonRequired         = errors.New("return reason is mandatory")
-	ErrReturnIDRequired             = errors.New("return id is required")
-	ErrReviewerIDRequired           = errors.New("reviewer id is required")
-	ErrOrderItemRequired            = errors.New("order item id is required")
-	ErrOrderIDRequired              = errors.New("order id is required")
-	ErrUserIDRequired               = errors.New("user id is required")
-	ErrDuplicateReturnRequest       = errors.New("duplicate return request for order item")
-	ErrOrderNotDelivered            = errors.New("order must be delivered to request a return")
-	ErrOrderItemNotFound            = errors.New("order item not found in order")
-	ErrUnauthorizedReturnRequest    = errors.New("order does not belong to authenticated user")
-	ErrReturnWindowExpired          = errors.New("return window has expired")
-	ErrProductNotReturnable         = errors.New("product is not returnable")
-	ErrInvalidReturnStatus          = errors.New("invalid return status")
-	ErrOrderNotFound                = errors.New("order not found")
-	ErrInvalidReturnType            = errors.New("invalid return type")
-	ErrProofImagesRequired          = errors.New("at least one proof image is required for product verification")
-	ErrVerifiedByRequired           = errors.New("verified by delivery partner ID is required")
-	ErrInvalidVerificationCondition = errors.New("invalid product verification condition")
+	ErrReturnReasonRequired           = errors.New("return reason is mandatory")
+	ErrReturnIDRequired               = errors.New("return id is required")
+	ErrReviewerIDRequired             = errors.New("reviewer id is required")
+	ErrOrderItemRequired              = errors.New("order item id is required")
+	ErrOrderIDRequired                = errors.New("order id is required")
+	ErrUserIDRequired                 = errors.New("user id is required")
+	ErrDuplicateReturnRequest         = errors.New("duplicate return request for order item")
+	ErrOrderNotDelivered              = errors.New("order must be delivered to request a return")
+	ErrOrderItemNotFound              = errors.New("order item not found in order")
+	ErrUnauthorizedReturnRequest      = errors.New("order does not belong to authenticated user")
+	ErrReturnWindowExpired            = errors.New("return window has expired")
+	ErrProductNotReturnable           = errors.New("product is not returnable")
+	ErrInvalidReturnStatus            = errors.New("invalid return status")
+	ErrOrderNotFound                  = errors.New("order not found")
+	ErrInvalidReturnType              = errors.New("invalid return type")
+	ErrProofImagesRequired            = errors.New("at least one proof image is required for product verification")
+	ErrVerifiedByRequired             = errors.New("verified by delivery partner ID is required")
+	ErrInvalidVerificationCondition   = errors.New("invalid product verification condition")
 	ErrInvalidExchangeConditionRating = errors.New("invalid exchange condition rating")
-	ErrReturnNotFound               = errors.New("return not found")
-	ErrReturnNotVerifiable          = errors.New("return cannot be verified in current status")
-	ErrMultipleItemsNotSupported     = errors.New("only one item per return request is supported")
-	ErrOrderItemMismatch             = errors.New("order item id and item ids mismatch")
-	ErrInvalidStateTransition        = errors.New("invalid return status transition")
-	ErrCustomerCannotReviewOwnReturn = errors.New("customer cannot approve or reject their own return")
-	ErrRejectionReasonRequired       = errors.New("rejection reason is required")
-	ErrExchangeNotFound              = errors.New("exchange record not found")
-	ErrExchangeNotVerifiable         = errors.New("exchange cannot be verified in current status")
-	ErrExchangeBrandModelRequired    = errors.New("old brand and old model are required for exchange")
-	ErrExchangeNewProductRequired    = errors.New("new product id is required for exchange")
-	ErrExchangeFunctionalRequired    = errors.New("device must be functional and serial must match to approve exchange")
-	ErrReturnNotEligibleForRefund    = errors.New("refund can only be triggered after return is received or verified")
-	ErrRefundExceedsPaidAmount       = errors.New("refund amount cannot exceed total paid amount")
-	ErrPaymentNotFound               = errors.New("payment not found for order")
+	ErrReturnNotFound                 = errors.New("return not found")
+	ErrReturnNotVerifiable            = errors.New("return cannot be verified in current status")
+	ErrMultipleItemsNotSupported      = errors.New("only one item per return request is supported")
+	ErrOrderItemMismatch              = errors.New("order item id and item ids mismatch")
+	ErrInvalidStateTransition         = errors.New("invalid return status transition")
+	ErrCustomerCannotReviewOwnReturn  = errors.New("customer cannot approve or reject their own return")
+	ErrRejectionReasonRequired        = errors.New("rejection reason is required")
+	ErrExchangeNotFound               = errors.New("exchange record not found")
+	ErrExchangeNotVerifiable          = errors.New("exchange cannot be verified in current status")
+	ErrExchangeBrandModelRequired     = errors.New("old brand and old model are required for exchange")
+	ErrExchangeNewProductRequired     = errors.New("new product id is required for exchange")
+	ErrExchangeFunctionalRequired     = errors.New("device must be functional and serial must match to approve exchange")
+	ErrReturnNotEligibleForRefund     = errors.New("refund can only be triggered after return is received or verified")
+	ErrRefundExceedsPaidAmount        = errors.New("refund amount cannot exceed total paid amount")
+	ErrPaymentNotFound                = errors.New("payment not found for order")
+	ErrRefundFailed                   = errors.New("payment refund failed")
 )
 
 type ReturnService interface {
@@ -627,13 +628,22 @@ func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProduc
 		nextStatus = model.ReturnStatusRejected
 	}
 
+	var outboxEvents []*outbox.Event
 	outboxEvt, err := events.BuildReturnVerifiedOutboxEvent(ret, v)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to build return verified outbox event", slog.Any("error", err))
 		return nil, nil, err
 	}
+	outboxEvents = append(outboxEvents, outboxEvt)
 
-	if err := s.repo.CreateVerificationWithOutbox(ctx, v, nextStatus, outboxEvt); err != nil {
+	if req.IsApproved && ret.Type == model.ReturnTypeReturn {
+		eligibleEvt, err := events.BuildReturnRefundEligibleOutboxEvent(ret, "Product verified and approved for refund")
+		if err == nil && eligibleEvt != nil {
+			outboxEvents = append(outboxEvents, eligibleEvt)
+		}
+	}
+
+	if err := s.repo.CreateVerificationWithOutbox(ctx, v, nextStatus, outboxEvents...); err != nil {
 		s.logger.ErrorContext(ctx, "failed to persist product verification", slog.Any("error", err))
 		return nil, nil, err
 	}
@@ -1093,8 +1103,31 @@ func (s *returnService) TriggerRefund(ctx context.Context, returnID string) (*mo
 		)
 		return nil, fmt.Errorf("payment service CreateRefund failed: %w", err)
 	}
+	if refResp == nil {
+		s.logger.ErrorContext(ctx, "empty refund response from payment service",
+			slog.String("return_id", ret.ID),
+			slog.String("payment_id", pmt.Id),
+		)
+		return nil, errors.New("payment service returned empty refund response")
+	}
 
-	// 8. Transition return status to COMPLETED with completed_at timestamp
+	// 8. Check persisted refund status returned by Payment Service.
+	// Only transition the return to COMPLETED when the refund has reached the appropriate successful state (SUCCESS or PROCESSED).
+	// Otherwise retain a pending/failed refund state.
+	refundStatus := strings.ToUpper(strings.TrimSpace(refResp.GetStatus()))
+	if refundStatus != "SUCCESS" && refundStatus != "PROCESSED" {
+		s.logger.WarnContext(ctx, "refund has not reached successful state; retaining refund initiated state",
+			slog.String("return_id", ret.ID),
+			slog.String("refund_id", refResp.GetRefundId()),
+			slog.String("refund_status", refundStatus),
+		)
+		if refundStatus == "FAILED" {
+			return ret, ErrRefundFailed
+		}
+		return ret, nil
+	}
+
+	// 9. Transition return status to COMPLETED with completed_at timestamp
 	now := time.Now().UTC()
 	ret.CompletedAt = &now
 	ret.Status = model.ReturnStatusCompleted
@@ -1130,4 +1163,3 @@ func (s *returnService) TriggerRefund(ctx context.Context, returnID string) (*mo
 
 	return ret, nil
 }
-
