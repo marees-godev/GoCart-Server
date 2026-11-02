@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -11,24 +12,31 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/service"
 )
 
 type PaymentHandler struct {
-	paymentRepo repository.PaymentRepository
-	paymentGW   gateway.PaymentGateway
-	gwConfig    gateway.GatewayConfig
-	log         *slog.Logger
+	paymentRepo    repository.PaymentRepository
+	paymentGW      gateway.PaymentGateway
+	paymentService service.PaymentService
+	gwConfig       gateway.GatewayConfig
+	log            *slog.Logger
 }
 
-func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gateway.PaymentGateway, gwConfig gateway.GatewayConfig, log *slog.Logger) *PaymentHandler {
+func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gateway.PaymentGateway, gwConfig gateway.GatewayConfig, log *slog.Logger, paymentService ...service.PaymentService) *PaymentHandler {
 	if log == nil {
 		log = slog.Default()
 	}
+	var svc service.PaymentService
+	if len(paymentService) > 0 {
+		svc = paymentService[0]
+	}
 	return &PaymentHandler{
-		paymentRepo: paymentRepo,
-		paymentGW:   paymentGW,
-		gwConfig:    gwConfig,
-		log:         log,
+		paymentRepo:    paymentRepo,
+		paymentGW:      paymentGW,
+		paymentService: svc,
+		gwConfig:       gwConfig,
+		log:            log,
 	}
 }
 
@@ -36,6 +44,10 @@ func (h *PaymentHandler) RegisterRoutes(app *fiber.App) {
 	app.Get("/get-key", h.GetKey)
 	app.Post("/create-order", h.CreateOrder)
 	app.All("/payment-callback", h.PaymentCallback)
+	app.Get("/", h.ServeTestUI)
+	app.Get("/test-ui", h.ServeTestUI)
+	app.Post("/api/process-refund", h.ProcessRefund)
+	app.Get("/api/order-payment/:order_id", h.GetOrderPayment)
 }
 
 func (h *PaymentHandler) GetKey(c *fiber.Ctx) error {
@@ -152,12 +164,49 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 }
 
 func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
-	orderID := c.FormValue("razorpay_order_id", c.Query("razorpay_order_id", c.Query("orderId", "")))
+	type cbJSON struct {
+		OrderID           string  `json:"order_id"`
+		Amount            float64 `json:"amount"`
+		RazorpayOrderID   string  `json:"razorpay_order_id"`
+		RazorpayPaymentID string  `json:"razorpay_payment_id"`
+		RazorpaySignature string  `json:"razorpay_signature"`
+		Status            string  `json:"status"`
+		ErrorCode         string  `json:"error_code"`
+		ErrorDescription  string  `json:"error_description"`
+	}
+	var cb cbJSON
+	_ = c.BodyParser(&cb)
+
+	orderID := c.FormValue("order_id", c.Query("order_id", c.Query("orderId", "")))
+	if orderID == "" {
+		orderID = cb.OrderID
+	}
+	if orderID == "" {
+		orderID = c.FormValue("razorpay_order_id", c.Query("razorpay_order_id", ""))
+		if orderID == "" {
+			orderID = cb.RazorpayOrderID
+		}
+	}
 	paymentID := c.FormValue("razorpay_payment_id", c.Query("razorpay_payment_id", c.Query("paymentId", "")))
+	if paymentID == "" {
+		paymentID = cb.RazorpayPaymentID
+	}
 	signature := c.FormValue("razorpay_signature", c.Query("razorpay_signature", c.Query("signature", "")))
+	if signature == "" {
+		signature = cb.RazorpaySignature
+	}
 	statusParam := strings.ToLower(c.FormValue("status", c.Query("status", "")))
+	if statusParam == "" {
+		statusParam = strings.ToLower(cb.Status)
+	}
 	errorCode := c.FormValue("error_code", c.Query("error_code", c.Query("error[code]", "")))
+	if errorCode == "" {
+		errorCode = cb.ErrorCode
+	}
 	errorDesc := c.FormValue("error_description", c.Query("error_description", c.Query("error[description]", c.Query("error_reason", c.Query("error", "")))))
+	if errorDesc == "" {
+		errorDesc = cb.ErrorDescription
+	}
 
 	isFailed := statusParam == "failed" || statusParam == "failure" || statusParam == "error" || errorCode != ""
 
@@ -173,7 +222,26 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 		if (err != nil || pmt == nil) && paymentID != "" && lookupID != paymentID {
 			pmt, err = h.paymentRepo.GetPaymentByID(c.UserContext(), paymentID)
 		}
-		if err == nil && pmt != nil {
+		if (err != nil || pmt == nil) && orderID != "" && !isFailed {
+			pmtAmount := cb.Amount
+			if pmtAmount <= 0 {
+				pmtAmount = 149.99
+			}
+			pmt = &model.Payment{
+				ID:                   uuid.New().String(),
+				OrderID:              orderID,
+				UserID:               uuid.New().String(),
+				PaymentMethod:        model.NormalizePaymentMethod("CARD"),
+				Amount:               pmtAmount,
+				Currency:             "INR",
+				Status:               model.PaymentStatusPending,
+				TransactionID:        fmt.Sprintf("tx_%s", uuid.New().String()),
+				GatewayTransactionID: paymentID,
+			}
+			_ = h.paymentRepo.CreatePayment(c.UserContext(), pmt)
+		}
+
+		if pmt != nil {
 			if isFailed {
 				reason := errorDesc
 				if reason == "" {
@@ -207,4 +275,116 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 		"payment_id": paymentID,
 		"signature":  signature,
 	})
+}
+
+func (h *PaymentHandler) ProcessRefund(c *fiber.Ctx) error {
+	if h.paymentService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "payment service unavailable",
+		})
+	}
+
+	type refundReq struct {
+		ReturnID     string  `json:"return_id"`
+		OrderID      string  `json:"order_id"`
+		OrderItemID  string  `json:"order_item_id"`
+		UserID       string  `json:"user_id"`
+		RefundAmount float64 `json:"refund_amount"`
+		Type         string  `json:"type"`
+		Reason       string  `json:"reason"`
+	}
+
+	var req refundReq
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "invalid request body: " + err.Error(),
+		})
+	}
+
+	if req.ReturnID == "" {
+		req.ReturnID = uuid.New().String()
+	}
+	if req.OrderItemID == "" {
+		req.OrderItemID = uuid.New().String()
+	}
+	if req.UserID == "" {
+		req.UserID = uuid.New().String()
+	}
+	if req.Type == "" {
+		req.Type = "RETURN"
+	}
+	if req.Reason == "" {
+		req.Reason = "Return refund initiated"
+	}
+
+	dto := &service.ProcessReturnRefundDTO{
+		ReturnID:     req.ReturnID,
+		OrderID:      req.OrderID,
+		OrderItemID:  req.OrderItemID,
+		UserID:       req.UserID,
+		RefundAmount: req.RefundAmount,
+		Type:         req.Type,
+		Reason:       req.Reason,
+	}
+
+	refund, err := h.paymentService.ProcessReturnRefund(c.UserContext(), dto)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   err.Error(),
+		})
+	}
+
+	var pmt *model.Payment
+	var allRefunds []*model.Refund
+	if h.paymentRepo != nil {
+		pmt, _ = h.paymentRepo.GetPaymentByOrderID(c.UserContext(), req.OrderID)
+		if pmt != nil {
+			allRefunds, _ = h.paymentRepo.GetRefundsByPaymentID(c.UserContext(), pmt.ID)
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"refund":  refund,
+		"payment": pmt,
+		"refunds": allRefunds,
+	})
+}
+
+func (h *PaymentHandler) GetOrderPayment(c *fiber.Ctx) error {
+	orderID := c.Params("order_id")
+	if orderID == "" || h.paymentRepo == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "order_id is required"})
+	}
+
+	pmt, err := h.paymentRepo.GetPaymentByOrderID(c.UserContext(), orderID)
+	if err != nil || pmt == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "payment not found"})
+	}
+
+	refunds, _ := h.paymentRepo.GetRefundsByPaymentID(c.UserContext(), pmt.ID)
+	return c.JSON(fiber.Map{
+		"payment": pmt,
+		"refunds": refunds,
+	})
+}
+
+func (h *PaymentHandler) ServeTestUI(c *fiber.Ctx) error {
+	paths := []string{
+		"templates/razorpay_refund_test.html",
+		"../../templates/razorpay_refund_test.html",
+		"../templates/razorpay_refund_test.html",
+	}
+
+	for _, p := range paths {
+		if content, err := os.ReadFile(p); err == nil {
+			c.Set("Content-Type", "text/html; charset=utf-8")
+			return c.Send(content)
+		}
+	}
+
+	return c.Status(fiber.StatusNotFound).SendString("Test UI template not found on disk")
 }

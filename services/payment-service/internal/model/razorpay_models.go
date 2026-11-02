@@ -98,7 +98,8 @@ type RazorpayOrderResponse struct {
 }
 
 type RazorpayRefundRequest struct {
-	Amount string            `json:"amount,omitempty"`
+	Amount int64             `json:"amount,omitempty"`
+	Speed  string            `json:"speed,omitempty"`
 	Notes  map[string]string `json:"notes,omitempty"`
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	returns "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/model"
@@ -106,6 +107,13 @@ func (m *mockReturnService) VerifyExchangeProduct(ctx context.Context, req *dto.
 	return nil, nil, nil
 }
 
+func (m *mockReturnService) TriggerRefund(ctx context.Context, returnID string) (*model.Return, error) {
+	return nil, nil
+}
+
+func (m *mockReturnService) ProcessRefund(ctx context.Context, returnID string) (*model.Return, error) {
+	return nil, nil
+}
 
 func TestReturnGRPCHandler_RequestReturn_Success(t *testing.T) {
 	ctx := context.Background()
@@ -409,6 +417,60 @@ func TestReturnGRPCHandler_VerifyProduct_Success(t *testing.T) {
 	}
 }
 
+func TestReturnGRPCHandler_VerifyProduct_WithoutProofImages(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	mockSvc := &mockReturnService{
+		verifyProductFunc: func(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error) {
+			ret := &model.Return{
+				ID:          req.ReturnID,
+				OrderID:     "order-1",
+				OrderItemID: "item-1",
+				UserID:      "user-1",
+				Status:      model.ReturnStatusVerified,
+				RequestedAt: now,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			v := &model.ProductVerification{
+				ID:          "ver-no-img",
+				ReturnID:    req.ReturnID,
+				VerifiedBy:  req.VerifiedBy,
+				Condition:   model.VerificationCondition(req.Condition),
+				IsApproved:  req.IsApproved,
+				ProofImages: req.ProofImages,
+				Notes:       req.Notes,
+				VerifiedAt:  now,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			ret.Verification = v
+			return ret, v, nil
+		},
+	}
+
+	h := handler.NewReturnGRPCHandler(mockSvc, nil)
+
+	res, err := h.VerifyProduct(ctx, &returns.VerifyProductRequest{
+		ReturnId:    "ret-1",
+		VerifiedBy:  "partner-1",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: nil,
+		Notes:       "condition verified without images",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ReturnOrder == nil || res.ReturnOrder.Status != string(model.ReturnStatusVerified) {
+		t.Fatalf("expected ReturnOrder status VERIFIED, got: %v", res.ReturnOrder)
+	}
+	if res.Verification == nil || len(res.Verification.ProofImages) != 0 {
+		t.Fatalf("expected 0 proof images, got: %v", res.Verification)
+	}
+}
+
 func TestReturnGRPCHandler_ListReturns_Success(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -479,6 +541,34 @@ func TestReturnGRPCHandler_ApproveReturn_SuccessAndPermissionDenied(t *testing.T
 	_, err = h.ApproveReturn(ctx, &returns.ApproveReturnRequest{Id: "ret-1", ReviewerId: "customer-1"})
 	if status.Code(err) != codes.PermissionDenied {
 		t.Errorf("expected PermissionDenied, got %v", err)
+	}
+
+	// 3. InvalidArgument on nil request
+	_, err = h.ApproveReturn(ctx, nil)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument on nil request, got %v", err)
+	}
+
+	// 4. InvalidArgument on empty ID
+	_, err = h.ApproveReturn(ctx, &returns.ApproveReturnRequest{Id: "  ", ReviewerId: "admin-1"})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument on empty ID, got %v", err)
+	}
+
+	// 5. InvalidArgument on empty reviewer ID with no context user
+	_, err = h.ApproveReturn(ctx, &returns.ApproveReturnRequest{Id: "ret-1", ReviewerId: ""})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument on missing reviewer ID, got %v", err)
+	}
+
+	// 6. Reviewer ID inferred from auth context
+	ctxWithUser := auth.WithUser(ctx, &auth.UserContext{UserID: "admin-context"})
+	resCtx, err := h.ApproveReturn(ctxWithUser, &returns.ApproveReturnRequest{Id: "ret-1"})
+	if err != nil {
+		t.Fatalf("unexpected error approving return with context user: %v", err)
+	}
+	if resCtx.ReturnOrder.Status != string(model.ReturnStatusApproved) {
+		t.Errorf("expected APPROVED status, got %s", resCtx.ReturnOrder.Status)
 	}
 }
 

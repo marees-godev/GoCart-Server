@@ -276,13 +276,14 @@ func (r *returnRepository) UpdateReturnStatusWithOutbox(ctx context.Context, id 
 		}
 		if status == model.ReturnStatusCompleted {
 			completedAt = &now
+			approvedAt = &now
 		}
 
 		query := `
 			UPDATE returns
 			SET status = $2,
-			    approved_at = COALESCE($3, approved_at),
-			    completed_at = COALESCE($4, completed_at),
+			    approved_at = COALESCE(approved_at, $3),
+			    completed_at = COALESCE(completed_at, $4),
 			    rejection_reason = COALESCE(NULLIF($5, ''), rejection_reason),
 			    updated_at = $6
 			WHERE id = $1
@@ -362,12 +363,19 @@ func (r *returnRepository) CreateVerificationWithOutbox(ctx context.Context, v *
 			}
 		}
 
+		now := time.Now().UTC()
+		var approvedAt *time.Time
+		if v.IsApproved {
+			approvedAt = &now
+		}
 		updateQuery := `
 			UPDATE returns
-			SET status = $2, updated_at = $3
+			SET status = $2,
+			    approved_at = COALESCE(approved_at, $3),
+			    updated_at = $4
 			WHERE id = $1
 		`
-		if _, err := tx.Exec(ctx, updateQuery, v.ReturnID, string(newStatus), time.Now().UTC()); err != nil {
+		if _, err := tx.Exec(ctx, updateQuery, v.ReturnID, string(newStatus), approvedAt, now); err != nil {
 			return fmt.Errorf("failed to update return status during verification: %w", err)
 		}
 
@@ -732,4 +740,3 @@ func scanExchange(row pgx.Row) (*model.Exchange, error) {
 	exc.Status = model.ExchangeStatus(statusStr)
 	return &exc, nil
 }
-

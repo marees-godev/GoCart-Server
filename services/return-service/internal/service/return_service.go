@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -22,6 +23,8 @@ import (
 
 var (
 	ErrReturnReasonRequired         = errors.New("return reason is mandatory")
+	ErrReturnIDRequired             = errors.New("return id is required")
+	ErrReviewerIDRequired           = errors.New("reviewer id is required")
 	ErrOrderItemRequired            = errors.New("order item id is required")
 	ErrOrderIDRequired              = errors.New("order id is required")
 	ErrUserIDRequired               = errors.New("user id is required")
@@ -50,6 +53,9 @@ var (
 	ErrExchangeBrandModelRequired    = errors.New("old brand and old model are required for exchange")
 	ErrExchangeNewProductRequired    = errors.New("new product id is required for exchange")
 	ErrExchangeFunctionalRequired    = errors.New("device must be functional and serial must match to approve exchange")
+	ErrReturnNotEligibleForRefund    = errors.New("refund can only be triggered after return is received or verified")
+	ErrRefundExceedsPaidAmount       = errors.New("refund amount cannot exceed total paid amount")
+	ErrPaymentNotFound               = errors.New("payment not found for order")
 )
 
 type ReturnService interface {
@@ -65,12 +71,15 @@ type ReturnService interface {
 	CreateExchange(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error)
 	GetExchange(ctx context.Context, id string) (*model.Exchange, error)
 	VerifyExchangeProduct(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error)
+	TriggerRefund(ctx context.Context, returnID string) (*model.Return, error)
+	ProcessRefund(ctx context.Context, returnID string) (*model.Return, error)
 }
 
 type returnService struct {
 	repo             repository.ReturnRepository
 	orderClient      client.OrderClient
 	productClient    client.ProductClient
+	paymentClient    client.PaymentClient
 	returnWindowDays int
 	logger           *slog.Logger
 }
@@ -80,24 +89,39 @@ func NewReturnService(
 	orderClient client.OrderClient,
 	productClient client.ProductClient,
 	returnWindowDays int,
-	log ...*slog.Logger,
+	opts ...any,
 ) ReturnService {
 	if returnWindowDays <= 0 {
 		returnWindowDays = 7
 	}
 	var l *slog.Logger
-	if len(log) > 0 && log[0] != nil {
-		l = log[0]
-	} else {
+	var payClient client.PaymentClient
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		switch v := opt.(type) {
+		case *slog.Logger:
+			l = v
+		case client.PaymentClient:
+			payClient = v
+		}
+	}
+	if l == nil {
 		l = slog.Default()
 	}
 	return &returnService{
 		repo:             repo,
 		orderClient:      orderClient,
 		productClient:    productClient,
+		paymentClient:    payClient,
 		returnWindowDays: returnWindowDays,
 		logger:           l,
 	}
+}
+
+func (s *returnService) SetPaymentClient(c client.PaymentClient) {
+	s.paymentClient = c
 }
 
 func (s *returnService) RequestReturn(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error) {
@@ -351,7 +375,7 @@ func (s *returnService) GetReturn(ctx context.Context, id string) (*model.Return
 func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return nil, errors.New("return id is required")
+		return nil, ErrReturnIDRequired
 	}
 	if !status.IsValid() {
 		s.logger.WarnContext(ctx, "invalid return status update attempted",
@@ -380,7 +404,7 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 			slog.String("current_status", string(current.Status)),
 			slog.String("target_status", string(status)),
 		)
-		return nil, ErrInvalidStateTransition
+		return nil, fmt.Errorf("%w: cannot transition return from %s to %s", ErrInvalidStateTransition, current.Status, status)
 	}
 
 	reviewerID := grpcclient.GetUserID(ctx)
@@ -413,10 +437,19 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 		return nil, ErrRejectionReasonRequired
 	}
 
+	if (status == model.ReturnStatusCompleted || status == model.ReturnStatusRefundInitiated) && current.Type == model.ReturnTypeReturn && s.paymentClient != nil {
+		return s.TriggerRefund(ctx, id)
+	}
+
 	var outboxEvents []*outbox.Event
 
 	// Publish ReturnApproved event
 	if status == model.ReturnStatusApproved {
+		now := time.Now().UTC()
+		if current.ApprovedAt == nil {
+			current.ApprovedAt = &now
+		}
+		current.UpdatedAt = now
 		apprEvt, err := events.BuildReturnApprovedOutboxEvent(current, reviewerID)
 		if err != nil {
 			s.logger.ErrorContext(ctx, "failed to build return approved outbox event", slog.Any("error", err))
@@ -433,6 +466,24 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 			return nil, err
 		}
 		outboxEvents = append(outboxEvents, rejEvt)
+	}
+
+	// Publish ReturnCompleted event
+	if status == model.ReturnStatusCompleted {
+		complEvt, err := events.BuildReturnCompletedOutboxEvent(current)
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to build return completed outbox event", slog.Any("error", err))
+			return nil, err
+		}
+		outboxEvents = append(outboxEvents, complEvt)
+	}
+
+	// Publish RefundInitiated event
+	if status == model.ReturnStatusRefundInitiated {
+		refInitEvt, err := events.BuildRefundInitiatedOutboxEvent(current, "", current.RefundAmount, "")
+		if err == nil && refInitEvt != nil {
+			outboxEvents = append(outboxEvents, refInitEvt)
+		}
 	}
 
 	// Publish ReturnStatusUpdated event
@@ -460,17 +511,47 @@ func (s *returnService) UpdateReturnStatus(ctx context.Context, id string, statu
 }
 
 func (s *returnService) ApproveReturn(ctx context.Context, id string, reviewerID string) (*model.Return, error) {
-	if reviewerID != "" {
-		ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrReturnIDRequired
 	}
-	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusApproved)
+	reviewerID = strings.TrimSpace(reviewerID)
+	if reviewerID == "" {
+		if u := grpcclient.GetUserID(ctx); u != "" {
+			reviewerID = u
+		} else if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+			reviewerID = u.UserID
+		}
+	}
+	if reviewerID == "" {
+		return nil, ErrReviewerIDRequired
+	}
+	ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusApproved, "", reviewerID)
 }
 
 func (s *returnService) RejectReturn(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error) {
-	if reviewerID != "" {
-		ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrReturnIDRequired
 	}
-	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusRejected, rejectionReason)
+	rejectionReason = strings.TrimSpace(rejectionReason)
+	if rejectionReason == "" {
+		return nil, ErrRejectionReasonRequired
+	}
+	reviewerID = strings.TrimSpace(reviewerID)
+	if reviewerID == "" {
+		if u := grpcclient.GetUserID(ctx); u != "" {
+			reviewerID = u
+		} else if u, ok := auth.UserFromContext(ctx); ok && u != nil {
+			reviewerID = u.UserID
+		}
+	}
+	if reviewerID == "" {
+		return nil, ErrReviewerIDRequired
+	}
+	ctx = auth.WithUser(ctx, &auth.UserContext{UserID: reviewerID})
+	return s.UpdateReturnStatus(ctx, id, model.ReturnStatusRejected, rejectionReason, reviewerID)
 }
 
 func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error) {
@@ -558,6 +639,9 @@ func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProduc
 	}
 
 	ret.Status = nextStatus
+	if req.IsApproved && ret.ApprovedAt == nil {
+		ret.ApprovedAt = &now
+	}
 	ret.Verification = v
 	ret.UpdatedAt = now
 
@@ -567,6 +651,18 @@ func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProduc
 		slog.Bool("is_approved", req.IsApproved),
 		slog.String("status", string(nextStatus)),
 	)
+
+	if req.IsApproved && ret.Type == model.ReturnTypeReturn && s.paymentClient != nil {
+		if refundedRet, refErr := s.TriggerRefund(ctx, ret.ID); refErr == nil && refundedRet != nil {
+			ret = refundedRet
+			ret.Verification = v
+		} else if refErr != nil {
+			s.logger.WarnContext(ctx, "automatic refund trigger after product verification deferred/failed",
+				slog.String("return_id", ret.ID),
+				slog.Any("error", refErr),
+			)
+		}
+	}
 
 	return ret, v, nil
 }
@@ -867,5 +963,171 @@ func (s *returnService) VerifyExchangeProduct(ctx context.Context, req *dto.Veri
 	)
 
 	return exc, v, nil
+}
+
+func (s *returnService) ProcessRefund(ctx context.Context, returnID string) (*model.Return, error) {
+	return s.TriggerRefund(ctx, returnID)
+}
+
+func (s *returnService) TriggerRefund(ctx context.Context, returnID string) (*model.Return, error) {
+	returnID = strings.TrimSpace(returnID)
+	if returnID == "" {
+		return nil, errors.New("return id is required")
+	}
+
+	ret, err := s.repo.GetReturnByID(ctx, returnID)
+	if err != nil {
+		if errors.Is(err, repository.ErrReturnNotFound) {
+			return nil, ErrReturnNotFound
+		}
+		return nil, err
+	}
+	if ret == nil {
+		return nil, ErrReturnNotFound
+	}
+
+	// 1. Non-monetary return types (REPLACEMENT, EXCHANGE) bypass payment refund calls.
+	if ret.Type == model.ReturnTypeReplacement || ret.Type == model.ReturnTypeExchange {
+		s.logger.InfoContext(ctx, "non-monetary return type bypasses payment refund calls",
+			slog.String("return_id", ret.ID),
+			slog.String("type", string(ret.Type)),
+		)
+		return ret, nil
+	}
+
+	// Idempotency: if already completed, return existing completed return
+	if ret.Status == model.ReturnStatusCompleted {
+		s.logger.InfoContext(ctx, "return is already completed", slog.String("return_id", ret.ID))
+		return ret, nil
+	}
+
+	// 2. Refund is triggered only after the required return state is reached (VERIFIED / RECEIVED).
+	if ret.Status != model.ReturnStatusVerified &&
+		ret.Status != model.ReturnStatusReceived &&
+		ret.Status != model.ReturnStatusItemReceived &&
+		ret.Status != model.ReturnStatusRefundInitiated {
+		s.logger.WarnContext(ctx, "refund rejected: return not in verified or received status",
+			slog.String("return_id", ret.ID),
+			slog.String("status", string(ret.Status)),
+		)
+		return nil, ErrReturnNotEligibleForRefund
+	}
+
+	if s.paymentClient == nil {
+		s.logger.WarnContext(ctx, "payment client is not configured; cannot trigger refund via payment service",
+			slog.String("return_id", ret.ID),
+		)
+		return nil, errors.New("payment service client unavailable")
+	}
+
+	// 3. Call Payment Service through gRPC (GetPaymentByOrderID)
+	pmt, err := s.paymentClient.GetPaymentByOrderID(ctx, ret.OrderID)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to get payment by order id",
+			slog.String("order_id", ret.OrderID),
+			slog.String("return_id", ret.ID),
+			slog.Any("error", err),
+		)
+		return nil, fmt.Errorf("failed to retrieve payment for order %s: %w", ret.OrderID, err)
+	}
+	if pmt == nil {
+		s.logger.WarnContext(ctx, "payment record not found for order",
+			slog.String("order_id", ret.OrderID),
+			slog.String("return_id", ret.ID),
+		)
+		return nil, ErrPaymentNotFound
+	}
+
+	// 4. Derive refund amount and ensure it cannot exceed total paid amount
+	refundAmount := ret.RefundAmount
+	if refundAmount <= 0 {
+		refundAmount = pmt.Amount
+	}
+	if refundAmount > pmt.Amount {
+		s.logger.WarnContext(ctx, "refund amount exceeds total paid amount",
+			slog.String("return_id", ret.ID),
+			slog.Float64("refund_amount", refundAmount),
+			slog.Float64("paid_amount", pmt.Amount),
+		)
+		return nil, ErrRefundExceedsPaidAmount
+	}
+
+	// 5. Deterministic idempotency key based on return ID and order ID
+	idempotencyKey := fmt.Sprintf("refund_%s_%s", ret.ID, ret.OrderID)
+
+	// 6. Return status reflects refund progression: transition to REFUND_INITIATED
+	if ret.Status != model.ReturnStatusRefundInitiated {
+		refInitEvt, buildErr := events.BuildRefundInitiatedOutboxEvent(ret, pmt.Id, refundAmount, pmt.Currency)
+		if buildErr != nil {
+			s.logger.ErrorContext(ctx, "failed to build refund initiated outbox event", slog.Any("error", buildErr))
+			return nil, buildErr
+		}
+		statusEvt, buildErr := events.BuildReturnStatusUpdatedOutboxEvent(ret, ret.Status, model.ReturnStatusRefundInitiated)
+		if buildErr != nil {
+			s.logger.ErrorContext(ctx, "failed to build return status updated outbox event", slog.Any("error", buildErr))
+			return nil, buildErr
+		}
+
+		updatedRet, updateErr := s.repo.UpdateReturnStatusWithOutbox(ctx, ret.ID, model.ReturnStatusRefundInitiated, "", refInitEvt, statusEvt)
+		if updateErr != nil {
+			s.logger.ErrorContext(ctx, "failed to update return status to REFUND_INITIATED", slog.Any("error", updateErr))
+			return nil, updateErr
+		}
+		ret = updatedRet
+	}
+
+	// 7. Call Payment Service through gRPC (CreateRefund)
+	createRefReq := &paymentpb.CreateRefundRequest{
+		PaymentId:      pmt.Id,
+		Amount:         refundAmount,
+		Reason:         ret.Reason,
+		IdempotencyKey: idempotencyKey,
+	}
+
+	refResp, err := s.paymentClient.CreateRefund(ctx, createRefReq)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to create refund through payment service",
+			slog.String("return_id", ret.ID),
+			slog.String("payment_id", pmt.Id),
+			slog.Any("error", err),
+		)
+		return nil, fmt.Errorf("payment service CreateRefund failed: %w", err)
+	}
+
+	// 8. Transition return status to COMPLETED with completed_at timestamp
+	now := time.Now().UTC()
+	ret.CompletedAt = &now
+	ret.Status = model.ReturnStatusCompleted
+
+	completedEvt, buildErr := events.BuildReturnCompletedOutboxEvent(ret)
+	if buildErr != nil {
+		s.logger.ErrorContext(ctx, "failed to build return completed outbox event", slog.Any("error", buildErr))
+		return nil, buildErr
+	}
+
+	statusCompletedEvt, buildErr := events.BuildReturnStatusUpdatedOutboxEvent(ret, model.ReturnStatusRefundInitiated, model.ReturnStatusCompleted)
+	if buildErr != nil {
+		s.logger.ErrorContext(ctx, "failed to build return status updated outbox event", slog.Any("error", buildErr))
+		return nil, buildErr
+	}
+
+	completedRet, err := s.repo.UpdateReturnStatusWithOutbox(ctx, ret.ID, model.ReturnStatusCompleted, "", completedEvt, statusCompletedEvt)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to update return status to COMPLETED", slog.Any("error", err))
+		return nil, err
+	}
+	if completedRet != nil {
+		completedRet.CompletedAt = &now
+		ret = completedRet
+	}
+
+	s.logger.InfoContext(ctx, "return refund completed successfully",
+		slog.String("return_id", ret.ID),
+		slog.String("refund_id", refResp.GetRefundId()),
+		slog.Float64("refund_amount", refundAmount),
+		slog.Time("completed_at", now),
+	)
+
+	return ret, nil
 }
 

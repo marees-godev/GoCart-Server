@@ -64,6 +64,7 @@ const (
 	EventTypeReturnRejected      = "ReturnRejected"
 	EventTypeReturnVerified      = "ReturnVerified"
 	EventTypeReturnStatusUpdated = "ReturnStatusUpdated"
+	EventTypeReturnCompleted     = "ReturnCompleted"
 	EventTypeExchangeCreated     = "ExchangeCreated"
 	EventTypeExchangeVerified    = "ExchangeVerified"
 )
@@ -123,6 +124,7 @@ const (
 	TopicReturnRejected      = "gocart.return.return-rejected"
 	TopicReturnVerified      = "gocart.return.return-verified"
 	TopicReturnStatusUpdated = "gocart.return.return-status-updated"
+	TopicReturnCompleted     = "gocart.return.return-completed"
 	TopicExchangeCreated     = "gocart.return.exchange-created"
 	TopicExchangeVerified    = "gocart.return.exchange-verified"
 )

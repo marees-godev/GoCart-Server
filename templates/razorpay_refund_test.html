@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoCart - Razorpay Return Refund Testing Workbench</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Razorpay Official Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    :root {
+      --bg-main: #0a0d14;
+      --bg-card: #111726;
+      --bg-card-sub: #161f33;
+      --bg-input: #0e1320;
+      --border-color: #1e293b;
+      --border-focus: #3b82f6;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.2);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --indigo: #6366f1;
+      --purple: #8b5cf6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* Top Nav */
+    header {
+      background: rgba(17, 23, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 0.875rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.125rem;
+      letter-spacing: -0.025em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-badge {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    /* Container */
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Stepper Bar */
+    .stepper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem 2rem;
+      position: relative;
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.875rem;
+      z-index: 2;
+    }
+
+    .step-item.active {
+      color: var(--primary);
+    }
+
+    .step-item.completed {
+      color: var(--success);
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+    }
+
+    .step-item.active .step-number {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    }
+
+    .step-item.completed .step-number {
+      background: var(--success);
+      color: #fff;
+      border-color: var(--success);
+    }
+
+    .step-arrow {
+      color: var(--border-color);
+      font-size: 1.25rem;
+    }
+
+    /* Main Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Forms & Inputs */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-label {
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-label span.req {
+      color: var(--danger);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+    }
+
+    .btn-sm {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.775rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--indigo));
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card-sub);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: #334155;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-success:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-warning {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.025em;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-pending {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-info {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .tab {
+      padding: 0.85rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Live Data Inspection */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.85rem;
+    }
+
+    .info-card {
+      background: var(--bg-card-sub);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .info-label {
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .info-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      overflow-wrap: break-word;
+    }
+
+    /* Console / Logs */
+    .console-box {
+      background: #060910;
+      border: 1px solid #172033;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.775rem;
+      height: 240px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 0.6rem;
+      line-height: 1.4;
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .log-tag {
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .log-tag.info { color: #60a5fa; }
+    .log-tag.success { color: #34d399; }
+    .log-tag.warn { color: #fbbf24; }
+    .log-tag.error { color: #f87171; }
+
+    .log-msg {
+      color: #e2e8f0;
+      word-break: break-all;
+    }
+
+    /* Receipt Box */
+    .receipt {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.05));
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .receipt-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.07);
+      padding-bottom: 0.4rem;
+    }
+
+    .receipt-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .receipt-label {
+      color: var(--text-muted);
+    }
+
+    .receipt-value {
+      font-weight: 600;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Nav -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">₹</div>
+      <div class="brand-title">
+        GoCart Razorpay Return Refund Workbench
+        <span class="brand-badge">Integration Tester</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span id="gateway-status">Gateway: Razorpay Test Mode</span>
+      </div>
+      <span class="badge badge-info" id="key-badge">Key: rzp_test_...</span>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main>
+    <!-- Stepper Workflow -->
+    <div class="stepper">
+      <div class="step-item active" id="step-1">
+        <div class="step-number">1</div>
+        <span>Create & Pay Order</span>
+      </div>
+      <div class="step-arrow">&rarr;</div>
+      <div class="step-item" id="step-2">
+        <div class="step-number">2</div>
+        <span>Request Return</span>
+      </div>
+      <div class="step-arrow">&rarr;</div>
+      <div class="step-item" id="step-3">
+        <div class="step-number">3</div>
+        <span>Product Verification</span>
+      </div>
+      <div class="step-arrow">&rarr;</div>
+      <div class="step-item" id="step-4">
+        <div class="step-number">4</div>
+        <span>Razorpay Refund Execution</span>
+      </div>
+      <div class="step-arrow">&rarr;</div>
+      <div class="step-item" id="step-5">
+        <div class="step-number">5</div>
+        <span>Settlement & Idempotency</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Left Column: Operations -->
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Tabbed Operations Card -->
+        <div class="card">
+          <div class="tabs">
+            <div class="tab active" onclick="switchTab('full-flow')">Full Interactive Flow</div>
+            <div class="tab" onclick="switchTab('direct-refund')">Direct Refund Tester</div>
+          </div>
+
+          <!-- Tab 1: Full Interactive Flow -->
+          <div id="tab-full-flow" class="card-body">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="font-size: 1rem; font-weight: 700;">Step 1: Test Payment via Razorpay Checkout</h3>
+                <p class="card-subtitle">Generate an order and pay with Razorpay Checkout test card/UPI</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="generateNewIds()">Generate UUIDs</button>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Order ID <span class="req">*</span></label>
+              <div class="input-row">
+                <input type="text" id="flow-order-id" class="mono" value="20000000-0000-0000-0000-000000000001">
+              </div>
+            </div>
+
+            <div class="input-row">
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">User ID <span class="req">*</span></label>
+                <input type="text" id="flow-user-id" class="mono" value="01a0e719-4b3e-72dd-93f0-13753c7ff053">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label">Amount (INR ₹) <span class="req">*</span></label>
+                <input type="number" id="flow-amount" step="0.01" value="149.99">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem;">
+              <button class="btn btn-primary" id="btn-pay-razorpay" onclick="startRazorpayPayment()" style="flex: 1;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                Pay with Razorpay Checkout
+              </button>
+              <button class="btn btn-secondary" onclick="simulatePaymentCapture()" title="Immediately mark payment as captured in DB without opening modal">
+                Quick Seed Payment
+              </button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.5rem 0;">
+
+            <!-- Step 2: Return & Refund Section -->
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <div>
+                <h3 style="font-size: 1rem; font-weight: 700;">Step 2 & 3: Return Order & Refund Trigger</h3>
+                <p class="card-subtitle">Initiate refund through payment-service's live Razorpay Refund API</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Return ID <span class="req">*</span></label>
+                <input type="text" id="flow-return-id" class="mono" value="36f30f4b-494f-42bf-9a51-3b484a23c14b">
+              </div>
+
+              <div class="input-row">
+                <div class="form-group" style="flex: 1;">
+                  <label class="form-label">Refund Amount (₹)</label>
+                  <input type="number" id="flow-refund-amount" step="0.01" value="149.99">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                  <label class="form-label">Return Type</label>
+                  <select id="flow-return-type">
+                    <option value="RETURN" selected>RETURN (Monetary Refund)</option>
+                    <option value="EXCHANGE">EXCHANGE (Non-monetary Bypass)</option>
+                    <option value="REPLACEMENT">REPLACEMENT (Non-monetary Bypass)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Reason</label>
+                <input type="text" id="flow-reason" value="Customer unsatisfied - Product returned and verified">
+              </div>
+
+              <div style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-success" id="btn-trigger-refund" onclick="triggerReturnRefund()" style="flex: 1;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  Execute Razorpay Refund
+                </button>
+                <button class="btn btn-warning" onclick="testIdempotency()" title="Re-execute identical refund to prove deduplication">
+                  Test Idempotency
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Direct Refund Tester -->
+          <div id="tab-direct-refund" class="card-body" style="display: none;">
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 700;">Direct Refund Executor</h3>
+              <p class="card-subtitle">Trigger Razorpay refund for any existing Order / Return ID</p>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Order ID</label>
+              <input type="text" id="direct-order-id" class="mono" placeholder="e.g. 20000000-0000-0000-0000-000000000001">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Return ID</label>
+              <input type="text" id="direct-return-id" class="mono" placeholder="e.g. 36f30f4b-494f-42bf-9a51-3b484a23c14b">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Refund Amount (₹)</label>
+              <input type="number" id="direct-amount" step="0.01" value="149.99">
+            </div>
+
+            <button class="btn btn-primary" onclick="triggerDirectRefund()">
+              Execute Direct Refund
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Settlement Receipt -->
+        <div id="refund-receipt" class="receipt" style="display: none;">
+          <div class="receipt-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Razorpay Refund Settled Successfully
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Gateway Refund ID</span>
+            <span class="receipt-value" id="rcpt-refund-id">rfnd_xxxx</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Internal Refund ID</span>
+            <span class="receipt-value" id="rcpt-internal-id">uuid</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Refund Amount</span>
+            <span class="receipt-value" id="rcpt-amount" style="color: #34d399;">₹0.00</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Status</span>
+            <span class="badge badge-success" id="rcpt-status">PROCESSED</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Idempotency Key</span>
+            <span class="receipt-value" id="rcpt-idemp-key">refund_...</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Settlement Speed</span>
+            <span class="receipt-value">NORMAL (Razorpay Gateway)</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Telemetry & State Inspector -->
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Live State Inspector Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Live Database & Payment State</div>
+              <div class="card-subtitle">Real-time status of payment & refunds</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="refreshLiveStatus()">Refresh</button>
+          </div>
+          <div class="card-body">
+            <div class="info-grid">
+              <div class="info-card">
+                <span class="info-label">Payment Status</span>
+                <span class="info-val" id="stat-payment-status"><span class="badge badge-pending">UNKNOWN</span></span>
+              </div>
+              <div class="info-card">
+                <span class="info-label">Captured Amount</span>
+                <span class="info-val" id="stat-amount">₹0.00</span>
+              </div>
+              <div class="info-card">
+                <span class="info-label">Razorpay Payment ID</span>
+                <span class="info-val mono" id="stat-rzp-pay-id" style="font-size: 0.8rem;">-</span>
+              </div>
+              <div class="info-card">
+                <span class="info-label">Razorpay Order ID</span>
+                <span class="info-val mono" id="stat-rzp-ord-id" style="font-size: 0.8rem;">-</span>
+              </div>
+            </div>
+
+            <!-- Refunds List in DB -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+              <span class="form-label">Recorded Refunds for this Payment:</span>
+              <div id="refunds-list" style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.825rem;">
+                <div style="color: var(--text-dim); font-style: italic;">No refunds recorded yet.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity & Event Log Console -->
+        <div class="card" style="flex: 1;">
+          <div class="card-header">
+            <div class="card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Execution Console & Telemetry
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Clear</button>
+          </div>
+          <div class="console-box" id="console">
+            <div class="log-entry">
+              <span class="log-time">[INIT]</span>
+              <span class="log-tag info">INFO</span>
+              <span class="log-msg">Workbench loaded. Initializing Razorpay gateway connection...</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Configuration
+    const API_BASE = window.location.origin.includes('http') ? window.location.origin : 'http://localhost:8888';
+    let razorpayKey = 'rzp_test_Tl2mmKdW70Yml2';
+    let currentPaymentID = '';
+    let currentRazorpayOrderID = '';
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', async () => {
+      log('INFO', `Connecting to payment-service at ${API_BASE}...`);
+      await fetchKey();
+      await refreshLiveStatus();
+    });
+
+    function log(tag, message) {
+      const consoleBox = document.getElementById('console');
+      const timeStr = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+
+      let tagClass = 'info';
+      if (tag === 'SUCCESS') tagClass = 'success';
+      if (tag === 'WARN') tagClass = 'warn';
+      if (tag === 'ERROR') tagClass = 'error';
+
+      entry.innerHTML = `
+        <span class="log-time">[${timeStr}]</span>
+        <span class="log-tag ${tagClass}">${tag}</span>
+        <span class="log-msg">${escapeHtml(message)}</span>
+      `;
+      consoleBox.appendChild(entry);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    function clearLogs() {
+      document.getElementById('console').innerHTML = '';
+      log('INFO', 'Console cleared');
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (tabName === 'full-flow') {
+        document.getElementById('tab-full-flow').style.display = 'flex';
+        document.getElementById('tab-direct-refund').style.display = 'none';
+      } else {
+        document.getElementById('tab-full-flow').style.display = 'none';
+        document.getElementById('tab-direct-refund').style.display = 'flex';
+      }
+    }
+
+    function setStep(stepNum) {
+      for (let i = 1; i <= 5; i++) {
+        const item = document.getElementById(`step-${i}`);
+        if (!item) continue;
+        item.classList.remove('active', 'completed');
+        if (i < stepNum) item.classList.add('completed');
+        if (i === stepNum) item.classList.add('active');
+      }
+    }
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    function generateNewIds() {
+      document.getElementById('flow-order-id').value = generateUUID();
+      document.getElementById('flow-return-id').value = generateUUID();
+      log('INFO', 'Generated fresh Order ID and Return ID');
+    }
+
+    async function fetchKey() {
+      try {
+        const res = await fetch(`${API_BASE}/get-key`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.key) {
+            razorpayKey = data.key;
+            document.getElementById('key-badge').innerText = `Key: ${razorpayKey}`;
+            log('SUCCESS', `Razorpay test key loaded: ${razorpayKey}`);
+          }
+        }
+      } catch (e) {
+        log('WARN', `Could not fetch key from server: ${e.message}. Using default test key.`);
+      }
+    }
+
+    // STEP 1: Razorpay Checkout
+    async function startRazorpayPayment() {
+      const orderID = document.getElementById('flow-order-id').value.trim();
+      const userID = document.getElementById('flow-user-id').value.trim();
+      const amount = parseFloat(document.getElementById('flow-amount').value);
+
+      if (!orderID || !amount) {
+        alert('Please specify Order ID and Amount');
+        return;
+      }
+
+      setStep(1);
+      log('INFO', `Creating order with Razorpay: OrderID=${orderID}, Amount=₹${amount}...`);
+
+      try {
+        const res = await fetch(`${API_BASE}/create-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: orderID,
+            user_id: userID,
+            amount: amount,
+            currency: 'INR',
+            payment_method: 'NET_BANKING'
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error(`Order creation failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        currentPaymentID = data.payment_id || '';
+        currentRazorpayOrderID = data.id || '';
+        if (data.key) razorpayKey = data.key;
+
+        log('SUCCESS', `Order created successfully! Razorpay Order ID: ${currentRazorpayOrderID || 'Standard Checkout'}, Internal Payment ID: ${currentPaymentID}`);
+
+        // Launch Razorpay Standard Checkout Popup
+        const options = {
+          key: razorpayKey,
+          amount: data.amount || (amount * 100),
+          currency: data.currency || 'INR',
+          name: 'GoCart E-Commerce',
+          description: `Order Payment for ${orderID.substring(0, 8)}`,
+          image: 'https://cdn.razorpay.com/static/assets/logo/rzp.png',
+          order_id: currentRazorpayOrderID,
+          handler: async function (response) {
+            log('SUCCESS', `Razorpay payment captured! Payment ID: ${response.razorpay_payment_id}`);
+            await notifyPaymentCallback({
+              order_id: orderID,
+              amount: amount,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id || currentRazorpayOrderID,
+              razorpay_signature: response.razorpay_signature,
+              status: 'success'
+            });
+          },
+          prefill: {
+            name: 'Test Customer',
+            email: 'customer@gocart.test',
+            contact: '9999999999'
+          },
+          theme: {
+            color: '#3b82f6'
+          },
+          modal: {
+            ondismiss: function() {
+              log('WARN', 'Razorpay Checkout popup dismissed by user');
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          log('ERROR', `Payment failed: ${response.error.description} (Code: ${response.error.code})`);
+        });
+        rzp.open();
+
+      } catch (err) {
+        log('ERROR', `Payment initiation error: ${err.message}`);
+      }
+    }
+
+    async function notifyPaymentCallback(payload) {
+      log('INFO', 'Synchronizing payment callback with payment-service...');
+      try {
+        const res = await fetch(`${API_BASE}/payment-callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        log('SUCCESS', `Payment callback verified & recorded: Status=${data.status}`);
+        setStep(2);
+        await refreshLiveStatus();
+      } catch (e) {
+        log('ERROR', `Callback notification failed: ${e.message}`);
+      }
+    }
+
+    async function simulatePaymentCapture() {
+      const orderID = document.getElementById('flow-order-id').value.trim();
+      const amount = parseFloat(document.getElementById('flow-amount').value);
+      const fakePayID = `pay_test_${Date.now()}`;
+
+      log('INFO', `Simulating payment capture for ${orderID} with fake transaction ${fakePayID}...`);
+      await notifyPaymentCallback({
+        order_id: orderID,
+        amount: amount,
+        razorpay_payment_id: fakePayID,
+        razorpay_order_id: `order_sim_${Date.now()}`,
+        razorpay_signature: 'sig_simulated_test',
+        status: 'success'
+      });
+    }
+
+    // STEP 4: Razorpay Refund Execution
+    async function triggerReturnRefund() {
+      const orderID = document.getElementById('flow-order-id').value.trim();
+      const returnID = document.getElementById('flow-return-id').value.trim();
+      const amount = parseFloat(document.getElementById('flow-refund-amount').value);
+      const rType = document.getElementById('flow-return-type').value;
+
+      if (!orderID || !returnID) {
+        alert('Order ID and Return ID are required');
+        return;
+      }
+
+      setStep(4);
+      log('INFO', `Executing Razorpay refund: ReturnID=${returnID}, OrderID=${orderID}, Amount=₹${amount}, Type=${rType}...`);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/process-refund`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            return_id: returnID,
+            order_id: orderID,
+            order_item_id: generateUUID(),
+            user_id: document.getElementById('flow-user-id').value.trim(),
+            refund_amount: amount,
+            type: rType,
+            approved_by: 'admin-workbench'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        const ref = data.refund;
+        log('SUCCESS', `Razorpay Refund settled successfully! Gateway Refund ID: ${ref.gateway_refund_id || 'N/A'}, Status: ${ref.status}`);
+        
+        // Show receipt
+        document.getElementById('refund-receipt').style.display = 'flex';
+        document.getElementById('rcpt-refund-id').innerText = ref.gateway_refund_id || 'PROCESSED_MOCK';
+        document.getElementById('rcpt-internal-id').innerText = ref.id;
+        document.getElementById('rcpt-amount').innerText = `₹${parseFloat(ref.amount).toFixed(2)}`;
+        document.getElementById('rcpt-status').innerText = ref.status;
+        document.getElementById('rcpt-idemp-key').innerText = ref.idempotency_key;
+
+        setStep(5);
+        await refreshLiveStatus();
+
+      } catch (err) {
+        log('ERROR', `Razorpay Refund Failed: ${err.message}`);
+      }
+    }
+
+    async function triggerDirectRefund() {
+      const orderID = document.getElementById('direct-order-id').value.trim();
+      let returnID = document.getElementById('direct-return-id').value.trim();
+      const amount = parseFloat(document.getElementById('direct-amount').value);
+
+      if (!orderID) {
+        alert('Order ID is required');
+        return;
+      }
+      if (!returnID) returnID = generateUUID();
+
+      log('INFO', `Direct refund initiated for Order ${orderID}...`);
+
+      try {
+        const res = await fetch(`${API_BASE}/api/process-refund`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            return_id: returnID,
+            order_id: orderID,
+            order_item_id: generateUUID(),
+            user_id: generateUUID(),
+            refund_amount: amount,
+            type: 'RETURN',
+            approved_by: 'admin-workbench'
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        log('SUCCESS', `Direct refund processed! Refund ID: ${data.refund.gateway_refund_id || data.refund.id}`);
+        await refreshLiveStatus(orderID);
+      } catch (err) {
+        log('ERROR', `Direct refund error: ${err.message}`);
+      }
+    }
+
+    async function testIdempotency() {
+      log('WARN', 'Testing idempotency: Re-sending exact same refund request to verify deduplication...');
+      await triggerReturnRefund();
+    }
+
+    async function refreshLiveStatus(targetOrderID) {
+      const orderID = targetOrderID || document.getElementById('flow-order-id').value.trim();
+      if (!orderID) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/order-payment/${orderID}`);
+        if (!res.ok) {
+          document.getElementById('stat-payment-status').innerHTML = '<span class="badge badge-pending">NOT FOUND</span>';
+          document.getElementById('stat-amount').innerText = '₹0.00';
+          document.getElementById('stat-rzp-pay-id').innerText = '-';
+          document.getElementById('stat-rzp-ord-id').innerText = '-';
+          document.getElementById('refunds-list').innerHTML = '<div style="color: var(--text-dim); font-style: italic;">No payment record found for this Order ID.</div>';
+          return;
+        }
+
+        const data = await res.json();
+        const pmt = data.payment;
+        const refunds = data.refunds || [];
+
+        // Update payment badge
+        let badgeClass = 'badge-pending';
+        if (pmt.status === 'SUCCESS') badgeClass = 'badge-success';
+        if (pmt.status === 'REFUNDED') badgeClass = 'badge-info';
+        if (pmt.status === 'PARTIALLY_REFUNDED') badgeClass = 'badge-warning';
+        if (pmt.status === 'FAILED') badgeClass = 'badge-danger';
+
+        document.getElementById('stat-payment-status').innerHTML = `<span class="badge ${badgeClass}">${pmt.status}</span>`;
+        document.getElementById('stat-amount').innerText = `₹${parseFloat(pmt.amount).toFixed(2)}`;
+        document.getElementById('stat-rzp-pay-id').innerText = pmt.gateway_transaction_id || pmt.id;
+        document.getElementById('stat-rzp-ord-id').innerText = pmt.order_id;
+
+        // Render refunds list
+        const listDiv = document.getElementById('refunds-list');
+        if (refunds.length === 0) {
+          listDiv.innerHTML = '<div style="color: var(--text-dim); font-style: italic;">No refunds recorded yet.</div>';
+        } else {
+          listDiv.innerHTML = refunds.map(r => `
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span class="mono" style="font-weight: 700; color: #60a5fa;">${r.gateway_refund_id || r.id.substring(0, 13)}</span>
+                <span style="color: var(--text-dim); font-size: 0.75rem; margin-left: 0.4rem;">(${new Date(r.created_at).toLocaleTimeString()})</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-weight: 700; color: #34d399;">₹${parseFloat(r.amount).toFixed(2)}</span>
+                <span class="badge ${r.status === 'PROCESSED' || r.status === 'SUCCESS' ? 'badge-success' : 'badge-pending'}">${r.status}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+      } catch (e) {
+        // quiet error on polling
+      }
+    }
+  </script>
+</body>
+</html>

@@ -389,12 +389,14 @@ type ReturnRequestedEvent struct {
 
 // ReturnApprovedEvent represents the payload for ReturnApproved domain event.
 type ReturnApprovedEvent struct {
-	ReturnID    string    `json:"return_id"`
-	OrderID     string    `json:"order_id"`
-	OrderItemID string    `json:"order_item_id"`
-	UserID      string    `json:"user_id"`
-	ApprovedBy  string    `json:"approved_by,omitempty"`
-	ApprovedAt  time.Time `json:"approved_at"`
+	ReturnID     string    `json:"return_id"`
+	OrderID      string    `json:"order_id"`
+	OrderItemID  string    `json:"order_item_id"`
+	UserID       string    `json:"user_id"`
+	ApprovedBy   string    `json:"approved_by,omitempty"`
+	ApprovedAt   time.Time `json:"approved_at"`
+	Type         string    `json:"type,omitempty"`
+	RefundAmount float64   `json:"refund_amount,omitempty"`
 }
 
 // ReturnRejectedEvent represents the payload for ReturnRejected domain event.
@@ -429,6 +431,16 @@ type ReturnStatusUpdatedEvent struct {
 	PreviousStatus string    `json:"previous_status"`
 	NewStatus      string    `json:"new_status"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// ReturnCompletedEvent represents the payload for ReturnCompleted domain event.
+type ReturnCompletedEvent struct {
+	ReturnID     string    `json:"return_id"`
+	OrderID      string    `json:"order_id"`
+	OrderItemID  string    `json:"order_item_id"`
+	UserID       string    `json:"user_id"`
+	RefundAmount float64   `json:"refund_amount,omitempty"`
+	CompletedAt  time.Time `json:"completed_at"`
 }
 
 

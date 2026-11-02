@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
@@ -135,18 +136,21 @@ func main() {
 	orderClient := client.NewOrderClient(cfg.Services.OrderServiceURL)
 	paymentService := service.NewPaymentService(paymentRepo, paymentGW, orderClient, gwConfig.Timeout)
 
-	// 6b. Start Kafka Event Consumer for OrderCreated events
+	// 6b. Start Kafka Event Consumer for OrderCreated and ReturnApproved events
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && kafkaProducer != nil {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "payment-service-group",
 			Topics: []string{
 				events.TopicOrderCreated,
+				events.TopicReturnApproved,
 			},
 		}
 		paymentKafkaConsumer := kafka.NewConsumer(kafka.Config{
-			Brokers:       cfg.Kafka.Brokers,
-			MaxRetries:    3,
-			RetryInterval: 1 * time.Second,
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       "payment-service-consumer",
+			MaxRetries:     3,
+			RetryInterval:  1 * time.Second,
+			ConnectTimeout: 10 * time.Second,
 		}, consumerCfg, kafkaProducer)
 
 		paymentEvtConsumer := consumer.NewPaymentEventConsumer(paymentService)
@@ -198,12 +202,18 @@ func main() {
 	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
 	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Razorpay-Signature, X-Razorpay-Idempotency-Key",
+		AllowMethods: "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS",
+	}))
+
 	// Metrics, Health and Readiness endpoints
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log)
+	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log, paymentService)
 	paymentHandler.RegisterRoutes(app)
 
 	// Webhook endpoints
