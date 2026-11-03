@@ -2,6 +2,7 @@ package gstin
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -67,12 +68,27 @@ func TestVerifyGSTIN_Unauthorized(t *testing.T) {
 
 func TestVerifyGSTIN_InvalidFormat(t *testing.T) {
 	c := NewGSTINClient(config.GSTINConfig{
-		Enabled: false,
+		Enabled: true,
 	})
 
 	_, err := c.VerifyGSTIN(context.Background(), "INVALID123")
-	if err == nil {
-		t.Errorf("expected error for invalid format, got nil")
+	if err == nil || !strings.Contains(err.Error(), "invalid GSTIN format") {
+		t.Errorf("expected invalid GSTIN format error, got %v", err)
+	}
+}
+
+func TestVerifyGSTIN_Disabled(t *testing.T) {
+	c := NewGSTINClient(config.GSTINConfig{
+		Enabled: false,
+	})
+
+	if c.IsEnabled() {
+		t.Errorf("expected client to be disabled")
+	}
+
+	_, err := c.VerifyGSTIN(context.Background(), "33AAACC1206D1ZN")
+	if !errors.Is(err, ErrGSTINVerificationDisabled) {
+		t.Fatalf("expected ErrGSTINVerificationDisabled, got %v", err)
 	}
 }
 
@@ -113,4 +129,3 @@ func TestVerifyGSTIN_API(t *testing.T) {
 		t.Errorf("unexpected response: %+v", res)
 	}
 }
-

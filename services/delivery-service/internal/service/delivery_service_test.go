@@ -10,15 +10,24 @@ import (
 	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	gstinClientPkg "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client/gstin"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/repository"
 )
 
 type mockGSTINClient struct {
+	disabled   bool
 	verifyFunc func(ctx context.Context, gstinStr string) (*gstinClientPkg.GSTINResponse, error)
 }
 
+func (m *mockGSTINClient) IsEnabled() bool {
+	return !m.disabled
+}
+
 func (m *mockGSTINClient) VerifyGSTIN(ctx context.Context, gstinStr string) (*gstinClientPkg.GSTINResponse, error) {
+	if m.disabled {
+		return nil, gstinClientPkg.ErrGSTINVerificationDisabled
+	}
 	if m.verifyFunc != nil {
 		return m.verifyFunc(ctx, gstinStr)
 	}
@@ -43,6 +52,10 @@ type mockDeliveryRepoForServiceTest struct {
 	listApprovedPartnersFunc                func(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error)
 	softDeletePartnerProfileFunc            func(ctx context.Context, partnerID uuid.UUID, deletedAt time.Time, reason ...string) error
 	softDeleteExpiredDeactivatedPartnersFunc func(ctx context.Context, cutoff time.Time) (int, error)
+}
+
+func (m *mockDeliveryRepoForServiceTest) GetByOrderID(ctx context.Context, orderID string) (*model.Delivery, error) {
+	return nil, appErrors.NotFound("delivery not found")
 }
 
 func (m *mockDeliveryRepoForServiceTest) GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error) {
@@ -800,6 +813,8 @@ func TestPartnerActivation_And_RetentionWorker(t *testing.T) {
 			ID:            uuid.New(),
 			PartnerID:     partnerUUID,
 			IsActive:      false,
+			ApprovalStatus:  model.ApprovalStatusApproved,
+			IsGSTINVerified: true,
 			DeactivatedAt: &deactivatedAt,
 		}
 		var saved *model.DeliveryPartnerProfile
@@ -1277,6 +1292,77 @@ func TestGSTIN_VerificationAndApproval(t *testing.T) {
 		}
 	})
 
+	t.Run("VerifyGSTIN fails when GSTIN verification is disabled and preserves unverified status", func(t *testing.T) {
+		profile := &model.DeliveryPartnerProfile{
+			ID:              uuid.New(),
+			PartnerID:       partnerUUID,
+			CompanyName:     "Acme Logistics",
+			Email:           "partner@test.com",
+			IsActive:        false,
+			ApprovalStatus:  model.ApprovalStatusPending,
+			IsGSTINVerified: false,
+		}
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getPartnerProfileFunc: func(ctx context.Context, pid uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+				return profile, nil
+			},
+			upsertPartnerProfileFunc: func(ctx context.Context, p *model.DeliveryPartnerProfile) error {
+				return nil
+			},
+		}
+		mockGSTIN := &mockGSTINClient{
+			disabled: true,
+		}
+		svc := NewDeliveryService(mockRepo, mockGSTIN)
+		_, err := svc.VerifyGSTIN(ctx, partnerUUID.String(), "33AAACC1206D1ZN", partnerUUID.String())
+		if err == nil {
+			t.Fatal("expected error when GSTIN verification is disabled, got nil")
+		}
+		if !strings.Contains(err.Error(), "GSTIN verification is disabled") {
+			t.Fatalf("expected error to mention disabled GSTIN verification, got %v", err)
+		}
+		if profile.IsGSTINVerified {
+			t.Fatal("expected is_gstin_verified to remain false when disabled")
+		}
+		if profile.ApprovalStatus != model.ApprovalStatusPending {
+			t.Fatalf("expected approval status to remain pending, got %s", profile.ApprovalStatus)
+		}
+	})
+
+	t.Run("VerifyGSTIN fails when GSTIN verification is disabled even for admin caller", func(t *testing.T) {
+		profile := &model.DeliveryPartnerProfile{
+			ID:              uuid.New(),
+			PartnerID:       partnerUUID,
+			CompanyName:     "Acme Logistics",
+			Email:           "partner@test.com",
+			IsActive:        false,
+			ApprovalStatus:  model.ApprovalStatusPending,
+			IsGSTINVerified: false,
+		}
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getPartnerProfileFunc: func(ctx context.Context, pid uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+				return profile, nil
+			},
+			upsertPartnerProfileFunc: func(ctx context.Context, p *model.DeliveryPartnerProfile) error {
+				return nil
+			},
+		}
+		mockGSTIN := &mockGSTINClient{
+			disabled: true,
+		}
+		svc := NewDeliveryService(mockRepo, mockGSTIN)
+		_, err := svc.VerifyGSTIN(ctx, partnerUUID.String(), "33AAACC1206D1ZN", "")
+		if err == nil {
+			t.Fatal("expected error when GSTIN verification is disabled, got nil")
+		}
+		if !strings.Contains(err.Error(), "GSTIN verification is disabled") {
+			t.Fatalf("expected error to mention disabled GSTIN verification, got %v", err)
+		}
+		if profile.IsGSTINVerified {
+			t.Fatal("expected is_gstin_verified to remain false")
+		}
+	})
+
 	t.Run("UpdatePartnerProfile leaves is_gstin_verified false until VerifyGSTIN", func(t *testing.T) {
 		profile := &model.DeliveryPartnerProfile{
 			ID:              uuid.New(),
@@ -1299,6 +1385,120 @@ func TestGSTIN_VerificationAndApproval(t *testing.T) {
 		}
 		if updated.IsGSTINVerified {
 			t.Fatal("expected is_gstin_verified to remain false until VerifyGSTIN is called")
+		}
+	})
+
+	t.Run("UpdatePartnerProfile GSTIN change invalidates existing approval and deactivates partner", func(t *testing.T) {
+		oldGSTIN := "29ABCDE1234F1Z5"
+		profile := &model.DeliveryPartnerProfile{
+			ID:              uuid.New(),
+			PartnerID:       partnerUUID,
+			CompanyName:     "Acme Logistics",
+			Email:           "partner@test.com",
+			GSTIN:           &oldGSTIN,
+			IsActive:        true,
+			ApprovalStatus:  model.ApprovalStatusApproved,
+			IsGSTINVerified: true,
+		}
+		var saved *model.DeliveryPartnerProfile
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getPartnerProfileFunc: func(ctx context.Context, pid uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+				return profile, nil
+			},
+			upsertPartnerProfileFunc: func(ctx context.Context, p *model.DeliveryPartnerProfile) error {
+				saved = p
+				return nil
+			},
+		}
+		svc := NewDeliveryService(mockRepo)
+		newGSTIN := "33AAACC1206D1ZN"
+		updated, err := svc.UpdatePartnerProfile(ctx, partnerUUID.String(), nil, nil, nil, &newGSTIN, partnerUUID.String())
+		if err != nil {
+			t.Fatalf("expected update partner profile to succeed, got %v", err)
+		}
+		if updated.IsGSTINVerified {
+			t.Fatal("expected is_gstin_verified to be false")
+		}
+		if updated.ApprovalStatus != model.ApprovalStatusPending {
+			t.Fatalf("expected approval_status to be PENDING, got %s", updated.ApprovalStatus)
+		}
+		if updated.IsActive {
+			t.Fatal("expected is_active to be false")
+		}
+		if saved.ApprovalStatus != model.ApprovalStatusPending || saved.IsActive || saved.IsGSTINVerified {
+			t.Fatal("expected saved profile to reflect pending approval and inactive state")
+		}
+
+		// Delivery operations blocked while pending verification/approval
+		orderConfirmedPayload := &dto.OrderConfirmedPayload{
+			OrderID:         "ord-test-blocked",
+			DeliveryPartner: partnerUUID.String(),
+			ShippingAddress: &model.ShippingAddress{
+				Street:        "123 Main St",
+				City:          "San Francisco",
+				State:         "CA",
+				PostalCode:    "94105",
+				Country:       "USA",
+				ContactNumber: "+1-555-0199",
+			},
+		}
+		_, err = svc.HandleOrderConfirmed(ctx, orderConfirmedPayload)
+		if err == nil {
+			t.Fatal("expected HandleOrderConfirmed to fail when partner is pending/inactive, got nil")
+		}
+		if !strings.Contains(err.Error(), "not approved or active") {
+			t.Fatalf("expected error mentioning not approved or active, got %v", err)
+		}
+
+		// Partner cannot activate themselves while verification/approval is pending
+		_, err = svc.ActivatePartner(ctx, partnerUUID.String())
+		if err == nil {
+			t.Fatal("expected ActivatePartner to fail when partner is not approved, got nil")
+		}
+		if !strings.Contains(err.Error(), "partner must be approved with verified GSTIN") {
+			t.Fatalf("expected error mentioning partner must be approved with verified GSTIN, got %v", err)
+		}
+	})
+
+	t.Run("UpdatePartnerProfile company name change invalidates existing approval and deactivates partner", func(t *testing.T) {
+		validGSTIN := "33AAACC1206D1ZN"
+		profile := &model.DeliveryPartnerProfile{
+			ID:              uuid.New(),
+			PartnerID:       partnerUUID,
+			CompanyName:     "Central Warehousing Corporation",
+			Email:           "partner@test.com",
+			GSTIN:           &validGSTIN,
+			IsActive:        true,
+			ApprovalStatus:  model.ApprovalStatusApproved,
+			IsGSTINVerified: true,
+		}
+		var saved *model.DeliveryPartnerProfile
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getPartnerProfileFunc: func(ctx context.Context, pid uuid.UUID) (*model.DeliveryPartnerProfile, error) {
+				return profile, nil
+			},
+			upsertPartnerProfileFunc: func(ctx context.Context, p *model.DeliveryPartnerProfile) error {
+				saved = p
+				return nil
+			},
+		}
+		svc := NewDeliveryService(mockRepo)
+		newCompany := "BB.Stores"
+		updated, err := svc.UpdatePartnerProfile(ctx, partnerUUID.String(), &newCompany, nil, nil, nil, partnerUUID.String())
+		if err != nil {
+			t.Fatalf("expected update partner profile to succeed, got %v", err)
+		}
+		if updated.IsGSTINVerified {
+			t.Fatal("expected is_gstin_verified to be false after company name change")
+		}
+		if updated.ApprovalStatus != model.ApprovalStatusPending {
+			t.Fatalf("expected approval_status to be PENDING, got %s", updated.ApprovalStatus)
+		}
+		if updated.IsActive {
+			t.Fatal("expected is_active to be false after company name change")
+		}
+		if saved.ApprovalStatus != model.ApprovalStatusPending || saved.IsActive || saved.IsGSTINVerified {
+			t.Fatal("expected saved profile to reflect pending approval and unverified GSTIN")
 		}
 	})
 
@@ -1399,4 +1599,61 @@ func TestPartnerOwnerOnly_ActivateDeactivate(t *testing.T) {
 			t.Fatalf("unexpected list result: %+v", list)
 		}
 	})
+}
+
+func TestMatchCompanyName_ExactNormalizedMatching(t *testing.T) {
+	tests := []struct {
+		name           string
+		partnerCompany string
+		legalName      string
+		tradeName      string
+		want           bool
+	}{
+		{
+			name:           "exact match with legal name ignoring corporate suffixes and case",
+			partnerCompany: "Acme Logistics",
+			legalName:      "ACME LOGISTICS PRIVATE LIMITED",
+			want:           true,
+		},
+		{
+			name:           "exact match with trade name",
+			partnerCompany: "Flash Express",
+			legalName:      "FLASH HOLDINGS INC",
+			tradeName:      "FLASH EXPRESS CO",
+			want:           true,
+		},
+		{
+			name:           "reject substring of legal name",
+			partnerCompany: "Logistics",
+			legalName:      "ACME LOGISTICS PRIVATE LIMITED",
+			want:           false,
+		},
+		{
+			name:           "reject superstring of legal name",
+			partnerCompany: "Acme Logistics Worldwide Express",
+			legalName:      "ACME LOGISTICS PRIVATE LIMITED",
+			want:           false,
+		},
+		{
+			name:           "reject subset words",
+			partnerCompany: "Acme",
+			legalName:      "ACME PHARMA AND CHEMICALS",
+			want:           false,
+		},
+		{
+			name:           "reject empty partner company",
+			partnerCompany: "   ",
+			legalName:      "ACME LOGISTICS PRIVATE LIMITED",
+			want:           false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := matchCompanyName(tt.partnerCompany, tt.legalName, tt.tradeName)
+			if got != tt.want {
+				t.Errorf("matchCompanyName(%q, %q, %q) = %v, want %v", tt.partnerCompany, tt.legalName, tt.tradeName, got, tt.want)
+			}
+		})
+	}
 }

@@ -410,6 +410,7 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 		OrderID:           orderID,
 		ShippingAddressID: "addr-e2e-1",
 		ShippingAddress:   &shippingAddr,
+		PaymentStatus:     "PAID",
 		ConfirmedAt:       time.Now().UTC(),
 	}
 

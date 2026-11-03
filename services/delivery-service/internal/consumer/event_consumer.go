@@ -65,7 +65,7 @@ func (c *DeliveryEventConsumer) handleOrderConfirmed(ctx context.Context, envelo
 		return appErrors.BadRequest("order_id is required in OrderConfirmed payload")
 	}
 
-	if raw.PaymentStatus != "" && !strings.EqualFold(raw.PaymentStatus, "PAID") {
+	if !strings.EqualFold(strings.TrimSpace(raw.PaymentStatus), "PAID") {
 		return appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
 	}
 

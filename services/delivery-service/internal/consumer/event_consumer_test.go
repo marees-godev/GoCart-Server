@@ -387,6 +387,7 @@ func TestOrderConfirmed_TriggersDeliveryCreation(t *testing.T) {
 	payload := events.OrderConfirmedEvent{
 		OrderID:         orderID,
 		ShippingAddress: &shippingAddr,
+		PaymentStatus:   "PAID",
 		ConfirmedAt:     time.Now().UTC(),
 	}
 
@@ -449,6 +450,7 @@ func TestOrderConfirmed_Idempotency_DuplicateEvents(t *testing.T) {
 	payload := events.OrderConfirmedEvent{
 		OrderID:         orderID,
 		ShippingAddress: &shippingAddr,
+		PaymentStatus:   "PAID",
 		ConfirmedAt:     time.Now().UTC(),
 	}
 
@@ -516,6 +518,7 @@ func TestOrderConfirmed_MissingContactNumber_ReturnsError(t *testing.T) {
 	payload := events.OrderConfirmedEvent{
 		OrderID:         orderID,
 		ShippingAddress: &shippingAddr,
+		PaymentStatus:   "PAID",
 		ConfirmedAt:     time.Now().UTC(),
 	}
 
@@ -560,6 +563,42 @@ func TestOrderConfirmed_UnpaidPaymentStatus_ReturnsError(t *testing.T) {
 	err = eventConsumer.HandleEvent(context.Background(), env)
 	if err == nil {
 		t.Fatalf("expected error when payment_status is not PAID, got nil")
+	}
+	if !strings.Contains(err.Error(), "payment_status must be PAID") {
+		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)
+	}
+}
+
+func TestOrderConfirmed_EmptyPaymentStatus_ReturnsError(t *testing.T) {
+	repo := newMemoryDeliveryRepo()
+	svc := service.NewDeliveryService(repo)
+	eventConsumer := consumer.NewDeliveryEventConsumer(svc)
+
+	orderID := "ord-empty-payment-" + uuid.NewString()
+	shippingAddr := events.ShippingAddressPayload{
+		Street:        "123 Main St",
+		City:          "Dallas",
+		State:         "TX",
+		PostalCode:    "75001",
+		Country:       "USA",
+		ContactNumber: "+1-214-555-0199",
+	}
+
+	payload := events.OrderConfirmedEvent{
+		OrderID:         orderID,
+		ShippingAddress: &shippingAddr,
+		PaymentStatus:   "",
+		ConfirmedAt:     time.Now().UTC(),
+	}
+
+	env, err := events.NewEventEnvelope(events.EventTypeOrderConfirmed, "order-service", payload)
+	if err != nil {
+		t.Fatalf("failed to create EventEnvelope: %v", err)
+	}
+
+	err = eventConsumer.HandleEvent(context.Background(), env)
+	if err == nil {
+		t.Fatalf("expected error when payment_status is empty, got nil")
 	}
 	if !strings.Contains(err.Error(), "payment_status must be PAID") {
 		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)

@@ -91,6 +91,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			UserID:      "01a16cca-732e-7593-8862-e67348dfccda",
 			Status:      "CONFIRMED",
 			OrderNumber: "ORD-SAME-CITY",
+			PaymentStatus:     "PAID",
 			ShippingAddress: model.ShippingAddress{
 				Street:        "123 Congress Ave",
 				City:          "Austin",
@@ -130,6 +131,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			"order_id":         orderID,
 			"delivery_partner": partnerID.String(),
 			"contact_number":   "+15125550101",
+			"payment_status":   "PAID",
 		}
 		data, _ := json.Marshal(orderConfirmedPayload)
 		envelope := &events.EventEnvelope{
@@ -170,6 +172,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			UserID:      "01a16cca-732e-7593-8862-e67348dfccda",
 			Status:      "CONFIRMED",
 			OrderNumber: "ORD-SAME-STATE",
+			PaymentStatus:     "PAID",
 			ShippingAddress: model.ShippingAddress{
 				Street:        "500 Main St",
 				City:          "Houston",
@@ -208,6 +211,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			"order_id":         orderID,
 			"delivery_partner": partnerID.String(),
 			"contact_number":   "+17135550202",
+			"payment_status":   "PAID",
 		}
 		data, _ := json.Marshal(orderConfirmedPayload)
 		envelope := &events.EventEnvelope{
@@ -242,6 +246,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			UserID:      "01a16cca-732e-7593-8862-e67348dfccda",
 			Status:      "CONFIRMED",
 			OrderNumber: "ORD-INTER-STATE",
+			PaymentStatus:     "PAID",
 			ShippingAddress: model.ShippingAddress{
 				Street:        "200 Michigan Ave",
 				City:          "Chicago",
@@ -280,6 +285,7 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			"order_id":         orderID,
 			"delivery_partner": partnerID.String(),
 			"contact_number":   "+13125550303",
+			"payment_status":   "PAID",
 		}
 		data, _ := json.Marshal(orderConfirmedPayload)
 		envelope := &events.EventEnvelope{
@@ -386,6 +392,8 @@ func TestDeliveryOrderService_TransitLogic_And_DeliveryFlow(t *testing.T) {
 			ID:          uuid.New(),
 			PartnerID:   rapidoID,
 			CompanyName: "Rapido",
+			ApprovalStatus:  model.ApprovalStatusApproved,
+			IsGSTINVerified: true,
 			IsActive:    true,
 		})
 		_ = repo.CreateWarehouse(ctx, &model.Warehouse{

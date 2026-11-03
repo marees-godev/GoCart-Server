@@ -3,6 +3,7 @@ package gstin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/config"
 )
 
+var ErrGSTINVerificationDisabled = errors.New("GSTIN verification is disabled")
 var GSTINRegex = regexp.MustCompile(`^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$`)
 var gstinRegex = GSTINRegex
 
@@ -61,6 +63,7 @@ type GSTINResponse struct {
 
 type GSTINClient interface {
 	VerifyGSTIN(ctx context.Context, gstin string) (*GSTINResponse, error)
+	IsEnabled() bool
 }
 
 type client struct {
@@ -93,10 +96,21 @@ func NewGSTINClient(cfg config.GSTINConfig, customHTTP ...*http.Client) GSTINCli
 	}
 }
 
+func (c *client) IsEnabled() bool {
+	return c.enabled
+}
+
 func (c *client) VerifyGSTIN(ctx context.Context, gstin string) (*GSTINResponse, error) {
+	if !c.enabled {
+		return nil, ErrGSTINVerificationDisabled
+	}
 	gstin = strings.ToUpper(strings.TrimSpace(gstin))
 	if !gstinRegex.MatchString(gstin) {
 		return nil, fmt.Errorf("invalid GSTIN format")
+	}
+
+	if strings.TrimSpace(c.apiKey) == "" {
+		return nil, fmt.Errorf("invalid credential: GSTIN API authentication failed (GSTIN_API_KEY is not configured)")
 	}
 
 	reqURL := fmt.Sprintf("%s/gstin/%s", c.baseURL, url.PathEscape(gstin))

@@ -144,12 +144,16 @@ func LoadEnv() *Config {
 			OrderServiceURL:          GetEnv("ORDER_SERVICE_GRPC_URL", GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059")),
 			InventoryServiceGRPCAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
 		},
-		GSTIN: GSTINConfig{
-			APIKey:  GetEnv("GSTIN_API_KEY", ""),
-			BaseURL: GetEnv("GSTIN_API_BASE_URL", "https://www.gstinapi.in/v1"),
-			Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", true),
-			Timeout: time.Duration(timeoutSec) * time.Second,
-		},
+		GSTIN: func() GSTINConfig {
+			apiKey := GetEnv("GSTIN_API_KEY", "")
+			defaultEnabled := strings.TrimSpace(apiKey) != ""
+			return GSTINConfig{
+				APIKey:  apiKey,
+				BaseURL: GetEnv("GSTIN_API_BASE_URL", "https://www.gstinapi.in/v1"),
+				Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", defaultEnabled),
+				Timeout: time.Duration(timeoutSec) * time.Second,
+			}
+		}(),
 		Retention: RetentionConfig{
 			Period:   time.Duration(GetEnvAsInt("DEACTIVATION_RETENTION_DAYS", 30)) * 24 * time.Hour,
 			Interval: time.Duration(GetEnvAsInt("DEACTIVATION_CHECK_INTERVAL_HOURS", 1)) * time.Hour,

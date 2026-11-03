@@ -234,10 +234,14 @@ func (m *mockDeliveryClient) ListApprovedPartners(ctx context.Context, in *deliv
 
 type mockOrderClientForDeliveryTest struct {
 	orderpb.OrderServiceClient
+	resp  *orderpb.GetOrderResponse
+	err   error
 	order *orderpb.Order
 }
 
 func (m *mockOrderClientForDeliveryTest) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.GetOrderResponse, error) {
+	if m.err != nil { return nil, m.err }
+	if m.resp != nil { return m.resp, nil }
 	if m.order != nil && m.order.Id == in.Id {
 		return &orderpb.GetOrderResponse{Order: m.order}, nil
 	}
@@ -271,9 +275,11 @@ func deliveryStrPtr(s string) *string {
 func TestCreateDelivery_Success(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-999", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -327,9 +333,11 @@ func TestCreateDelivery_Success(t *testing.T) {
 func TestCreateDelivery_WithDeliveryPartnerID_GetsCompanyName(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-999", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -450,9 +458,11 @@ func TestCreateDelivery_OrderPaymentStatusNotPaid_Fails(t *testing.T) {
 func TestCreateDelivery_AdminSuccess(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-100", AddressLine: "100 Pine St, San Francisco, CA 94111"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-100", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -483,8 +493,10 @@ func TestCreateDelivery_AdminSuccess(t *testing.T) {
 
 func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-777", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -512,9 +524,11 @@ func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 func TestCreateDelivery_MissingContactNumber_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "123 Main St"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-777", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -865,4 +879,77 @@ func TestDeliveryPartner_ApprovalAndAccountMutations(t *testing.T) {
 			t.Fatalf("expected APPEALED partner, got %s", partners[0].ApprovalStatus)
 		}
 	})
+}
+
+func TestCreateDelivery_OrderLookupFails_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		err: appErrors.NotFound("order not found"),
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-missing",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when order lookup fails, got nil")
+	}
+}
+
+func TestCreateDelivery_NilOrIncompleteOrderResponse_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	// Incomplete order response (missing order id)
+	orderMockIncomplete := &mockOrderClientForDeliveryTest{
+		resp: &orderpb.GetOrderResponse{Order: &orderpb.Order{Id: "", PaymentStatus: "PAID"}},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMockIncomplete,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-incomplete",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error for incomplete order response, got nil")
+	}
+	if !strings.Contains(err.Error(), "incomplete or invalid order response") {
+		t.Errorf("expected 'incomplete or invalid order response' error, got %v", err)
+	}
+}
+
+func TestCreateDelivery_OrderPaymentStatusEmpty_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{
+			Id:            "ord-unpaid",
+			PaymentStatus: "",
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-unpaid",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when order payment_status is empty, got nil")
+	}
+	if !strings.Contains(err.Error(), "payment_status must be PAID") {
+		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)
+	}
 }

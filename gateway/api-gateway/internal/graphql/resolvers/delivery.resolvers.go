@@ -59,18 +59,27 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 	var shippingAddr string
 
 	orderClient, oErr := r.getOrderClient()
-	var ord *orderpb.Order
-	if oErr == nil && orderClient != nil {
-		orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
-		if err == nil && orderResp != nil && orderResp.Order != nil {
-			ord = orderResp.Order
-			if !strings.EqualFold(ord.PaymentStatus, "PAID") {
-				return nil, appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
-			}
-			if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
-				shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
-			}
-		}
+	if oErr != nil {
+		return nil, grpcclient.TranslateGRPCError(oErr)
+	}
+	if orderClient == nil {
+		return nil, appErrors.Internal(nil, "order service unavailable")
+	}
+
+	orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if orderResp == nil || orderResp.Order == nil || strings.TrimSpace(orderResp.Order.Id) == "" {
+		return nil, appErrors.BadRequest("incomplete or invalid order response from order service")
+	}
+
+	ord := orderResp.Order
+	if !strings.EqualFold(strings.TrimSpace(ord.PaymentStatus), "PAID") {
+		return nil, appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
+	}
+	if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
+		shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
 	}
 
 	if shippingAddressID == "" {

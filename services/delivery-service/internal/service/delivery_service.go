@@ -104,7 +104,7 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	// Retrieve order from order_service if orderClient is configured and address info is needed or for authoritative enrichment
 	if s.orderClient != nil {
 		if ord, oErr := s.orderClient.GetOrder(ctx, orderID); oErr == nil && ord != nil {
-			if ord.PaymentStatus != "" && !strings.EqualFold(ord.PaymentStatus, "PAID") {
+			if !strings.EqualFold(strings.TrimSpace(ord.PaymentStatus), "PAID") {
 				s.logger.Warn("HandleOrderConfirmed rejected: order payment_status is not PAID", slog.String("order_id", orderID), slog.String("payment_status", ord.PaymentStatus))
 				return nil, appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
 			}
@@ -145,12 +145,22 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	if rawPartner != "" {
 		if pUUID, pErr := uuid.Parse(rawPartner); pErr == nil {
 			partnerUUID = pUUID
-			if prof, profErr := s.repo.GetPartnerProfile(ctx, partnerUUID); profErr == nil && prof != nil && strings.TrimSpace(prof.CompanyName) != "" {
-				partnerName = strings.TrimSpace(prof.CompanyName)
+			if prof, profErr := s.repo.GetPartnerProfile(ctx, partnerUUID); profErr == nil && prof != nil {
+				if prof.ApprovalStatus != model.ApprovalStatusApproved || !prof.IsActive || !prof.IsGSTINVerified {
+					s.logger.Warn("HandleOrderConfirmed rejected: delivery partner is not approved or active", slog.String("partner_id", partnerUUID.String()), slog.String("approval_status", string(prof.ApprovalStatus)), slog.Bool("is_active", prof.IsActive), slog.Bool("is_gstin_verified", prof.IsGSTINVerified))
+					return nil, appErrors.BadRequest("cannot assign delivery: partner is not approved or active for delivery operations")
+				}
+				if strings.TrimSpace(prof.CompanyName) != "" {
+					partnerName = strings.TrimSpace(prof.CompanyName)
+				}
 			}
 		} else {
 			partnerName = rawPartner
 			if prof, profErr := s.repo.GetPartnerProfileByCompanyName(ctx, rawPartner); profErr == nil && prof != nil {
+				if prof.ApprovalStatus != model.ApprovalStatusApproved || !prof.IsActive || !prof.IsGSTINVerified {
+					s.logger.Warn("HandleOrderConfirmed rejected: delivery partner is not approved or active", slog.String("partner_name", rawPartner), slog.String("approval_status", string(prof.ApprovalStatus)), slog.Bool("is_active", prof.IsActive), slog.Bool("is_gstin_verified", prof.IsGSTINVerified))
+					return nil, appErrors.BadRequest("cannot assign delivery: partner is not approved or active for delivery operations")
+				}
 				partnerUUID = prof.PartnerID
 			}
 		}
@@ -288,9 +298,9 @@ func (s *deliveryService) EstimateDelivery(ctx context.Context, orderID string, 
 	}
 
 	// 3. Calculate estimated transit delivery date:
-	// - Same-city delivery: 1â€“2 days (target: 2 days)
-	// - Within the same state: 2â€“4 days (target: 4 days)
-	// - Inter-state delivery: 4â€“7 days (target: 7 days)
+	// - Same-city delivery: 1–2 days (target: 2 days)
+	// - Within the same state: 2–4 days (target: 4 days)
+	// - Inter-state delivery: 4–7 days (target: 7 days)
 	transitResult := CalculateTransitDeliveryDate(originCity, originState, destCity, destState, now)
 
 	return &dto.EstimatedDeliveryResponse{
@@ -565,7 +575,13 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 	}
 
 	if companyName != nil {
-		existing.CompanyName = strings.TrimSpace(*companyName)
+		newCompany := strings.TrimSpace(*companyName)
+		if existing.CompanyName != newCompany {
+			existing.CompanyName = newCompany
+			existing.IsGSTINVerified = false
+			existing.ApprovalStatus = model.ApprovalStatusPending
+			existing.IsActive = false
+		}
 	}
 	if email != nil {
 		trimmedEmail := strings.TrimSpace(*email)
@@ -578,17 +594,23 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 		existing.ContactNumber = strings.TrimSpace(*contactNumber)
 	}
 
-	if gstin != nil && strings.TrimSpace(*gstin) != "" {
+	if gstin != nil {
 		cleanGSTIN := strings.ToUpper(strings.TrimSpace(*gstin))
-		if !gstinRegex.MatchString(cleanGSTIN) {
+		if cleanGSTIN != "" && !gstinRegex.MatchString(cleanGSTIN) {
 			return nil, appErrors.BadRequest("invalid GSTIN format")
 		}
-		if existing.GSTIN == nil || *existing.GSTIN != cleanGSTIN {
+		if cleanGSTIN == "" {
+			if existing.GSTIN != nil {
+				existing.GSTIN = nil
+				existing.IsGSTINVerified = false
+				existing.ApprovalStatus = model.ApprovalStatusPending
+				existing.IsActive = false
+			}
+		} else if existing.GSTIN == nil || *existing.GSTIN != cleanGSTIN {
 			existing.GSTIN = &cleanGSTIN
 			existing.IsGSTINVerified = false
-		}
-		if existing.ApprovalStatus != model.ApprovalStatusApproved {
 			existing.ApprovalStatus = model.ApprovalStatusPending
+			existing.IsActive = false
 		}
 	}
 
@@ -652,16 +674,24 @@ func (s *deliveryService) VerifyGSTIN(ctx context.Context, partnerID string, gst
 	if s.gstinClient == nil {
 		s.gstinClient = gstinClientPkg.NewGSTINClient(config.LoadEnv().GSTIN)
 	}
+	if !s.gstinClient.IsEnabled() {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest("GSTIN verification is disabled")
+	}
 	resp, gErr := s.gstinClient.VerifyGSTIN(ctx, cleanGSTIN)
 	if gErr != nil {
 		existing.IsGSTINVerified = false
 		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		if errors.Is(gErr, gstinClientPkg.ErrGSTINVerificationDisabled) {
+			return nil, appErrors.BadRequest("GSTIN verification is disabled")
+		}
 		errStr := strings.ToLower(gErr.Error())
 		if strings.Contains(errStr, "not found") || strings.Contains(errStr, "no record") {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' is not found in GST database", cleanGSTIN))
 		}
 		if strings.Contains(errStr, "invalid credential") || strings.Contains(errStr, "401") || strings.Contains(errStr, "403") || strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "authentication failed") {
-			return nil, appErrors.BadRequest("invalid credential: GSTIN API authentication failed")
+			return nil, appErrors.BadRequest("invalid credential: GSTIN API authentication failed (check server GSTIN_API_KEY)")
 		}
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' verification failed: %v", cleanGSTIN, gErr))
 	}
@@ -766,51 +796,13 @@ func matchCompanyName(partnerCompany, legalName, tradeName string) bool {
 	}
 
 	normLegal := normalizeCompanyName(legalName)
+	if normLegal != "" && normPartner == normLegal {
+		return true
+	}
+
 	normTrade := normalizeCompanyName(tradeName)
-
-	if normLegal != "" {
-		if normPartner == normLegal || strings.Contains(normLegal, normPartner) || strings.Contains(normPartner, normLegal) {
-			return true
-		}
-	}
-	if normTrade != "" {
-		if normPartner == normTrade || strings.Contains(normTrade, normPartner) || strings.Contains(normPartner, normTrade) {
-			return true
-		}
-	}
-
-	partnerWords := strings.Fields(normPartner)
-	if len(partnerWords) > 0 {
-		legalWords := make(map[string]bool)
-		for _, w := range strings.Fields(normLegal) {
-			legalWords[w] = true
-		}
-		tradeWords := make(map[string]bool)
-		for _, w := range strings.Fields(normTrade) {
-			tradeWords[w] = true
-		}
-
-		matchLegal := true
-		for _, w := range partnerWords {
-			if !legalWords[w] {
-				matchLegal = false
-				break
-			}
-		}
-		if matchLegal && len(legalWords) > 0 {
-			return true
-		}
-
-		matchTrade := true
-		for _, w := range partnerWords {
-			if !tradeWords[w] {
-				matchTrade = false
-				break
-			}
-		}
-		if matchTrade && len(tradeWords) > 0 {
-			return true
-		}
+	if normTrade != "" && normPartner == normTrade {
+		return true
 	}
 
 	return false
@@ -841,6 +833,9 @@ func (s *deliveryService) ActivatePartner(ctx context.Context, partnerID string,
 		}
 	}
 
+	if existing.ApprovalStatus != model.ApprovalStatusApproved || !existing.IsGSTINVerified {
+		return nil, appErrors.BadRequest("cannot activate delivery partner: partner must be approved with verified GSTIN")
+	}
 	existing.IsActive = true
 	existing.DeactivatedAt = nil
 	existing.DeactivationReason = nil
@@ -950,6 +945,7 @@ func (s *deliveryService) ApprovePartner(ctx context.Context, partnerID string) 
 
 	existing.ApprovalStatus = model.ApprovalStatusApproved
 	existing.IsGSTINVerified = true
+	existing.IsActive = true
 	existing.RejectionReason = nil
 	existing.UpdatedAt = time.Now().UTC()
 
