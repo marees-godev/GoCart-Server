@@ -240,6 +240,71 @@ func BuildExchangeCreatedOutboxEvent(exc *model.Exchange) (*outbox.Event, error)
 	}, nil
 }
 
+func BuildExchangeOfferAppliedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
+	payload := events.ExchangeOfferAppliedEvent{
+		ExchangeID:        exc.ID,
+		QuoteID:           exc.QuoteID,
+		OrderID:           exc.OrderID,
+		OrderItemID:       exc.OrderItemID,
+		UserID:            exc.UserID,
+		NewProductID:      exc.NewProductID,
+		OldBrand:          exc.OldBrand,
+		OldModel:          exc.OldModel,
+		OldVariant:        exc.OldVariant,
+		SerialOrIMEI:      exc.SerialOrIMEI,
+		BaseExchangeValue: exc.BaseExchangeValue,
+		DiscountAmount:    exc.EstimatedDiscount,
+		AppliedAt:         exc.CreatedAt,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeOfferApplied, SourceReturnService, exc.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "exchange",
+		AggregateID:   exc.ID,
+		EventType:     events.EventTypeExchangeOfferApplied,
+		Payload:       bytes,
+		Topic:         events.TopicExchangeOfferApplied,
+	}, nil
+}
+
+func BuildExchangeCompletedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
+	payload := events.ExchangeCompletedEvent{
+		ExchangeID:    exc.ID,
+		OrderID:       exc.OrderID,
+		OrderItemID:   exc.OrderItemID,
+		UserID:        exc.UserID,
+		FinalDiscount: exc.FinalDiscount,
+		CompletedAt:   exc.UpdatedAt,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeCompleted, SourceReturnService, exc.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "exchange",
+		AggregateID:   exc.ID,
+		EventType:     events.EventTypeExchangeCompleted,
+		Payload:       bytes,
+		Topic:         events.TopicExchangeCompleted,
+	}, nil
+}
+
 func BuildExchangeVerifiedOutboxEvent(exc *model.Exchange, v *model.ExchangeVerification) (*outbox.Event, error) {
 	payload := map[string]interface{}{
 		"exchange_id":       exc.ID,

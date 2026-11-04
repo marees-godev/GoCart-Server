@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
@@ -37,7 +38,6 @@ var (
 	ErrInvalidReturnStatus            = errors.New("invalid return status")
 	ErrOrderNotFound                  = errors.New("order not found")
 	ErrInvalidReturnType              = errors.New("invalid return type")
-	ErrProofImagesRequired            = errors.New("at least one proof image is required for product verification")
 	ErrVerifiedByRequired             = errors.New("verified by delivery partner ID is required")
 	ErrInvalidVerificationCondition   = errors.New("invalid product verification condition")
 	ErrInvalidExchangeConditionRating = errors.New("invalid exchange condition rating")
@@ -55,8 +55,21 @@ var (
 	ErrExchangeFunctionalRequired     = errors.New("device must be functional and serial must match to approve exchange")
 	ErrReturnNotEligibleForRefund     = errors.New("refund can only be triggered after return is received or verified")
 	ErrRefundExceedsPaidAmount        = errors.New("refund amount cannot exceed total paid amount")
-	ErrPaymentNotFound                = errors.New("payment not found for order")
-	ErrRefundFailed                   = errors.New("payment refund failed")
+	ErrPaymentNotFound                  = errors.New("payment not found for order")
+	ErrRefundFailed                     = errors.New("payment refund failed")
+	ErrProductNotFound                  = errors.New("product not found")
+	ErrProductNotExchangeEligible       = errors.New("product is not eligible for exchange")
+	ErrProductCategoryNotExchangeable   = errors.New("product category does not support exchange; only eligible smartphones can be exchanged")
+	ErrSmallProductExchangeRestricted   = errors.New("exchanges are not allowed for small products or accessories")
+	ErrExchangeProductIDRequired        = errors.New("productId is required for exchange")
+	ErrExchangeDeviceCatalogIDRequired  = errors.New("exchangeDeviceCatalogId is required for exchange")
+	ErrExchangeDeviceInactive           = errors.New("exchange device catalog entry is inactive")
+	ErrIncompatibleExchangeCategory     = errors.New("cannot exchange products across incompatible categories")
+	ErrExchangeQuoteExpired             = errors.New("exchange quote has expired")
+	ErrExchangeQuoteNotFound            = errors.New("exchange quote not found")
+	ErrExchangeQuoteNotApplicable       = errors.New("exchange quote cannot be applied in its current status")
+	ErrExchangeDeviceNotFound           = errors.New("selected device not found in exchange catalog")
+	ErrExchangeDisqualified             = errors.New("device is disqualified for exchange")
 )
 
 type ReturnService interface {
@@ -72,6 +85,12 @@ type ReturnService interface {
 	CreateExchange(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error)
 	GetExchange(ctx context.Context, id string) (*model.Exchange, error)
 	VerifyExchangeProduct(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error)
+	GetExchangeQuestions(ctx context.Context, req *dto.GetExchangeQuestionsDTO) ([]*model.ExchangeDiagnosticQuestion, []*model.ExchangeDeviceCatalog, error)
+	CalculateExchangeValuation(ctx context.Context, req *dto.CalculateExchangeValuationDTO) (*dto.ExchangeValuationResultDTO, error)
+	LockExchangeQuote(ctx context.Context, req *dto.LockExchangeQuoteDTO) (*model.ExchangeQuote, error)
+	GetExchangeQuote(ctx context.Context, quoteID string) (*model.ExchangeQuote, error)
+	ApplyExchangeToOrder(ctx context.Context, req *dto.ApplyExchangeToOrderDTO) (*model.Exchange, error)
+	ResolveExchangeMismatch(ctx context.Context, req *dto.ResolveExchangeMismatchDTO) (*model.Exchange, error)
 	TriggerRefund(ctx context.Context, returnID string) (*model.Return, error)
 	ProcessRefund(ctx context.Context, returnID string) (*model.Return, error)
 }
@@ -726,47 +745,50 @@ func (s *returnService) CreateExchange(ctx context.Context, req *dto.CreateExcha
 	if req.UserID == "" {
 		return nil, ErrUserIDRequired
 	}
-	req.OrderID = strings.TrimSpace(req.OrderID)
-	if req.OrderID == "" {
-		return nil, ErrOrderIDRequired
+	req.ProductID = strings.TrimSpace(req.ProductID)
+	if req.ProductID == "" {
+		return nil, ErrExchangeProductIDRequired
 	}
-	req.NewProductID = strings.TrimSpace(req.NewProductID)
-	if req.NewProductID == "" {
-		return nil, ErrExchangeNewProductRequired
-	}
-	req.OldBrand = strings.TrimSpace(req.OldBrand)
-	req.OldModel = strings.TrimSpace(req.OldModel)
-	if req.OldBrand == "" || req.OldModel == "" {
-		return nil, ErrExchangeBrandModelRequired
-	}
-	if req.BaseExchangeValue < 0 {
-		return nil, errors.New("base exchange value cannot be negative")
+	req.ExchangeDeviceCatalogID = strings.TrimSpace(req.ExchangeDeviceCatalogID)
+	if req.ExchangeDeviceCatalogID == "" {
+		return nil, ErrExchangeDeviceCatalogIDRequired
 	}
 
-	if s.orderClient != nil {
-		order, err := s.orderClient.GetOrder(ctx, req.OrderID, req.UserID)
+	deviceCatalog, err := s.repo.GetExchangeDeviceCatalogByID(ctx, req.ExchangeDeviceCatalogID)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to get exchange device catalog", slog.String("id", req.ExchangeDeviceCatalogID), slog.Any("error", err))
+		return nil, err
+	}
+	if deviceCatalog == nil {
+		return nil, ErrExchangeDeviceNotFound
+	}
+	if !deviceCatalog.IsActive {
+		return nil, ErrExchangeDeviceInactive
+	}
+
+	var prod *productpb.Product
+	if s.productClient != nil {
+		var err error
+		prod, err = s.productClient.GetProduct(ctx, req.ProductID)
 		if err != nil {
-			s.logger.ErrorContext(ctx, "failed to retrieve order from order service for exchange",
-				slog.String("order_id", req.OrderID),
-				slog.String("user_id", req.UserID),
+			s.logger.ErrorContext(ctx, "failed to retrieve product from product service for exchange",
+				slog.String("product_id", req.ProductID),
 				slog.Any("error", err),
 			)
 			return nil, err
 		}
-		if order == nil {
-			s.logger.WarnContext(ctx, "order not found for exchange request", slog.String("order_id", req.OrderID))
-			return nil, ErrOrderNotFound
-		}
-		if order.GetUserId() != "" && order.GetUserId() != req.UserID {
-			s.logger.WarnContext(ctx, "exchange request rejected: unauthorized user",
-				slog.String("order_id", req.OrderID),
-				slog.String("request_user_id", req.UserID),
-				slog.String("order_user_id", order.GetUserId()),
-			)
-			return nil, ErrUnauthorizedReturnRequest
+		if prod == nil {
+			return nil, ErrProductNotFound
 		}
 	}
 
+	if prod != nil {
+		if err := validateProductExchangeEligibility(prod, deviceCatalog); err != nil {
+			return nil, err
+		}
+	}
+
+	baseExchangeValue := deviceCatalog.BaseExchangeValue
 	totalDeductions := 0.0
 	var answers []*model.ExchangeQuestionAnswer
 	now := time.Now().UTC()
@@ -794,37 +816,44 @@ func (s *returnService) CreateExchange(ctx context.Context, req *dto.CreateExcha
 		})
 	}
 
-	estimatedDiscount := req.BaseExchangeValue - totalDeductions
+	estimatedDiscount := baseExchangeValue - totalDeductions
 	if estimatedDiscount < 0 {
 		estimatedDiscount = 0
 	}
+	if prod != nil && prod.GetMaxExchangeDiscount() > 0 && estimatedDiscount > prod.GetMaxExchangeDiscount() {
+		estimatedDiscount = prod.GetMaxExchangeDiscount()
+	}
 
-	priceDiff := 0.0
-	if s.productClient != nil {
-		prod, err := s.productClient.GetProduct(ctx, req.NewProductID)
-		if err == nil && prod != nil && prod.GetPrice() > 0 {
-			priceDiff = prod.GetPrice() - estimatedDiscount
-		}
+	brand := deviceCatalog.Brand
+	if strings.TrimSpace(req.OldBrand) != "" {
+		brand = strings.TrimSpace(req.OldBrand)
+	}
+	modelName := deviceCatalog.Model
+	if strings.TrimSpace(req.OldModel) != "" {
+		modelName = strings.TrimSpace(req.OldModel)
+	}
+	variant := deviceCatalog.Variant
+	if strings.TrimSpace(req.OldVariant) != "" {
+		variant = strings.TrimSpace(req.OldVariant)
 	}
 
 	exc := &model.Exchange{
-		ID:                uuid.New().String(),
-		OrderID:           req.OrderID,
-		OrderItemID:       strings.TrimSpace(req.OrderItemID),
-		UserID:            req.UserID,
-		NewProductID:      req.NewProductID,
-		OldBrand:          req.OldBrand,
-		OldModel:          req.OldModel,
-		OldVariant:        strings.TrimSpace(req.OldVariant),
-		SerialOrIMEI:      strings.TrimSpace(req.SerialOrIMEI),
-		BaseExchangeValue: req.BaseExchangeValue,
-		EstimatedDiscount: estimatedDiscount,
-		FinalDiscount:     estimatedDiscount,
-		PriceDifference:   priceDiff,
-		Status:            model.ExchangeStatusOfferCreated,
-		Answers:           answers,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		ID:                      uuid.New().String(),
+		ProductID:               req.ProductID,
+		ExchangeDeviceCatalogID: req.ExchangeDeviceCatalogID,
+		UserID:                  req.UserID,
+		OldBrand:                brand,
+		OldModel:                modelName,
+		OldVariant:              variant,
+		SerialOrIMEI:            strings.TrimSpace(req.SerialOrIMEI),
+		BaseExchangeValue:       baseExchangeValue,
+		EstimatedDiscount:       estimatedDiscount,
+		FinalDiscount:           estimatedDiscount,
+		PriceDifference:         0.0,
+		Status:                  model.ExchangeStatusOfferCreated,
+		Answers:                 answers,
+		CreatedAt:               now,
+		UpdatedAt:               now,
 	}
 
 	outboxEvt, err := events.BuildExchangeCreatedOutboxEvent(exc)
@@ -840,12 +869,62 @@ func (s *returnService) CreateExchange(ctx context.Context, req *dto.CreateExcha
 
 	s.logger.InfoContext(ctx, "exchange created successfully",
 		slog.String("exchange_id", exc.ID),
-		slog.String("order_id", exc.OrderID),
+		slog.String("product_id", exc.ProductID),
+		slog.String("exchange_device_catalog_id", exc.ExchangeDeviceCatalogID),
 		slog.String("user_id", exc.UserID),
 		slog.Float64("estimated_discount", exc.EstimatedDiscount),
 	)
 
 	return exc, nil
+}
+
+func validateProductExchangeEligibility(prod *productpb.Product, catalogItem *model.ExchangeDeviceCatalog) error {
+	if !prod.GetIsExchangeEligible() {
+		return ErrProductNotExchangeEligible
+	}
+
+	name := strings.ToLower(prod.GetName())
+	desc := strings.ToLower(prod.GetDescription())
+	cat := strings.ToUpper(strings.TrimSpace(prod.GetCategoryId()))
+	text := name + " " + desc
+
+	smallKeywords := []string{
+		"charger", "adapter", "cable",
+		"airpod", "airpods", "earbud", "earbuds", "earphone", "earphones", "headphone", "headphones",
+		"watch", "smartwatch",
+		"accessory", "accessories",
+		"case", "cover", "screen protector",
+	}
+	for _, kw := range smallKeywords {
+		if strings.Contains(text, kw) || strings.EqualFold(cat, kw) {
+			return ErrSmallProductExchangeRestricted
+		}
+	}
+
+	laptopKeywords := []string{"laptop", "macbook", "notebook", "chromebook", "ultrabook"}
+	for _, kw := range laptopKeywords {
+		if strings.Contains(text, kw) || strings.EqualFold(cat, kw) {
+			return ErrProductCategoryNotExchangeable
+		}
+	}
+
+	isSmartphone := strings.EqualFold(cat, "SMARTPHONE") ||
+		strings.Contains(text, "smartphone") ||
+		strings.Contains(text, "phone") ||
+		strings.Contains(text, "mobile") ||
+		strings.Contains(text, "iphone") ||
+		strings.Contains(text, "galaxy") ||
+		strings.Contains(text, "pixel")
+
+	if !isSmartphone {
+		return ErrProductCategoryNotExchangeable
+	}
+
+	if !strings.EqualFold(catalogItem.CategoryCode, "SMARTPHONE") {
+		return ErrIncompatibleExchangeCategory
+	}
+
+	return nil
 }
 
 func (s *returnService) GetExchange(ctx context.Context, id string) (*model.Exchange, error) {
@@ -1162,4 +1241,378 @@ func (s *returnService) TriggerRefund(ctx context.Context, returnID string) (*mo
 	)
 
 	return ret, nil
+}
+
+func (s *returnService) GetExchangeQuestions(ctx context.Context, req *dto.GetExchangeQuestionsDTO) ([]*model.ExchangeDiagnosticQuestion, []*model.ExchangeDeviceCatalog, error) {
+	category := "SMARTPHONE"
+	if req != nil && strings.TrimSpace(req.CategoryCode) != "" {
+		category = strings.ToUpper(strings.TrimSpace(req.CategoryCode))
+	}
+
+	if req != nil && strings.TrimSpace(req.ProductID) != "" && s.productClient != nil {
+		prod, err := s.productClient.GetProduct(ctx, strings.TrimSpace(req.ProductID))
+		if err == nil && prod != nil && !prod.GetIsExchangeEligible() {
+			return nil, nil, ErrProductNotExchangeEligible
+		}
+	}
+
+	questions, err := s.repo.ListExchangeDiagnosticQuestions(ctx, category)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	devices, err := s.repo.ListExchangeDeviceCatalog(ctx, category)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return questions, devices, nil
+}
+
+func (s *returnService) CalculateExchangeValuation(ctx context.Context, req *dto.CalculateExchangeValuationDTO) (*dto.ExchangeValuationResultDTO, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	req.OldBrand = strings.TrimSpace(req.OldBrand)
+	req.OldModel = strings.TrimSpace(req.OldModel)
+	if req.OldBrand == "" || req.OldModel == "" {
+		return nil, ErrExchangeBrandModelRequired
+	}
+
+	category := "SMARTPHONE"
+	if strings.TrimSpace(req.CategoryCode) != "" {
+		category = strings.ToUpper(strings.TrimSpace(req.CategoryCode))
+	}
+
+	var maxDiscount float64
+	if strings.TrimSpace(req.NewProductID) != "" && s.productClient != nil {
+		prod, err := s.productClient.GetProduct(ctx, strings.TrimSpace(req.NewProductID))
+		if err == nil && prod != nil {
+			if !prod.GetIsExchangeEligible() {
+				return nil, ErrProductNotExchangeEligible
+			}
+			maxDiscount = prod.GetMaxExchangeDiscount()
+		}
+	}
+
+	dev, err := s.repo.GetExchangeDeviceByModel(ctx, category, req.OldBrand, req.OldModel, strings.TrimSpace(req.OldVariant))
+	if err != nil {
+		return nil, err
+	}
+	baseValue := 20000.00
+	if dev != nil && dev.BaseExchangeValue > 0 {
+		baseValue = dev.BaseExchangeValue
+	}
+
+	questions, err := s.repo.ListExchangeDiagnosticQuestions(ctx, category)
+	if err != nil {
+		return nil, err
+	}
+
+	optionLookup := make(map[string]*model.ExchangeQuestionOption)
+	for _, q := range questions {
+		for _, opt := range q.Options {
+			key := fmt.Sprintf("%s:%s", q.QuestionKey, opt.OptionKey)
+			optionLookup[key] = opt
+		}
+	}
+
+	totalDeductions := 0.0
+	var deductions []*dto.ExchangeDeductionDetailDTO
+
+	for _, a := range req.Answers {
+		if a == nil {
+			continue
+		}
+		qKey := strings.TrimSpace(a.QuestionKey)
+		optKey := strings.TrimSpace(a.OptionKey)
+		lookupKey := fmt.Sprintf("%s:%s", qKey, optKey)
+
+		opt, exists := optionLookup[lookupKey]
+		if !exists {
+			continue
+		}
+
+		if opt.IsFatalDisqualifier {
+			reason := opt.RejectionReason
+			if reason == "" {
+				reason = "Item does not meet minimum condition requirements for exchange."
+			}
+			return &dto.ExchangeValuationResultDTO{
+				IsEligible:        false,
+				RejectionReason:   reason,
+				BaseExchangeValue: baseValue,
+				TotalDeductions:   0,
+				FinalDiscount:     0,
+				Deductions: []*dto.ExchangeDeductionDetailDTO{
+					{
+						QuestionKey:     qKey,
+						OptionKey:       optKey,
+						DeductionAmount: opt.DeductionAmount,
+						IsFatal:         true,
+						RejectionReason: reason,
+					},
+				},
+			}, nil
+		}
+
+		totalDeductions += opt.DeductionAmount
+		deductions = append(deductions, &dto.ExchangeDeductionDetailDTO{
+			QuestionKey:     qKey,
+			OptionKey:       optKey,
+			DeductionAmount: opt.DeductionAmount,
+			IsFatal:         false,
+		})
+	}
+
+	finalDiscount := baseValue - totalDeductions
+	if finalDiscount < 0 {
+		finalDiscount = 0
+	}
+	if maxDiscount > 0 && finalDiscount > maxDiscount {
+		finalDiscount = maxDiscount
+	}
+
+	return &dto.ExchangeValuationResultDTO{
+		IsEligible:        true,
+		BaseExchangeValue: baseValue,
+		TotalDeductions:   totalDeductions,
+		FinalDiscount:     finalDiscount,
+		Deductions:        deductions,
+	}, nil
+}
+
+func (s *returnService) LockExchangeQuote(ctx context.Context, req *dto.LockExchangeQuoteDTO) (*model.ExchangeQuote, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	req.UserID = strings.TrimSpace(req.UserID)
+	if req.UserID == "" {
+		return nil, ErrUserIDRequired
+	}
+	req.NewProductID = strings.TrimSpace(req.NewProductID)
+	if req.NewProductID == "" {
+		return nil, ErrExchangeNewProductRequired
+	}
+
+	valRes, err := s.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+		NewProductID: req.NewProductID,
+		CategoryCode: req.CategoryCode,
+		OldBrand:     req.OldBrand,
+		OldModel:     req.OldModel,
+		OldVariant:   req.OldVariant,
+		Answers:      req.Answers,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	category := "SMARTPHONE"
+	if strings.TrimSpace(req.CategoryCode) != "" {
+		category = strings.ToUpper(strings.TrimSpace(req.CategoryCode))
+	}
+
+	now := time.Now().UTC()
+	quoteID := uuid.New().String()
+
+	quoteAnswers := make([]*model.ExchangeQuoteAnswer, 0, len(valRes.Deductions))
+	for _, d := range valRes.Deductions {
+		quoteAnswers = append(quoteAnswers, &model.ExchangeQuoteAnswer{
+			ID:              uuid.New().String(),
+			QuoteID:         quoteID,
+			QuestionKey:     d.QuestionKey,
+			OptionKey:       d.OptionKey,
+			DeductionAmount: d.DeductionAmount,
+			IsFatal:         d.IsFatal,
+			CreatedAt:       now,
+		})
+	}
+
+	quote := &model.ExchangeQuote{
+		ID:                     quoteID,
+		UserID:                 req.UserID,
+		NewProductID:           req.NewProductID,
+		CategoryCode:           category,
+		OldBrand:               req.OldBrand,
+		OldModel:               req.OldModel,
+		OldVariant:             strings.TrimSpace(req.OldVariant),
+		SerialOrIMEI:           strings.TrimSpace(req.SerialOrIMEI),
+		BaseExchangeValue:      valRes.BaseExchangeValue,
+		TotalDeductions:        valRes.TotalDeductions,
+		FinalDiscount:          valRes.FinalDiscount,
+		IsDisqualified:         !valRes.IsEligible,
+		DisqualificationReason: valRes.RejectionReason,
+		Status:                 model.ExchangeQuoteStatusLocked,
+		ExpiresAt:              now.Add(30 * time.Minute),
+		Answers:                quoteAnswers,
+		CreatedAt:              now,
+		UpdatedAt:              now,
+	}
+
+	if err := s.repo.CreateExchangeQuote(ctx, quote, quoteAnswers); err != nil {
+		s.logger.ErrorContext(ctx, "failed to lock exchange quote", slog.Any("error", err))
+		return nil, err
+	}
+
+	return quote, nil
+}
+
+func (s *returnService) GetExchangeQuote(ctx context.Context, quoteID string) (*model.ExchangeQuote, error) {
+	quoteID = strings.TrimSpace(quoteID)
+	if quoteID == "" {
+		return nil, errors.New("quote id is required")
+	}
+
+	quote, err := s.repo.GetExchangeQuoteByID(ctx, quoteID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	if quote.IsExpired(now) && quote.Status == model.ExchangeQuoteStatusLocked {
+		quote.Status = model.ExchangeQuoteStatusExpired
+		_ = s.repo.UpdateExchangeQuoteStatus(ctx, quote.ID, model.ExchangeQuoteStatusExpired)
+	}
+
+	return quote, nil
+}
+
+func (s *returnService) ApplyExchangeToOrder(ctx context.Context, req *dto.ApplyExchangeToOrderDTO) (*model.Exchange, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	req.QuoteID = strings.TrimSpace(req.QuoteID)
+	req.OrderID = strings.TrimSpace(req.OrderID)
+	req.OrderItemID = strings.TrimSpace(req.OrderItemID)
+	req.UserID = strings.TrimSpace(req.UserID)
+
+	if req.QuoteID == "" {
+		return nil, errors.New("quote_id is required")
+	}
+	if req.OrderID == "" {
+		return nil, ErrOrderIDRequired
+	}
+	if req.UserID == "" {
+		return nil, ErrUserIDRequired
+	}
+
+	quote, err := s.GetExchangeQuote(ctx, req.QuoteID)
+	if err != nil {
+		return nil, err
+	}
+	if quote.UserID != req.UserID {
+		return nil, ErrUnauthorizedReturnRequest
+	}
+	if quote.IsExpired(time.Now().UTC()) {
+		return nil, ErrExchangeQuoteExpired
+	}
+	if quote.IsDisqualified {
+		return nil, ErrExchangeDisqualified
+	}
+	if quote.Status != model.ExchangeQuoteStatusLocked && quote.Status != model.ExchangeQuoteStatusQuoted {
+		return nil, ErrExchangeQuoteNotApplicable
+	}
+
+	now := time.Now().UTC()
+	excID := uuid.New().String()
+
+	answers := make([]*model.ExchangeQuestionAnswer, 0, len(quote.Answers))
+	for _, qa := range quote.Answers {
+		answers = append(answers, &model.ExchangeQuestionAnswer{
+			ID:              uuid.New().String(),
+			ExchangeID:      excID,
+			QuestionKey:     qa.QuestionKey,
+			AnswerValue:     qa.OptionKey,
+			DeductionAmount: qa.DeductionAmount,
+			CreatedAt:       now,
+		})
+	}
+
+	exc := &model.Exchange{
+		ID:                excID,
+		OrderID:           req.OrderID,
+		OrderItemID:       req.OrderItemID,
+		UserID:            req.UserID,
+		NewProductID:      quote.NewProductID,
+		OldBrand:          quote.OldBrand,
+		OldModel:          quote.OldModel,
+		OldVariant:        quote.OldVariant,
+		SerialOrIMEI:      quote.SerialOrIMEI,
+		BaseExchangeValue: quote.BaseExchangeValue,
+		EstimatedDiscount: quote.FinalDiscount,
+		FinalDiscount:     quote.FinalDiscount,
+		PriceDifference:   0,
+		Status:            model.ExchangeStatusRequested,
+		QuoteID:           quote.ID,
+		Answers:           answers,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	outboxEvt, err := events.BuildExchangeOfferAppliedOutboxEvent(exc)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to build exchange offer applied outbox event", slog.Any("error", err))
+		return nil, err
+	}
+
+	if err := s.repo.ApplyExchangeQuoteToOrderWithOutbox(ctx, exc, quote.ID, answers, outboxEvt); err != nil {
+		s.logger.ErrorContext(ctx, "failed to apply exchange quote to order", slog.Any("error", err))
+		return nil, err
+	}
+
+	return exc, nil
+}
+
+func (s *returnService) ResolveExchangeMismatch(ctx context.Context, req *dto.ResolveExchangeMismatchDTO) (*model.Exchange, error) {
+	if req == nil {
+		return nil, errors.New("request cannot be nil")
+	}
+
+	req.ExchangeID = strings.TrimSpace(req.ExchangeID)
+	if req.ExchangeID == "" {
+		return nil, errors.New("exchange_id is required")
+	}
+
+	exc, err := s.repo.GetExchangeByID(ctx, req.ExchangeID)
+	if err != nil {
+		return nil, err
+	}
+
+	action := strings.ToUpper(strings.TrimSpace(req.Action))
+	var nextStatus model.ExchangeStatus
+	var finalDiscount float64
+	var priceDiff float64
+	var outboxEvt *outbox.Event
+
+	switch action {
+	case "ACCEPT_REVISED":
+		nextStatus = model.ExchangeStatusCompleted
+		finalDiscount = exc.FinalDiscount
+		priceDiff = exc.EstimatedDiscount - finalDiscount
+		outboxEvt, _ = events.BuildExchangeCompletedOutboxEvent(exc)
+
+	case "DECLINE_AND_CANCEL":
+		nextStatus = model.ExchangeStatusCancelled
+		finalDiscount = 0
+		priceDiff = exc.EstimatedDiscount
+		outboxEvt, _ = events.BuildExchangeCompletedOutboxEvent(exc)
+
+	default:
+		return nil, errors.New("invalid action: must be ACCEPT_REVISED or DECLINE_AND_CANCEL")
+	}
+
+	if err := s.repo.UpdateExchangeStatusAndDiscountWithOutbox(ctx, exc.ID, nextStatus, finalDiscount, priceDiff, outboxEvt); err != nil {
+		s.logger.ErrorContext(ctx, "failed to resolve exchange mismatch", slog.Any("error", err))
+		return nil, err
+	}
+
+	exc.Status = nextStatus
+	exc.FinalDiscount = finalDiscount
+	exc.PriceDifference = priceDiff
+	exc.UpdatedAt = time.Now().UTC()
+
+	return exc, nil
 }

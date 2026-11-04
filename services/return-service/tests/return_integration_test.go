@@ -224,6 +224,75 @@ func (m *inMemReturnRepo) GetExchangeQuestionAnswers(ctx context.Context, exchan
 	return exc.Answers, nil
 }
 
+func (m *inMemReturnRepo) ListExchangeDiagnosticQuestions(ctx context.Context, categoryCode string) ([]*model.ExchangeDiagnosticQuestion, error) {
+	return []*model.ExchangeDiagnosticQuestion{
+		{
+			ID: "q1", CategoryCode: "SMARTPHONE", QuestionKey: "powers_on", QuestionText: "Powers on?", DisplayOrder: 1,
+			Options: []*model.ExchangeQuestionOption{
+				{ID: "opt1", QuestionID: "q1", OptionKey: "yes", OptionLabel: "Yes", DeductionAmount: 0, IsFatalDisqualifier: false},
+				{ID: "opt2", QuestionID: "q1", OptionKey: "no", OptionLabel: "No", DeductionAmount: 0, IsFatalDisqualifier: true, RejectionReason: "Device does not power on"},
+			},
+		},
+	}, nil
+}
+
+func (m *inMemReturnRepo) ListExchangeDeviceCatalog(ctx context.Context, categoryCode string) ([]*model.ExchangeDeviceCatalog, error) {
+	return []*model.ExchangeDeviceCatalog{
+		{ID: "d1", CategoryCode: "SMARTPHONE", Brand: "Apple", Model: "iPhone 13", BaseExchangeValue: 26000, IsActive: true},
+	}, nil
+}
+
+func (m *inMemReturnRepo) GetExchangeDeviceByModel(ctx context.Context, categoryCode, brand, modelName, variant string) (*model.ExchangeDeviceCatalog, error) {
+	return &model.ExchangeDeviceCatalog{
+		ID: "d1", CategoryCode: "SMARTPHONE", Brand: brand, Model: modelName, Variant: variant, BaseExchangeValue: 26000, IsActive: true,
+	}, nil
+}
+
+func (m *inMemReturnRepo) GetExchangeDeviceCatalogByID(ctx context.Context, id string) (*model.ExchangeDeviceCatalog, error) {
+	return &model.ExchangeDeviceCatalog{
+		ID: id, CategoryCode: "SMARTPHONE", Brand: "Apple", Model: "iPhone 13", BaseExchangeValue: 26000, IsActive: true,
+	}, nil
+}
+
+func (m *inMemReturnRepo) CreateExchangeQuote(ctx context.Context, quote *model.ExchangeQuote, answers []*model.ExchangeQuoteAnswer) error {
+	return nil
+}
+
+func (m *inMemReturnRepo) GetExchangeQuoteByID(ctx context.Context, id string) (*model.ExchangeQuote, error) {
+	return &model.ExchangeQuote{
+		ID: id, UserID: "u1", NewProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 26000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
+	}, nil
+}
+
+func (m *inMemReturnRepo) UpdateExchangeQuoteStatus(ctx context.Context, id string, status model.ExchangeQuoteStatus) error {
+	return nil
+}
+
+func (m *inMemReturnRepo) ApplyExchangeQuoteToOrderWithOutbox(ctx context.Context, exc *model.Exchange, quoteID string, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *exc
+	m.exchanges[exc.ID] = &cp
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
+}
+
+func (m *inMemReturnRepo) UpdateExchangeStatusAndDiscountWithOutbox(ctx context.Context, exchangeID string, status model.ExchangeStatus, finalDiscount, priceDiff float64, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if exc, ok := m.exchanges[exchangeID]; ok {
+		exc.Status = status
+		exc.FinalDiscount = finalDiscount
+		exc.PriceDifference = priceDiff
+	}
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
+}
+
 func (m *inMemReturnRepo) ListReturns(ctx context.Context, limit, offset int, status, userID, returnType string) ([]*model.Return, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

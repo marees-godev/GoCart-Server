@@ -42,16 +42,14 @@ type ExchangeAnswerDTO struct {
 }
 
 type CreateExchangeDTO struct {
-	OrderID           string               `json:"order_id"`
-	OrderItemID       string               `json:"order_item_id"`
-	UserID            string               `json:"user_id"`
-	NewProductID      string               `json:"new_product_id"`
-	OldBrand          string               `json:"old_brand"`
-	OldModel          string               `json:"old_model"`
-	OldVariant        string               `json:"old_variant,omitempty"`
-	SerialOrIMEI      string               `json:"serial_or_imei,omitempty"`
-	BaseExchangeValue float64              `json:"base_exchange_value"`
-	Answers           []*ExchangeAnswerDTO `json:"answers,omitempty"`
+	ProductID               string               `json:"product_id"`
+	ExchangeDeviceCatalogID string               `json:"exchange_device_catalog_id"`
+	UserID                  string               `json:"user_id"`
+	OldBrand                string               `json:"old_brand,omitempty"`
+	OldModel                string               `json:"old_model,omitempty"`
+	OldVariant              string               `json:"old_variant,omitempty"`
+	SerialOrIMEI            string               `json:"serial_or_imei,omitempty"`
+	Answers                 []*ExchangeAnswerDTO `json:"answers,omitempty"`
 }
 
 type VerifyExchangeProductDTO struct {
@@ -73,3 +71,63 @@ type GetExchangeDTO struct {
 	OrderID string `json:"order_id,omitempty"`
 }
 
+type GetExchangeQuestionsDTO struct {
+	CategoryCode string `json:"category_code"`
+	ProductID    string `json:"product_id,omitempty"`
+}
+
+type ExchangeUserAnswerDTO struct {
+	QuestionKey string `json:"question_key"`
+	OptionKey   string `json:"option_key"`
+}
+
+type ExchangeDeductionDetailDTO struct {
+	QuestionKey     string  `json:"question_key"`
+	OptionKey       string  `json:"option_key"`
+	DeductionAmount float64 `json:"deduction_amount"`
+	IsFatal         bool    `json:"is_fatal"`
+	RejectionReason string  `json:"rejection_reason,omitempty"`
+}
+
+type CalculateExchangeValuationDTO struct {
+	NewProductID string                   `json:"new_product_id"`
+	CategoryCode string                   `json:"category_code"`
+	OldBrand     string                   `json:"old_brand"`
+	OldModel     string                   `json:"old_model"`
+	OldVariant   string                   `json:"old_variant,omitempty"`
+	Answers      []*ExchangeUserAnswerDTO `json:"answers,omitempty"`
+}
+
+type ExchangeValuationResultDTO struct {
+	IsEligible        bool                          `json:"is_eligible"`
+	RejectionReason   string                        `json:"rejection_reason,omitempty"`
+	BaseExchangeValue float64                       `json:"base_exchange_value"`
+	TotalDeductions   float64                       `json:"total_deductions"`
+	FinalDiscount     float64                       `json:"final_discount"`
+	Deductions        []*ExchangeDeductionDetailDTO `json:"deductions,omitempty"`
+}
+
+type LockExchangeQuoteDTO struct {
+	UserID       string                   `json:"user_id"`
+	NewProductID string                   `json:"new_product_id"`
+	CategoryCode string                   `json:"category_code"`
+	OldBrand     string                   `json:"old_brand"`
+	OldModel     string                   `json:"old_model"`
+	OldVariant   string                   `json:"old_variant,omitempty"`
+	SerialOrIMEI string                   `json:"serial_or_imei,omitempty"`
+	Answers      []*ExchangeUserAnswerDTO `json:"answers,omitempty"`
+}
+
+type ApplyExchangeToOrderDTO struct {
+	QuoteID     string `json:"quote_id"`
+	OrderID     string `json:"order_id"`
+	OrderItemID string `json:"order_item_id"`
+	UserID      string `json:"user_id"`
+}
+
+type ResolveExchangeMismatchDTO struct {
+	ExchangeID    string `json:"exchange_id"`
+	Action        string `json:"action"` // "ACCEPT_REVISED" or "DECLINE_AND_CANCEL"
+	PaymentMethod string `json:"payment_method,omitempty"`
+	Notes         string `json:"notes,omitempty"`
+}

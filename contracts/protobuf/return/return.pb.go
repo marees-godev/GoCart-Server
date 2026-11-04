@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.0
-// source: contracts/protobuf/return/return.proto
+// source: return.proto
 
 package returns
 
@@ -44,7 +44,7 @@ type ReturnOrder struct {
 
 func (x *ReturnOrder) Reset() {
 	*x = ReturnOrder{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[0]
+	mi := &file_return_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -56,7 +56,7 @@ func (x *ReturnOrder) String() string {
 func (*ReturnOrder) ProtoMessage() {}
 
 func (x *ReturnOrder) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[0]
+	mi := &file_return_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -69,7 +69,7 @@ func (x *ReturnOrder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnOrder.ProtoReflect.Descriptor instead.
 func (*ReturnOrder) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{0}
+	return file_return_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ReturnOrder) GetId() string {
@@ -195,7 +195,7 @@ type ProductVerification struct {
 
 func (x *ProductVerification) Reset() {
 	*x = ProductVerification{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[1]
+	mi := &file_return_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +207,7 @@ func (x *ProductVerification) String() string {
 func (*ProductVerification) ProtoMessage() {}
 
 func (x *ProductVerification) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[1]
+	mi := &file_return_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,7 +220,7 @@ func (x *ProductVerification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductVerification.ProtoReflect.Descriptor instead.
 func (*ProductVerification) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{1}
+	return file_return_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ProductVerification) GetId() string {
@@ -307,7 +307,7 @@ type RequestReturnRequest struct {
 
 func (x *RequestReturnRequest) Reset() {
 	*x = RequestReturnRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[2]
+	mi := &file_return_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +319,7 @@ func (x *RequestReturnRequest) String() string {
 func (*RequestReturnRequest) ProtoMessage() {}
 
 func (x *RequestReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[2]
+	mi := &file_return_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +332,7 @@ func (x *RequestReturnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestReturnRequest.ProtoReflect.Descriptor instead.
 func (*RequestReturnRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{2}
+	return file_return_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RequestReturnRequest) GetOrderId() string {
@@ -386,7 +386,7 @@ type RequestReturnResponse struct {
 
 func (x *RequestReturnResponse) Reset() {
 	*x = RequestReturnResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[3]
+	mi := &file_return_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -398,7 +398,7 @@ func (x *RequestReturnResponse) String() string {
 func (*RequestReturnResponse) ProtoMessage() {}
 
 func (x *RequestReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[3]
+	mi := &file_return_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -411,7 +411,7 @@ func (x *RequestReturnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RequestReturnResponse.ProtoReflect.Descriptor instead.
 func (*RequestReturnResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{3}
+	return file_return_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RequestReturnResponse) GetReturnOrder() *ReturnOrder {
@@ -430,7 +430,7 @@ type GetReturnRequest struct {
 
 func (x *GetReturnRequest) Reset() {
 	*x = GetReturnRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[4]
+	mi := &file_return_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -442,7 +442,7 @@ func (x *GetReturnRequest) String() string {
 func (*GetReturnRequest) ProtoMessage() {}
 
 func (x *GetReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[4]
+	mi := &file_return_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -455,7 +455,7 @@ func (x *GetReturnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReturnRequest.ProtoReflect.Descriptor instead.
 func (*GetReturnRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{4}
+	return file_return_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetReturnRequest) GetId() string {
@@ -474,7 +474,7 @@ type GetReturnResponse struct {
 
 func (x *GetReturnResponse) Reset() {
 	*x = GetReturnResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[5]
+	mi := &file_return_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +486,7 @@ func (x *GetReturnResponse) String() string {
 func (*GetReturnResponse) ProtoMessage() {}
 
 func (x *GetReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[5]
+	mi := &file_return_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +499,7 @@ func (x *GetReturnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReturnResponse.ProtoReflect.Descriptor instead.
 func (*GetReturnResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{5}
+	return file_return_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetReturnResponse) GetReturnOrder() *ReturnOrder {
@@ -521,7 +521,7 @@ type UpdateReturnStatusRequest struct {
 
 func (x *UpdateReturnStatusRequest) Reset() {
 	*x = UpdateReturnStatusRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[6]
+	mi := &file_return_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -533,7 +533,7 @@ func (x *UpdateReturnStatusRequest) String() string {
 func (*UpdateReturnStatusRequest) ProtoMessage() {}
 
 func (x *UpdateReturnStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[6]
+	mi := &file_return_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -546,7 +546,7 @@ func (x *UpdateReturnStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReturnStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateReturnStatusRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{6}
+	return file_return_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateReturnStatusRequest) GetId() string {
@@ -586,7 +586,7 @@ type UpdateReturnStatusResponse struct {
 
 func (x *UpdateReturnStatusResponse) Reset() {
 	*x = UpdateReturnStatusResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[7]
+	mi := &file_return_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -598,7 +598,7 @@ func (x *UpdateReturnStatusResponse) String() string {
 func (*UpdateReturnStatusResponse) ProtoMessage() {}
 
 func (x *UpdateReturnStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[7]
+	mi := &file_return_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -611,7 +611,7 @@ func (x *UpdateReturnStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReturnStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateReturnStatusResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{7}
+	return file_return_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateReturnStatusResponse) GetReturnOrder() *ReturnOrder {
@@ -631,7 +631,7 @@ type ApproveReturnRequest struct {
 
 func (x *ApproveReturnRequest) Reset() {
 	*x = ApproveReturnRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[8]
+	mi := &file_return_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -643,7 +643,7 @@ func (x *ApproveReturnRequest) String() string {
 func (*ApproveReturnRequest) ProtoMessage() {}
 
 func (x *ApproveReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[8]
+	mi := &file_return_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -656,7 +656,7 @@ func (x *ApproveReturnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveReturnRequest.ProtoReflect.Descriptor instead.
 func (*ApproveReturnRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{8}
+	return file_return_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ApproveReturnRequest) GetId() string {
@@ -682,7 +682,7 @@ type ApproveReturnResponse struct {
 
 func (x *ApproveReturnResponse) Reset() {
 	*x = ApproveReturnResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[9]
+	mi := &file_return_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -694,7 +694,7 @@ func (x *ApproveReturnResponse) String() string {
 func (*ApproveReturnResponse) ProtoMessage() {}
 
 func (x *ApproveReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[9]
+	mi := &file_return_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -707,7 +707,7 @@ func (x *ApproveReturnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveReturnResponse.ProtoReflect.Descriptor instead.
 func (*ApproveReturnResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{9}
+	return file_return_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ApproveReturnResponse) GetReturnOrder() *ReturnOrder {
@@ -728,7 +728,7 @@ type RejectReturnRequest struct {
 
 func (x *RejectReturnRequest) Reset() {
 	*x = RejectReturnRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[10]
+	mi := &file_return_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -740,7 +740,7 @@ func (x *RejectReturnRequest) String() string {
 func (*RejectReturnRequest) ProtoMessage() {}
 
 func (x *RejectReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[10]
+	mi := &file_return_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +753,7 @@ func (x *RejectReturnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectReturnRequest.ProtoReflect.Descriptor instead.
 func (*RejectReturnRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{10}
+	return file_return_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RejectReturnRequest) GetId() string {
@@ -786,7 +786,7 @@ type RejectReturnResponse struct {
 
 func (x *RejectReturnResponse) Reset() {
 	*x = RejectReturnResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[11]
+	mi := &file_return_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -798,7 +798,7 @@ func (x *RejectReturnResponse) String() string {
 func (*RejectReturnResponse) ProtoMessage() {}
 
 func (x *RejectReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[11]
+	mi := &file_return_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -811,7 +811,7 @@ func (x *RejectReturnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectReturnResponse.ProtoReflect.Descriptor instead.
 func (*RejectReturnResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{11}
+	return file_return_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RejectReturnResponse) GetReturnOrder() *ReturnOrder {
@@ -835,7 +835,7 @@ type VerifyProductRequest struct {
 
 func (x *VerifyProductRequest) Reset() {
 	*x = VerifyProductRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[12]
+	mi := &file_return_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -847,7 +847,7 @@ func (x *VerifyProductRequest) String() string {
 func (*VerifyProductRequest) ProtoMessage() {}
 
 func (x *VerifyProductRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[12]
+	mi := &file_return_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -860,7 +860,7 @@ func (x *VerifyProductRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyProductRequest.ProtoReflect.Descriptor instead.
 func (*VerifyProductRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{12}
+	return file_return_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *VerifyProductRequest) GetReturnId() string {
@@ -915,7 +915,7 @@ type VerifyProductResponse struct {
 
 func (x *VerifyProductResponse) Reset() {
 	*x = VerifyProductResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[13]
+	mi := &file_return_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -927,7 +927,7 @@ func (x *VerifyProductResponse) String() string {
 func (*VerifyProductResponse) ProtoMessage() {}
 
 func (x *VerifyProductResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[13]
+	mi := &file_return_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -940,7 +940,7 @@ func (x *VerifyProductResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyProductResponse.ProtoReflect.Descriptor instead.
 func (*VerifyProductResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{13}
+	return file_return_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *VerifyProductResponse) GetReturnOrder() *ReturnOrder {
@@ -970,7 +970,7 @@ type ListReturnsRequest struct {
 
 func (x *ListReturnsRequest) Reset() {
 	*x = ListReturnsRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[14]
+	mi := &file_return_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -982,7 +982,7 @@ func (x *ListReturnsRequest) String() string {
 func (*ListReturnsRequest) ProtoMessage() {}
 
 func (x *ListReturnsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[14]
+	mi := &file_return_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -995,7 +995,7 @@ func (x *ListReturnsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReturnsRequest.ProtoReflect.Descriptor instead.
 func (*ListReturnsRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{14}
+	return file_return_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListReturnsRequest) GetLimit() int32 {
@@ -1043,7 +1043,7 @@ type ListReturnsResponse struct {
 
 func (x *ListReturnsResponse) Reset() {
 	*x = ListReturnsResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[15]
+	mi := &file_return_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1055,7 +1055,7 @@ func (x *ListReturnsResponse) String() string {
 func (*ListReturnsResponse) ProtoMessage() {}
 
 func (x *ListReturnsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[15]
+	mi := &file_return_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1068,7 +1068,7 @@ func (x *ListReturnsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReturnsResponse.ProtoReflect.Descriptor instead.
 func (*ListReturnsResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{15}
+	return file_return_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ListReturnsResponse) GetReturns() []*ReturnOrder {
@@ -1094,7 +1094,7 @@ type GetReturnsByOrderRequest struct {
 
 func (x *GetReturnsByOrderRequest) Reset() {
 	*x = GetReturnsByOrderRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[16]
+	mi := &file_return_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1106,7 +1106,7 @@ func (x *GetReturnsByOrderRequest) String() string {
 func (*GetReturnsByOrderRequest) ProtoMessage() {}
 
 func (x *GetReturnsByOrderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[16]
+	mi := &file_return_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1119,7 +1119,7 @@ func (x *GetReturnsByOrderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReturnsByOrderRequest.ProtoReflect.Descriptor instead.
 func (*GetReturnsByOrderRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{16}
+	return file_return_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetReturnsByOrderRequest) GetOrderId() string {
@@ -1138,7 +1138,7 @@ type GetReturnsByOrderResponse struct {
 
 func (x *GetReturnsByOrderResponse) Reset() {
 	*x = GetReturnsByOrderResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[17]
+	mi := &file_return_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1150,7 +1150,7 @@ func (x *GetReturnsByOrderResponse) String() string {
 func (*GetReturnsByOrderResponse) ProtoMessage() {}
 
 func (x *GetReturnsByOrderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[17]
+	mi := &file_return_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1163,7 +1163,7 @@ func (x *GetReturnsByOrderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReturnsByOrderResponse.ProtoReflect.Descriptor instead.
 func (*GetReturnsByOrderResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{17}
+	return file_return_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetReturnsByOrderResponse) GetReturns() []*ReturnOrder {
@@ -1187,7 +1187,7 @@ type ExchangeQuestionAnswer struct {
 
 func (x *ExchangeQuestionAnswer) Reset() {
 	*x = ExchangeQuestionAnswer{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[18]
+	mi := &file_return_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1199,7 +1199,7 @@ func (x *ExchangeQuestionAnswer) String() string {
 func (*ExchangeQuestionAnswer) ProtoMessage() {}
 
 func (x *ExchangeQuestionAnswer) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[18]
+	mi := &file_return_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1212,7 +1212,7 @@ func (x *ExchangeQuestionAnswer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExchangeQuestionAnswer.ProtoReflect.Descriptor instead.
 func (*ExchangeQuestionAnswer) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{18}
+	return file_return_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ExchangeQuestionAnswer) GetId() string {
@@ -1280,7 +1280,7 @@ type ExchangeVerification struct {
 
 func (x *ExchangeVerification) Reset() {
 	*x = ExchangeVerification{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[19]
+	mi := &file_return_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1292,7 +1292,7 @@ func (x *ExchangeVerification) String() string {
 func (*ExchangeVerification) ProtoMessage() {}
 
 func (x *ExchangeVerification) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[19]
+	mi := &file_return_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1305,7 +1305,7 @@ func (x *ExchangeVerification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExchangeVerification.ProtoReflect.Descriptor instead.
 func (*ExchangeVerification) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{19}
+	return file_return_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ExchangeVerification) GetId() string {
@@ -1414,32 +1414,35 @@ func (x *ExchangeVerification) GetUpdatedAt() string {
 }
 
 type Exchange struct {
-	state             protoimpl.MessageState    `protogen:"open.v1"`
-	Id                string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OrderId           string                    `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
-	OrderItemId       string                    `protobuf:"bytes,3,opt,name=order_item_id,json=orderItemId,proto3" json:"order_item_id,omitempty"`
-	UserId            string                    `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	NewProductId      string                    `protobuf:"bytes,5,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
-	OldBrand          string                    `protobuf:"bytes,6,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
-	OldModel          string                    `protobuf:"bytes,7,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
-	OldVariant        string                    `protobuf:"bytes,8,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
-	SerialOrImei      string                    `protobuf:"bytes,9,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
-	BaseExchangeValue float64                   `protobuf:"fixed64,10,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
-	EstimatedDiscount float64                   `protobuf:"fixed64,11,opt,name=estimated_discount,json=estimatedDiscount,proto3" json:"estimated_discount,omitempty"`
-	FinalDiscount     float64                   `protobuf:"fixed64,12,opt,name=final_discount,json=finalDiscount,proto3" json:"final_discount,omitempty"`
-	PriceDifference   float64                   `protobuf:"fixed64,13,opt,name=price_difference,json=priceDifference,proto3" json:"price_difference,omitempty"`
-	Status            string                    `protobuf:"bytes,14,opt,name=status,proto3" json:"status,omitempty"`
-	Answers           []*ExchangeQuestionAnswer `protobuf:"bytes,15,rep,name=answers,proto3" json:"answers,omitempty"`
-	Verification      *ExchangeVerification     `protobuf:"bytes,16,opt,name=verification,proto3" json:"verification,omitempty"`
-	CreatedAt         string                    `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt         string                    `protobuf:"bytes,18,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                   protoimpl.MessageState    `protogen:"open.v1"`
+	Id                      string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrderId                 string                    `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	OrderItemId             string                    `protobuf:"bytes,3,opt,name=order_item_id,json=orderItemId,proto3" json:"order_item_id,omitempty"`
+	UserId                  string                    `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NewProductId            string                    `protobuf:"bytes,5,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
+	OldBrand                string                    `protobuf:"bytes,6,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
+	OldModel                string                    `protobuf:"bytes,7,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
+	OldVariant              string                    `protobuf:"bytes,8,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
+	SerialOrImei            string                    `protobuf:"bytes,9,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
+	BaseExchangeValue       float64                   `protobuf:"fixed64,10,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
+	EstimatedDiscount       float64                   `protobuf:"fixed64,11,opt,name=estimated_discount,json=estimatedDiscount,proto3" json:"estimated_discount,omitempty"`
+	FinalDiscount           float64                   `protobuf:"fixed64,12,opt,name=final_discount,json=finalDiscount,proto3" json:"final_discount,omitempty"`
+	PriceDifference         float64                   `protobuf:"fixed64,13,opt,name=price_difference,json=priceDifference,proto3" json:"price_difference,omitempty"`
+	Status                  string                    `protobuf:"bytes,14,opt,name=status,proto3" json:"status,omitempty"`
+	Answers                 []*ExchangeQuestionAnswer `protobuf:"bytes,15,rep,name=answers,proto3" json:"answers,omitempty"`
+	Verification            *ExchangeVerification     `protobuf:"bytes,16,opt,name=verification,proto3" json:"verification,omitempty"`
+	CreatedAt               string                    `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt               string                    `protobuf:"bytes,18,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	QuoteId                 string                    `protobuf:"bytes,19,opt,name=quote_id,json=quoteId,proto3" json:"quote_id,omitempty"`
+	ProductId               string                    `protobuf:"bytes,20,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ExchangeDeviceCatalogId string                    `protobuf:"bytes,21,opt,name=exchange_device_catalog_id,json=exchangeDeviceCatalogId,proto3" json:"exchange_device_catalog_id,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Exchange) Reset() {
 	*x = Exchange{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[20]
+	mi := &file_return_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1451,7 +1454,7 @@ func (x *Exchange) String() string {
 func (*Exchange) ProtoMessage() {}
 
 func (x *Exchange) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[20]
+	mi := &file_return_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1464,7 +1467,7 @@ func (x *Exchange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Exchange.ProtoReflect.Descriptor instead.
 func (*Exchange) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{20}
+	return file_return_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Exchange) GetId() string {
@@ -1593,25 +1596,44 @@ func (x *Exchange) GetUpdatedAt() string {
 	return ""
 }
 
+func (x *Exchange) GetQuoteId() string {
+	if x != nil {
+		return x.QuoteId
+	}
+	return ""
+}
+
+func (x *Exchange) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *Exchange) GetExchangeDeviceCatalogId() string {
+	if x != nil {
+		return x.ExchangeDeviceCatalogId
+	}
+	return ""
+}
+
 type CreateExchangeRequest struct {
-	state             protoimpl.MessageState    `protogen:"open.v1"`
-	OrderId           string                    `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
-	OrderItemId       string                    `protobuf:"bytes,2,opt,name=order_item_id,json=orderItemId,proto3" json:"order_item_id,omitempty"`
-	UserId            string                    `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	NewProductId      string                    `protobuf:"bytes,4,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
-	OldBrand          string                    `protobuf:"bytes,5,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
-	OldModel          string                    `protobuf:"bytes,6,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
-	OldVariant        string                    `protobuf:"bytes,7,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
-	SerialOrImei      string                    `protobuf:"bytes,8,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
-	BaseExchangeValue float64                   `protobuf:"fixed64,9,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
-	Answers           []*ExchangeQuestionAnswer `protobuf:"bytes,10,rep,name=answers,proto3" json:"answers,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                   protoimpl.MessageState    `protogen:"open.v1"`
+	UserId                  string                    `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	OldBrand                string                    `protobuf:"bytes,5,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
+	OldModel                string                    `protobuf:"bytes,6,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
+	OldVariant              string                    `protobuf:"bytes,7,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
+	SerialOrImei            string                    `protobuf:"bytes,8,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
+	Answers                 []*ExchangeQuestionAnswer `protobuf:"bytes,10,rep,name=answers,proto3" json:"answers,omitempty"`
+	ExchangeDeviceCatalogId string                    `protobuf:"bytes,11,opt,name=exchange_device_catalog_id,json=exchangeDeviceCatalogId,proto3" json:"exchange_device_catalog_id,omitempty"`
+	ProductId               string                    `protobuf:"bytes,12,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *CreateExchangeRequest) Reset() {
 	*x = CreateExchangeRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[21]
+	mi := &file_return_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1623,7 +1645,7 @@ func (x *CreateExchangeRequest) String() string {
 func (*CreateExchangeRequest) ProtoMessage() {}
 
 func (x *CreateExchangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[21]
+	mi := &file_return_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1636,33 +1658,12 @@ func (x *CreateExchangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateExchangeRequest.ProtoReflect.Descriptor instead.
 func (*CreateExchangeRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *CreateExchangeRequest) GetOrderId() string {
-	if x != nil {
-		return x.OrderId
-	}
-	return ""
-}
-
-func (x *CreateExchangeRequest) GetOrderItemId() string {
-	if x != nil {
-		return x.OrderItemId
-	}
-	return ""
+	return file_return_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *CreateExchangeRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
-	}
-	return ""
-}
-
-func (x *CreateExchangeRequest) GetNewProductId() string {
-	if x != nil {
-		return x.NewProductId
 	}
 	return ""
 }
@@ -1695,18 +1696,25 @@ func (x *CreateExchangeRequest) GetSerialOrImei() string {
 	return ""
 }
 
-func (x *CreateExchangeRequest) GetBaseExchangeValue() float64 {
-	if x != nil {
-		return x.BaseExchangeValue
-	}
-	return 0
-}
-
 func (x *CreateExchangeRequest) GetAnswers() []*ExchangeQuestionAnswer {
 	if x != nil {
 		return x.Answers
 	}
 	return nil
+}
+
+func (x *CreateExchangeRequest) GetExchangeDeviceCatalogId() string {
+	if x != nil {
+		return x.ExchangeDeviceCatalogId
+	}
+	return ""
+}
+
+func (x *CreateExchangeRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
 }
 
 type CreateExchangeResponse struct {
@@ -1718,7 +1726,7 @@ type CreateExchangeResponse struct {
 
 func (x *CreateExchangeResponse) Reset() {
 	*x = CreateExchangeResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[22]
+	mi := &file_return_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1730,7 +1738,7 @@ func (x *CreateExchangeResponse) String() string {
 func (*CreateExchangeResponse) ProtoMessage() {}
 
 func (x *CreateExchangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[22]
+	mi := &file_return_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1743,7 +1751,7 @@ func (x *CreateExchangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateExchangeResponse.ProtoReflect.Descriptor instead.
 func (*CreateExchangeResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{22}
+	return file_return_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CreateExchangeResponse) GetExchange() *Exchange {
@@ -1763,7 +1771,7 @@ type GetExchangeRequest struct {
 
 func (x *GetExchangeRequest) Reset() {
 	*x = GetExchangeRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[23]
+	mi := &file_return_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1775,7 +1783,7 @@ func (x *GetExchangeRequest) String() string {
 func (*GetExchangeRequest) ProtoMessage() {}
 
 func (x *GetExchangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[23]
+	mi := &file_return_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1788,7 +1796,7 @@ func (x *GetExchangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExchangeRequest.ProtoReflect.Descriptor instead.
 func (*GetExchangeRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{23}
+	return file_return_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetExchangeRequest) GetId() string {
@@ -1814,7 +1822,7 @@ type GetExchangeResponse struct {
 
 func (x *GetExchangeResponse) Reset() {
 	*x = GetExchangeResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[24]
+	mi := &file_return_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1826,7 +1834,7 @@ func (x *GetExchangeResponse) String() string {
 func (*GetExchangeResponse) ProtoMessage() {}
 
 func (x *GetExchangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[24]
+	mi := &file_return_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1839,7 +1847,7 @@ func (x *GetExchangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExchangeResponse.ProtoReflect.Descriptor instead.
 func (*GetExchangeResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{24}
+	return file_return_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetExchangeResponse) GetExchange() *Exchange {
@@ -1868,7 +1876,7 @@ type VerifyExchangeProductRequest struct {
 
 func (x *VerifyExchangeProductRequest) Reset() {
 	*x = VerifyExchangeProductRequest{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[25]
+	mi := &file_return_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1880,7 +1888,7 @@ func (x *VerifyExchangeProductRequest) String() string {
 func (*VerifyExchangeProductRequest) ProtoMessage() {}
 
 func (x *VerifyExchangeProductRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[25]
+	mi := &file_return_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1893,7 +1901,7 @@ func (x *VerifyExchangeProductRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyExchangeProductRequest.ProtoReflect.Descriptor instead.
 func (*VerifyExchangeProductRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{25}
+	return file_return_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *VerifyExchangeProductRequest) GetExchangeId() string {
@@ -1983,7 +1991,7 @@ type VerifyExchangeProductResponse struct {
 
 func (x *VerifyExchangeProductResponse) Reset() {
 	*x = VerifyExchangeProductResponse{}
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[26]
+	mi := &file_return_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1995,7 +2003,7 @@ func (x *VerifyExchangeProductResponse) String() string {
 func (*VerifyExchangeProductResponse) ProtoMessage() {}
 
 func (x *VerifyExchangeProductResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_return_return_proto_msgTypes[26]
+	mi := &file_return_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2008,7 +2016,7 @@ func (x *VerifyExchangeProductResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyExchangeProductResponse.ProtoReflect.Descriptor instead.
 func (*VerifyExchangeProductResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_return_return_proto_rawDescGZIP(), []int{26}
+	return file_return_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *VerifyExchangeProductResponse) GetExchange() *Exchange {
@@ -2025,11 +2033,1399 @@ func (x *VerifyExchangeProductResponse) GetVerification() *ExchangeVerification 
 	return nil
 }
 
-var File_contracts_protobuf_return_return_proto protoreflect.FileDescriptor
+type ExchangeQuestionOption struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	QuestionId          string                 `protobuf:"bytes,2,opt,name=question_id,json=questionId,proto3" json:"question_id,omitempty"`
+	OptionKey           string                 `protobuf:"bytes,3,opt,name=option_key,json=optionKey,proto3" json:"option_key,omitempty"`
+	OptionLabel         string                 `protobuf:"bytes,4,opt,name=option_label,json=optionLabel,proto3" json:"option_label,omitempty"`
+	DeductionAmount     float64                `protobuf:"fixed64,5,opt,name=deduction_amount,json=deductionAmount,proto3" json:"deduction_amount,omitempty"`
+	IsFatalDisqualifier bool                   `protobuf:"varint,6,opt,name=is_fatal_disqualifier,json=isFatalDisqualifier,proto3" json:"is_fatal_disqualifier,omitempty"`
+	RejectionReason     string                 `protobuf:"bytes,7,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	DisplayOrder        int32                  `protobuf:"varint,8,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
 
-const file_contracts_protobuf_return_return_proto_rawDesc = "" +
+func (x *ExchangeQuestionOption) Reset() {
+	*x = ExchangeQuestionOption{}
+	mi := &file_return_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeQuestionOption) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeQuestionOption) ProtoMessage() {}
+
+func (x *ExchangeQuestionOption) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeQuestionOption.ProtoReflect.Descriptor instead.
+func (*ExchangeQuestionOption) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ExchangeQuestionOption) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExchangeQuestionOption) GetQuestionId() string {
+	if x != nil {
+		return x.QuestionId
+	}
+	return ""
+}
+
+func (x *ExchangeQuestionOption) GetOptionKey() string {
+	if x != nil {
+		return x.OptionKey
+	}
+	return ""
+}
+
+func (x *ExchangeQuestionOption) GetOptionLabel() string {
+	if x != nil {
+		return x.OptionLabel
+	}
+	return ""
+}
+
+func (x *ExchangeQuestionOption) GetDeductionAmount() float64 {
+	if x != nil {
+		return x.DeductionAmount
+	}
+	return 0
+}
+
+func (x *ExchangeQuestionOption) GetIsFatalDisqualifier() bool {
+	if x != nil {
+		return x.IsFatalDisqualifier
+	}
+	return false
+}
+
+func (x *ExchangeQuestionOption) GetRejectionReason() string {
+	if x != nil {
+		return x.RejectionReason
+	}
+	return ""
+}
+
+func (x *ExchangeQuestionOption) GetDisplayOrder() int32 {
+	if x != nil {
+		return x.DisplayOrder
+	}
+	return 0
+}
+
+type ExchangeDiagnosticQuestion struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Id            string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CategoryCode  string                    `protobuf:"bytes,2,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	QuestionKey   string                    `protobuf:"bytes,3,opt,name=question_key,json=questionKey,proto3" json:"question_key,omitempty"`
+	QuestionText  string                    `protobuf:"bytes,4,opt,name=question_text,json=questionText,proto3" json:"question_text,omitempty"`
+	DisplayOrder  int32                     `protobuf:"varint,5,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
+	Options       []*ExchangeQuestionOption `protobuf:"bytes,6,rep,name=options,proto3" json:"options,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExchangeDiagnosticQuestion) Reset() {
+	*x = ExchangeDiagnosticQuestion{}
+	mi := &file_return_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeDiagnosticQuestion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeDiagnosticQuestion) ProtoMessage() {}
+
+func (x *ExchangeDiagnosticQuestion) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeDiagnosticQuestion.ProtoReflect.Descriptor instead.
+func (*ExchangeDiagnosticQuestion) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ExchangeDiagnosticQuestion) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExchangeDiagnosticQuestion) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *ExchangeDiagnosticQuestion) GetQuestionKey() string {
+	if x != nil {
+		return x.QuestionKey
+	}
+	return ""
+}
+
+func (x *ExchangeDiagnosticQuestion) GetQuestionText() string {
+	if x != nil {
+		return x.QuestionText
+	}
+	return ""
+}
+
+func (x *ExchangeDiagnosticQuestion) GetDisplayOrder() int32 {
+	if x != nil {
+		return x.DisplayOrder
+	}
+	return 0
+}
+
+func (x *ExchangeDiagnosticQuestion) GetOptions() []*ExchangeQuestionOption {
+	if x != nil {
+		return x.Options
+	}
+	return nil
+}
+
+type ExchangeDeviceOption struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CategoryCode      string                 `protobuf:"bytes,2,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	Brand             string                 `protobuf:"bytes,3,opt,name=brand,proto3" json:"brand,omitempty"`
+	Model             string                 `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
+	Variant           string                 `protobuf:"bytes,5,opt,name=variant,proto3" json:"variant,omitempty"`
+	BaseExchangeValue float64                `protobuf:"fixed64,6,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ExchangeDeviceOption) Reset() {
+	*x = ExchangeDeviceOption{}
+	mi := &file_return_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeDeviceOption) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeDeviceOption) ProtoMessage() {}
+
+func (x *ExchangeDeviceOption) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeDeviceOption.ProtoReflect.Descriptor instead.
+func (*ExchangeDeviceOption) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ExchangeDeviceOption) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExchangeDeviceOption) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *ExchangeDeviceOption) GetBrand() string {
+	if x != nil {
+		return x.Brand
+	}
+	return ""
+}
+
+func (x *ExchangeDeviceOption) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *ExchangeDeviceOption) GetVariant() string {
+	if x != nil {
+		return x.Variant
+	}
+	return ""
+}
+
+func (x *ExchangeDeviceOption) GetBaseExchangeValue() float64 {
+	if x != nil {
+		return x.BaseExchangeValue
+	}
+	return 0
+}
+
+type GetExchangeQuestionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CategoryCode  string                 `protobuf:"bytes,1,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	ProductId     *string                `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3,oneof" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExchangeQuestionsRequest) Reset() {
+	*x = GetExchangeQuestionsRequest{}
+	mi := &file_return_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExchangeQuestionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExchangeQuestionsRequest) ProtoMessage() {}
+
+func (x *GetExchangeQuestionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExchangeQuestionsRequest.ProtoReflect.Descriptor instead.
+func (*GetExchangeQuestionsRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *GetExchangeQuestionsRequest) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *GetExchangeQuestionsRequest) GetProductId() string {
+	if x != nil && x.ProductId != nil {
+		return *x.ProductId
+	}
+	return ""
+}
+
+type GetExchangeQuestionsResponse struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Questions     []*ExchangeDiagnosticQuestion `protobuf:"bytes,1,rep,name=questions,proto3" json:"questions,omitempty"`
+	Devices       []*ExchangeDeviceOption       `protobuf:"bytes,2,rep,name=devices,proto3" json:"devices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExchangeQuestionsResponse) Reset() {
+	*x = GetExchangeQuestionsResponse{}
+	mi := &file_return_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExchangeQuestionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExchangeQuestionsResponse) ProtoMessage() {}
+
+func (x *GetExchangeQuestionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExchangeQuestionsResponse.ProtoReflect.Descriptor instead.
+func (*GetExchangeQuestionsResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *GetExchangeQuestionsResponse) GetQuestions() []*ExchangeDiagnosticQuestion {
+	if x != nil {
+		return x.Questions
+	}
+	return nil
+}
+
+func (x *GetExchangeQuestionsResponse) GetDevices() []*ExchangeDeviceOption {
+	if x != nil {
+		return x.Devices
+	}
+	return nil
+}
+
+type ExchangeUserAnswer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	QuestionKey   string                 `protobuf:"bytes,1,opt,name=question_key,json=questionKey,proto3" json:"question_key,omitempty"`
+	OptionKey     string                 `protobuf:"bytes,2,opt,name=option_key,json=optionKey,proto3" json:"option_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExchangeUserAnswer) Reset() {
+	*x = ExchangeUserAnswer{}
+	mi := &file_return_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeUserAnswer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeUserAnswer) ProtoMessage() {}
+
+func (x *ExchangeUserAnswer) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeUserAnswer.ProtoReflect.Descriptor instead.
+func (*ExchangeUserAnswer) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ExchangeUserAnswer) GetQuestionKey() string {
+	if x != nil {
+		return x.QuestionKey
+	}
+	return ""
+}
+
+func (x *ExchangeUserAnswer) GetOptionKey() string {
+	if x != nil {
+		return x.OptionKey
+	}
+	return ""
+}
+
+type ExchangeDeductionDetail struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	QuestionKey     string                 `protobuf:"bytes,1,opt,name=question_key,json=questionKey,proto3" json:"question_key,omitempty"`
+	OptionKey       string                 `protobuf:"bytes,2,opt,name=option_key,json=optionKey,proto3" json:"option_key,omitempty"`
+	DeductionAmount float64                `protobuf:"fixed64,3,opt,name=deduction_amount,json=deductionAmount,proto3" json:"deduction_amount,omitempty"`
+	IsFatal         bool                   `protobuf:"varint,4,opt,name=is_fatal,json=isFatal,proto3" json:"is_fatal,omitempty"`
+	RejectionReason string                 `protobuf:"bytes,5,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ExchangeDeductionDetail) Reset() {
+	*x = ExchangeDeductionDetail{}
+	mi := &file_return_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeDeductionDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeDeductionDetail) ProtoMessage() {}
+
+func (x *ExchangeDeductionDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeDeductionDetail.ProtoReflect.Descriptor instead.
+func (*ExchangeDeductionDetail) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ExchangeDeductionDetail) GetQuestionKey() string {
+	if x != nil {
+		return x.QuestionKey
+	}
+	return ""
+}
+
+func (x *ExchangeDeductionDetail) GetOptionKey() string {
+	if x != nil {
+		return x.OptionKey
+	}
+	return ""
+}
+
+func (x *ExchangeDeductionDetail) GetDeductionAmount() float64 {
+	if x != nil {
+		return x.DeductionAmount
+	}
+	return 0
+}
+
+func (x *ExchangeDeductionDetail) GetIsFatal() bool {
+	if x != nil {
+		return x.IsFatal
+	}
+	return false
+}
+
+func (x *ExchangeDeductionDetail) GetRejectionReason() string {
+	if x != nil {
+		return x.RejectionReason
+	}
+	return ""
+}
+
+type CalculateExchangeValuationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NewProductId  string                 `protobuf:"bytes,1,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
+	CategoryCode  string                 `protobuf:"bytes,2,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	OldBrand      string                 `protobuf:"bytes,3,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
+	OldModel      string                 `protobuf:"bytes,4,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
+	OldVariant    string                 `protobuf:"bytes,5,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
+	Answers       []*ExchangeUserAnswer  `protobuf:"bytes,6,rep,name=answers,proto3" json:"answers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CalculateExchangeValuationRequest) Reset() {
+	*x = CalculateExchangeValuationRequest{}
+	mi := &file_return_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateExchangeValuationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateExchangeValuationRequest) ProtoMessage() {}
+
+func (x *CalculateExchangeValuationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateExchangeValuationRequest.ProtoReflect.Descriptor instead.
+func (*CalculateExchangeValuationRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *CalculateExchangeValuationRequest) GetNewProductId() string {
+	if x != nil {
+		return x.NewProductId
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationRequest) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationRequest) GetOldBrand() string {
+	if x != nil {
+		return x.OldBrand
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationRequest) GetOldModel() string {
+	if x != nil {
+		return x.OldModel
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationRequest) GetOldVariant() string {
+	if x != nil {
+		return x.OldVariant
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationRequest) GetAnswers() []*ExchangeUserAnswer {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
+type CalculateExchangeValuationResponse struct {
+	state             protoimpl.MessageState     `protogen:"open.v1"`
+	IsEligible        bool                       `protobuf:"varint,1,opt,name=is_eligible,json=isEligible,proto3" json:"is_eligible,omitempty"`
+	RejectionReason   string                     `protobuf:"bytes,2,opt,name=rejection_reason,json=rejectionReason,proto3" json:"rejection_reason,omitempty"`
+	BaseExchangeValue float64                    `protobuf:"fixed64,3,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
+	TotalDeductions   float64                    `protobuf:"fixed64,4,opt,name=total_deductions,json=totalDeductions,proto3" json:"total_deductions,omitempty"`
+	FinalDiscount     float64                    `protobuf:"fixed64,5,opt,name=final_discount,json=finalDiscount,proto3" json:"final_discount,omitempty"`
+	Deductions        []*ExchangeDeductionDetail `protobuf:"bytes,6,rep,name=deductions,proto3" json:"deductions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CalculateExchangeValuationResponse) Reset() {
+	*x = CalculateExchangeValuationResponse{}
+	mi := &file_return_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateExchangeValuationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateExchangeValuationResponse) ProtoMessage() {}
+
+func (x *CalculateExchangeValuationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateExchangeValuationResponse.ProtoReflect.Descriptor instead.
+func (*CalculateExchangeValuationResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *CalculateExchangeValuationResponse) GetIsEligible() bool {
+	if x != nil {
+		return x.IsEligible
+	}
+	return false
+}
+
+func (x *CalculateExchangeValuationResponse) GetRejectionReason() string {
+	if x != nil {
+		return x.RejectionReason
+	}
+	return ""
+}
+
+func (x *CalculateExchangeValuationResponse) GetBaseExchangeValue() float64 {
+	if x != nil {
+		return x.BaseExchangeValue
+	}
+	return 0
+}
+
+func (x *CalculateExchangeValuationResponse) GetTotalDeductions() float64 {
+	if x != nil {
+		return x.TotalDeductions
+	}
+	return 0
+}
+
+func (x *CalculateExchangeValuationResponse) GetFinalDiscount() float64 {
+	if x != nil {
+		return x.FinalDiscount
+	}
+	return 0
+}
+
+func (x *CalculateExchangeValuationResponse) GetDeductions() []*ExchangeDeductionDetail {
+	if x != nil {
+		return x.Deductions
+	}
+	return nil
+}
+
+type ExchangeQuoteAnswer struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	QuoteId         string                 `protobuf:"bytes,2,opt,name=quote_id,json=quoteId,proto3" json:"quote_id,omitempty"`
+	QuestionKey     string                 `protobuf:"bytes,3,opt,name=question_key,json=questionKey,proto3" json:"question_key,omitempty"`
+	OptionKey       string                 `protobuf:"bytes,4,opt,name=option_key,json=optionKey,proto3" json:"option_key,omitempty"`
+	DeductionAmount float64                `protobuf:"fixed64,5,opt,name=deduction_amount,json=deductionAmount,proto3" json:"deduction_amount,omitempty"`
+	IsFatal         bool                   `protobuf:"varint,6,opt,name=is_fatal,json=isFatal,proto3" json:"is_fatal,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ExchangeQuoteAnswer) Reset() {
+	*x = ExchangeQuoteAnswer{}
+	mi := &file_return_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeQuoteAnswer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeQuoteAnswer) ProtoMessage() {}
+
+func (x *ExchangeQuoteAnswer) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeQuoteAnswer.ProtoReflect.Descriptor instead.
+func (*ExchangeQuoteAnswer) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ExchangeQuoteAnswer) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExchangeQuoteAnswer) GetQuoteId() string {
+	if x != nil {
+		return x.QuoteId
+	}
+	return ""
+}
+
+func (x *ExchangeQuoteAnswer) GetQuestionKey() string {
+	if x != nil {
+		return x.QuestionKey
+	}
+	return ""
+}
+
+func (x *ExchangeQuoteAnswer) GetOptionKey() string {
+	if x != nil {
+		return x.OptionKey
+	}
+	return ""
+}
+
+func (x *ExchangeQuoteAnswer) GetDeductionAmount() float64 {
+	if x != nil {
+		return x.DeductionAmount
+	}
+	return 0
+}
+
+func (x *ExchangeQuoteAnswer) GetIsFatal() bool {
+	if x != nil {
+		return x.IsFatal
+	}
+	return false
+}
+
+type ExchangeQuote struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId                 string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NewProductId           string                 `protobuf:"bytes,3,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
+	CategoryCode           string                 `protobuf:"bytes,4,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	OldBrand               string                 `protobuf:"bytes,5,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
+	OldModel               string                 `protobuf:"bytes,6,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
+	OldVariant             string                 `protobuf:"bytes,7,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
+	SerialOrImei           string                 `protobuf:"bytes,8,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
+	BaseExchangeValue      float64                `protobuf:"fixed64,9,opt,name=base_exchange_value,json=baseExchangeValue,proto3" json:"base_exchange_value,omitempty"`
+	TotalDeductions        float64                `protobuf:"fixed64,10,opt,name=total_deductions,json=totalDeductions,proto3" json:"total_deductions,omitempty"`
+	FinalDiscount          float64                `protobuf:"fixed64,11,opt,name=final_discount,json=finalDiscount,proto3" json:"final_discount,omitempty"`
+	IsDisqualified         bool                   `protobuf:"varint,12,opt,name=is_disqualified,json=isDisqualified,proto3" json:"is_disqualified,omitempty"`
+	DisqualificationReason string                 `protobuf:"bytes,13,opt,name=disqualification_reason,json=disqualificationReason,proto3" json:"disqualification_reason,omitempty"`
+	Status                 string                 `protobuf:"bytes,14,opt,name=status,proto3" json:"status,omitempty"`
+	ExpiresAt              string                 `protobuf:"bytes,15,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Answers                []*ExchangeQuoteAnswer `protobuf:"bytes,16,rep,name=answers,proto3" json:"answers,omitempty"`
+	CreatedAt              string                 `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt              string                 `protobuf:"bytes,18,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *ExchangeQuote) Reset() {
+	*x = ExchangeQuote{}
+	mi := &file_return_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExchangeQuote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExchangeQuote) ProtoMessage() {}
+
+func (x *ExchangeQuote) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExchangeQuote.ProtoReflect.Descriptor instead.
+func (*ExchangeQuote) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ExchangeQuote) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetNewProductId() string {
+	if x != nil {
+		return x.NewProductId
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetOldBrand() string {
+	if x != nil {
+		return x.OldBrand
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetOldModel() string {
+	if x != nil {
+		return x.OldModel
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetOldVariant() string {
+	if x != nil {
+		return x.OldVariant
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetSerialOrImei() string {
+	if x != nil {
+		return x.SerialOrImei
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetBaseExchangeValue() float64 {
+	if x != nil {
+		return x.BaseExchangeValue
+	}
+	return 0
+}
+
+func (x *ExchangeQuote) GetTotalDeductions() float64 {
+	if x != nil {
+		return x.TotalDeductions
+	}
+	return 0
+}
+
+func (x *ExchangeQuote) GetFinalDiscount() float64 {
+	if x != nil {
+		return x.FinalDiscount
+	}
+	return 0
+}
+
+func (x *ExchangeQuote) GetIsDisqualified() bool {
+	if x != nil {
+		return x.IsDisqualified
+	}
+	return false
+}
+
+func (x *ExchangeQuote) GetDisqualificationReason() string {
+	if x != nil {
+		return x.DisqualificationReason
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetExpiresAt() string {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetAnswers() []*ExchangeQuoteAnswer {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
+func (x *ExchangeQuote) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *ExchangeQuote) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type LockExchangeQuoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NewProductId  string                 `protobuf:"bytes,2,opt,name=new_product_id,json=newProductId,proto3" json:"new_product_id,omitempty"`
+	CategoryCode  string                 `protobuf:"bytes,3,opt,name=category_code,json=categoryCode,proto3" json:"category_code,omitempty"`
+	OldBrand      string                 `protobuf:"bytes,4,opt,name=old_brand,json=oldBrand,proto3" json:"old_brand,omitempty"`
+	OldModel      string                 `protobuf:"bytes,5,opt,name=old_model,json=oldModel,proto3" json:"old_model,omitempty"`
+	OldVariant    string                 `protobuf:"bytes,6,opt,name=old_variant,json=oldVariant,proto3" json:"old_variant,omitempty"`
+	SerialOrImei  string                 `protobuf:"bytes,7,opt,name=serial_or_imei,json=serialOrImei,proto3" json:"serial_or_imei,omitempty"`
+	Answers       []*ExchangeUserAnswer  `protobuf:"bytes,8,rep,name=answers,proto3" json:"answers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LockExchangeQuoteRequest) Reset() {
+	*x = LockExchangeQuoteRequest{}
+	mi := &file_return_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockExchangeQuoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockExchangeQuoteRequest) ProtoMessage() {}
+
+func (x *LockExchangeQuoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockExchangeQuoteRequest.ProtoReflect.Descriptor instead.
+func (*LockExchangeQuoteRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *LockExchangeQuoteRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetNewProductId() string {
+	if x != nil {
+		return x.NewProductId
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetCategoryCode() string {
+	if x != nil {
+		return x.CategoryCode
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetOldBrand() string {
+	if x != nil {
+		return x.OldBrand
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetOldModel() string {
+	if x != nil {
+		return x.OldModel
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetOldVariant() string {
+	if x != nil {
+		return x.OldVariant
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetSerialOrImei() string {
+	if x != nil {
+		return x.SerialOrImei
+	}
+	return ""
+}
+
+func (x *LockExchangeQuoteRequest) GetAnswers() []*ExchangeUserAnswer {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
+type LockExchangeQuoteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Quote         *ExchangeQuote         `protobuf:"bytes,1,opt,name=quote,proto3" json:"quote,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LockExchangeQuoteResponse) Reset() {
+	*x = LockExchangeQuoteResponse{}
+	mi := &file_return_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockExchangeQuoteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockExchangeQuoteResponse) ProtoMessage() {}
+
+func (x *LockExchangeQuoteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockExchangeQuoteResponse.ProtoReflect.Descriptor instead.
+func (*LockExchangeQuoteResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *LockExchangeQuoteResponse) GetQuote() *ExchangeQuote {
+	if x != nil {
+		return x.Quote
+	}
+	return nil
+}
+
+type GetExchangeQuoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExchangeQuoteRequest) Reset() {
+	*x = GetExchangeQuoteRequest{}
+	mi := &file_return_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExchangeQuoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExchangeQuoteRequest) ProtoMessage() {}
+
+func (x *GetExchangeQuoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExchangeQuoteRequest.ProtoReflect.Descriptor instead.
+func (*GetExchangeQuoteRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *GetExchangeQuoteRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type GetExchangeQuoteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Quote         *ExchangeQuote         `protobuf:"bytes,1,opt,name=quote,proto3" json:"quote,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExchangeQuoteResponse) Reset() {
+	*x = GetExchangeQuoteResponse{}
+	mi := &file_return_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExchangeQuoteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExchangeQuoteResponse) ProtoMessage() {}
+
+func (x *GetExchangeQuoteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExchangeQuoteResponse.ProtoReflect.Descriptor instead.
+func (*GetExchangeQuoteResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *GetExchangeQuoteResponse) GetQuote() *ExchangeQuote {
+	if x != nil {
+		return x.Quote
+	}
+	return nil
+}
+
+type ApplyExchangeToOrderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	QuoteId       string                 `protobuf:"bytes,1,opt,name=quote_id,json=quoteId,proto3" json:"quote_id,omitempty"`
+	OrderId       string                 `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	OrderItemId   string                 `protobuf:"bytes,3,opt,name=order_item_id,json=orderItemId,proto3" json:"order_item_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyExchangeToOrderRequest) Reset() {
+	*x = ApplyExchangeToOrderRequest{}
+	mi := &file_return_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyExchangeToOrderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyExchangeToOrderRequest) ProtoMessage() {}
+
+func (x *ApplyExchangeToOrderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyExchangeToOrderRequest.ProtoReflect.Descriptor instead.
+func (*ApplyExchangeToOrderRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ApplyExchangeToOrderRequest) GetQuoteId() string {
+	if x != nil {
+		return x.QuoteId
+	}
+	return ""
+}
+
+func (x *ApplyExchangeToOrderRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *ApplyExchangeToOrderRequest) GetOrderItemId() string {
+	if x != nil {
+		return x.OrderItemId
+	}
+	return ""
+}
+
+func (x *ApplyExchangeToOrderRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ApplyExchangeToOrderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exchange      *Exchange              `protobuf:"bytes,1,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApplyExchangeToOrderResponse) Reset() {
+	*x = ApplyExchangeToOrderResponse{}
+	mi := &file_return_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApplyExchangeToOrderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApplyExchangeToOrderResponse) ProtoMessage() {}
+
+func (x *ApplyExchangeToOrderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApplyExchangeToOrderResponse.ProtoReflect.Descriptor instead.
+func (*ApplyExchangeToOrderResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ApplyExchangeToOrderResponse) GetExchange() *Exchange {
+	if x != nil {
+		return x.Exchange
+	}
+	return nil
+}
+
+type ResolveExchangeMismatchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExchangeId    string                 `protobuf:"bytes,1,opt,name=exchange_id,json=exchangeId,proto3" json:"exchange_id,omitempty"`
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	PaymentMethod string                 `protobuf:"bytes,3,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`
+	Notes         string                 `protobuf:"bytes,4,opt,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveExchangeMismatchRequest) Reset() {
+	*x = ResolveExchangeMismatchRequest{}
+	mi := &file_return_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveExchangeMismatchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveExchangeMismatchRequest) ProtoMessage() {}
+
+func (x *ResolveExchangeMismatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveExchangeMismatchRequest.ProtoReflect.Descriptor instead.
+func (*ResolveExchangeMismatchRequest) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ResolveExchangeMismatchRequest) GetExchangeId() string {
+	if x != nil {
+		return x.ExchangeId
+	}
+	return ""
+}
+
+func (x *ResolveExchangeMismatchRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *ResolveExchangeMismatchRequest) GetPaymentMethod() string {
+	if x != nil {
+		return x.PaymentMethod
+	}
+	return ""
+}
+
+func (x *ResolveExchangeMismatchRequest) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
+}
+
+type ResolveExchangeMismatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exchange      *Exchange              `protobuf:"bytes,1,opt,name=exchange,proto3" json:"exchange,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveExchangeMismatchResponse) Reset() {
+	*x = ResolveExchangeMismatchResponse{}
+	mi := &file_return_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveExchangeMismatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveExchangeMismatchResponse) ProtoMessage() {}
+
+func (x *ResolveExchangeMismatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_return_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveExchangeMismatchResponse.ProtoReflect.Descriptor instead.
+func (*ResolveExchangeMismatchResponse) Descriptor() ([]byte, []int) {
+	return file_return_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ResolveExchangeMismatchResponse) GetExchange() *Exchange {
+	if x != nil {
+		return x.Exchange
+	}
+	return nil
+}
+
+var File_return_proto protoreflect.FileDescriptor
+
+const file_return_proto_rawDesc = "" +
 	"\n" +
-	"&contracts/protobuf/return/return.proto\x12\x10gocart.return.v1\"\xf9\x03\n" +
+	"\freturn.proto\x12\x10gocart.return.v1\"\xf9\x03\n" +
 	"\vReturnOrder\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\x12\x17\n" +
@@ -2160,7 +3556,7 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x0e \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x0f \x01(\tR\tupdatedAt\"\xb0\x05\n" +
+	"updated_at\x18\x0f \x01(\tR\tupdatedAt\"\xa7\x06\n" +
 	"\bExchange\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\x12\"\n" +
@@ -2183,20 +3579,24 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x11 \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x12 \x01(\tR\tupdatedAt\"\x8a\x03\n" +
-	"\x15CreateExchangeRequest\x12\x19\n" +
-	"\border_id\x18\x01 \x01(\tR\aorderId\x12\"\n" +
-	"\rorder_item_id\x18\x02 \x01(\tR\vorderItemId\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\x12$\n" +
-	"\x0enew_product_id\x18\x04 \x01(\tR\fnewProductId\x12\x1b\n" +
+	"updated_at\x18\x12 \x01(\tR\tupdatedAt\x12\x19\n" +
+	"\bquote_id\x18\x13 \x01(\tR\aquoteId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x14 \x01(\tR\tproductId\x12;\n" +
+	"\x1aexchange_device_catalog_id\x18\x15 \x01(\tR\x17exchangeDeviceCatalogId\"\xe9\x02\n" +
+	"\x15CreateExchangeRequest\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1b\n" +
 	"\told_brand\x18\x05 \x01(\tR\boldBrand\x12\x1b\n" +
 	"\told_model\x18\x06 \x01(\tR\boldModel\x12\x1f\n" +
 	"\vold_variant\x18\a \x01(\tR\n" +
 	"oldVariant\x12$\n" +
-	"\x0eserial_or_imei\x18\b \x01(\tR\fserialOrImei\x12.\n" +
-	"\x13base_exchange_value\x18\t \x01(\x01R\x11baseExchangeValue\x12B\n" +
+	"\x0eserial_or_imei\x18\b \x01(\tR\fserialOrImei\x12B\n" +
 	"\aanswers\x18\n" +
-	" \x03(\v2(.gocart.return.v1.ExchangeQuestionAnswerR\aanswers\"P\n" +
+	" \x03(\v2(.gocart.return.v1.ExchangeQuestionAnswerR\aanswers\x12;\n" +
+	"\x1aexchange_device_catalog_id\x18\v \x01(\tR\x17exchangeDeviceCatalogId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\f \x01(\tR\tproductIdJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x04\x10\x05J\x04\b\t\x10\n" +
+	"\"P\n" +
 	"\x16CreateExchangeResponse\x126\n" +
 	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\"?\n" +
 	"\x12GetExchangeRequest\x12\x0e\n" +
@@ -2226,7 +3626,132 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\x12_adjusted_discount\"\xa3\x01\n" +
 	"\x1dVerifyExchangeProductResponse\x126\n" +
 	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\x12J\n" +
-	"\fverification\x18\x02 \x01(\v2&.gocart.return.v1.ExchangeVerificationR\fverification2\xe0\b\n" +
+	"\fverification\x18\x02 \x01(\v2&.gocart.return.v1.ExchangeVerificationR\fverification\"\xba\x02\n" +
+	"\x16ExchangeQuestionOption\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vquestion_id\x18\x02 \x01(\tR\n" +
+	"questionId\x12\x1d\n" +
+	"\n" +
+	"option_key\x18\x03 \x01(\tR\toptionKey\x12!\n" +
+	"\foption_label\x18\x04 \x01(\tR\voptionLabel\x12)\n" +
+	"\x10deduction_amount\x18\x05 \x01(\x01R\x0fdeductionAmount\x122\n" +
+	"\x15is_fatal_disqualifier\x18\x06 \x01(\bR\x13isFatalDisqualifier\x12)\n" +
+	"\x10rejection_reason\x18\a \x01(\tR\x0frejectionReason\x12#\n" +
+	"\rdisplay_order\x18\b \x01(\x05R\fdisplayOrder\"\x82\x02\n" +
+	"\x1aExchangeDiagnosticQuestion\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rcategory_code\x18\x02 \x01(\tR\fcategoryCode\x12!\n" +
+	"\fquestion_key\x18\x03 \x01(\tR\vquestionKey\x12#\n" +
+	"\rquestion_text\x18\x04 \x01(\tR\fquestionText\x12#\n" +
+	"\rdisplay_order\x18\x05 \x01(\x05R\fdisplayOrder\x12B\n" +
+	"\aoptions\x18\x06 \x03(\v2(.gocart.return.v1.ExchangeQuestionOptionR\aoptions\"\xc1\x01\n" +
+	"\x14ExchangeDeviceOption\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rcategory_code\x18\x02 \x01(\tR\fcategoryCode\x12\x14\n" +
+	"\x05brand\x18\x03 \x01(\tR\x05brand\x12\x14\n" +
+	"\x05model\x18\x04 \x01(\tR\x05model\x12\x18\n" +
+	"\avariant\x18\x05 \x01(\tR\avariant\x12.\n" +
+	"\x13base_exchange_value\x18\x06 \x01(\x01R\x11baseExchangeValue\"u\n" +
+	"\x1bGetExchangeQuestionsRequest\x12#\n" +
+	"\rcategory_code\x18\x01 \x01(\tR\fcategoryCode\x12\"\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\tH\x00R\tproductId\x88\x01\x01B\r\n" +
+	"\v_product_id\"\xac\x01\n" +
+	"\x1cGetExchangeQuestionsResponse\x12J\n" +
+	"\tquestions\x18\x01 \x03(\v2,.gocart.return.v1.ExchangeDiagnosticQuestionR\tquestions\x12@\n" +
+	"\adevices\x18\x02 \x03(\v2&.gocart.return.v1.ExchangeDeviceOptionR\adevices\"V\n" +
+	"\x12ExchangeUserAnswer\x12!\n" +
+	"\fquestion_key\x18\x01 \x01(\tR\vquestionKey\x12\x1d\n" +
+	"\n" +
+	"option_key\x18\x02 \x01(\tR\toptionKey\"\xcc\x01\n" +
+	"\x17ExchangeDeductionDetail\x12!\n" +
+	"\fquestion_key\x18\x01 \x01(\tR\vquestionKey\x12\x1d\n" +
+	"\n" +
+	"option_key\x18\x02 \x01(\tR\toptionKey\x12)\n" +
+	"\x10deduction_amount\x18\x03 \x01(\x01R\x0fdeductionAmount\x12\x19\n" +
+	"\bis_fatal\x18\x04 \x01(\bR\aisFatal\x12)\n" +
+	"\x10rejection_reason\x18\x05 \x01(\tR\x0frejectionReason\"\x89\x02\n" +
+	"!CalculateExchangeValuationRequest\x12$\n" +
+	"\x0enew_product_id\x18\x01 \x01(\tR\fnewProductId\x12#\n" +
+	"\rcategory_code\x18\x02 \x01(\tR\fcategoryCode\x12\x1b\n" +
+	"\told_brand\x18\x03 \x01(\tR\boldBrand\x12\x1b\n" +
+	"\told_model\x18\x04 \x01(\tR\boldModel\x12\x1f\n" +
+	"\vold_variant\x18\x05 \x01(\tR\n" +
+	"oldVariant\x12>\n" +
+	"\aanswers\x18\x06 \x03(\v2$.gocart.return.v1.ExchangeUserAnswerR\aanswers\"\xbd\x02\n" +
+	"\"CalculateExchangeValuationResponse\x12\x1f\n" +
+	"\vis_eligible\x18\x01 \x01(\bR\n" +
+	"isEligible\x12)\n" +
+	"\x10rejection_reason\x18\x02 \x01(\tR\x0frejectionReason\x12.\n" +
+	"\x13base_exchange_value\x18\x03 \x01(\x01R\x11baseExchangeValue\x12)\n" +
+	"\x10total_deductions\x18\x04 \x01(\x01R\x0ftotalDeductions\x12%\n" +
+	"\x0efinal_discount\x18\x05 \x01(\x01R\rfinalDiscount\x12I\n" +
+	"\n" +
+	"deductions\x18\x06 \x03(\v2).gocart.return.v1.ExchangeDeductionDetailR\n" +
+	"deductions\"\xc8\x01\n" +
+	"\x13ExchangeQuoteAnswer\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
+	"\bquote_id\x18\x02 \x01(\tR\aquoteId\x12!\n" +
+	"\fquestion_key\x18\x03 \x01(\tR\vquestionKey\x12\x1d\n" +
+	"\n" +
+	"option_key\x18\x04 \x01(\tR\toptionKey\x12)\n" +
+	"\x10deduction_amount\x18\x05 \x01(\x01R\x0fdeductionAmount\x12\x19\n" +
+	"\bis_fatal\x18\x06 \x01(\bR\aisFatal\"\x9e\x05\n" +
+	"\rExchangeQuote\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12$\n" +
+	"\x0enew_product_id\x18\x03 \x01(\tR\fnewProductId\x12#\n" +
+	"\rcategory_code\x18\x04 \x01(\tR\fcategoryCode\x12\x1b\n" +
+	"\told_brand\x18\x05 \x01(\tR\boldBrand\x12\x1b\n" +
+	"\told_model\x18\x06 \x01(\tR\boldModel\x12\x1f\n" +
+	"\vold_variant\x18\a \x01(\tR\n" +
+	"oldVariant\x12$\n" +
+	"\x0eserial_or_imei\x18\b \x01(\tR\fserialOrImei\x12.\n" +
+	"\x13base_exchange_value\x18\t \x01(\x01R\x11baseExchangeValue\x12)\n" +
+	"\x10total_deductions\x18\n" +
+	" \x01(\x01R\x0ftotalDeductions\x12%\n" +
+	"\x0efinal_discount\x18\v \x01(\x01R\rfinalDiscount\x12'\n" +
+	"\x0fis_disqualified\x18\f \x01(\bR\x0eisDisqualified\x127\n" +
+	"\x17disqualification_reason\x18\r \x01(\tR\x16disqualificationReason\x12\x16\n" +
+	"\x06status\x18\x0e \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x0f \x01(\tR\texpiresAt\x12?\n" +
+	"\aanswers\x18\x10 \x03(\v2%.gocart.return.v1.ExchangeQuoteAnswerR\aanswers\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x11 \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x12 \x01(\tR\tupdatedAt\"\xbf\x02\n" +
+	"\x18LockExchangeQuoteRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12$\n" +
+	"\x0enew_product_id\x18\x02 \x01(\tR\fnewProductId\x12#\n" +
+	"\rcategory_code\x18\x03 \x01(\tR\fcategoryCode\x12\x1b\n" +
+	"\told_brand\x18\x04 \x01(\tR\boldBrand\x12\x1b\n" +
+	"\told_model\x18\x05 \x01(\tR\boldModel\x12\x1f\n" +
+	"\vold_variant\x18\x06 \x01(\tR\n" +
+	"oldVariant\x12$\n" +
+	"\x0eserial_or_imei\x18\a \x01(\tR\fserialOrImei\x12>\n" +
+	"\aanswers\x18\b \x03(\v2$.gocart.return.v1.ExchangeUserAnswerR\aanswers\"R\n" +
+	"\x19LockExchangeQuoteResponse\x125\n" +
+	"\x05quote\x18\x01 \x01(\v2\x1f.gocart.return.v1.ExchangeQuoteR\x05quote\")\n" +
+	"\x17GetExchangeQuoteRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"Q\n" +
+	"\x18GetExchangeQuoteResponse\x125\n" +
+	"\x05quote\x18\x01 \x01(\v2\x1f.gocart.return.v1.ExchangeQuoteR\x05quote\"\x90\x01\n" +
+	"\x1bApplyExchangeToOrderRequest\x12\x19\n" +
+	"\bquote_id\x18\x01 \x01(\tR\aquoteId\x12\x19\n" +
+	"\border_id\x18\x02 \x01(\tR\aorderId\x12\"\n" +
+	"\rorder_item_id\x18\x03 \x01(\tR\vorderItemId\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\"V\n" +
+	"\x1cApplyExchangeToOrderResponse\x126\n" +
+	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange\"\x96\x01\n" +
+	"\x1eResolveExchangeMismatchRequest\x12\x1f\n" +
+	"\vexchange_id\x18\x01 \x01(\tR\n" +
+	"exchangeId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12%\n" +
+	"\x0epayment_method\x18\x03 \x01(\tR\rpaymentMethod\x12\x14\n" +
+	"\x05notes\x18\x04 \x01(\tR\x05notes\"Y\n" +
+	"\x1fResolveExchangeMismatchResponse\x126\n" +
+	"\bexchange\x18\x01 \x01(\v2\x1a.gocart.return.v1.ExchangeR\bexchange2\xb1\x0e\n" +
 	"\rReturnService\x12`\n" +
 	"\rRequestReturn\x12&.gocart.return.v1.RequestReturnRequest\x1a'.gocart.return.v1.RequestReturnResponse\x12T\n" +
 	"\tGetReturn\x12\".gocart.return.v1.GetReturnRequest\x1a#.gocart.return.v1.GetReturnResponse\x12o\n" +
@@ -2238,51 +3763,76 @@ const file_contracts_protobuf_return_return_proto_rawDesc = "" +
 	"\x11GetReturnsByOrder\x12*.gocart.return.v1.GetReturnsByOrderRequest\x1a+.gocart.return.v1.GetReturnsByOrderResponse\x12c\n" +
 	"\x0eCreateExchange\x12'.gocart.return.v1.CreateExchangeRequest\x1a(.gocart.return.v1.CreateExchangeResponse\x12Z\n" +
 	"\vGetExchange\x12$.gocart.return.v1.GetExchangeRequest\x1a%.gocart.return.v1.GetExchangeResponse\x12x\n" +
-	"\x15VerifyExchangeProduct\x12..gocart.return.v1.VerifyExchangeProductRequest\x1a/.gocart.return.v1.VerifyExchangeProductResponseBIZGgithub.com/marees-godev/GoCart-Server/contracts/protobuf/return;returnsb\x06proto3"
+	"\x15VerifyExchangeProduct\x12..gocart.return.v1.VerifyExchangeProductRequest\x1a/.gocart.return.v1.VerifyExchangeProductResponse\x12u\n" +
+	"\x14GetExchangeQuestions\x12-.gocart.return.v1.GetExchangeQuestionsRequest\x1a..gocart.return.v1.GetExchangeQuestionsResponse\x12\x87\x01\n" +
+	"\x1aCalculateExchangeValuation\x123.gocart.return.v1.CalculateExchangeValuationRequest\x1a4.gocart.return.v1.CalculateExchangeValuationResponse\x12l\n" +
+	"\x11LockExchangeQuote\x12*.gocart.return.v1.LockExchangeQuoteRequest\x1a+.gocart.return.v1.LockExchangeQuoteResponse\x12i\n" +
+	"\x10GetExchangeQuote\x12).gocart.return.v1.GetExchangeQuoteRequest\x1a*.gocart.return.v1.GetExchangeQuoteResponse\x12u\n" +
+	"\x14ApplyExchangeToOrder\x12-.gocart.return.v1.ApplyExchangeToOrderRequest\x1a..gocart.return.v1.ApplyExchangeToOrderResponse\x12~\n" +
+	"\x17ResolveExchangeMismatch\x120.gocart.return.v1.ResolveExchangeMismatchRequest\x1a1.gocart.return.v1.ResolveExchangeMismatchResponseBIZGgithub.com/marees-godev/GoCart-Server/contracts/protobuf/return;returnsb\x06proto3"
 
 var (
-	file_contracts_protobuf_return_return_proto_rawDescOnce sync.Once
-	file_contracts_protobuf_return_return_proto_rawDescData []byte
+	file_return_proto_rawDescOnce sync.Once
+	file_return_proto_rawDescData []byte
 )
 
-func file_contracts_protobuf_return_return_proto_rawDescGZIP() []byte {
-	file_contracts_protobuf_return_return_proto_rawDescOnce.Do(func() {
-		file_contracts_protobuf_return_return_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_contracts_protobuf_return_return_proto_rawDesc), len(file_contracts_protobuf_return_return_proto_rawDesc)))
+func file_return_proto_rawDescGZIP() []byte {
+	file_return_proto_rawDescOnce.Do(func() {
+		file_return_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_return_proto_rawDesc), len(file_return_proto_rawDesc)))
 	})
-	return file_contracts_protobuf_return_return_proto_rawDescData
+	return file_return_proto_rawDescData
 }
 
-var file_contracts_protobuf_return_return_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
-var file_contracts_protobuf_return_return_proto_goTypes = []any{
-	(*ReturnOrder)(nil),                   // 0: gocart.return.v1.ReturnOrder
-	(*ProductVerification)(nil),           // 1: gocart.return.v1.ProductVerification
-	(*RequestReturnRequest)(nil),          // 2: gocart.return.v1.RequestReturnRequest
-	(*RequestReturnResponse)(nil),         // 3: gocart.return.v1.RequestReturnResponse
-	(*GetReturnRequest)(nil),              // 4: gocart.return.v1.GetReturnRequest
-	(*GetReturnResponse)(nil),             // 5: gocart.return.v1.GetReturnResponse
-	(*UpdateReturnStatusRequest)(nil),     // 6: gocart.return.v1.UpdateReturnStatusRequest
-	(*UpdateReturnStatusResponse)(nil),    // 7: gocart.return.v1.UpdateReturnStatusResponse
-	(*ApproveReturnRequest)(nil),          // 8: gocart.return.v1.ApproveReturnRequest
-	(*ApproveReturnResponse)(nil),         // 9: gocart.return.v1.ApproveReturnResponse
-	(*RejectReturnRequest)(nil),           // 10: gocart.return.v1.RejectReturnRequest
-	(*RejectReturnResponse)(nil),          // 11: gocart.return.v1.RejectReturnResponse
-	(*VerifyProductRequest)(nil),          // 12: gocart.return.v1.VerifyProductRequest
-	(*VerifyProductResponse)(nil),         // 13: gocart.return.v1.VerifyProductResponse
-	(*ListReturnsRequest)(nil),            // 14: gocart.return.v1.ListReturnsRequest
-	(*ListReturnsResponse)(nil),           // 15: gocart.return.v1.ListReturnsResponse
-	(*GetReturnsByOrderRequest)(nil),      // 16: gocart.return.v1.GetReturnsByOrderRequest
-	(*GetReturnsByOrderResponse)(nil),     // 17: gocart.return.v1.GetReturnsByOrderResponse
-	(*ExchangeQuestionAnswer)(nil),        // 18: gocart.return.v1.ExchangeQuestionAnswer
-	(*ExchangeVerification)(nil),          // 19: gocart.return.v1.ExchangeVerification
-	(*Exchange)(nil),                      // 20: gocart.return.v1.Exchange
-	(*CreateExchangeRequest)(nil),         // 21: gocart.return.v1.CreateExchangeRequest
-	(*CreateExchangeResponse)(nil),        // 22: gocart.return.v1.CreateExchangeResponse
-	(*GetExchangeRequest)(nil),            // 23: gocart.return.v1.GetExchangeRequest
-	(*GetExchangeResponse)(nil),           // 24: gocart.return.v1.GetExchangeResponse
-	(*VerifyExchangeProductRequest)(nil),  // 25: gocart.return.v1.VerifyExchangeProductRequest
-	(*VerifyExchangeProductResponse)(nil), // 26: gocart.return.v1.VerifyExchangeProductResponse
+var file_return_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
+var file_return_proto_goTypes = []any{
+	(*ReturnOrder)(nil),                        // 0: gocart.return.v1.ReturnOrder
+	(*ProductVerification)(nil),                // 1: gocart.return.v1.ProductVerification
+	(*RequestReturnRequest)(nil),               // 2: gocart.return.v1.RequestReturnRequest
+	(*RequestReturnResponse)(nil),              // 3: gocart.return.v1.RequestReturnResponse
+	(*GetReturnRequest)(nil),                   // 4: gocart.return.v1.GetReturnRequest
+	(*GetReturnResponse)(nil),                  // 5: gocart.return.v1.GetReturnResponse
+	(*UpdateReturnStatusRequest)(nil),          // 6: gocart.return.v1.UpdateReturnStatusRequest
+	(*UpdateReturnStatusResponse)(nil),         // 7: gocart.return.v1.UpdateReturnStatusResponse
+	(*ApproveReturnRequest)(nil),               // 8: gocart.return.v1.ApproveReturnRequest
+	(*ApproveReturnResponse)(nil),              // 9: gocart.return.v1.ApproveReturnResponse
+	(*RejectReturnRequest)(nil),                // 10: gocart.return.v1.RejectReturnRequest
+	(*RejectReturnResponse)(nil),               // 11: gocart.return.v1.RejectReturnResponse
+	(*VerifyProductRequest)(nil),               // 12: gocart.return.v1.VerifyProductRequest
+	(*VerifyProductResponse)(nil),              // 13: gocart.return.v1.VerifyProductResponse
+	(*ListReturnsRequest)(nil),                 // 14: gocart.return.v1.ListReturnsRequest
+	(*ListReturnsResponse)(nil),                // 15: gocart.return.v1.ListReturnsResponse
+	(*GetReturnsByOrderRequest)(nil),           // 16: gocart.return.v1.GetReturnsByOrderRequest
+	(*GetReturnsByOrderResponse)(nil),          // 17: gocart.return.v1.GetReturnsByOrderResponse
+	(*ExchangeQuestionAnswer)(nil),             // 18: gocart.return.v1.ExchangeQuestionAnswer
+	(*ExchangeVerification)(nil),               // 19: gocart.return.v1.ExchangeVerification
+	(*Exchange)(nil),                           // 20: gocart.return.v1.Exchange
+	(*CreateExchangeRequest)(nil),              // 21: gocart.return.v1.CreateExchangeRequest
+	(*CreateExchangeResponse)(nil),             // 22: gocart.return.v1.CreateExchangeResponse
+	(*GetExchangeRequest)(nil),                 // 23: gocart.return.v1.GetExchangeRequest
+	(*GetExchangeResponse)(nil),                // 24: gocart.return.v1.GetExchangeResponse
+	(*VerifyExchangeProductRequest)(nil),       // 25: gocart.return.v1.VerifyExchangeProductRequest
+	(*VerifyExchangeProductResponse)(nil),      // 26: gocart.return.v1.VerifyExchangeProductResponse
+	(*ExchangeQuestionOption)(nil),             // 27: gocart.return.v1.ExchangeQuestionOption
+	(*ExchangeDiagnosticQuestion)(nil),         // 28: gocart.return.v1.ExchangeDiagnosticQuestion
+	(*ExchangeDeviceOption)(nil),               // 29: gocart.return.v1.ExchangeDeviceOption
+	(*GetExchangeQuestionsRequest)(nil),        // 30: gocart.return.v1.GetExchangeQuestionsRequest
+	(*GetExchangeQuestionsResponse)(nil),       // 31: gocart.return.v1.GetExchangeQuestionsResponse
+	(*ExchangeUserAnswer)(nil),                 // 32: gocart.return.v1.ExchangeUserAnswer
+	(*ExchangeDeductionDetail)(nil),            // 33: gocart.return.v1.ExchangeDeductionDetail
+	(*CalculateExchangeValuationRequest)(nil),  // 34: gocart.return.v1.CalculateExchangeValuationRequest
+	(*CalculateExchangeValuationResponse)(nil), // 35: gocart.return.v1.CalculateExchangeValuationResponse
+	(*ExchangeQuoteAnswer)(nil),                // 36: gocart.return.v1.ExchangeQuoteAnswer
+	(*ExchangeQuote)(nil),                      // 37: gocart.return.v1.ExchangeQuote
+	(*LockExchangeQuoteRequest)(nil),           // 38: gocart.return.v1.LockExchangeQuoteRequest
+	(*LockExchangeQuoteResponse)(nil),          // 39: gocart.return.v1.LockExchangeQuoteResponse
+	(*GetExchangeQuoteRequest)(nil),            // 40: gocart.return.v1.GetExchangeQuoteRequest
+	(*GetExchangeQuoteResponse)(nil),           // 41: gocart.return.v1.GetExchangeQuoteResponse
+	(*ApplyExchangeToOrderRequest)(nil),        // 42: gocart.return.v1.ApplyExchangeToOrderRequest
+	(*ApplyExchangeToOrderResponse)(nil),       // 43: gocart.return.v1.ApplyExchangeToOrderResponse
+	(*ResolveExchangeMismatchRequest)(nil),     // 44: gocart.return.v1.ResolveExchangeMismatchRequest
+	(*ResolveExchangeMismatchResponse)(nil),    // 45: gocart.return.v1.ResolveExchangeMismatchResponse
 }
-var file_contracts_protobuf_return_return_proto_depIdxs = []int32{
+var file_return_proto_depIdxs = []int32{
 	1,  // 0: gocart.return.v1.ReturnOrder.verification:type_name -> gocart.return.v1.ProductVerification
 	0,  // 1: gocart.return.v1.RequestReturnResponse.return_order:type_name -> gocart.return.v1.ReturnOrder
 	0,  // 2: gocart.return.v1.GetReturnResponse.return_order:type_name -> gocart.return.v1.ReturnOrder
@@ -2300,56 +3850,80 @@ var file_contracts_protobuf_return_return_proto_depIdxs = []int32{
 	20, // 14: gocart.return.v1.GetExchangeResponse.exchange:type_name -> gocart.return.v1.Exchange
 	20, // 15: gocart.return.v1.VerifyExchangeProductResponse.exchange:type_name -> gocart.return.v1.Exchange
 	19, // 16: gocart.return.v1.VerifyExchangeProductResponse.verification:type_name -> gocart.return.v1.ExchangeVerification
-	2,  // 17: gocart.return.v1.ReturnService.RequestReturn:input_type -> gocart.return.v1.RequestReturnRequest
-	4,  // 18: gocart.return.v1.ReturnService.GetReturn:input_type -> gocart.return.v1.GetReturnRequest
-	6,  // 19: gocart.return.v1.ReturnService.UpdateReturnStatus:input_type -> gocart.return.v1.UpdateReturnStatusRequest
-	8,  // 20: gocart.return.v1.ReturnService.ApproveReturn:input_type -> gocart.return.v1.ApproveReturnRequest
-	10, // 21: gocart.return.v1.ReturnService.RejectReturn:input_type -> gocart.return.v1.RejectReturnRequest
-	12, // 22: gocart.return.v1.ReturnService.VerifyProduct:input_type -> gocart.return.v1.VerifyProductRequest
-	14, // 23: gocart.return.v1.ReturnService.ListReturns:input_type -> gocart.return.v1.ListReturnsRequest
-	16, // 24: gocart.return.v1.ReturnService.GetReturnsByOrder:input_type -> gocart.return.v1.GetReturnsByOrderRequest
-	21, // 25: gocart.return.v1.ReturnService.CreateExchange:input_type -> gocart.return.v1.CreateExchangeRequest
-	23, // 26: gocart.return.v1.ReturnService.GetExchange:input_type -> gocart.return.v1.GetExchangeRequest
-	25, // 27: gocart.return.v1.ReturnService.VerifyExchangeProduct:input_type -> gocart.return.v1.VerifyExchangeProductRequest
-	3,  // 28: gocart.return.v1.ReturnService.RequestReturn:output_type -> gocart.return.v1.RequestReturnResponse
-	5,  // 29: gocart.return.v1.ReturnService.GetReturn:output_type -> gocart.return.v1.GetReturnResponse
-	7,  // 30: gocart.return.v1.ReturnService.UpdateReturnStatus:output_type -> gocart.return.v1.UpdateReturnStatusResponse
-	9,  // 31: gocart.return.v1.ReturnService.ApproveReturn:output_type -> gocart.return.v1.ApproveReturnResponse
-	11, // 32: gocart.return.v1.ReturnService.RejectReturn:output_type -> gocart.return.v1.RejectReturnResponse
-	13, // 33: gocart.return.v1.ReturnService.VerifyProduct:output_type -> gocart.return.v1.VerifyProductResponse
-	15, // 34: gocart.return.v1.ReturnService.ListReturns:output_type -> gocart.return.v1.ListReturnsResponse
-	17, // 35: gocart.return.v1.ReturnService.GetReturnsByOrder:output_type -> gocart.return.v1.GetReturnsByOrderResponse
-	22, // 36: gocart.return.v1.ReturnService.CreateExchange:output_type -> gocart.return.v1.CreateExchangeResponse
-	24, // 37: gocart.return.v1.ReturnService.GetExchange:output_type -> gocart.return.v1.GetExchangeResponse
-	26, // 38: gocart.return.v1.ReturnService.VerifyExchangeProduct:output_type -> gocart.return.v1.VerifyExchangeProductResponse
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	27, // 17: gocart.return.v1.ExchangeDiagnosticQuestion.options:type_name -> gocart.return.v1.ExchangeQuestionOption
+	28, // 18: gocart.return.v1.GetExchangeQuestionsResponse.questions:type_name -> gocart.return.v1.ExchangeDiagnosticQuestion
+	29, // 19: gocart.return.v1.GetExchangeQuestionsResponse.devices:type_name -> gocart.return.v1.ExchangeDeviceOption
+	32, // 20: gocart.return.v1.CalculateExchangeValuationRequest.answers:type_name -> gocart.return.v1.ExchangeUserAnswer
+	33, // 21: gocart.return.v1.CalculateExchangeValuationResponse.deductions:type_name -> gocart.return.v1.ExchangeDeductionDetail
+	36, // 22: gocart.return.v1.ExchangeQuote.answers:type_name -> gocart.return.v1.ExchangeQuoteAnswer
+	32, // 23: gocart.return.v1.LockExchangeQuoteRequest.answers:type_name -> gocart.return.v1.ExchangeUserAnswer
+	37, // 24: gocart.return.v1.LockExchangeQuoteResponse.quote:type_name -> gocart.return.v1.ExchangeQuote
+	37, // 25: gocart.return.v1.GetExchangeQuoteResponse.quote:type_name -> gocart.return.v1.ExchangeQuote
+	20, // 26: gocart.return.v1.ApplyExchangeToOrderResponse.exchange:type_name -> gocart.return.v1.Exchange
+	20, // 27: gocart.return.v1.ResolveExchangeMismatchResponse.exchange:type_name -> gocart.return.v1.Exchange
+	2,  // 28: gocart.return.v1.ReturnService.RequestReturn:input_type -> gocart.return.v1.RequestReturnRequest
+	4,  // 29: gocart.return.v1.ReturnService.GetReturn:input_type -> gocart.return.v1.GetReturnRequest
+	6,  // 30: gocart.return.v1.ReturnService.UpdateReturnStatus:input_type -> gocart.return.v1.UpdateReturnStatusRequest
+	8,  // 31: gocart.return.v1.ReturnService.ApproveReturn:input_type -> gocart.return.v1.ApproveReturnRequest
+	10, // 32: gocart.return.v1.ReturnService.RejectReturn:input_type -> gocart.return.v1.RejectReturnRequest
+	12, // 33: gocart.return.v1.ReturnService.VerifyProduct:input_type -> gocart.return.v1.VerifyProductRequest
+	14, // 34: gocart.return.v1.ReturnService.ListReturns:input_type -> gocart.return.v1.ListReturnsRequest
+	16, // 35: gocart.return.v1.ReturnService.GetReturnsByOrder:input_type -> gocart.return.v1.GetReturnsByOrderRequest
+	21, // 36: gocart.return.v1.ReturnService.CreateExchange:input_type -> gocart.return.v1.CreateExchangeRequest
+	23, // 37: gocart.return.v1.ReturnService.GetExchange:input_type -> gocart.return.v1.GetExchangeRequest
+	25, // 38: gocart.return.v1.ReturnService.VerifyExchangeProduct:input_type -> gocart.return.v1.VerifyExchangeProductRequest
+	30, // 39: gocart.return.v1.ReturnService.GetExchangeQuestions:input_type -> gocart.return.v1.GetExchangeQuestionsRequest
+	34, // 40: gocart.return.v1.ReturnService.CalculateExchangeValuation:input_type -> gocart.return.v1.CalculateExchangeValuationRequest
+	38, // 41: gocart.return.v1.ReturnService.LockExchangeQuote:input_type -> gocart.return.v1.LockExchangeQuoteRequest
+	40, // 42: gocart.return.v1.ReturnService.GetExchangeQuote:input_type -> gocart.return.v1.GetExchangeQuoteRequest
+	42, // 43: gocart.return.v1.ReturnService.ApplyExchangeToOrder:input_type -> gocart.return.v1.ApplyExchangeToOrderRequest
+	44, // 44: gocart.return.v1.ReturnService.ResolveExchangeMismatch:input_type -> gocart.return.v1.ResolveExchangeMismatchRequest
+	3,  // 45: gocart.return.v1.ReturnService.RequestReturn:output_type -> gocart.return.v1.RequestReturnResponse
+	5,  // 46: gocart.return.v1.ReturnService.GetReturn:output_type -> gocart.return.v1.GetReturnResponse
+	7,  // 47: gocart.return.v1.ReturnService.UpdateReturnStatus:output_type -> gocart.return.v1.UpdateReturnStatusResponse
+	9,  // 48: gocart.return.v1.ReturnService.ApproveReturn:output_type -> gocart.return.v1.ApproveReturnResponse
+	11, // 49: gocart.return.v1.ReturnService.RejectReturn:output_type -> gocart.return.v1.RejectReturnResponse
+	13, // 50: gocart.return.v1.ReturnService.VerifyProduct:output_type -> gocart.return.v1.VerifyProductResponse
+	15, // 51: gocart.return.v1.ReturnService.ListReturns:output_type -> gocart.return.v1.ListReturnsResponse
+	17, // 52: gocart.return.v1.ReturnService.GetReturnsByOrder:output_type -> gocart.return.v1.GetReturnsByOrderResponse
+	22, // 53: gocart.return.v1.ReturnService.CreateExchange:output_type -> gocart.return.v1.CreateExchangeResponse
+	24, // 54: gocart.return.v1.ReturnService.GetExchange:output_type -> gocart.return.v1.GetExchangeResponse
+	26, // 55: gocart.return.v1.ReturnService.VerifyExchangeProduct:output_type -> gocart.return.v1.VerifyExchangeProductResponse
+	31, // 56: gocart.return.v1.ReturnService.GetExchangeQuestions:output_type -> gocart.return.v1.GetExchangeQuestionsResponse
+	35, // 57: gocart.return.v1.ReturnService.CalculateExchangeValuation:output_type -> gocart.return.v1.CalculateExchangeValuationResponse
+	39, // 58: gocart.return.v1.ReturnService.LockExchangeQuote:output_type -> gocart.return.v1.LockExchangeQuoteResponse
+	41, // 59: gocart.return.v1.ReturnService.GetExchangeQuote:output_type -> gocart.return.v1.GetExchangeQuoteResponse
+	43, // 60: gocart.return.v1.ReturnService.ApplyExchangeToOrder:output_type -> gocart.return.v1.ApplyExchangeToOrderResponse
+	45, // 61: gocart.return.v1.ReturnService.ResolveExchangeMismatch:output_type -> gocart.return.v1.ResolveExchangeMismatchResponse
+	45, // [45:62] is the sub-list for method output_type
+	28, // [28:45] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
-func init() { file_contracts_protobuf_return_return_proto_init() }
-func file_contracts_protobuf_return_return_proto_init() {
-	if File_contracts_protobuf_return_return_proto != nil {
+func init() { file_return_proto_init() }
+func file_return_proto_init() {
+	if File_return_proto != nil {
 		return
 	}
-	file_contracts_protobuf_return_return_proto_msgTypes[25].OneofWrappers = []any{}
+	file_return_proto_msgTypes[25].OneofWrappers = []any{}
+	file_return_proto_msgTypes[30].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_return_return_proto_rawDesc), len(file_contracts_protobuf_return_return_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_return_proto_rawDesc), len(file_return_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_contracts_protobuf_return_return_proto_goTypes,
-		DependencyIndexes: file_contracts_protobuf_return_return_proto_depIdxs,
-		MessageInfos:      file_contracts_protobuf_return_return_proto_msgTypes,
+		GoTypes:           file_return_proto_goTypes,
+		DependencyIndexes: file_return_proto_depIdxs,
+		MessageInfos:      file_return_proto_msgTypes,
 	}.Build()
-	File_contracts_protobuf_return_return_proto = out.File
-	file_contracts_protobuf_return_return_proto_goTypes = nil
-	file_contracts_protobuf_return_return_proto_depIdxs = nil
+	File_return_proto = out.File
+	file_return_proto_goTypes = nil
+	file_return_proto_depIdxs = nil
 }

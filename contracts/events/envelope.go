@@ -67,7 +67,9 @@ const (
 	EventTypeReturnStatusUpdated  = "ReturnStatusUpdated"
 	EventTypeReturnCompleted      = "ReturnCompleted"
 	EventTypeExchangeCreated      = "ExchangeCreated"
+	EventTypeExchangeOfferApplied = "ExchangeOfferApplied"
 	EventTypeExchangeVerified     = "ExchangeVerified"
+	EventTypeExchangeCompleted    = "ExchangeCompleted"
 )
 
 // Standard Topic Constants
@@ -128,7 +130,9 @@ const (
 	TopicReturnStatusUpdated  = "gocart.return.return-status-updated"
 	TopicReturnCompleted      = "gocart.return.return-completed"
 	TopicExchangeCreated      = "gocart.return.exchange-created"
+	TopicExchangeOfferApplied = "gocart.return.exchange-offer-applied"
 	TopicExchangeVerified     = "gocart.return.exchange-verified"
+	TopicExchangeCompleted    = "gocart.return.exchange-completed"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.

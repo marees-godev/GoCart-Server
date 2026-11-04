@@ -183,17 +183,15 @@ func (r *mutationResolver) VerifyProduct(ctx context.Context, input model.Verify
 	}
 
 	var images []string
-	if len(input.ProofImages) > 0 {
-		images = append(images, input.ProofImages...)
-	}
-
-	for _, up := range input.ImagesUpload {
+	for _, up := range input.ProofImages {
 		if up != nil {
 			processed, err := processUpload(up)
 			if err != nil {
 				return nil, appErrors.BadRequest("failed to process image upload")
 			}
-			images = append(images, processed)
+			if processed != "" {
+				images = append(images, processed)
+			}
 		}
 	}
 
@@ -398,49 +396,32 @@ func (r *mutationResolver) CreateExchange(ctx context.Context, input model.Creat
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
-	orderID := strings.TrimSpace(input.OrderID)
-	if orderID == "" {
-		return nil, appErrors.BadRequest("orderId is required")
+	productID := strings.TrimSpace(input.ProductID)
+	if productID == "" {
+		return nil, appErrors.BadRequest("productId is required")
 	}
 
-	orderItemID := strings.TrimSpace(input.OrderItemID)
-	if orderItemID == "" {
-		return nil, appErrors.BadRequest("orderItemId is required")
-	}
-
-	newProductID := strings.TrimSpace(input.NewProductID)
-	if newProductID == "" {
-		return nil, appErrors.BadRequest("newProductId is required")
-	}
-
-	oldBrand := strings.TrimSpace(input.OldBrand)
-	if oldBrand == "" {
-		return nil, appErrors.BadRequest("oldBrand is required")
-	}
-
-	oldModel := strings.TrimSpace(input.OldModel)
-	if oldModel == "" {
-		return nil, appErrors.BadRequest("oldModel is required")
-	}
-
-	if input.BaseExchangeValue < 0 {
-		return nil, appErrors.BadRequest("baseExchangeValue cannot be negative")
+	exchangeDeviceCatalogID := strings.TrimSpace(input.ExchangeDeviceCatalogID)
+	if exchangeDeviceCatalogID == "" {
+		return nil, appErrors.BadRequest("exchangeDeviceCatalogId is required")
 	}
 
 	req := &returnpb.CreateExchangeRequest{
-		OrderId:           orderID,
-		OrderItemId:       orderItemID,
-		UserId:            userID,
-		NewProductId:      newProductID,
-		OldBrand:          oldBrand,
-		OldModel:          oldModel,
-		BaseExchangeValue: input.BaseExchangeValue,
+		ProductId:               productID,
+		ExchangeDeviceCatalogId: exchangeDeviceCatalogID,
+		UserId:                  userID,
 	}
 
-	if input.OldVariant != nil {
+	if input.OldBrand != nil && strings.TrimSpace(*input.OldBrand) != "" {
+		req.OldBrand = strings.TrimSpace(*input.OldBrand)
+	}
+	if input.OldModel != nil && strings.TrimSpace(*input.OldModel) != "" {
+		req.OldModel = strings.TrimSpace(*input.OldModel)
+	}
+	if input.OldVariant != nil && strings.TrimSpace(*input.OldVariant) != "" {
 		req.OldVariant = strings.TrimSpace(*input.OldVariant)
 	}
-	if input.SerialOrImei != nil {
+	if input.SerialOrImei != nil && strings.TrimSpace(*input.SerialOrImei) != "" {
 		req.SerialOrImei = strings.TrimSpace(*input.SerialOrImei)
 	}
 
@@ -526,6 +507,180 @@ func (r *mutationResolver) VerifyExchangeProduct(ctx context.Context, input mode
 	}
 
 	res, err := client.VerifyExchangeProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelExchange(res.Exchange), nil
+}
+
+// CalculateExchangeValuation is the resolver for the calculateExchangeValuation field.
+func (r *mutationResolver) CalculateExchangeValuation(ctx context.Context, input model.CalculateExchangeValuationInput) (*model.ExchangeValuationResult, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	answers := make([]*returnpb.ExchangeUserAnswer, 0, len(input.Answers))
+	for _, a := range input.Answers {
+		if a != nil {
+			answers = append(answers, &returnpb.ExchangeUserAnswer{
+				QuestionKey: a.QuestionKey,
+				OptionKey:   a.OptionKey,
+			})
+		}
+	}
+
+	cat := "SMARTPHONE"
+	if input.CategoryCode != nil && *input.CategoryCode != "" {
+		cat = *input.CategoryCode
+	}
+	variant := ""
+	if input.OldVariant != nil {
+		variant = *input.OldVariant
+	}
+
+	res, err := client.CalculateExchangeValuation(ctx, &returnpb.CalculateExchangeValuationRequest{
+		NewProductId: input.NewProductID,
+		CategoryCode: cat,
+		OldBrand:     input.OldBrand,
+		OldModel:     input.OldModel,
+		OldVariant:   variant,
+		Answers:      answers,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	deductions := make([]*model.ExchangeDeductionDetail, 0, len(res.Deductions))
+	for _, d := range res.Deductions {
+		var reason *string
+		if d.RejectionReason != "" {
+			reason = &d.RejectionReason
+		}
+		deductions = append(deductions, &model.ExchangeDeductionDetail{
+			QuestionKey:     d.QuestionKey,
+			OptionKey:       d.OptionKey,
+			DeductionAmount: d.DeductionAmount,
+			IsFatal:         d.IsFatal,
+			RejectionReason: reason,
+		})
+	}
+
+	var rejReason *string
+	if res.RejectionReason != "" {
+		rejReason = &res.RejectionReason
+	}
+
+	return &model.ExchangeValuationResult{
+		IsEligible:        res.IsEligible,
+		RejectionReason:   rejReason,
+		BaseExchangeValue: res.BaseExchangeValue,
+		TotalDeductions:   res.TotalDeductions,
+		FinalDiscount:     res.FinalDiscount,
+		Deductions:        deductions,
+	}, nil
+}
+
+// LockExchangeQuote is the resolver for the lockExchangeQuote field.
+func (r *mutationResolver) LockExchangeQuote(ctx context.Context, input model.LockExchangeQuoteInput) (*model.ExchangeQuote, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		return nil, appErrors.Unauthorized("unauthenticated")
+	}
+
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	answers := make([]*returnpb.ExchangeUserAnswer, 0, len(input.Answers))
+	for _, a := range input.Answers {
+		if a != nil {
+			answers = append(answers, &returnpb.ExchangeUserAnswer{
+				QuestionKey: a.QuestionKey,
+				OptionKey:   a.OptionKey,
+			})
+		}
+	}
+
+	cat := "SMARTPHONE"
+	if input.CategoryCode != nil && *input.CategoryCode != "" {
+		cat = *input.CategoryCode
+	}
+	variant := ""
+	if input.OldVariant != nil {
+		variant = *input.OldVariant
+	}
+	serial := ""
+	if input.SerialOrImei != nil {
+		serial = *input.SerialOrImei
+	}
+
+	res, err := client.LockExchangeQuote(ctx, &returnpb.LockExchangeQuoteRequest{
+		UserId:       userCtx.UserID,
+		NewProductId: input.NewProductID,
+		CategoryCode: cat,
+		OldBrand:     input.OldBrand,
+		OldModel:     input.OldModel,
+		OldVariant:   variant,
+		SerialOrImei: serial,
+		Answers:      answers,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelExchangeQuote(res.Quote), nil
+}
+
+// ApplyExchangeToOrder is the resolver for the applyExchangeToOrder field.
+func (r *mutationResolver) ApplyExchangeToOrder(ctx context.Context, input model.ApplyExchangeToOrderInput) (*model.Exchange, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		return nil, appErrors.Unauthorized("unauthenticated")
+	}
+
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.ApplyExchangeToOrder(ctx, &returnpb.ApplyExchangeToOrderRequest{
+		QuoteId:     input.QuoteID,
+		OrderId:     input.OrderID,
+		OrderItemId: input.OrderItemID,
+		UserId:      userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelExchange(res.Exchange), nil
+}
+
+// ResolveExchangeMismatch is the resolver for the resolveExchangeMismatch field.
+func (r *mutationResolver) ResolveExchangeMismatch(ctx context.Context, input model.ResolveExchangeMismatchInput) (*model.Exchange, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	paymentMethod := ""
+	if input.PaymentMethod != nil {
+		paymentMethod = *input.PaymentMethod
+	}
+	notes := ""
+	if input.Notes != nil {
+		notes = *input.Notes
+	}
+
+	res, err := client.ResolveExchangeMismatch(ctx, &returnpb.ResolveExchangeMismatchRequest{
+		ExchangeId:    input.ExchangeID,
+		Action:        input.Action,
+		PaymentMethod: paymentMethod,
+		Notes:         notes,
+	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
@@ -697,12 +852,162 @@ func (r *queryResolver) Exchange(ctx context.Context, id string) (*model.Exchang
 	return toModelExchange(res.Exchange), nil
 }
 
+// ExchangeQuestions is the resolver for the exchangeQuestions field.
+func (r *queryResolver) ExchangeQuestions(ctx context.Context, categoryCode *string, productID *string) (*model.ExchangeQuestionsResponse, error) {
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	cat := "SMARTPHONE"
+	if categoryCode != nil && *categoryCode != "" {
+		cat = *categoryCode
+	}
+
+	res, err := client.GetExchangeQuestions(ctx, &returnpb.GetExchangeQuestionsRequest{
+		CategoryCode: cat,
+		ProductId:    productID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	questions := make([]*model.ExchangeDiagnosticQuestion, 0, len(res.Questions))
+	for _, q := range res.Questions {
+		opts := make([]*model.ExchangeQuestionOption, 0, len(q.Options))
+		for _, o := range q.Options {
+			var reason *string
+			if o.RejectionReason != "" {
+				reason = &o.RejectionReason
+			}
+			opts = append(opts, &model.ExchangeQuestionOption{
+				ID:                  o.Id,
+				QuestionID:          o.QuestionId,
+				OptionKey:           o.OptionKey,
+				OptionLabel:         o.OptionLabel,
+				DeductionAmount:     o.DeductionAmount,
+				IsFatalDisqualifier: o.IsFatalDisqualifier,
+				RejectionReason:     reason,
+				DisplayOrder:        int(o.DisplayOrder),
+			})
+		}
+		questions = append(questions, &model.ExchangeDiagnosticQuestion{
+			ID:           q.Id,
+			CategoryCode: q.CategoryCode,
+			QuestionKey:  q.QuestionKey,
+			QuestionText: q.QuestionText,
+			DisplayOrder: int(q.DisplayOrder),
+			Options:      opts,
+		})
+	}
+
+	devices := make([]*model.ExchangeDeviceOption, 0, len(res.Devices))
+	for _, d := range res.Devices {
+		devices = append(devices, &model.ExchangeDeviceOption{
+			ID:                d.Id,
+			CategoryCode:      d.CategoryCode,
+			Brand:             d.Brand,
+			Model:             d.Model,
+			Variant:           d.Variant,
+			BaseExchangeValue: d.BaseExchangeValue,
+		})
+	}
+
+	return &model.ExchangeQuestionsResponse{
+		Questions: questions,
+		Devices:   devices,
+	}, nil
+}
+
+// ExchangeQuote is the resolver for the exchangeQuote field.
+func (r *queryResolver) ExchangeQuote(ctx context.Context, id string) (*model.ExchangeQuote, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		return nil, appErrors.Unauthorized("unauthenticated")
+	}
+
+	client, err := r.getReturnClient()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.GetExchangeQuote(ctx, &returnpb.GetExchangeQuoteRequest{Id: id})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if res.Quote != nil && res.Quote.UserId != userCtx.UserID && userCtx.Role != "ADMIN" {
+		return nil, appErrors.Forbidden("you do not have permission to view this exchange quote")
+	}
+
+	return toModelExchangeQuote(res.Quote), nil
+}
+
 // !!! WARNING !!!
 // The code below was going to be deleted when updating resolvers. It has been copied here so you have
 // one last chance to move it out of harms way if you want. There are two reasons this happens:
 //   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
 //     it when you're done.
 //   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func toModelExchangeQuote(protoQuote *returnpb.ExchangeQuote) *model.ExchangeQuote {
+	if protoQuote == nil {
+		return nil
+	}
+
+	answers := make([]*model.ExchangeQuoteAnswer, 0, len(protoQuote.Answers))
+	for _, a := range protoQuote.Answers {
+		answers = append(answers, &model.ExchangeQuoteAnswer{
+			ID:              a.Id,
+			QuoteID:         a.QuoteId,
+			QuestionKey:     a.QuestionKey,
+			OptionKey:       a.OptionKey,
+			DeductionAmount: a.DeductionAmount,
+			IsFatal:         a.IsFatal,
+		})
+	}
+
+	var variant *string
+	if protoQuote.OldVariant != "" {
+		variant = &protoQuote.OldVariant
+	}
+	var serial *string
+	if protoQuote.SerialOrImei != "" {
+		serial = &protoQuote.SerialOrImei
+	}
+	var reason *string
+	if protoQuote.DisqualificationReason != "" {
+		reason = &protoQuote.DisqualificationReason
+	}
+	var createdAt *string
+	if protoQuote.CreatedAt != "" {
+		createdAt = &protoQuote.CreatedAt
+	}
+	var updatedAt *string
+	if protoQuote.UpdatedAt != "" {
+		updatedAt = &protoQuote.UpdatedAt
+	}
+
+	return &model.ExchangeQuote{
+		ID:                     protoQuote.Id,
+		UserID:                 protoQuote.UserId,
+		NewProductID:           protoQuote.NewProductId,
+		CategoryCode:           protoQuote.CategoryCode,
+		OldBrand:               protoQuote.OldBrand,
+		OldModel:               protoQuote.OldModel,
+		OldVariant:             variant,
+		SerialOrImei:           serial,
+		BaseExchangeValue:      protoQuote.BaseExchangeValue,
+		TotalDeductions:        protoQuote.TotalDeductions,
+		FinalDiscount:          protoQuote.FinalDiscount,
+		IsDisqualified:         protoQuote.IsDisqualified,
+		DisqualificationReason: reason,
+		Status:                 protoQuote.Status,
+		ExpiresAt:              protoQuote.ExpiresAt,
+		Answers:                answers,
+		CreatedAt:              createdAt,
+		UpdatedAt:              updatedAt,
+	}
+}
 func (r *Resolver) getReturnClient() (returnpb.ReturnServiceClient, error) {
 	if r.Clients != nil && r.Clients.ReturnClient != nil {
 		return r.Clients.ReturnClient, nil
@@ -786,10 +1091,7 @@ func toModelExchange(protoExc *returnpb.Exchange) *model.Exchange {
 
 	res := &model.Exchange{
 		ID:                protoExc.Id,
-		OrderID:           protoExc.OrderId,
-		OrderItemID:       protoExc.OrderItemId,
 		UserID:            protoExc.UserId,
-		NewProductID:      protoExc.NewProductId,
 		OldBrand:          protoExc.OldBrand,
 		OldModel:          protoExc.OldModel,
 		BaseExchangeValue: protoExc.BaseExchangeValue,
@@ -797,8 +1099,27 @@ func toModelExchange(protoExc *returnpb.Exchange) *model.Exchange {
 		Status:            protoExc.Status,
 	}
 
+	if protoExc.OrderId != "" {
+		res.OrderID = &protoExc.OrderId
+	}
+	if protoExc.OrderItemId != "" {
+		res.OrderItemID = &protoExc.OrderItemId
+	}
+	if protoExc.NewProductId != "" {
+		res.NewProductID = &protoExc.NewProductId
+	}
+	if protoExc.ProductId != "" {
+		res.ProductID = &protoExc.ProductId
+	}
+	if protoExc.ExchangeDeviceCatalogId != "" {
+		res.ExchangeDeviceCatalogID = &protoExc.ExchangeDeviceCatalogId
+	}
+
 	if protoExc.OldVariant != "" {
 		res.OldVariant = &protoExc.OldVariant
+	}
+	if protoExc.QuoteId != "" {
+		res.QuoteID = &protoExc.QuoteId
 	}
 	if protoExc.SerialOrImei != "" {
 		res.SerialOrImei = &protoExc.SerialOrImei

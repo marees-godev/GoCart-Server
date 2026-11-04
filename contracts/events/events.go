@@ -466,3 +466,47 @@ type PartnerRegisteredEvent struct {
 	ContactNumber string `json:"contact_number"`
 }
 
+// ExchangeOfferAppliedEvent represents the payload when an exchange offer is locked & applied to an order.
+type ExchangeOfferAppliedEvent struct {
+	ExchangeID        string    `json:"exchange_id"`
+	QuoteID           string    `json:"quote_id,omitempty"`
+	OrderID           string    `json:"order_id"`
+	OrderItemID       string    `json:"order_item_id"`
+	UserID            string    `json:"user_id"`
+	NewProductID      string    `json:"new_product_id"`
+	OldBrand          string    `json:"old_brand"`
+	OldModel          string    `json:"old_model"`
+	OldVariant        string    `json:"old_variant,omitempty"`
+	SerialOrIMEI      string    `json:"serial_or_imei,omitempty"`
+	BaseExchangeValue float64   `json:"base_exchange_value"`
+	DiscountAmount    float64   `json:"discount_amount"`
+	AppliedAt         time.Time `json:"applied_at"`
+}
+
+// ExchangeVerifiedEvent represents the payload when a delivery partner verifies the exchange product at the doorstep.
+type ExchangeVerifiedEvent struct {
+	ExchangeID       string    `json:"exchange_id"`
+	OrderID          string    `json:"order_id"`
+	VerifiedBy       string    `json:"verified_by"`
+	ConditionRating  string    `json:"condition_rating"`
+	IsApproved       bool      `json:"is_approved"`
+	ScreenIntact     bool      `json:"screen_intact"`
+	BodyIntact       bool      `json:"body_intact"`
+	Functional       bool      `json:"functional"`
+	SerialMatches    bool      `json:"serial_matches"`
+	AdjustedDiscount float64   `json:"adjusted_discount"`
+	PriceDifference  float64   `json:"price_difference"`
+	Notes            string    `json:"notes,omitempty"`
+	VerifiedAt       time.Time `json:"verified_at"`
+}
+
+// ExchangeCompletedEvent represents the payload when an exchange is successfully completed.
+type ExchangeCompletedEvent struct {
+	ExchangeID    string    `json:"exchange_id"`
+	OrderID       string    `json:"order_id"`
+	OrderItemID   string    `json:"order_item_id"`
+	UserID        string    `json:"user_id"`
+	FinalDiscount float64   `json:"final_discount"`
+	CompletedAt   time.Time `json:"completed_at"`
+}
+

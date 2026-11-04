@@ -16,6 +16,12 @@ service ReturnService {
   rpc CreateExchange (CreateExchangeRequest) returns (CreateExchangeResponse);
   rpc GetExchange (GetExchangeRequest) returns (GetExchangeResponse);
   rpc VerifyExchangeProduct (VerifyExchangeProductRequest) returns (VerifyExchangeProductResponse);
+  rpc GetExchangeQuestions (GetExchangeQuestionsRequest) returns (GetExchangeQuestionsResponse);
+  rpc CalculateExchangeValuation (CalculateExchangeValuationRequest) returns (CalculateExchangeValuationResponse);
+  rpc LockExchangeQuote (LockExchangeQuoteRequest) returns (LockExchangeQuoteResponse);
+  rpc GetExchangeQuote (GetExchangeQuoteRequest) returns (GetExchangeQuoteResponse);
+  rpc ApplyExchangeToOrder (ApplyExchangeToOrderRequest) returns (ApplyExchangeToOrderResponse);
+  rpc ResolveExchangeMismatch (ResolveExchangeMismatchRequest) returns (ResolveExchangeMismatchResponse);
 }
 
 message ReturnOrder {
@@ -181,19 +187,21 @@ message Exchange {
   ExchangeVerification verification = 16;
   string created_at = 17;
   string updated_at = 18;
+  string quote_id = 19;
+  string product_id = 20;
+  string exchange_device_catalog_id = 21;
 }
 
 message CreateExchangeRequest {
-  string order_id = 1;
-  string order_item_id = 2;
+  reserved 1, 2, 4, 9;
   string user_id = 3;
-  string new_product_id = 4;
   string old_brand = 5;
   string old_model = 6;
   string old_variant = 7;
   string serial_or_imei = 8;
-  double base_exchange_value = 9;
   repeated ExchangeQuestionAnswer answers = 10;
+  string exchange_device_catalog_id = 11;
+  string product_id = 12;
 }
 
 message CreateExchangeResponse {
@@ -226,5 +234,150 @@ message VerifyExchangeProductRequest {
 message VerifyExchangeProductResponse {
   Exchange exchange = 1;
   ExchangeVerification verification = 2;
+}
+
+message ExchangeQuestionOption {
+  string id = 1;
+  string question_id = 2;
+  string option_key = 3;
+  string option_label = 4;
+  double deduction_amount = 5;
+  bool is_fatal_disqualifier = 6;
+  string rejection_reason = 7;
+  int32 display_order = 8;
+}
+
+message ExchangeDiagnosticQuestion {
+  string id = 1;
+  string category_code = 2;
+  string question_key = 3;
+  string question_text = 4;
+  int32 display_order = 5;
+  repeated ExchangeQuestionOption options = 6;
+}
+
+message ExchangeDeviceOption {
+  string id = 1;
+  string category_code = 2;
+  string brand = 3;
+  string model = 4;
+  string variant = 5;
+  double base_exchange_value = 6;
+}
+
+message GetExchangeQuestionsRequest {
+  string category_code = 1;
+  optional string product_id = 2;
+}
+
+message GetExchangeQuestionsResponse {
+  repeated ExchangeDiagnosticQuestion questions = 1;
+  repeated ExchangeDeviceOption devices = 2;
+}
+
+message ExchangeUserAnswer {
+  string question_key = 1;
+  string option_key = 2;
+}
+
+message ExchangeDeductionDetail {
+  string question_key = 1;
+  string option_key = 2;
+  double deduction_amount = 3;
+  bool is_fatal = 4;
+  string rejection_reason = 5;
+}
+
+message CalculateExchangeValuationRequest {
+  string new_product_id = 1;
+  string category_code = 2;
+  string old_brand = 3;
+  string old_model = 4;
+  string old_variant = 5;
+  repeated ExchangeUserAnswer answers = 6;
+}
+
+message CalculateExchangeValuationResponse {
+  bool is_eligible = 1;
+  string rejection_reason = 2;
+  double base_exchange_value = 3;
+  double total_deductions = 4;
+  double final_discount = 5;
+  repeated ExchangeDeductionDetail deductions = 6;
+}
+
+message ExchangeQuoteAnswer {
+  string id = 1;
+  string quote_id = 2;
+  string question_key = 3;
+  string option_key = 4;
+  double deduction_amount = 5;
+  bool is_fatal = 6;
+}
+
+message ExchangeQuote {
+  string id = 1;
+  string user_id = 2;
+  string new_product_id = 3;
+  string category_code = 4;
+  string old_brand = 5;
+  string old_model = 6;
+  string old_variant = 7;
+  string serial_or_imei = 8;
+  double base_exchange_value = 9;
+  double total_deductions = 10;
+  double final_discount = 11;
+  bool is_disqualified = 12;
+  string disqualification_reason = 13;
+  string status = 14;
+  string expires_at = 15;
+  repeated ExchangeQuoteAnswer answers = 16;
+  string created_at = 17;
+  string updated_at = 18;
+}
+
+message LockExchangeQuoteRequest {
+  string user_id = 1;
+  string new_product_id = 2;
+  string category_code = 3;
+  string old_brand = 4;
+  string old_model = 5;
+  string old_variant = 6;
+  string serial_or_imei = 7;
+  repeated ExchangeUserAnswer answers = 8;
+}
+
+message LockExchangeQuoteResponse {
+  ExchangeQuote quote = 1;
+}
+
+message GetExchangeQuoteRequest {
+  string id = 1;
+}
+
+message GetExchangeQuoteResponse {
+  ExchangeQuote quote = 1;
+}
+
+message ApplyExchangeToOrderRequest {
+  string quote_id = 1;
+  string order_id = 2;
+  string order_item_id = 3;
+  string user_id = 4;
+}
+
+message ApplyExchangeToOrderResponse {
+  Exchange exchange = 1;
+}
+
+message ResolveExchangeMismatchRequest {
+  string exchange_id = 1;
+  string action = 2;
+  string payment_method = 3;
+  string notes = 4;
+}
+
+message ResolveExchangeMismatchResponse {
+  Exchange exchange = 1;
 }
 

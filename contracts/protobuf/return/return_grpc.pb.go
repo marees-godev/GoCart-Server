@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v7.36.0
-// source: contracts/protobuf/return/return.proto
+// source: return.proto
 
 package returns
 
@@ -19,17 +19,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ReturnService_RequestReturn_FullMethodName         = "/gocart.return.v1.ReturnService/RequestReturn"
-	ReturnService_GetReturn_FullMethodName             = "/gocart.return.v1.ReturnService/GetReturn"
-	ReturnService_UpdateReturnStatus_FullMethodName    = "/gocart.return.v1.ReturnService/UpdateReturnStatus"
-	ReturnService_ApproveReturn_FullMethodName         = "/gocart.return.v1.ReturnService/ApproveReturn"
-	ReturnService_RejectReturn_FullMethodName          = "/gocart.return.v1.ReturnService/RejectReturn"
-	ReturnService_VerifyProduct_FullMethodName         = "/gocart.return.v1.ReturnService/VerifyProduct"
-	ReturnService_ListReturns_FullMethodName           = "/gocart.return.v1.ReturnService/ListReturns"
-	ReturnService_GetReturnsByOrder_FullMethodName     = "/gocart.return.v1.ReturnService/GetReturnsByOrder"
-	ReturnService_CreateExchange_FullMethodName        = "/gocart.return.v1.ReturnService/CreateExchange"
-	ReturnService_GetExchange_FullMethodName           = "/gocart.return.v1.ReturnService/GetExchange"
-	ReturnService_VerifyExchangeProduct_FullMethodName = "/gocart.return.v1.ReturnService/VerifyExchangeProduct"
+	ReturnService_RequestReturn_FullMethodName              = "/gocart.return.v1.ReturnService/RequestReturn"
+	ReturnService_GetReturn_FullMethodName                  = "/gocart.return.v1.ReturnService/GetReturn"
+	ReturnService_UpdateReturnStatus_FullMethodName         = "/gocart.return.v1.ReturnService/UpdateReturnStatus"
+	ReturnService_ApproveReturn_FullMethodName              = "/gocart.return.v1.ReturnService/ApproveReturn"
+	ReturnService_RejectReturn_FullMethodName               = "/gocart.return.v1.ReturnService/RejectReturn"
+	ReturnService_VerifyProduct_FullMethodName              = "/gocart.return.v1.ReturnService/VerifyProduct"
+	ReturnService_ListReturns_FullMethodName                = "/gocart.return.v1.ReturnService/ListReturns"
+	ReturnService_GetReturnsByOrder_FullMethodName          = "/gocart.return.v1.ReturnService/GetReturnsByOrder"
+	ReturnService_CreateExchange_FullMethodName             = "/gocart.return.v1.ReturnService/CreateExchange"
+	ReturnService_GetExchange_FullMethodName                = "/gocart.return.v1.ReturnService/GetExchange"
+	ReturnService_VerifyExchangeProduct_FullMethodName      = "/gocart.return.v1.ReturnService/VerifyExchangeProduct"
+	ReturnService_GetExchangeQuestions_FullMethodName       = "/gocart.return.v1.ReturnService/GetExchangeQuestions"
+	ReturnService_CalculateExchangeValuation_FullMethodName = "/gocart.return.v1.ReturnService/CalculateExchangeValuation"
+	ReturnService_LockExchangeQuote_FullMethodName          = "/gocart.return.v1.ReturnService/LockExchangeQuote"
+	ReturnService_GetExchangeQuote_FullMethodName           = "/gocart.return.v1.ReturnService/GetExchangeQuote"
+	ReturnService_ApplyExchangeToOrder_FullMethodName       = "/gocart.return.v1.ReturnService/ApplyExchangeToOrder"
+	ReturnService_ResolveExchangeMismatch_FullMethodName    = "/gocart.return.v1.ReturnService/ResolveExchangeMismatch"
 )
 
 // ReturnServiceClient is the client API for ReturnService service.
@@ -47,6 +53,12 @@ type ReturnServiceClient interface {
 	CreateExchange(ctx context.Context, in *CreateExchangeRequest, opts ...grpc.CallOption) (*CreateExchangeResponse, error)
 	GetExchange(ctx context.Context, in *GetExchangeRequest, opts ...grpc.CallOption) (*GetExchangeResponse, error)
 	VerifyExchangeProduct(ctx context.Context, in *VerifyExchangeProductRequest, opts ...grpc.CallOption) (*VerifyExchangeProductResponse, error)
+	GetExchangeQuestions(ctx context.Context, in *GetExchangeQuestionsRequest, opts ...grpc.CallOption) (*GetExchangeQuestionsResponse, error)
+	CalculateExchangeValuation(ctx context.Context, in *CalculateExchangeValuationRequest, opts ...grpc.CallOption) (*CalculateExchangeValuationResponse, error)
+	LockExchangeQuote(ctx context.Context, in *LockExchangeQuoteRequest, opts ...grpc.CallOption) (*LockExchangeQuoteResponse, error)
+	GetExchangeQuote(ctx context.Context, in *GetExchangeQuoteRequest, opts ...grpc.CallOption) (*GetExchangeQuoteResponse, error)
+	ApplyExchangeToOrder(ctx context.Context, in *ApplyExchangeToOrderRequest, opts ...grpc.CallOption) (*ApplyExchangeToOrderResponse, error)
+	ResolveExchangeMismatch(ctx context.Context, in *ResolveExchangeMismatchRequest, opts ...grpc.CallOption) (*ResolveExchangeMismatchResponse, error)
 }
 
 type returnServiceClient struct {
@@ -167,6 +179,66 @@ func (c *returnServiceClient) VerifyExchangeProduct(ctx context.Context, in *Ver
 	return out, nil
 }
 
+func (c *returnServiceClient) GetExchangeQuestions(ctx context.Context, in *GetExchangeQuestionsRequest, opts ...grpc.CallOption) (*GetExchangeQuestionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetExchangeQuestionsResponse)
+	err := c.cc.Invoke(ctx, ReturnService_GetExchangeQuestions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) CalculateExchangeValuation(ctx context.Context, in *CalculateExchangeValuationRequest, opts ...grpc.CallOption) (*CalculateExchangeValuationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CalculateExchangeValuationResponse)
+	err := c.cc.Invoke(ctx, ReturnService_CalculateExchangeValuation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) LockExchangeQuote(ctx context.Context, in *LockExchangeQuoteRequest, opts ...grpc.CallOption) (*LockExchangeQuoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LockExchangeQuoteResponse)
+	err := c.cc.Invoke(ctx, ReturnService_LockExchangeQuote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) GetExchangeQuote(ctx context.Context, in *GetExchangeQuoteRequest, opts ...grpc.CallOption) (*GetExchangeQuoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetExchangeQuoteResponse)
+	err := c.cc.Invoke(ctx, ReturnService_GetExchangeQuote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) ApplyExchangeToOrder(ctx context.Context, in *ApplyExchangeToOrderRequest, opts ...grpc.CallOption) (*ApplyExchangeToOrderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApplyExchangeToOrderResponse)
+	err := c.cc.Invoke(ctx, ReturnService_ApplyExchangeToOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *returnServiceClient) ResolveExchangeMismatch(ctx context.Context, in *ResolveExchangeMismatchRequest, opts ...grpc.CallOption) (*ResolveExchangeMismatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveExchangeMismatchResponse)
+	err := c.cc.Invoke(ctx, ReturnService_ResolveExchangeMismatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReturnServiceServer is the server API for ReturnService service.
 // All implementations must embed UnimplementedReturnServiceServer
 // for forward compatibility.
@@ -182,6 +254,12 @@ type ReturnServiceServer interface {
 	CreateExchange(context.Context, *CreateExchangeRequest) (*CreateExchangeResponse, error)
 	GetExchange(context.Context, *GetExchangeRequest) (*GetExchangeResponse, error)
 	VerifyExchangeProduct(context.Context, *VerifyExchangeProductRequest) (*VerifyExchangeProductResponse, error)
+	GetExchangeQuestions(context.Context, *GetExchangeQuestionsRequest) (*GetExchangeQuestionsResponse, error)
+	CalculateExchangeValuation(context.Context, *CalculateExchangeValuationRequest) (*CalculateExchangeValuationResponse, error)
+	LockExchangeQuote(context.Context, *LockExchangeQuoteRequest) (*LockExchangeQuoteResponse, error)
+	GetExchangeQuote(context.Context, *GetExchangeQuoteRequest) (*GetExchangeQuoteResponse, error)
+	ApplyExchangeToOrder(context.Context, *ApplyExchangeToOrderRequest) (*ApplyExchangeToOrderResponse, error)
+	ResolveExchangeMismatch(context.Context, *ResolveExchangeMismatchRequest) (*ResolveExchangeMismatchResponse, error)
 	mustEmbedUnimplementedReturnServiceServer()
 }
 
@@ -224,6 +302,24 @@ func (UnimplementedReturnServiceServer) GetExchange(context.Context, *GetExchang
 }
 func (UnimplementedReturnServiceServer) VerifyExchangeProduct(context.Context, *VerifyExchangeProductRequest) (*VerifyExchangeProductResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyExchangeProduct not implemented")
+}
+func (UnimplementedReturnServiceServer) GetExchangeQuestions(context.Context, *GetExchangeQuestionsRequest) (*GetExchangeQuestionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetExchangeQuestions not implemented")
+}
+func (UnimplementedReturnServiceServer) CalculateExchangeValuation(context.Context, *CalculateExchangeValuationRequest) (*CalculateExchangeValuationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CalculateExchangeValuation not implemented")
+}
+func (UnimplementedReturnServiceServer) LockExchangeQuote(context.Context, *LockExchangeQuoteRequest) (*LockExchangeQuoteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LockExchangeQuote not implemented")
+}
+func (UnimplementedReturnServiceServer) GetExchangeQuote(context.Context, *GetExchangeQuoteRequest) (*GetExchangeQuoteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetExchangeQuote not implemented")
+}
+func (UnimplementedReturnServiceServer) ApplyExchangeToOrder(context.Context, *ApplyExchangeToOrderRequest) (*ApplyExchangeToOrderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApplyExchangeToOrder not implemented")
+}
+func (UnimplementedReturnServiceServer) ResolveExchangeMismatch(context.Context, *ResolveExchangeMismatchRequest) (*ResolveExchangeMismatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResolveExchangeMismatch not implemented")
 }
 func (UnimplementedReturnServiceServer) mustEmbedUnimplementedReturnServiceServer() {}
 func (UnimplementedReturnServiceServer) testEmbeddedByValue()                       {}
@@ -444,6 +540,114 @@ func _ReturnService_VerifyExchangeProduct_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReturnService_GetExchangeQuestions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExchangeQuestionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).GetExchangeQuestions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_GetExchangeQuestions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).GetExchangeQuestions(ctx, req.(*GetExchangeQuestionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_CalculateExchangeValuation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CalculateExchangeValuationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).CalculateExchangeValuation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_CalculateExchangeValuation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).CalculateExchangeValuation(ctx, req.(*CalculateExchangeValuationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_LockExchangeQuote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LockExchangeQuoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).LockExchangeQuote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_LockExchangeQuote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).LockExchangeQuote(ctx, req.(*LockExchangeQuoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_GetExchangeQuote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExchangeQuoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).GetExchangeQuote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_GetExchangeQuote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).GetExchangeQuote(ctx, req.(*GetExchangeQuoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_ApplyExchangeToOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyExchangeToOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).ApplyExchangeToOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_ApplyExchangeToOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).ApplyExchangeToOrder(ctx, req.(*ApplyExchangeToOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReturnService_ResolveExchangeMismatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveExchangeMismatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReturnServiceServer).ResolveExchangeMismatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReturnService_ResolveExchangeMismatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReturnServiceServer).ResolveExchangeMismatch(ctx, req.(*ResolveExchangeMismatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReturnService_ServiceDesc is the grpc.ServiceDesc for ReturnService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -495,7 +699,31 @@ var ReturnService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "VerifyExchangeProduct",
 			Handler:    _ReturnService_VerifyExchangeProduct_Handler,
 		},
+		{
+			MethodName: "GetExchangeQuestions",
+			Handler:    _ReturnService_GetExchangeQuestions_Handler,
+		},
+		{
+			MethodName: "CalculateExchangeValuation",
+			Handler:    _ReturnService_CalculateExchangeValuation_Handler,
+		},
+		{
+			MethodName: "LockExchangeQuote",
+			Handler:    _ReturnService_LockExchangeQuote_Handler,
+		},
+		{
+			MethodName: "GetExchangeQuote",
+			Handler:    _ReturnService_GetExchangeQuote_Handler,
+		},
+		{
+			MethodName: "ApplyExchangeToOrder",
+			Handler:    _ReturnService_ApplyExchangeToOrder_Handler,
+		},
+		{
+			MethodName: "ResolveExchangeMismatch",
+			Handler:    _ReturnService_ResolveExchangeMismatch_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "contracts/protobuf/return/return.proto",
+	Metadata: "return.proto",
 }

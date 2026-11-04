@@ -39,6 +39,8 @@ type Product {
   tax: Float!
   status: ProductStatus!
   imageUrl: String
+  isExchangeEligible: Boolean
+  maxExchangeDiscount: Float
   images: [String!]
   variants: [ProductVariant!]
   avgRating: Float!
@@ -82,6 +84,8 @@ input CreateProductInput {
   tax: Float
   status: ProductStatus
   imageUrl: String
+  isExchangeEligible: Boolean
+  maxExchangeDiscount: Float
   images: [String!]
   imagesUpload: [Upload!]
   variants: [CreateProductVariantInput!]
@@ -106,6 +110,8 @@ input UpdateProductInput {
   tax: Float
   status: ProductStatus
   imageUrl: String
+  isExchangeEligible: Boolean
+  maxExchangeDiscount: Float
   categoryId: String
   images: [String!]
   imagesUpload: [Upload!]

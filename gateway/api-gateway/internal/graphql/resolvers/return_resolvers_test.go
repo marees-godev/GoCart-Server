@@ -1,9 +1,11 @@
 package resolvers
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
+	"github.com/99designs/gqlgen/graphql"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
@@ -161,17 +163,16 @@ func (m *mockReturnClient) CreateExchange(ctx context.Context, in *returnpb.Crea
 	m.lastCreateExcReq = in
 	return &returnpb.CreateExchangeResponse{
 		Exchange: &returnpb.Exchange{
-			Id:                "exc-100",
-			OrderId:           in.OrderId,
-			OrderItemId:       in.OrderItemId,
-			UserId:            in.UserId,
-			NewProductId:      in.NewProductId,
-			OldBrand:          in.OldBrand,
-			OldModel:          in.OldModel,
-			BaseExchangeValue: in.BaseExchangeValue,
-			EstimatedDiscount: in.BaseExchangeValue,
-			Status:            "ESTIMATED",
-			Answers:           in.Answers,
+			Id:                      "exc-100",
+			UserId:                  in.UserId,
+			OldBrand:                in.OldBrand,
+			OldModel:                in.OldModel,
+			ProductId:               in.ProductId,
+			ExchangeDeviceCatalogId: in.ExchangeDeviceCatalogId,
+			BaseExchangeValue:       300.0,
+			EstimatedDiscount:       300.0,
+			Status:                  "ESTIMATED",
+			Answers:                 in.Answers,
 		},
 	}, nil
 }
@@ -419,11 +420,18 @@ func TestVerifyProduct_Success_DeliveryPartner(t *testing.T) {
 	})
 
 	notes := "Product is defective but packaging is intact"
+	uploadData1 := []byte("proof-image-1")
+	up1 := &graphql.Upload{
+		File:        bytes.NewReader(uploadData1),
+		Filename:    "proof1.jpg",
+		ContentType: "image/jpeg",
+		Size:        int64(len(uploadData1)),
+	}
 	input := model.VerifyProductInput{
 		ReturnID:    "ret-100",
 		Condition:   "DEFECTIVE",
 		IsApproved:  true,
-		ProofImages: []string{"https://storage.gocart.internal/proof/1.jpg"},
+		ProofImages: []*graphql.Upload{up1},
 		Notes:       &notes,
 	}
 
@@ -470,6 +478,69 @@ func TestVerifyProduct_Success_WithoutImages(t *testing.T) {
 	if res.Status != "VERIFIED" {
 		t.Errorf("expected status 'VERIFIED', got '%s'", res.Status)
 	}
+	if res.Verification != nil && len(res.Verification.ProofImages) != 0 {
+		t.Errorf("expected 0 proof images, got %d", len(res.Verification.ProofImages))
+	}
+}
+
+func TestVerifyProduct_Success_WithNilProofImages(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "user-dp-1",
+		PartnerID: "partner-999",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	input := model.VerifyProductInput{
+		ReturnID:    "ret-100",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: nil,
+	}
+
+	res, err := resolver.Mutation().VerifyProduct(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error when verifying with nil images: %v", err)
+	}
+	if res.Status != "VERIFIED" {
+		t.Errorf("expected status 'VERIFIED', got '%s'", res.Status)
+	}
+	if res.Verification != nil && len(res.Verification.ProofImages) != 0 {
+		t.Errorf("expected 0 proof images, got %d", len(res.Verification.ProofImages))
+	}
+}
+
+func TestVerifyProduct_Success_WithEmptyProofImages(t *testing.T) {
+	mockClient := &mockReturnClient{}
+	clients := &grpc.Clients{ReturnClient: mockClient}
+	resolver := NewResolver(clients)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "user-dp-1",
+		PartnerID: "partner-999",
+		Role:      "DELIVERY_PARTNER",
+	})
+
+	input := model.VerifyProductInput{
+		ReturnID:    "ret-100",
+		Condition:   "GOOD",
+		IsApproved:  true,
+		ProofImages: []*graphql.Upload{},
+	}
+
+	res, err := resolver.Mutation().VerifyProduct(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error when verifying with empty images: %v", err)
+	}
+	if res.Status != "VERIFIED" {
+		t.Errorf("expected status 'VERIFIED', got '%s'", res.Status)
+	}
+	if res.Verification != nil && len(res.Verification.ProofImages) != 0 {
+		t.Errorf("expected 0 proof images, got %d", len(res.Verification.ProofImages))
+	}
 }
 
 func TestVerifyProduct_Success_WithMultipleImages(t *testing.T) {
@@ -483,15 +554,25 @@ func TestVerifyProduct_Success_WithMultipleImages(t *testing.T) {
 		Role:      "DELIVERY_PARTNER",
 	})
 
-	images := []string{
-		"https://storage.gocart.internal/proof/img1.jpg",
-		"https://storage.gocart.internal/proof/img2.jpg",
+	uploadData1 := []byte("proof-image-1")
+	up1 := &graphql.Upload{
+		File:        bytes.NewReader(uploadData1),
+		Filename:    "proof1.jpg",
+		ContentType: "image/jpeg",
+		Size:        int64(len(uploadData1)),
+	}
+	uploadData2 := []byte("proof-image-2")
+	up2 := &graphql.Upload{
+		File:        bytes.NewReader(uploadData2),
+		Filename:    "proof2.jpg",
+		ContentType: "image/jpeg",
+		Size:        int64(len(uploadData2)),
 	}
 	input := model.VerifyProductInput{
 		ReturnID:    "ret-100",
 		Condition:   "DEFECTIVE",
 		IsApproved:  true,
-		ProofImages: images,
+		ProofImages: []*graphql.Upload{up1, up2},
 	}
 
 	res, err := resolver.Mutation().VerifyProduct(ctx, input)
@@ -519,11 +600,18 @@ func TestVerifyProduct_ForbiddenCustomer(t *testing.T) {
 		Role:   "USER",
 	})
 
+	uploadData1 := []byte("proof-image-1")
+	up1 := &graphql.Upload{
+		File:        bytes.NewReader(uploadData1),
+		Filename:    "proof1.jpg",
+		ContentType: "image/jpeg",
+		Size:        int64(len(uploadData1)),
+	}
 	input := model.VerifyProductInput{
 		ReturnID:    "ret-100",
 		Condition:   "GOOD",
 		IsApproved:  true,
-		ProofImages: []string{"https://img.jpg"},
+		ProofImages: []*graphql.Upload{up1},
 	}
 
 	_, err := resolver.Mutation().VerifyProduct(ctx, input)
@@ -799,13 +887,13 @@ func TestCreateExchange_Success(t *testing.T) {
 	})
 
 	ded := 50.0
+	brand := "Apple"
+	modelName := "iPhone 12"
 	input := model.CreateExchangeInput{
-		OrderID:           "order-1",
-		OrderItemID:       "item-1",
-		NewProductID:      "prod-2",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-1",
+		ExchangeDeviceCatalogID: "catalog-1",
+		OldBrand:                &brand,
+		OldModel:                &modelName,
 		Answers: []*model.ExchangeQuestionAnswerInput{
 			{
 				QuestionKey:     "screen_condition",
@@ -826,6 +914,12 @@ func TestCreateExchange_Success(t *testing.T) {
 	if mockClient.lastCreateExcReq.UserId != "user-123" {
 		t.Errorf("expected user ID 'user-123', got '%s'", mockClient.lastCreateExcReq.UserId)
 	}
+	if mockClient.lastCreateExcReq.ProductId != "prod-1" {
+		t.Errorf("expected product ID 'prod-1', got '%s'", mockClient.lastCreateExcReq.ProductId)
+	}
+	if mockClient.lastCreateExcReq.ExchangeDeviceCatalogId != "catalog-1" {
+		t.Errorf("expected catalog ID 'catalog-1', got '%s'", mockClient.lastCreateExcReq.ExchangeDeviceCatalogId)
+	}
 	if len(mockClient.lastCreateExcReq.Answers) != 1 {
 		t.Fatalf("expected 1 answer, got %d", len(mockClient.lastCreateExcReq.Answers))
 	}
@@ -839,13 +933,13 @@ func TestCreateExchange_Unauthorized(t *testing.T) {
 	clients := &grpc.Clients{ReturnClient: mockClient}
 	resolver := NewResolver(clients)
 
+	brand := "Apple"
+	modelName := "iPhone 12"
 	input := model.CreateExchangeInput{
-		OrderID:           "order-1",
-		OrderItemID:       "item-1",
-		NewProductID:      "prod-2",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-1",
+		ExchangeDeviceCatalogID: "catalog-1",
+		OldBrand:                &brand,
+		OldModel:                &modelName,
 	}
 
 	_, err := resolver.Mutation().CreateExchange(context.Background(), input)
@@ -860,14 +954,14 @@ func TestCreateExchange_WithInputUserID_Success(t *testing.T) {
 	resolver := NewResolver(clients)
 
 	targetUser := "user-custom-456"
+	brand := "Apple"
+	modelName := "iPhone 12"
 	input := model.CreateExchangeInput{
-		OrderID:           "order-1",
-		UserID:            &targetUser,
-		OrderItemID:       "item-1",
-		NewProductID:      "prod-2",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-1",
+		ExchangeDeviceCatalogID: "catalog-1",
+		UserID:                  &targetUser,
+		OldBrand:                &brand,
+		OldModel:                &modelName,
 	}
 
 	exc, err := resolver.Mutation().CreateExchange(context.Background(), input)
@@ -893,14 +987,14 @@ func TestCreateExchange_Forbidden_OtherUser(t *testing.T) {
 	})
 
 	otherUser := "user-999"
+	brand := "Apple"
+	modelName := "iPhone 12"
 	input := model.CreateExchangeInput{
-		OrderID:           "order-1",
-		UserID:            &otherUser,
-		OrderItemID:       "item-1",
-		NewProductID:      "prod-2",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-1",
+		ExchangeDeviceCatalogID: "catalog-1",
+		UserID:                  &otherUser,
+		OldBrand:                &brand,
+		OldModel:                &modelName,
 	}
 
 	_, err := resolver.Mutation().CreateExchange(ctx, input)
@@ -920,14 +1014,14 @@ func TestCreateExchange_Admin_OverrideCustomer(t *testing.T) {
 	})
 
 	customerUser := "customer-100"
+	brand := "Apple"
+	modelName := "iPhone 12"
 	input := model.CreateExchangeInput{
-		OrderID:           "order-1",
-		UserID:            &customerUser,
-		OrderItemID:       "item-1",
-		NewProductID:      "prod-2",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-1",
+		ExchangeDeviceCatalogID: "catalog-1",
+		UserID:                  &customerUser,
+		OldBrand:                &brand,
+		OldModel:                &modelName,
 	}
 
 	exc, err := resolver.Mutation().CreateExchange(ctx, input)

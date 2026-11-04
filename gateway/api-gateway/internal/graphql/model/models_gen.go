@@ -38,6 +38,12 @@ type Address struct {
 	UpdatedAt    *string `json:"updatedAt,omitempty"`
 }
 
+type ApplyExchangeToOrderInput struct {
+	QuoteID     string `json:"quoteId"`
+	OrderID     string `json:"orderId"`
+	OrderItemID string `json:"orderItemId"`
+}
+
 type AuthPayload struct {
 	Token        string  `json:"token"`
 	RefreshToken *string `json:"refreshToken,omitempty"`
@@ -60,6 +66,15 @@ type BankAccountInput struct {
 	AccountNumber     string  `json:"accountNumber"`
 	IfscCode          *string `json:"ifscCode,omitempty"`
 	Gstin             *string `json:"gstin,omitempty"`
+}
+
+type CalculateExchangeValuationInput struct {
+	NewProductID string                     `json:"newProductId"`
+	CategoryCode *string                    `json:"categoryCode,omitempty"`
+	OldBrand     string                     `json:"oldBrand"`
+	OldModel     string                     `json:"oldModel"`
+	OldVariant   *string                    `json:"oldVariant,omitempty"`
+	Answers      []*ExchangeUserAnswerInput `json:"answers"`
 }
 
 type Cart struct {
@@ -131,16 +146,14 @@ type CreateDeliveryInput struct {
 }
 
 type CreateExchangeInput struct {
-	OrderID           string                         `json:"orderId"`
-	UserID            *string                        `json:"userId,omitempty"`
-	OrderItemID       string                         `json:"orderItemId"`
-	NewProductID      string                         `json:"newProductId"`
-	OldBrand          string                         `json:"oldBrand"`
-	OldModel          string                         `json:"oldModel"`
-	OldVariant        *string                        `json:"oldVariant,omitempty"`
-	SerialOrImei      *string                        `json:"serialOrImei,omitempty"`
-	BaseExchangeValue float64                        `json:"baseExchangeValue"`
-	Answers           []*ExchangeQuestionAnswerInput `json:"answers,omitempty"`
+	ProductID               string                         `json:"productId"`
+	ExchangeDeviceCatalogID string                         `json:"exchangeDeviceCatalogId"`
+	UserID                  *string                        `json:"userId,omitempty"`
+	OldBrand                *string                        `json:"oldBrand,omitempty"`
+	OldModel                *string                        `json:"oldModel,omitempty"`
+	OldVariant              *string                        `json:"oldVariant,omitempty"`
+	SerialOrImei            *string                        `json:"serialOrImei,omitempty"`
+	Answers                 []*ExchangeQuestionAnswerInput `json:"answers,omitempty"`
 }
 
 type CreateInventoryInput struct {
@@ -165,19 +178,21 @@ type CreateOrderInput struct {
 }
 
 type CreateProductInput struct {
-	StoreID      string                       `json:"storeId"`
-	CategoryID   string                       `json:"categoryId"`
-	Sku          string                       `json:"sku"`
-	Name         string                       `json:"name"`
-	Description  *string                      `json:"description,omitempty"`
-	Price        float64                      `json:"price"`
-	Mrp          float64                      `json:"mrp"`
-	Tax          *float64                     `json:"tax,omitempty"`
-	Status       *ProductStatus               `json:"status,omitempty"`
-	ImageURL     *string                      `json:"imageUrl,omitempty"`
-	Images       []string                     `json:"images,omitempty"`
-	ImagesUpload []*graphql.Upload            `json:"imagesUpload,omitempty"`
-	Variants     []*CreateProductVariantInput `json:"variants,omitempty"`
+	StoreID             string                       `json:"storeId"`
+	CategoryID          string                       `json:"categoryId"`
+	Sku                 string                       `json:"sku"`
+	Name                string                       `json:"name"`
+	Description         *string                      `json:"description,omitempty"`
+	Price               float64                      `json:"price"`
+	Mrp                 float64                      `json:"mrp"`
+	Tax                 *float64                     `json:"tax,omitempty"`
+	Status              *ProductStatus               `json:"status,omitempty"`
+	ImageURL            *string                      `json:"imageUrl,omitempty"`
+	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`
+	MaxExchangeDiscount *float64                     `json:"maxExchangeDiscount,omitempty"`
+	Images              []string                     `json:"images,omitempty"`
+	ImagesUpload        []*graphql.Upload            `json:"imagesUpload,omitempty"`
+	Variants            []*CreateProductVariantInput `json:"variants,omitempty"`
 }
 
 type CreateProductVariantInput struct {
@@ -302,24 +317,53 @@ type DeliveryPartnerProfile struct {
 }
 
 type Exchange struct {
-	ID                string                    `json:"id"`
-	OrderID           string                    `json:"orderId"`
-	OrderItemID       string                    `json:"orderItemId"`
-	UserID            string                    `json:"userId"`
-	NewProductID      string                    `json:"newProductId"`
-	OldBrand          string                    `json:"oldBrand"`
-	OldModel          string                    `json:"oldModel"`
-	OldVariant        *string                   `json:"oldVariant,omitempty"`
-	SerialOrImei      *string                   `json:"serialOrImei,omitempty"`
-	BaseExchangeValue float64                   `json:"baseExchangeValue"`
-	EstimatedDiscount float64                   `json:"estimatedDiscount"`
-	FinalDiscount     *float64                  `json:"finalDiscount,omitempty"`
-	PriceDifference   *float64                  `json:"priceDifference,omitempty"`
-	Status            string                    `json:"status"`
-	Answers           []*ExchangeQuestionAnswer `json:"answers,omitempty"`
-	Verification      *ExchangeVerification     `json:"verification,omitempty"`
-	CreatedAt         *string                   `json:"createdAt,omitempty"`
-	UpdatedAt         *string                   `json:"updatedAt,omitempty"`
+	ID                      string                    `json:"id"`
+	OrderID                 *string                   `json:"orderId,omitempty"`
+	OrderItemID             *string                   `json:"orderItemId,omitempty"`
+	UserID                  string                    `json:"userId"`
+	NewProductID            *string                   `json:"newProductId,omitempty"`
+	ProductID               *string                   `json:"productId,omitempty"`
+	ExchangeDeviceCatalogID *string                   `json:"exchangeDeviceCatalogId,omitempty"`
+	OldBrand                string                    `json:"oldBrand"`
+	OldModel                string                    `json:"oldModel"`
+	OldVariant              *string                   `json:"oldVariant,omitempty"`
+	SerialOrImei            *string                   `json:"serialOrImei,omitempty"`
+	BaseExchangeValue       float64                   `json:"baseExchangeValue"`
+	EstimatedDiscount       float64                   `json:"estimatedDiscount"`
+	FinalDiscount           *float64                  `json:"finalDiscount,omitempty"`
+	PriceDifference         *float64                  `json:"priceDifference,omitempty"`
+	Status                  string                    `json:"status"`
+	QuoteID                 *string                   `json:"quoteId,omitempty"`
+	Answers                 []*ExchangeQuestionAnswer `json:"answers,omitempty"`
+	Verification            *ExchangeVerification     `json:"verification,omitempty"`
+	CreatedAt               *string                   `json:"createdAt,omitempty"`
+	UpdatedAt               *string                   `json:"updatedAt,omitempty"`
+}
+
+type ExchangeDeductionDetail struct {
+	QuestionKey     string  `json:"questionKey"`
+	OptionKey       string  `json:"optionKey"`
+	DeductionAmount float64 `json:"deductionAmount"`
+	IsFatal         bool    `json:"isFatal"`
+	RejectionReason *string `json:"rejectionReason,omitempty"`
+}
+
+type ExchangeDeviceOption struct {
+	ID                string  `json:"id"`
+	CategoryCode      string  `json:"categoryCode"`
+	Brand             string  `json:"brand"`
+	Model             string  `json:"model"`
+	Variant           string  `json:"variant"`
+	BaseExchangeValue float64 `json:"baseExchangeValue"`
+}
+
+type ExchangeDiagnosticQuestion struct {
+	ID           string                    `json:"id"`
+	CategoryCode string                    `json:"categoryCode"`
+	QuestionKey  string                    `json:"questionKey"`
+	QuestionText string                    `json:"questionText"`
+	DisplayOrder int                       `json:"displayOrder"`
+	Options      []*ExchangeQuestionOption `json:"options"`
 }
 
 type ExchangeQuestionAnswer struct {
@@ -335,6 +379,66 @@ type ExchangeQuestionAnswerInput struct {
 	QuestionKey     string   `json:"questionKey"`
 	AnswerValue     string   `json:"answerValue"`
 	DeductionAmount *float64 `json:"deductionAmount,omitempty"`
+}
+
+type ExchangeQuestionOption struct {
+	ID                  string  `json:"id"`
+	QuestionID          string  `json:"questionId"`
+	OptionKey           string  `json:"optionKey"`
+	OptionLabel         string  `json:"optionLabel"`
+	DeductionAmount     float64 `json:"deductionAmount"`
+	IsFatalDisqualifier bool    `json:"isFatalDisqualifier"`
+	RejectionReason     *string `json:"rejectionReason,omitempty"`
+	DisplayOrder        int     `json:"displayOrder"`
+}
+
+type ExchangeQuestionsResponse struct {
+	Questions []*ExchangeDiagnosticQuestion `json:"questions"`
+	Devices   []*ExchangeDeviceOption       `json:"devices"`
+}
+
+type ExchangeQuote struct {
+	ID                     string                 `json:"id"`
+	UserID                 string                 `json:"userId"`
+	NewProductID           string                 `json:"newProductId"`
+	CategoryCode           string                 `json:"categoryCode"`
+	OldBrand               string                 `json:"oldBrand"`
+	OldModel               string                 `json:"oldModel"`
+	OldVariant             *string                `json:"oldVariant,omitempty"`
+	SerialOrImei           *string                `json:"serialOrImei,omitempty"`
+	BaseExchangeValue      float64                `json:"baseExchangeValue"`
+	TotalDeductions        float64                `json:"totalDeductions"`
+	FinalDiscount          float64                `json:"finalDiscount"`
+	IsDisqualified         bool                   `json:"isDisqualified"`
+	DisqualificationReason *string                `json:"disqualificationReason,omitempty"`
+	Status                 string                 `json:"status"`
+	ExpiresAt              string                 `json:"expiresAt"`
+	Answers                []*ExchangeQuoteAnswer `json:"answers,omitempty"`
+	CreatedAt              *string                `json:"createdAt,omitempty"`
+	UpdatedAt              *string                `json:"updatedAt,omitempty"`
+}
+
+type ExchangeQuoteAnswer struct {
+	ID              string  `json:"id"`
+	QuoteID         string  `json:"quoteId"`
+	QuestionKey     string  `json:"questionKey"`
+	OptionKey       string  `json:"optionKey"`
+	DeductionAmount float64 `json:"deductionAmount"`
+	IsFatal         bool    `json:"isFatal"`
+}
+
+type ExchangeUserAnswerInput struct {
+	QuestionKey string `json:"questionKey"`
+	OptionKey   string `json:"optionKey"`
+}
+
+type ExchangeValuationResult struct {
+	IsEligible        bool                       `json:"isEligible"`
+	RejectionReason   *string                    `json:"rejectionReason,omitempty"`
+	BaseExchangeValue float64                    `json:"baseExchangeValue"`
+	TotalDeductions   float64                    `json:"totalDeductions"`
+	FinalDiscount     float64                    `json:"finalDiscount"`
+	Deductions        []*ExchangeDeductionDetail `json:"deductions,omitempty"`
 }
 
 type ExchangeVerification struct {
@@ -382,6 +486,16 @@ type InventoryItem struct {
 	LowStockThreshold int     `json:"lowStockThreshold"`
 	UpdatedAt         string  `json:"updatedAt"`
 	CreatedAt         *string `json:"createdAt,omitempty"`
+}
+
+type LockExchangeQuoteInput struct {
+	NewProductID string                     `json:"newProductId"`
+	CategoryCode *string                    `json:"categoryCode,omitempty"`
+	OldBrand     string                     `json:"oldBrand"`
+	OldModel     string                     `json:"oldModel"`
+	OldVariant   *string                    `json:"oldVariant,omitempty"`
+	SerialOrImei *string                    `json:"serialOrImei,omitempty"`
+	Answers      []*ExchangeUserAnswerInput `json:"answers"`
 }
 
 type LoginInput struct {
@@ -510,23 +624,25 @@ type ProcessPaymentInput struct {
 }
 
 type Product struct {
-	ID          string            `json:"id"`
-	StoreID     string            `json:"storeId"`
-	CategoryID  string            `json:"categoryId"`
-	Sku         string            `json:"sku"`
-	Name        string            `json:"name"`
-	Description *string           `json:"description,omitempty"`
-	Price       float64           `json:"price"`
-	Mrp         float64           `json:"mrp"`
-	Tax         float64           `json:"tax"`
-	Status      ProductStatus     `json:"status"`
-	ImageURL    *string           `json:"imageUrl,omitempty"`
-	Images      []string          `json:"images,omitempty"`
-	Variants    []*ProductVariant `json:"variants,omitempty"`
-	AvgRating   float64           `json:"avgRating"`
-	CreatedAt   *string           `json:"createdAt,omitempty"`
-	UpdatedAt   *string           `json:"updatedAt,omitempty"`
-	DeletedAt   *string           `json:"deletedAt,omitempty"`
+	ID                  string            `json:"id"`
+	StoreID             string            `json:"storeId"`
+	CategoryID          string            `json:"categoryId"`
+	Sku                 string            `json:"sku"`
+	Name                string            `json:"name"`
+	Description         *string           `json:"description,omitempty"`
+	Price               float64           `json:"price"`
+	Mrp                 float64           `json:"mrp"`
+	Tax                 float64           `json:"tax"`
+	Status              ProductStatus     `json:"status"`
+	ImageURL            *string           `json:"imageUrl,omitempty"`
+	IsExchangeEligible  *bool             `json:"isExchangeEligible,omitempty"`
+	MaxExchangeDiscount *float64          `json:"maxExchangeDiscount,omitempty"`
+	Images              []string          `json:"images,omitempty"`
+	Variants            []*ProductVariant `json:"variants,omitempty"`
+	AvgRating           float64           `json:"avgRating"`
+	CreatedAt           *string           `json:"createdAt,omitempty"`
+	UpdatedAt           *string           `json:"updatedAt,omitempty"`
+	DeletedAt           *string           `json:"deletedAt,omitempty"`
 }
 
 type ProductList struct {
@@ -645,6 +761,13 @@ type ResetPasswordWithOtpInput struct {
 	Otp         string   `json:"otp"`
 	NewPassword string   `json:"newPassword"`
 	Role        AuthRole `json:"role"`
+}
+
+type ResolveExchangeMismatchInput struct {
+	ExchangeID    string  `json:"exchangeId"`
+	Action        string  `json:"action"`
+	PaymentMethod *string `json:"paymentMethod,omitempty"`
+	Notes         *string `json:"notes,omitempty"`
 }
 
 type RestockInventoryInput struct {
@@ -793,17 +916,19 @@ type UpdateMerchantInput struct {
 }
 
 type UpdateProductInput struct {
-	Name         *string                      `json:"name,omitempty"`
-	Description  *string                      `json:"description,omitempty"`
-	Price        *float64                     `json:"price,omitempty"`
-	Mrp          *float64                     `json:"mrp,omitempty"`
-	Tax          *float64                     `json:"tax,omitempty"`
-	Status       *ProductStatus               `json:"status,omitempty"`
-	ImageURL     *string                      `json:"imageUrl,omitempty"`
-	CategoryID   *string                      `json:"categoryId,omitempty"`
-	Images       []string                     `json:"images,omitempty"`
-	ImagesUpload []*graphql.Upload            `json:"imagesUpload,omitempty"`
-	Variants     []*UpdateProductVariantInput `json:"variants,omitempty"`
+	Name                *string                      `json:"name,omitempty"`
+	Description         *string                      `json:"description,omitempty"`
+	Price               *float64                     `json:"price,omitempty"`
+	Mrp                 *float64                     `json:"mrp,omitempty"`
+	Tax                 *float64                     `json:"tax,omitempty"`
+	Status              *ProductStatus               `json:"status,omitempty"`
+	ImageURL            *string                      `json:"imageUrl,omitempty"`
+	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`
+	MaxExchangeDiscount *float64                     `json:"maxExchangeDiscount,omitempty"`
+	CategoryID          *string                      `json:"categoryId,omitempty"`
+	Images              []string                     `json:"images,omitempty"`
+	ImagesUpload        []*graphql.Upload            `json:"imagesUpload,omitempty"`
+	Variants            []*UpdateProductVariantInput `json:"variants,omitempty"`
 }
 
 type UpdateProductVariantInput struct {
@@ -899,12 +1024,11 @@ type VerifyExchangeProductInput struct {
 }
 
 type VerifyProductInput struct {
-	ReturnID     string            `json:"returnId"`
-	Condition    string            `json:"condition"`
-	IsApproved   bool              `json:"isApproved"`
-	ProofImages  []string          `json:"proofImages,omitempty"`
-	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
-	Notes        *string           `json:"notes,omitempty"`
+	ReturnID    string            `json:"returnId"`
+	Condition   string            `json:"condition"`
+	IsApproved  bool              `json:"isApproved"`
+	ProofImages []*graphql.Upload `json:"proofImages,omitempty"`
+	Notes       *string           `json:"notes,omitempty"`
 }
 
 type Warehouse struct {
