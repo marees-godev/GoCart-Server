@@ -8,6 +8,13 @@ enum DeliveryStatus {
   CANCELLED
 }
 
+enum PartnerApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPEALED
+}
+
 type Delivery {
   id: ID!
   orderId: String!
@@ -17,6 +24,7 @@ type Delivery {
   deliveredAt: String
   deliveryPartner: String!
   shippingAddress: String
+  shippingAddressId: String
   contactNumber: String
   createdAt: String
   updatedAt: String
@@ -35,7 +43,17 @@ type DeliveryPartnerProfile {
   companyName: String
   email: String!
   contactNumber: String
+  gstin: String
+  isGstinVerified: Boolean!
   isActive: Boolean!
+  approvalStatus: PartnerApprovalStatus!
+  rejectionReason: String
+  appealReason: String
+  deactivationReason: String
+  deletionReason: String
+  appealedAt: String
+  deactivatedAt: String
+  deletedAt: String
   createdAt: String
   updatedAt: String
 }
@@ -45,6 +63,19 @@ input UpdateDeliveryPartnerProfileInput {
   companyName: String
   email: String
   contactNumber: String
+  gstin: String
+}
+
+type DeliveryPartnerActionResponse {
+  success: Boolean!
+  message: String!
+  status: String!
+}
+
+type DeletePartnerResponse {
+  success: Boolean!
+  message: String!
+  status: String!
 }
 
 extend type Query {
@@ -52,10 +83,19 @@ extend type Query {
   deliveryByTracking(trackingNumber: String!): Delivery @auth
   deliveryByOrder(orderId: String!): Delivery @auth
   deliveryPartnerProfile(partnerId: ID): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  appealDeliveryPartners: [DeliveryPartnerProfile!]! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  verifyDeliveryPartnerGSTIN(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
+  activateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  reactivateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  deactivateDeliveryPartner(reason: String!): DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  deleteDeliveryPartner(reason: String): DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  appealDeliveryPartnerRejection(reason: String!): DeliveryPartnerProfile! @auth(requires: [DELIVERY_PARTNER])
+  approveDeliveryPartner(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
+  rejectDeliveryPartner(partnerId: ID!, reason: String!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
 }

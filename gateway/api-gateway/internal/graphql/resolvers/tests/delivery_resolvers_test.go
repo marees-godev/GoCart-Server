@@ -171,6 +171,18 @@ func TestDeliveryResolver_UpdatePartnerProfile(t *testing.T) {
 		t.Errorf("expected companyName %s in gRPC request, got %v", newCompany, deliveryMock.lastUpdateProfileReq.CompanyName)
 	}
 
+	// Test updating using profile ID ("prof-1") instead of user UUID
+	profileIDRes, err := resolver.Mutation().UpdateDeliveryPartnerProfile(ctx, model.UpdateDeliveryPartnerProfileInput{
+		PartnerID:   "prof-1",
+		CompanyName: &newCompany,
+	})
+	if err != nil {
+		t.Fatalf("UpdateDeliveryPartnerProfile with profile ID failed: %v", err)
+	}
+	if profileIDRes == nil || profileIDRes.CompanyName == nil || *profileIDRes.CompanyName != newCompany {
+		t.Errorf("expected companyName %s when updating by profile ID, got %v", newCompany, profileIDRes)
+	}
+
 	// Test cross-partner profile update rejection for delivery partner
 	_, err = resolver.Mutation().UpdateDeliveryPartnerProfile(ctx, model.UpdateDeliveryPartnerProfileInput{
 		PartnerID: "different-partner-id",

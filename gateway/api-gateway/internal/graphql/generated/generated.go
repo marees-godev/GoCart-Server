@@ -127,6 +127,12 @@ type ComplexityRoot struct {
 		Success func(childComplexity int) int
 	}
 
+	DeletePartnerResponse struct {
+		Message func(childComplexity int) int
+		Status  func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	DeleteProductResponse struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
@@ -156,20 +162,37 @@ type ComplexityRoot struct {
 		ID                  func(childComplexity int) int
 		OrderID             func(childComplexity int) int
 		ShippingAddress     func(childComplexity int) int
+		ShippingAddressID   func(childComplexity int) int
 		Status              func(childComplexity int) int
 		TrackingNumber      func(childComplexity int) int
 		UpdatedAt           func(childComplexity int) int
 	}
 
+	DeliveryPartnerActionResponse struct {
+		Message func(childComplexity int) int
+		Status  func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	DeliveryPartnerProfile struct {
-		CompanyName   func(childComplexity int) int
-		ContactNumber func(childComplexity int) int
-		CreatedAt     func(childComplexity int) int
-		Email         func(childComplexity int) int
-		ID            func(childComplexity int) int
-		IsActive      func(childComplexity int) int
-		PartnerID     func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
+		AppealReason       func(childComplexity int) int
+		AppealedAt         func(childComplexity int) int
+		ApprovalStatus     func(childComplexity int) int
+		CompanyName        func(childComplexity int) int
+		ContactNumber      func(childComplexity int) int
+		CreatedAt          func(childComplexity int) int
+		DeactivatedAt      func(childComplexity int) int
+		DeactivationReason func(childComplexity int) int
+		DeletedAt          func(childComplexity int) int
+		DeletionReason     func(childComplexity int) int
+		Email              func(childComplexity int) int
+		Gstin              func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		IsActive           func(childComplexity int) int
+		IsGstinVerified    func(childComplexity int) int
+		PartnerID          func(childComplexity int) int
+		RejectionReason    func(childComplexity int) int
+		UpdatedAt          func(childComplexity int) int
 	}
 
 	Exchange struct {
@@ -275,81 +298,89 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddToCart                    func(childComplexity int, input model.AddToCartInput) int
-		AppealStore                  func(childComplexity int, id string, reason string) int
-		ApproveReturn                func(childComplexity int, id string) int
-		ApproveStore                 func(childComplexity int, id string) int
-		CancelOrder                  func(childComplexity int, id string, reason *string) int
-		CancelPayment                func(childComplexity int, paymentID *string, orderID *string, reason *string) int
-		ChangePassword               func(childComplexity int, input model.ChangePasswordInput) int
-		Checkout                     func(childComplexity int, input model.CreateOrderInput) int
-		ClearCart                    func(childComplexity int, userID *string) int
-		CloseStore                   func(childComplexity int, id string, reason *string) int
-		CreateCategory               func(childComplexity int, input model.CreateCategoryInput) int
-		CreateDelivery               func(childComplexity int, input model.CreateDeliveryInput) int
-		CreateExchange               func(childComplexity int, input model.CreateExchangeInput) int
-		CreateInventory              func(childComplexity int, input model.CreateInventoryInput) int
-		CreateOrder                  func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct                func(childComplexity int, input model.CreateProductInput) int
-		CreateRating                 func(childComplexity int, input model.CreateRatingInput) int
-		CreateRefund                 func(childComplexity int, paymentID string, amount float64, reason *string, idempotencyKey *string) int
-		CreateStore                  func(childComplexity int, input model.CreateStoreInput) int
-		CreateUserAddress            func(childComplexity int, userID string, input model.CreateAddressInput) int
-		CreateWarehouse              func(childComplexity int, input model.CreateWarehouseInput) int
-		DeactivateAccount            func(childComplexity int, input *model.DeactivateAccountInput) int
-		DeleteAccount                func(childComplexity int, input *model.DeleteAccountInput) int
-		DeleteCategory               func(childComplexity int, id string) int
-		DeleteMerchant               func(childComplexity int, id string) int
-		DeleteProduct                func(childComplexity int, id string) int
-		DeleteProductVariant         func(childComplexity int, productID string, id string) int
-		DeleteRating                 func(childComplexity int, id string) int
-		DeleteUserAddress            func(childComplexity int, id string) int
-		DeleteWarehouse              func(childComplexity int, id string, deliveryPartnerID *string) int
-		Empty                        func(childComplexity int) int
-		ForgotPassword               func(childComplexity int, input model.ForgotPasswordInput) int
-		GenerateStoreUploadURL       func(childComplexity int, input model.GenerateStoreUploadURLInput) int
-		Login                        func(childComplexity int, input model.LoginInput) int
-		Logout                       func(childComplexity int) int
-		MerchantAppeal               func(childComplexity int, merchantID string, reason string) int
-		ProcessPayment               func(childComplexity int, input model.ProcessPaymentInput) int
-		PublishStore                 func(childComplexity int, id string) int
-		ReactivateAccount            func(childComplexity int) int
-		RefreshToken                 func(childComplexity int, input model.RefreshTokenInput) int
-		Register                     func(childComplexity int, input model.RegisterInput) int
-		RejectReturn                 func(childComplexity int, id string, reason string) int
-		RejectStore                  func(childComplexity int, id string, reason string) int
-		ReleaseStock                 func(childComplexity int, reservationID string) int
-		RemoveFromCart               func(childComplexity int, userID *string, productID string) int
-		RequestReplacement           func(childComplexity int, input model.RequestReplacementInput) int
-		RequestReturn                func(childComplexity int, input model.RequestReturnInput) int
-		ResendVerificationEmail      func(childComplexity int, email string, role model.AuthRole) int
-		ReserveStock                 func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
-		ResetPasswordWithOtp         func(childComplexity int, input model.ResetPasswordWithOtpInput) int
-		RestockInventory             func(childComplexity int, input model.RestockInventoryInput) int
-		SendNotification             func(childComplexity int, input model.SendNotificationInput) int
-		SetDefaultUserAddress        func(childComplexity int, id string) int
-		SubmitKyc                    func(childComplexity int, input model.SubmitKYCInput) int
-		SubmitStore                  func(childComplexity int, id string) int
-		SuspendStore                 func(childComplexity int, id string, reason string) int
-		UnpublishStore               func(childComplexity int, id string) int
-		UnsuspendStore               func(childComplexity int, id string, reason *string) int
-		UpdateCategory               func(childComplexity int, id string, input model.UpdateCategoryInput) int
-		UpdateDeliveryPartnerProfile func(childComplexity int, input model.UpdateDeliveryPartnerProfileInput) int
-		UpdateDeliveryStatus         func(childComplexity int, id string, status model.DeliveryStatus, location *string) int
-		UpdateMerchant               func(childComplexity int, id string, input model.UpdateMerchantInput) int
-		UpdateMerchantStatus         func(childComplexity int, id string, status model.MerchantStatus, rejectionReason *string) int
-		UpdateOrderStatus            func(childComplexity int, id string, status string) int
-		UpdateProduct                func(childComplexity int, id string, input model.UpdateProductInput) int
-		UpdateRating                 func(childComplexity int, input model.UpdateRatingInput) int
-		UpdateReturnStatus           func(childComplexity int, id string, status string, rejectionReason *string) int
-		UpdateStock                  func(childComplexity int, inventoryID *string, productID *string, variantID *string, quantity int) int
-		UpdateStore                  func(childComplexity int, input model.UpdateStoreInput) int
-		UpdateUser                   func(childComplexity int, id string, input model.UpdateUserInput) int
-		UpdateUserAddress            func(childComplexity int, id string, input model.UpdateAddressInput) int
-		UpdateWarehouse              func(childComplexity int, input model.UpdateWarehouseInput) int
-		VerifyEmail                  func(childComplexity int, email string, otp string, role model.AuthRole) int
-		VerifyExchangeProduct        func(childComplexity int, input model.VerifyExchangeProductInput) int
-		VerifyProduct                func(childComplexity int, input model.VerifyProductInput) int
+		ActivateDeliveryPartner        func(childComplexity int) int
+		AddToCart                      func(childComplexity int, input model.AddToCartInput) int
+		AppealDeliveryPartnerRejection func(childComplexity int, reason string) int
+		AppealStore                    func(childComplexity int, id string, reason string) int
+		ApproveDeliveryPartner         func(childComplexity int, partnerID string) int
+		ApproveReturn                  func(childComplexity int, id string) int
+		ApproveStore                   func(childComplexity int, id string) int
+		CancelOrder                    func(childComplexity int, id string, reason *string) int
+		CancelPayment                  func(childComplexity int, paymentID *string, orderID *string, reason *string) int
+		ChangePassword                 func(childComplexity int, input model.ChangePasswordInput) int
+		Checkout                       func(childComplexity int, input model.CreateOrderInput) int
+		ClearCart                      func(childComplexity int, userID *string) int
+		CloseStore                     func(childComplexity int, id string, reason *string) int
+		CreateCategory                 func(childComplexity int, input model.CreateCategoryInput) int
+		CreateDelivery                 func(childComplexity int, input model.CreateDeliveryInput) int
+		CreateExchange                 func(childComplexity int, input model.CreateExchangeInput) int
+		CreateInventory                func(childComplexity int, input model.CreateInventoryInput) int
+		CreateOrder                    func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct                  func(childComplexity int, input model.CreateProductInput) int
+		CreateRating                   func(childComplexity int, input model.CreateRatingInput) int
+		CreateRefund                   func(childComplexity int, paymentID string, amount float64, reason *string, idempotencyKey *string) int
+		CreateStore                    func(childComplexity int, input model.CreateStoreInput) int
+		CreateUserAddress              func(childComplexity int, userID string, input model.CreateAddressInput) int
+		CreateWarehouse                func(childComplexity int, input model.CreateWarehouseInput) int
+		DeactivateAccount              func(childComplexity int, input *model.DeactivateAccountInput) int
+		DeactivateDeliveryPartner      func(childComplexity int, reason string) int
+		DeleteAccount                  func(childComplexity int, input *model.DeleteAccountInput) int
+		DeleteCategory                 func(childComplexity int, id string) int
+		DeleteDeliveryPartner          func(childComplexity int, reason *string) int
+		DeleteMerchant                 func(childComplexity int, id string) int
+		DeleteProduct                  func(childComplexity int, id string) int
+		DeleteProductVariant           func(childComplexity int, productID string, id string) int
+		DeleteRating                   func(childComplexity int, id string) int
+		DeleteUserAddress              func(childComplexity int, id string) int
+		DeleteWarehouse                func(childComplexity int, id string, deliveryPartnerID *string) int
+		Empty                          func(childComplexity int) int
+		ForgotPassword                 func(childComplexity int, input model.ForgotPasswordInput) int
+		GenerateStoreUploadURL         func(childComplexity int, input model.GenerateStoreUploadURLInput) int
+		Login                          func(childComplexity int, input model.LoginInput) int
+		Logout                         func(childComplexity int) int
+		MerchantAppeal                 func(childComplexity int, merchantID string, reason string) int
+		ProcessPayment                 func(childComplexity int, input model.ProcessPaymentInput) int
+		PublishStore                   func(childComplexity int, id string) int
+		ReactivateAccount              func(childComplexity int) int
+		ReactivateDeliveryPartner      func(childComplexity int) int
+		RefreshToken                   func(childComplexity int, input model.RefreshTokenInput) int
+		Register                       func(childComplexity int, input model.RegisterInput) int
+		RejectDeliveryPartner          func(childComplexity int, partnerID string, reason string) int
+		RejectReturn                   func(childComplexity int, id string, reason string) int
+		RejectStore                    func(childComplexity int, id string, reason string) int
+		ReleaseStock                   func(childComplexity int, reservationID string) int
+		RemoveFromCart                 func(childComplexity int, userID *string, productID string) int
+		RequestReplacement             func(childComplexity int, input model.RequestReplacementInput) int
+		RequestReturn                  func(childComplexity int, input model.RequestReturnInput) int
+		ResendVerificationEmail        func(childComplexity int, email string, role model.AuthRole) int
+		ReserveStock                   func(childComplexity int, orderID string, items []*model.ReservationItemInput) int
+		ResetPasswordWithOtp           func(childComplexity int, input model.ResetPasswordWithOtpInput) int
+		RestockInventory               func(childComplexity int, input model.RestockInventoryInput) int
+		SendNotification               func(childComplexity int, input model.SendNotificationInput) int
+		SetDefaultUserAddress          func(childComplexity int, id string) int
+		SubmitKyc                      func(childComplexity int, input model.SubmitKYCInput) int
+		SubmitStore                    func(childComplexity int, id string) int
+		SuspendStore                   func(childComplexity int, id string, reason string) int
+		UnpublishStore                 func(childComplexity int, id string) int
+		UnsuspendStore                 func(childComplexity int, id string, reason *string) int
+		UpdateCategory                 func(childComplexity int, id string, input model.UpdateCategoryInput) int
+		UpdateDeliveryPartnerProfile   func(childComplexity int, input model.UpdateDeliveryPartnerProfileInput) int
+		UpdateDeliveryStatus           func(childComplexity int, id string, status model.DeliveryStatus, location *string) int
+		UpdateMerchant                 func(childComplexity int, id string, input model.UpdateMerchantInput) int
+		UpdateMerchantStatus           func(childComplexity int, id string, status model.MerchantStatus, rejectionReason *string) int
+		UpdateOrderStatus              func(childComplexity int, id string, status string) int
+		UpdateProduct                  func(childComplexity int, id string, input model.UpdateProductInput) int
+		UpdateRating                   func(childComplexity int, input model.UpdateRatingInput) int
+		UpdateReturnStatus             func(childComplexity int, id string, status string, rejectionReason *string) int
+		UpdateStock                    func(childComplexity int, inventoryID *string, productID *string, variantID *string, quantity int) int
+		UpdateStore                    func(childComplexity int, input model.UpdateStoreInput) int
+		UpdateUser                     func(childComplexity int, id string, input model.UpdateUserInput) int
+		UpdateUserAddress              func(childComplexity int, id string, input model.UpdateAddressInput) int
+		UpdateWarehouse                func(childComplexity int, input model.UpdateWarehouseInput) int
+		VerifyDeliveryPartnerGstin     func(childComplexity int, partnerID string) int
+		VerifyEmail                    func(childComplexity int, email string, otp string, role model.AuthRole) int
+		VerifyExchangeProduct          func(childComplexity int, input model.VerifyExchangeProductInput) int
+		VerifyProduct                  func(childComplexity int, input model.VerifyProductInput) int
 	}
 
 	Notification struct {
@@ -485,6 +516,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AppealDeliveryPartners        func(childComplexity int) int
 		Cart                          func(childComplexity int, userID *string) int
 		Categories                    func(childComplexity int, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) int
 		Category                      func(childComplexity int, id string) int
@@ -703,6 +735,14 @@ type MutationResolver interface {
 	CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error)
 	UpdateDeliveryStatus(ctx context.Context, id string, status model.DeliveryStatus, location *string) (*model.Delivery, error)
 	UpdateDeliveryPartnerProfile(ctx context.Context, input model.UpdateDeliveryPartnerProfileInput) (*model.DeliveryPartnerProfile, error)
+	VerifyDeliveryPartnerGstin(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
+	ActivateDeliveryPartner(ctx context.Context) (*model.DeliveryPartnerActionResponse, error)
+	ReactivateDeliveryPartner(ctx context.Context) (*model.DeliveryPartnerActionResponse, error)
+	DeactivateDeliveryPartner(ctx context.Context, reason string) (*model.DeliveryPartnerActionResponse, error)
+	DeleteDeliveryPartner(ctx context.Context, reason *string) (*model.DeliveryPartnerActionResponse, error)
+	AppealDeliveryPartnerRejection(ctx context.Context, reason string) (*model.DeliveryPartnerProfile, error)
+	ApproveDeliveryPartner(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
+	RejectDeliveryPartner(ctx context.Context, partnerID string, reason string) (*model.DeliveryPartnerProfile, error)
 	ReserveStock(ctx context.Context, orderID string, items []*model.ReservationItemInput) (*model.ReserveStockPayload, error)
 	ReleaseStock(ctx context.Context, reservationID string) (bool, error)
 	UpdateStock(ctx context.Context, inventoryID *string, productID *string, variantID *string, quantity int) (*model.StockItem, error)
@@ -772,6 +812,7 @@ type QueryResolver interface {
 	DeliveryByTracking(ctx context.Context, trackingNumber string) (*model.Delivery, error)
 	DeliveryByOrder(ctx context.Context, orderID string) (*model.Delivery, error)
 	DeliveryPartnerProfile(ctx context.Context, partnerID *string) (*model.DeliveryPartnerProfile, error)
+	AppealDeliveryPartners(ctx context.Context) ([]*model.DeliveryPartnerProfile, error)
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
 	Inventory(ctx context.Context, productID *string, variantID *string, inventoryID *string, warehouseID *string) (*model.InventoryItem, error)
 	Warehouse(ctx context.Context, id string, deliveryPartnerID *string) (*model.Warehouse, error)
@@ -1173,6 +1214,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeleteCategoryResponse.Success(childComplexity), true
 
+	case "DeletePartnerResponse.message":
+		if e.complexity.DeletePartnerResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.DeletePartnerResponse.Message(childComplexity), true
+
+	case "DeletePartnerResponse.status":
+		if e.complexity.DeletePartnerResponse.Status == nil {
+			break
+		}
+
+		return e.complexity.DeletePartnerResponse.Status(childComplexity), true
+
+	case "DeletePartnerResponse.success":
+		if e.complexity.DeletePartnerResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.DeletePartnerResponse.Success(childComplexity), true
+
 	case "DeleteProductResponse.message":
 		if e.complexity.DeleteProductResponse.Message == nil {
 			break
@@ -1285,6 +1347,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Delivery.ShippingAddress(childComplexity), true
 
+	case "Delivery.shippingAddressId":
+		if e.complexity.Delivery.ShippingAddressID == nil {
+			break
+		}
+
+		return e.complexity.Delivery.ShippingAddressID(childComplexity), true
+
 	case "Delivery.status":
 		if e.complexity.Delivery.Status == nil {
 			break
@@ -1305,6 +1374,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Delivery.UpdatedAt(childComplexity), true
+
+	case "DeliveryPartnerActionResponse.message":
+		if e.complexity.DeliveryPartnerActionResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerActionResponse.Message(childComplexity), true
+
+	case "DeliveryPartnerActionResponse.status":
+		if e.complexity.DeliveryPartnerActionResponse.Status == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerActionResponse.Status(childComplexity), true
+
+	case "DeliveryPartnerActionResponse.success":
+		if e.complexity.DeliveryPartnerActionResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerActionResponse.Success(childComplexity), true
+
+	case "DeliveryPartnerProfile.appealReason":
+		if e.complexity.DeliveryPartnerProfile.AppealReason == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.AppealReason(childComplexity), true
+
+	case "DeliveryPartnerProfile.appealedAt":
+		if e.complexity.DeliveryPartnerProfile.AppealedAt == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.AppealedAt(childComplexity), true
+
+	case "DeliveryPartnerProfile.approvalStatus":
+		if e.complexity.DeliveryPartnerProfile.ApprovalStatus == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.ApprovalStatus(childComplexity), true
 
 	case "DeliveryPartnerProfile.companyName":
 		if e.complexity.DeliveryPartnerProfile.CompanyName == nil {
@@ -1327,12 +1438,47 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeliveryPartnerProfile.CreatedAt(childComplexity), true
 
+	case "DeliveryPartnerProfile.deactivatedAt":
+		if e.complexity.DeliveryPartnerProfile.DeactivatedAt == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.DeactivatedAt(childComplexity), true
+
+	case "DeliveryPartnerProfile.deactivationReason":
+		if e.complexity.DeliveryPartnerProfile.DeactivationReason == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.DeactivationReason(childComplexity), true
+
+	case "DeliveryPartnerProfile.deletedAt":
+		if e.complexity.DeliveryPartnerProfile.DeletedAt == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.DeletedAt(childComplexity), true
+
+	case "DeliveryPartnerProfile.deletionReason":
+		if e.complexity.DeliveryPartnerProfile.DeletionReason == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.DeletionReason(childComplexity), true
+
 	case "DeliveryPartnerProfile.email":
 		if e.complexity.DeliveryPartnerProfile.Email == nil {
 			break
 		}
 
 		return e.complexity.DeliveryPartnerProfile.Email(childComplexity), true
+
+	case "DeliveryPartnerProfile.gstin":
+		if e.complexity.DeliveryPartnerProfile.Gstin == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.Gstin(childComplexity), true
 
 	case "DeliveryPartnerProfile.id":
 		if e.complexity.DeliveryPartnerProfile.ID == nil {
@@ -1348,12 +1494,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DeliveryPartnerProfile.IsActive(childComplexity), true
 
+	case "DeliveryPartnerProfile.isGstinVerified":
+		if e.complexity.DeliveryPartnerProfile.IsGstinVerified == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.IsGstinVerified(childComplexity), true
+
 	case "DeliveryPartnerProfile.partnerId":
 		if e.complexity.DeliveryPartnerProfile.PartnerID == nil {
 			break
 		}
 
 		return e.complexity.DeliveryPartnerProfile.PartnerID(childComplexity), true
+
+	case "DeliveryPartnerProfile.rejectionReason":
+		if e.complexity.DeliveryPartnerProfile.RejectionReason == nil {
+			break
+		}
+
+		return e.complexity.DeliveryPartnerProfile.RejectionReason(childComplexity), true
 
 	case "DeliveryPartnerProfile.updatedAt":
 		if e.complexity.DeliveryPartnerProfile.UpdatedAt == nil {
@@ -1887,6 +2047,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MerchantList.Total(childComplexity), true
 
+	case "Mutation.activateDeliveryPartner":
+		if e.complexity.Mutation.ActivateDeliveryPartner == nil {
+			break
+		}
+
+		return e.complexity.Mutation.ActivateDeliveryPartner(childComplexity), true
+
 	case "Mutation.addToCart":
 		if e.complexity.Mutation.AddToCart == nil {
 			break
@@ -1899,6 +2066,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.AddToCart(childComplexity, args["input"].(model.AddToCartInput)), true
 
+	case "Mutation.appealDeliveryPartnerRejection":
+		if e.complexity.Mutation.AppealDeliveryPartnerRejection == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_appealDeliveryPartnerRejection_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AppealDeliveryPartnerRejection(childComplexity, args["reason"].(string)), true
+
 	case "Mutation.appealStore":
 		if e.complexity.Mutation.AppealStore == nil {
 			break
@@ -1910,6 +2089,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.AppealStore(childComplexity, args["id"].(string), args["reason"].(string)), true
+
+	case "Mutation.approveDeliveryPartner":
+		if e.complexity.Mutation.ApproveDeliveryPartner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_approveDeliveryPartner_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ApproveDeliveryPartner(childComplexity, args["partnerId"].(string)), true
 
 	case "Mutation.approveReturn":
 		if e.complexity.Mutation.ApproveReturn == nil {
@@ -2151,6 +2342,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeactivateAccount(childComplexity, args["input"].(*model.DeactivateAccountInput)), true
 
+	case "Mutation.deactivateDeliveryPartner":
+		if e.complexity.Mutation.DeactivateDeliveryPartner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deactivateDeliveryPartner_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeactivateDeliveryPartner(childComplexity, args["reason"].(string)), true
+
 	case "Mutation.deleteAccount":
 		if e.complexity.Mutation.DeleteAccount == nil {
 			break
@@ -2174,6 +2377,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DeleteCategory(childComplexity, args["id"].(string)), true
+
+	case "Mutation.deleteDeliveryPartner":
+		if e.complexity.Mutation.DeleteDeliveryPartner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteDeliveryPartner_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteDeliveryPartner(childComplexity, args["reason"].(*string)), true
 
 	case "Mutation.deleteMerchant":
 		if e.complexity.Mutation.DeleteMerchant == nil {
@@ -2340,6 +2555,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ReactivateAccount(childComplexity), true
 
+	case "Mutation.reactivateDeliveryPartner":
+		if e.complexity.Mutation.ReactivateDeliveryPartner == nil {
+			break
+		}
+
+		return e.complexity.Mutation.ReactivateDeliveryPartner(childComplexity), true
+
 	case "Mutation.refreshToken":
 		if e.complexity.Mutation.RefreshToken == nil {
 			break
@@ -2363,6 +2585,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
+
+	case "Mutation.rejectDeliveryPartner":
+		if e.complexity.Mutation.RejectDeliveryPartner == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_rejectDeliveryPartner_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RejectDeliveryPartner(childComplexity, args["partnerId"].(string), args["reason"].(string)), true
 
 	case "Mutation.rejectReturn":
 		if e.complexity.Mutation.RejectReturn == nil {
@@ -2735,6 +2969,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateWarehouse(childComplexity, args["input"].(model.UpdateWarehouseInput)), true
+
+	case "Mutation.verifyDeliveryPartnerGSTIN":
+		if e.complexity.Mutation.VerifyDeliveryPartnerGstin == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyDeliveryPartnerGSTIN_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyDeliveryPartnerGstin(childComplexity, args["partnerId"].(string)), true
 
 	case "Mutation.verifyEmail":
 		if e.complexity.Mutation.VerifyEmail == nil {
@@ -3464,6 +3710,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ProductVerification.VerifiedBy(childComplexity), true
+
+	case "Query.appealDeliveryPartners":
+		if e.complexity.Query.AppealDeliveryPartners == nil {
+			break
+		}
+
+		return e.complexity.Query.AppealDeliveryPartners(childComplexity), true
 
 	case "Query.cart":
 		if e.complexity.Query.Cart == nil {
@@ -5048,6 +5301,13 @@ type Mutation {
   CANCELLED
 }
 
+enum PartnerApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPEALED
+}
+
 type Delivery {
   id: ID!
   orderId: String!
@@ -5057,6 +5317,7 @@ type Delivery {
   deliveredAt: String
   deliveryPartner: String!
   shippingAddress: String
+  shippingAddressId: String
   contactNumber: String
   createdAt: String
   updatedAt: String
@@ -5075,7 +5336,17 @@ type DeliveryPartnerProfile {
   companyName: String
   email: String!
   contactNumber: String
+  gstin: String
+  isGstinVerified: Boolean!
   isActive: Boolean!
+  approvalStatus: PartnerApprovalStatus!
+  rejectionReason: String
+  appealReason: String
+  deactivationReason: String
+  deletionReason: String
+  appealedAt: String
+  deactivatedAt: String
+  deletedAt: String
   createdAt: String
   updatedAt: String
 }
@@ -5085,6 +5356,19 @@ input UpdateDeliveryPartnerProfileInput {
   companyName: String
   email: String
   contactNumber: String
+  gstin: String
+}
+
+type DeliveryPartnerActionResponse {
+  success: Boolean!
+  message: String!
+  status: String!
+}
+
+type DeletePartnerResponse {
+  success: Boolean!
+  message: String!
+  status: String!
 }
 
 extend type Query {
@@ -5092,13 +5376,23 @@ extend type Query {
   deliveryByTracking(trackingNumber: String!): Delivery @auth
   deliveryByOrder(orderId: String!): Delivery @auth
   deliveryPartnerProfile(partnerId: ID): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  appealDeliveryPartners: [DeliveryPartnerProfile!]! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
-}`, BuiltIn: false},
+  verifyDeliveryPartnerGSTIN(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
+  activateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  reactivateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  deactivateDeliveryPartner(reason: String!): DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  deleteDeliveryPartner(reason: String): DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
+  appealDeliveryPartnerRejection(reason: String!): DeliveryPartnerProfile! @auth(requires: [DELIVERY_PARTNER])
+  approveDeliveryPartner(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
+  rejectDeliveryPartner(partnerId: ID!, reason: String!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
+}
+`, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/inventory/inventory.graphql", Input: `type StockItem {
   productId: ID!
   availableQuantity: Int!
@@ -6071,6 +6365,21 @@ func (ec *executionContext) field_Mutation_addToCart_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_appealDeliveryPartnerRejection_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_appealStore_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -6092,6 +6401,21 @@ func (ec *executionContext) field_Mutation_appealStore_args(ctx context.Context,
 		}
 	}
 	args["reason"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_approveDeliveryPartner_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["partnerId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("partnerId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["partnerId"] = arg0
 	return args, nil
 }
 
@@ -6467,6 +6791,21 @@ func (ec *executionContext) field_Mutation_deactivateAccount_args(ctx context.Co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deactivateDeliveryPartner_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteAccount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -6494,6 +6833,21 @@ func (ec *executionContext) field_Mutation_deleteCategory_args(ctx context.Conte
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteDeliveryPartner_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg0
 	return args, nil
 }
 
@@ -6731,6 +7085,30 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_rejectDeliveryPartner_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["partnerId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("partnerId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["partnerId"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -7394,6 +7772,21 @@ func (ec *executionContext) field_Mutation_updateWarehouse_args(ctx context.Cont
 		}
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyDeliveryPartnerGSTIN_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["partnerId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("partnerId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["partnerId"] = arg0
 	return args, nil
 }
 
@@ -10491,6 +10884,138 @@ func (ec *executionContext) fieldContext_DeleteCategoryResponse_message(_ contex
 	return fc, nil
 }
 
+func (ec *executionContext) _DeletePartnerResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.DeletePartnerResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeletePartnerResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeletePartnerResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeletePartnerResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeletePartnerResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.DeletePartnerResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeletePartnerResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeletePartnerResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeletePartnerResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeletePartnerResponse_status(ctx context.Context, field graphql.CollectedField, obj *model.DeletePartnerResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeletePartnerResponse_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeletePartnerResponse_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeletePartnerResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _DeleteProductResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.DeleteProductResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_DeleteProductResponse_success(ctx, field)
 	if err != nil {
@@ -11183,6 +11708,47 @@ func (ec *executionContext) fieldContext_Delivery_shippingAddress(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Delivery_shippingAddressId(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Delivery_shippingAddressId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ShippingAddressID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Delivery_shippingAddressId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Delivery_contactNumber(ctx context.Context, field graphql.CollectedField, obj *model.Delivery) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Delivery_contactNumber(ctx, field)
 	if err != nil {
@@ -11296,6 +11862,138 @@ func (ec *executionContext) _Delivery_updatedAt(ctx context.Context, field graph
 func (ec *executionContext) fieldContext_Delivery_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Delivery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerActionResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerActionResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerActionResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerActionResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerActionResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerActionResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerActionResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerActionResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerActionResponse_status(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerActionResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerActionResponse_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerActionResponse_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerActionResponse",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -11520,6 +12218,91 @@ func (ec *executionContext) fieldContext_DeliveryPartnerProfile_contactNumber(_ 
 	return fc, nil
 }
 
+func (ec *executionContext) _DeliveryPartnerProfile_gstin(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Gstin, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_gstin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_isGstinVerified(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsGstinVerified, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_isGstinVerified(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _DeliveryPartnerProfile_isActive(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
 	if err != nil {
@@ -11559,6 +12342,337 @@ func (ec *executionContext) fieldContext_DeliveryPartnerProfile_isActive(_ conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_approvalStatus(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ApprovalStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.PartnerApprovalStatus)
+	fc.Result = res
+	return ec.marshalNPartnerApprovalStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPartnerApprovalStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_approvalStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type PartnerApprovalStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_rejectionReason(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RejectionReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_rejectionReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_appealReason(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AppealReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_appealReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_deactivationReason(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeactivationReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_deactivationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_deletionReason(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeletionReason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_deletionReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_appealedAt(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AppealedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_appealedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_deactivatedAt(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeactivatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_deactivatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeliveryPartnerProfile_deletedAt(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryPartnerProfile) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeletedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeliveryPartnerProfile_deletedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeliveryPartnerProfile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -16107,6 +17221,8 @@ func (ec *executionContext) fieldContext_Mutation_createDelivery(ctx context.Con
 				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
 			case "shippingAddress":
 				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_Delivery_contactNumber(ctx, field)
 			case "createdAt":
@@ -16207,6 +17323,8 @@ func (ec *executionContext) fieldContext_Mutation_updateDeliveryStatus(ctx conte
 				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
 			case "shippingAddress":
 				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_Delivery_contactNumber(ctx, field)
 			case "createdAt":
@@ -16301,8 +17419,28 @@ func (ec *executionContext) fieldContext_Mutation_updateDeliveryPartnerProfile(c
 				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
 			case "isActive":
 				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
 			case "updatedAt":
@@ -16319,6 +17457,800 @@ func (ec *executionContext) fieldContext_Mutation_updateDeliveryPartnerProfile(c
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateDeliveryPartnerProfile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyDeliveryPartnerGSTIN(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyDeliveryPartnerGSTIN(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().VerifyDeliveryPartnerGstin(rctx, fc.Args["partnerId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerProfile); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerProfile`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerProfile)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyDeliveryPartnerGSTIN(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DeliveryPartnerProfile_id(ctx, field)
+			case "partnerId":
+				return ec.fieldContext_DeliveryPartnerProfile_partnerId(ctx, field)
+			case "companyName":
+				return ec.fieldContext_DeliveryPartnerProfile_companyName(ctx, field)
+			case "email":
+				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+			case "isActive":
+				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerProfile", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyDeliveryPartnerGSTIN_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_activateDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_activateDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ActivateDeliveryPartner(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerActionResponse)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_activateDeliveryPartner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeliveryPartnerActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeliveryPartnerActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_DeliveryPartnerActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerActionResponse", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_reactivateDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_reactivateDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ReactivateDeliveryPartner(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerActionResponse)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_reactivateDeliveryPartner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeliveryPartnerActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeliveryPartnerActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_DeliveryPartnerActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerActionResponse", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deactivateDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deactivateDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeactivateDeliveryPartner(rctx, fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerActionResponse)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deactivateDeliveryPartner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeliveryPartnerActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeliveryPartnerActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_DeliveryPartnerActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerActionResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deactivateDeliveryPartner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteDeliveryPartner(rctx, fc.Args["reason"].(*string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerActionResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerActionResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerActionResponse)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteDeliveryPartner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeliveryPartnerActionResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeliveryPartnerActionResponse_message(ctx, field)
+			case "status":
+				return ec.fieldContext_DeliveryPartnerActionResponse_status(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerActionResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteDeliveryPartner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_appealDeliveryPartnerRejection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_appealDeliveryPartnerRejection(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().AppealDeliveryPartnerRejection(rctx, fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"DELIVERY_PARTNER"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerProfile); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerProfile`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerProfile)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_appealDeliveryPartnerRejection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DeliveryPartnerProfile_id(ctx, field)
+			case "partnerId":
+				return ec.fieldContext_DeliveryPartnerProfile_partnerId(ctx, field)
+			case "companyName":
+				return ec.fieldContext_DeliveryPartnerProfile_companyName(ctx, field)
+			case "email":
+				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+			case "isActive":
+				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerProfile", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_appealDeliveryPartnerRejection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_approveDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_approveDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().ApproveDeliveryPartner(rctx, fc.Args["partnerId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerProfile); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerProfile`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerProfile)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_approveDeliveryPartner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DeliveryPartnerProfile_id(ctx, field)
+			case "partnerId":
+				return ec.fieldContext_DeliveryPartnerProfile_partnerId(ctx, field)
+			case "companyName":
+				return ec.fieldContext_DeliveryPartnerProfile_companyName(ctx, field)
+			case "email":
+				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+			case "isActive":
+				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerProfile", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_approveDeliveryPartner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_rejectDeliveryPartner(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_rejectDeliveryPartner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().RejectDeliveryPartner(rctx, fc.Args["partnerId"].(string), fc.Args["reason"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeliveryPartnerProfile); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerProfile`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeliveryPartnerProfile)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_rejectDeliveryPartner(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DeliveryPartnerProfile_id(ctx, field)
+			case "partnerId":
+				return ec.fieldContext_DeliveryPartnerProfile_partnerId(ctx, field)
+			case "companyName":
+				return ec.fieldContext_DeliveryPartnerProfile_companyName(ctx, field)
+			case "email":
+				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+			case "isActive":
+				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerProfile", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_rejectDeliveryPartner_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -26879,6 +28811,8 @@ func (ec *executionContext) fieldContext_Query_delivery(ctx context.Context, fie
 				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
 			case "shippingAddress":
 				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_Delivery_contactNumber(ctx, field)
 			case "createdAt":
@@ -26975,6 +28909,8 @@ func (ec *executionContext) fieldContext_Query_deliveryByTracking(ctx context.Co
 				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
 			case "shippingAddress":
 				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_Delivery_contactNumber(ctx, field)
 			case "createdAt":
@@ -27071,6 +29007,8 @@ func (ec *executionContext) fieldContext_Query_deliveryByOrder(ctx context.Conte
 				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
 			case "shippingAddress":
 				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_Delivery_contactNumber(ctx, field)
 			case "createdAt":
@@ -27165,8 +29103,28 @@ func (ec *executionContext) fieldContext_Query_deliveryPartnerProfile(ctx contex
 				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
 			case "contactNumber":
 				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
 			case "isActive":
 				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
 			case "updatedAt":
@@ -27185,6 +29143,112 @@ func (ec *executionContext) fieldContext_Query_deliveryPartnerProfile(ctx contex
 	if fc.Args, err = ec.field_Query_deliveryPartnerProfile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_appealDeliveryPartners(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_appealDeliveryPartners(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().AppealDeliveryPartners(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, requires)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.([]*model.DeliveryPartnerProfile); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be []*github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeliveryPartnerProfile`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.DeliveryPartnerProfile)
+	fc.Result = res
+	return ec.marshalNDeliveryPartnerProfile2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfileᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_appealDeliveryPartners(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_DeliveryPartnerProfile_id(ctx, field)
+			case "partnerId":
+				return ec.fieldContext_DeliveryPartnerProfile_partnerId(ctx, field)
+			case "companyName":
+				return ec.fieldContext_DeliveryPartnerProfile_companyName(ctx, field)
+			case "email":
+				return ec.fieldContext_DeliveryPartnerProfile_email(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_DeliveryPartnerProfile_contactNumber(ctx, field)
+			case "gstin":
+				return ec.fieldContext_DeliveryPartnerProfile_gstin(ctx, field)
+			case "isGstinVerified":
+				return ec.fieldContext_DeliveryPartnerProfile_isGstinVerified(ctx, field)
+			case "isActive":
+				return ec.fieldContext_DeliveryPartnerProfile_isActive(ctx, field)
+			case "approvalStatus":
+				return ec.fieldContext_DeliveryPartnerProfile_approvalStatus(ctx, field)
+			case "rejectionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_rejectionReason(ctx, field)
+			case "appealReason":
+				return ec.fieldContext_DeliveryPartnerProfile_appealReason(ctx, field)
+			case "deactivationReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivationReason(ctx, field)
+			case "deletionReason":
+				return ec.fieldContext_DeliveryPartnerProfile_deletionReason(ctx, field)
+			case "appealedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_appealedAt(ctx, field)
+			case "deactivatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deactivatedAt(ctx, field)
+			case "deletedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_deletedAt(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_DeliveryPartnerProfile_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_DeliveryPartnerProfile_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeliveryPartnerProfile", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -38511,7 +40575,7 @@ func (ec *executionContext) unmarshalInputUpdateDeliveryPartnerProfileInput(ctx 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"partnerId", "companyName", "email", "contactNumber"}
+	fieldsInOrder := [...]string{"partnerId", "companyName", "email", "contactNumber", "gstin"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -38546,6 +40610,13 @@ func (ec *executionContext) unmarshalInputUpdateDeliveryPartnerProfileInput(ctx 
 				return it, err
 			}
 			it.ContactNumber = data
+		case "gstin":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gstin"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Gstin = data
 		}
 	}
 
@@ -39777,6 +41848,55 @@ func (ec *executionContext) _DeleteCategoryResponse(ctx context.Context, sel ast
 	return out
 }
 
+var deletePartnerResponseImplementors = []string{"DeletePartnerResponse"}
+
+func (ec *executionContext) _DeletePartnerResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeletePartnerResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deletePartnerResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeletePartnerResponse")
+		case "success":
+			out.Values[i] = ec._DeletePartnerResponse_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._DeletePartnerResponse_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._DeletePartnerResponse_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var deleteProductResponseImplementors = []string{"DeleteProductResponse"}
 
 func (ec *executionContext) _DeleteProductResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteProductResponse) graphql.Marshaler {
@@ -39992,12 +42112,63 @@ func (ec *executionContext) _Delivery(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "shippingAddress":
 			out.Values[i] = ec._Delivery_shippingAddress(ctx, field, obj)
+		case "shippingAddressId":
+			out.Values[i] = ec._Delivery_shippingAddressId(ctx, field, obj)
 		case "contactNumber":
 			out.Values[i] = ec._Delivery_contactNumber(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Delivery_createdAt(ctx, field, obj)
 		case "updatedAt":
 			out.Values[i] = ec._Delivery_updatedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var deliveryPartnerActionResponseImplementors = []string{"DeliveryPartnerActionResponse"}
+
+func (ec *executionContext) _DeliveryPartnerActionResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeliveryPartnerActionResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deliveryPartnerActionResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeliveryPartnerActionResponse")
+		case "success":
+			out.Values[i] = ec._DeliveryPartnerActionResponse_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._DeliveryPartnerActionResponse_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._DeliveryPartnerActionResponse_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -40051,11 +42222,37 @@ func (ec *executionContext) _DeliveryPartnerProfile(ctx context.Context, sel ast
 			}
 		case "contactNumber":
 			out.Values[i] = ec._DeliveryPartnerProfile_contactNumber(ctx, field, obj)
+		case "gstin":
+			out.Values[i] = ec._DeliveryPartnerProfile_gstin(ctx, field, obj)
+		case "isGstinVerified":
+			out.Values[i] = ec._DeliveryPartnerProfile_isGstinVerified(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "isActive":
 			out.Values[i] = ec._DeliveryPartnerProfile_isActive(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "approvalStatus":
+			out.Values[i] = ec._DeliveryPartnerProfile_approvalStatus(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rejectionReason":
+			out.Values[i] = ec._DeliveryPartnerProfile_rejectionReason(ctx, field, obj)
+		case "appealReason":
+			out.Values[i] = ec._DeliveryPartnerProfile_appealReason(ctx, field, obj)
+		case "deactivationReason":
+			out.Values[i] = ec._DeliveryPartnerProfile_deactivationReason(ctx, field, obj)
+		case "deletionReason":
+			out.Values[i] = ec._DeliveryPartnerProfile_deletionReason(ctx, field, obj)
+		case "appealedAt":
+			out.Values[i] = ec._DeliveryPartnerProfile_appealedAt(ctx, field, obj)
+		case "deactivatedAt":
+			out.Values[i] = ec._DeliveryPartnerProfile_deactivatedAt(ctx, field, obj)
+		case "deletedAt":
+			out.Values[i] = ec._DeliveryPartnerProfile_deletedAt(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._DeliveryPartnerProfile_createdAt(ctx, field, obj)
 		case "updatedAt":
@@ -40808,6 +43005,62 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateDeliveryPartnerProfile(ctx, field)
 			})
+		case "verifyDeliveryPartnerGSTIN":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyDeliveryPartnerGSTIN(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "activateDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_activateDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reactivateDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_reactivateDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deactivateDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deactivateDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "appealDeliveryPartnerRejection":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_appealDeliveryPartnerRejection(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "approveDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_approveDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rejectDeliveryPartner":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_rejectDeliveryPartner(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "reserveStock":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_reserveStock(ctx, field)
@@ -42098,6 +44351,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_deliveryPartnerProfile(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "appealDeliveryPartners":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_appealDeliveryPartners(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -44358,6 +46633,78 @@ func (ec *executionContext) marshalNDeleteProductVariantResponse2ᚖgithubᚗcom
 	return ec._DeleteProductVariantResponse(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNDeliveryPartnerActionResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx context.Context, sel ast.SelectionSet, v model.DeliveryPartnerActionResponse) graphql.Marshaler {
+	return ec._DeliveryPartnerActionResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDeliveryPartnerActionResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx context.Context, sel ast.SelectionSet, v *model.DeliveryPartnerActionResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeliveryPartnerActionResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDeliveryPartnerProfile2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx context.Context, sel ast.SelectionSet, v model.DeliveryPartnerProfile) graphql.Marshaler {
+	return ec._DeliveryPartnerProfile(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDeliveryPartnerProfile2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfileᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.DeliveryPartnerProfile) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNDeliveryPartnerProfile2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerProfile(ctx context.Context, sel ast.SelectionSet, v *model.DeliveryPartnerProfile) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeliveryPartnerProfile(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNDeliveryStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryStatus(ctx context.Context, v interface{}) (model.DeliveryStatus, error) {
 	var res model.DeliveryStatus
 	err := res.UnmarshalGQL(v)
@@ -44805,6 +47152,16 @@ func (ec *executionContext) marshalNOrderList2ᚖgithubᚗcomᚋmareesᚑgodev�
 		return graphql.Null
 	}
 	return ec._OrderList(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNPartnerApprovalStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPartnerApprovalStatus(ctx context.Context, v interface{}) (model.PartnerApprovalStatus, error) {
+	var res model.PartnerApprovalStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPartnerApprovalStatus2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPartnerApprovalStatus(ctx context.Context, sel ast.SelectionSet, v model.PartnerApprovalStatus) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNProcessPaymentInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐProcessPaymentInput(ctx context.Context, v interface{}) (model.ProcessPaymentInput, error) {

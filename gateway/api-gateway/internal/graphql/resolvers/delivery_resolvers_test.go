@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
@@ -57,13 +58,14 @@ func (m *mockDeliveryClient) CreateDelivery(ctx context.Context, in *deliverypb.
 	m.lastCreateReq = in
 	return &deliverypb.CreateDeliveryResponse{
 		Delivery: &deliverypb.Delivery{
-			Id:              "del-123",
-			OrderId:         in.OrderId,
-			TrackingNumber:  "TRK-TEST-999",
-			Status:          "CREATED",
-			DeliveryPartner: in.DeliveryPartner,
-			ShippingAddress: in.ShippingAddress,
-			ContactNumber:   in.ContactNumber,
+			Id:                "del-123",
+			OrderId:           in.OrderId,
+			TrackingNumber:    "TRK-TEST-999",
+			Status:            "CREATED",
+			DeliveryPartner:   in.DeliveryPartner,
+			ShippingAddress:   in.ShippingAddress,
+			ContactNumber:     in.ContactNumber,
+			ShippingAddressId: in.ShippingAddressId,
 		},
 	}, nil
 }
@@ -110,12 +112,136 @@ func (m *mockDeliveryClient) GetDeliveryByOrder(ctx context.Context, in *deliver
 	}, nil
 }
 
+func (m *mockDeliveryClient) ActivatePartner(ctx context.Context, in *deliverypb.ActivatePartnerRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:             "prof-1",
+			PartnerId:      in.PartnerId,
+			IsActive:       true,
+			ApprovalStatus: "APPROVED",
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) DeactivatePartner(ctx context.Context, in *deliverypb.DeactivatePartnerRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	now := "2026-10-29T10:00:00Z"
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:                 "prof-1",
+			PartnerId:          in.PartnerId,
+			IsActive:           false,
+			DeactivatedAt:      now,
+			DeactivationReason: in.Reason,
+			ApprovalStatus:     "APPROVED",
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) VerifyGSTIN(ctx context.Context, in *deliverypb.VerifyPartnerGSTINRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	gstinVal := in.Gstin
+	if gstinVal == "" {
+		gstinVal = "29ABCDE1234F1Z5"
+	}
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:              "prof-1",
+			PartnerId:       in.PartnerId,
+			Gstin:           gstinVal,
+			IsGstinVerified: true,
+			ApprovalStatus:  "PENDING",
+			IsActive:        true,
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) ListAppealedPartners(ctx context.Context, in *deliverypb.ListAppealedPartnersRequest, opts ...grpcPkg.CallOption) (*deliverypb.ListAppealedPartnersResponse, error) {
+	reason := "Valid appeal reason"
+	return &deliverypb.ListAppealedPartnersResponse{
+		Profiles: []*deliverypb.DeliveryPartnerProfile{
+			{
+				Id:             "prof-1",
+				PartnerId:      "partner-uuid-1",
+				CompanyName:    "Super Express Logistics",
+				Email:          "contact@superexpress.com",
+				ApprovalStatus: "APPEALED",
+				AppealReason:   reason,
+				IsActive:       true,
+			},
+		},
+		Total: 1,
+	}, nil
+}
+
+func (m *mockDeliveryClient) DeletePartnerProfile(ctx context.Context, in *deliverypb.DeletePartnerProfileRequest, opts ...grpcPkg.CallOption) (*deliverypb.DeletePartnerProfileResponse, error) {
+	return &deliverypb.DeletePartnerProfileResponse{
+		Success: true,
+		Message: "account deleted successfully",
+		Status:  "deleted",
+	}, nil
+}
+
+func (m *mockDeliveryClient) ApprovePartner(ctx context.Context, in *deliverypb.ApprovePartnerRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:              "prof-1",
+			PartnerId:       in.PartnerId,
+			ApprovalStatus:  "APPROVED",
+			IsActive:        true,
+			IsGstinVerified: true,
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) RejectPartner(ctx context.Context, in *deliverypb.RejectPartnerRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:              "prof-1",
+			PartnerId:       in.PartnerId,
+			ApprovalStatus:  "REJECTED",
+			RejectionReason: in.Reason,
+			IsActive:        true,
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) AppealRejection(ctx context.Context, in *deliverypb.AppealRejectionRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	return &deliverypb.PartnerProfileResponse{
+		Profile: &deliverypb.DeliveryPartnerProfile{
+			Id:             "prof-1",
+			PartnerId:      in.PartnerId,
+			ApprovalStatus: "APPEALED",
+			AppealReason:   in.Reason,
+			IsActive:       true,
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) ListApprovedPartners(ctx context.Context, in *deliverypb.ListApprovedPartnersRequest, opts ...grpcPkg.CallOption) (*deliverypb.ListApprovedPartnersResponse, error) {
+	return &deliverypb.ListApprovedPartnersResponse{
+		Profiles: []*deliverypb.DeliveryPartnerProfile{
+			{
+				Id:             "prof-1",
+				PartnerId:      "partner-uuid-1",
+				CompanyName:    "Super Express Logistics",
+				Email:          "contact@superexpress.com",
+				ApprovalStatus: "APPROVED",
+				IsActive:       true,
+			},
+		},
+		Total: 1,
+	}, nil
+}
+
 type mockOrderClientForDeliveryTest struct {
 	orderpb.OrderServiceClient
+	resp  *orderpb.GetOrderResponse
+	err   error
 	order *orderpb.Order
 }
 
 func (m *mockOrderClientForDeliveryTest) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.GetOrderResponse, error) {
+	if m.err != nil { return nil, m.err }
+	if m.resp != nil { return m.resp, nil }
 	if m.order != nil && m.order.Id == in.Id {
 		return &orderpb.GetOrderResponse{Order: m.order}, nil
 	}
@@ -149,9 +275,11 @@ func deliveryStrPtr(s string) *string {
 func TestCreateDelivery_Success(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-999", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -194,14 +322,22 @@ func TestCreateDelivery_Success(t *testing.T) {
 	if deliveryMock.lastCreateReq.ContactNumber != "+1-415-555-0200" {
 		t.Errorf("expected contact number '+1-415-555-0200', got %s", deliveryMock.lastCreateReq.ContactNumber)
 	}
+	if deliveryMock.lastCreateReq.ShippingAddressId != "addr-1" {
+		t.Errorf("expected shipping address id 'addr-1', got %s", deliveryMock.lastCreateReq.ShippingAddressId)
+	}
+	if res.ShippingAddressID == nil || *res.ShippingAddressID != "addr-1" {
+		t.Errorf("expected res.ShippingAddressID to be 'addr-1'")
+	}
 }
 
 func TestCreateDelivery_WithDeliveryPartnerID_GetsCompanyName(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "200 Market St, San Francisco, CA 94105"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-999", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -237,9 +373,11 @@ func TestCreateDelivery_ResolvesAddressAndPhoneFromOrder(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	orderMock := &mockOrderClientForDeliveryTest{
 		order: &orderpb.Order{
-			Id:              "ord-auto",
-			UserId:          "user-cust-1",
-			ShippingAddress: `{"street":"500 Howard St","city":"San Francisco","state":"CA","postal_code":"94105","contact_number":"+1-555-0199"}`,
+			Id:                "ord-auto",
+			UserId:            "user-cust-1",
+			ShippingAddressId: "addr-auto-1",
+			ShippingAddress:   `{"street":"500 Howard St","city":"San Francisco","state":"CA","postal_code":"94105","contact_number":"+1-555-0199"}`,
+			PaymentStatus:     "PAID",
 		},
 	}
 	clients := &grpc.Clients{
@@ -278,12 +416,53 @@ func TestCreateDelivery_ResolvesAddressAndPhoneFromOrder(t *testing.T) {
 	}
 }
 
+func TestCreateDelivery_OrderPaymentStatusNotPaid_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{
+			Id:                "ord-pending-payment",
+			UserId:            "user-cust-1",
+			ShippingAddressId: "addr-auto-1",
+			ShippingAddress:   `{"street":"500 Howard St","city":"San Francisco","state":"CA","postal_code":"94105","contact_number":"+1-555-0199"}`,
+			PaymentStatus:     "PENDING",
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{Clients: clients},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-1",
+		Role:   "ADMIN",
+	})
+
+	input := model.CreateDeliveryInput{
+		OrderID:           "ord-pending-payment",
+		DeliveryPartnerID: "partner-uuid-1",
+	}
+
+	_, err := r.CreateDelivery(ctx, input)
+	if err == nil {
+		t.Fatal("expected error when order payment_status is not PAID, got nil")
+	}
+	if !strings.Contains(err.Error(), "payment_status must be PAID") {
+		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)
+	}
+}
+
 func TestCreateDelivery_AdminSuccess(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-100", AddressLine: "100 Pine St, San Francisco, CA 94111"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-100", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -314,8 +493,10 @@ func TestCreateDelivery_AdminSuccess(t *testing.T) {
 
 func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-777", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -343,9 +524,11 @@ func TestCreateDelivery_MissingShippingAddress_Fails(t *testing.T) {
 func TestCreateDelivery_MissingContactNumber_Fails(t *testing.T) {
 	deliveryMock := &mockDeliveryClient{}
 	userMock := &mockUserClientForDeliveryTest{address: &userpb.Address{Id: "addr-1", AddressLine: "123 Main St"}}
+	orderMock := &mockOrderClientForDeliveryTest{order: &orderpb.Order{Id: "ord-777", PaymentStatus: "PAID"}}
 	clients := &grpc.Clients{
 		DeliveryClient: deliveryMock,
 		UserClient: userMock,
+		OrderClient: orderMock,
 	}
 
 	r := &mutationResolver{
@@ -400,6 +583,34 @@ func TestCreateDelivery_MissingDeliveryPartnerID_Fails(t *testing.T) {
 	}
 }
 
+func TestCreateDelivery_MissingShippingAddressID_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+	}
+
+	r := &mutationResolver{
+		Resolver: &Resolver{Clients: clients},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "usr-1",
+		Role:   "CUSTOMER",
+	})
+
+	input := model.CreateDeliveryInput{
+		OrderID:           "ord-777",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "",
+		ContactNumber:     deliveryStrPtr("+1-234-567-8900"),
+	}
+
+	_, err := r.CreateDelivery(ctx, input)
+	if err == nil {
+		t.Fatal("expected error when shipping address id is empty")
+	}
+}
+
 func TestCreateDelivery_Unauthorized(t *testing.T) {
 	r := &mutationResolver{
 		Resolver: &Resolver{Clients: &grpc.Clients{DeliveryClient: &mockDeliveryClient{}}},
@@ -442,5 +653,303 @@ func TestDeliveryQueriesAndStatusUpdate(t *testing.T) {
 	dOrd, err := qResolver.DeliveryByOrder(ctx, "ord-1")
 	if err != nil || dOrd.OrderID != "ord-1" {
 		t.Errorf("DeliveryByOrder failed: %v", err)
+	}
+}
+
+func TestDeliveryPartner_ApprovalAndAccountMutations(t *testing.T) {
+	clients := &grpc.Clients{
+		DeliveryClient: &mockDeliveryClient{},
+	}
+	mResolver := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	qResolver := &queryResolver{Resolver: &Resolver{Clients: clients}}
+
+	partnerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID:    "partner-uuid-1",
+		Role:      auth.RoleDeliveryPartner,
+		PartnerID: "partner-uuid-1",
+	})
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-user-1",
+		Role:   auth.RoleAdmin,
+	})
+	customerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "customer-user-1",
+		Role:   "CUSTOMER",
+	})
+
+	t.Run("VerifyDeliveryPartnerGSTIN", func(t *testing.T) {
+		targetPartnerID := "partner-uuid-1"
+
+		// Customer cannot verify GSTIN
+		_, err := mResolver.VerifyDeliveryPartnerGstin(customerCtx, targetPartnerID)
+		if err == nil {
+			t.Fatal("expected customer GSTIN verification to be forbidden, got nil")
+		}
+
+		// Partner cannot verify GSTIN (only admin can)
+		_, err = mResolver.VerifyDeliveryPartnerGstin(partnerCtx, targetPartnerID)
+		if err == nil {
+			t.Fatal("expected partner GSTIN verification to be forbidden, got nil")
+		}
+
+		// Empty partner ID fails
+		_, err = mResolver.VerifyDeliveryPartnerGstin(adminCtx, "   ")
+		if err == nil {
+			t.Fatal("expected empty partner ID to fail, got nil")
+		}
+
+		// Admin succeeds
+		res, err := mResolver.VerifyDeliveryPartnerGstin(adminCtx, targetPartnerID)
+		if err != nil {
+			t.Fatalf("expected admin verify GSTIN to succeed, got %v", err)
+		}
+		if !res.IsGstinVerified {
+			t.Fatal("expected is_gstin_verified to be true")
+		}
+		if res.Gstin == nil || *res.Gstin != "29ABCDE1234F1Z5" {
+			t.Fatalf("expected gstin to be 29ABCDE1234F1Z5, got %v", res.Gstin)
+		}
+	})
+
+	t.Run("ActivateDeliveryPartner", func(t *testing.T) {
+		// Admin cannot activate partner (owner only)
+		_, err := mResolver.ActivateDeliveryPartner(adminCtx)
+		if err == nil {
+			t.Fatal("expected admin activation to be forbidden, got nil")
+		}
+
+		// Customer cannot activate partner
+		_, err = mResolver.ActivateDeliveryPartner(customerCtx)
+		if err == nil {
+			t.Fatal("expected customer activation to be forbidden, got nil")
+		}
+
+		res, err := mResolver.ActivateDeliveryPartner(partnerCtx)
+		if err != nil {
+			t.Fatalf("expected activation to succeed, got %v", err)
+		}
+		if !res.Success {
+			t.Fatal("expected success to be true")
+		}
+		if res.Status != "active" {
+			t.Fatalf("expected status 'active', got %s", res.Status)
+		}
+		if res.Message != "account reactivated successfully" {
+			t.Fatalf("expected message 'account reactivated successfully', got %s", res.Message)
+		}
+
+		reactRes, err := mResolver.ReactivateDeliveryPartner(partnerCtx)
+		if err != nil {
+			t.Fatalf("expected reactivate to succeed, got %v", err)
+		}
+		if !reactRes.Success || reactRes.Status != "active" {
+			t.Fatalf("expected reactivate success and active status, got %+v", reactRes)
+		}
+	})
+
+	t.Run("DeactivateDeliveryPartner", func(t *testing.T) {
+		// Admin cannot deactivate partner (owner only)
+		_, err := mResolver.DeactivateDeliveryPartner(adminCtx, "Admin shutdown")
+		if err == nil {
+			t.Fatal("expected admin deactivation to be forbidden, got nil")
+		}
+
+		// Customer cannot deactivate partner
+		_, err = mResolver.DeactivateDeliveryPartner(customerCtx, "Customer shutdown")
+		if err == nil {
+			t.Fatal("expected customer deactivation to be forbidden, got nil")
+		}
+
+		// Empty reason fails
+		_, err = mResolver.DeactivateDeliveryPartner(partnerCtx, "   ")
+		if err == nil {
+			t.Fatal("expected empty reason to fail, got nil")
+		}
+
+		res, err := mResolver.DeactivateDeliveryPartner(partnerCtx, "Business reorganization")
+		if err != nil {
+			t.Fatalf("expected deactivation to succeed, got %v", err)
+		}
+		if !res.Success {
+			t.Fatal("expected success to be true")
+		}
+		if res.Status != "deactivated" {
+			t.Fatalf("expected status 'deactivated', got %s", res.Status)
+		}
+		if res.Message != "account deactivated successfully" {
+			t.Fatalf("expected message 'account deactivated successfully', got %s", res.Message)
+		}
+	})
+
+	t.Run("DeleteDeliveryPartner owner check", func(t *testing.T) {
+		// Customer cannot delete partner
+		_, err := mResolver.DeleteDeliveryPartner(customerCtx, nil)
+		if err == nil {
+			t.Fatal("expected customer deletion to be forbidden, got nil")
+		}
+
+		// Partner owner can delete with input Reason
+		reason := "Business closing"
+		delRes, err := mResolver.DeleteDeliveryPartner(partnerCtx, &reason)
+		if err != nil {
+			t.Fatalf("expected partner deletion to succeed, got %v", err)
+		}
+		if !delRes.Success {
+			t.Fatal("expected success true")
+		}
+		if delRes.Status != "deleted" {
+			t.Fatalf("expected status 'deleted', got %s", delRes.Status)
+		}
+		if delRes.Message != "account deleted successfully" {
+			t.Fatalf("expected message 'account deleted successfully', got %s", delRes.Message)
+		}
+	})
+
+	t.Run("AppealDeliveryPartnerRejection validation", func(t *testing.T) {
+		// Customer cannot appeal
+		_, err := mResolver.AppealDeliveryPartnerRejection(customerCtx, "Reason")
+		if err == nil {
+			t.Fatal("expected customer appeal to be forbidden, got nil")
+		}
+
+		// Empty reason fails
+		_, err = mResolver.AppealDeliveryPartnerRejection(partnerCtx, "   ")
+		if err == nil {
+			t.Fatal("expected empty reason to fail, got nil")
+		}
+
+		// Valid appeal succeeds
+		appRes, err := mResolver.AppealDeliveryPartnerRejection(partnerCtx, "Valid Appeal Reason")
+		if err != nil {
+			t.Fatalf("expected appeal to succeed, got %v", err)
+		}
+		if appRes.ApprovalStatus != model.PartnerApprovalStatusAppealed {
+			t.Fatalf("expected APPEALED status, got %s", appRes.ApprovalStatus)
+		}
+	})
+
+	t.Run("ApproveDeliveryPartner admin flow", func(t *testing.T) {
+		_, err := mResolver.ApproveDeliveryPartner(adminCtx, "  ")
+		if err == nil {
+			t.Fatal("expected empty partnerId to fail, got nil")
+		}
+
+		apprRes, err := mResolver.ApproveDeliveryPartner(adminCtx, "partner-uuid-1")
+		if err != nil {
+			t.Fatalf("expected approve to succeed, got %v", err)
+		}
+		if apprRes.ApprovalStatus != model.PartnerApprovalStatusApproved {
+			t.Fatalf("expected APPROVED status, got %s", apprRes.ApprovalStatus)
+		}
+		if !apprRes.IsGstinVerified {
+			t.Fatal("expected is_gstin_verified to be true")
+		}
+	})
+
+	t.Run("RejectDeliveryPartner admin flow", func(t *testing.T) {
+		_, err := mResolver.RejectDeliveryPartner(adminCtx, "partner-uuid-1", "  ")
+		if err == nil {
+			t.Fatal("expected empty reason to fail, got nil")
+		}
+
+		rejRes, err := mResolver.RejectDeliveryPartner(adminCtx, "partner-uuid-1", "Rejection Reason")
+		if err != nil {
+			t.Fatalf("expected reject to succeed, got %v", err)
+		}
+		if rejRes.ApprovalStatus != model.PartnerApprovalStatusRejected {
+			t.Fatalf("expected REJECTED status, got %s", rejRes.ApprovalStatus)
+		}
+	})
+
+	t.Run("AppealDeliveryPartners query", func(t *testing.T) {
+		// Non-admin query fails
+		_, err := qResolver.AppealDeliveryPartners(partnerCtx)
+		if err == nil {
+			t.Fatal("expected non-admin appealDeliveryPartners to be forbidden, got nil")
+		}
+
+		partners, err := qResolver.AppealDeliveryPartners(adminCtx)
+		if err != nil {
+			t.Fatalf("expected query to succeed, got %v", err)
+		}
+		if len(partners) != 1 {
+			t.Fatalf("expected 1 appealed partner, got %d", len(partners))
+		}
+		if partners[0].ApprovalStatus != model.PartnerApprovalStatusAppealed {
+			t.Fatalf("expected APPEALED partner, got %s", partners[0].ApprovalStatus)
+		}
+	})
+}
+
+func TestCreateDelivery_OrderLookupFails_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		err: appErrors.NotFound("order not found"),
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-missing",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when order lookup fails, got nil")
+	}
+}
+
+func TestCreateDelivery_NilOrIncompleteOrderResponse_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	// Incomplete order response (missing order id)
+	orderMockIncomplete := &mockOrderClientForDeliveryTest{
+		resp: &orderpb.GetOrderResponse{Order: &orderpb.Order{Id: "", PaymentStatus: "PAID"}},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMockIncomplete,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-incomplete",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error for incomplete order response, got nil")
+	}
+	if !strings.Contains(err.Error(), "incomplete or invalid order response") {
+		t.Errorf("expected 'incomplete or invalid order response' error, got %v", err)
+	}
+}
+
+func TestCreateDelivery_OrderPaymentStatusEmpty_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{
+			Id:            "ord-unpaid",
+			PaymentStatus: "",
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "ADMIN"})
+	_, err := r.CreateDelivery(ctx, model.CreateDeliveryInput{
+		OrderID:           "ord-unpaid",
+		DeliveryPartnerID: "partner-uuid-1",
+		ShippingAddressID: "addr-1",
+	})
+	if err == nil {
+		t.Fatal("expected error when order payment_status is empty, got nil")
+	}
+	if !strings.Contains(err.Error(), "payment_status must be PAID") {
+		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)
 	}
 }

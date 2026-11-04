@@ -602,6 +602,7 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 	now := time.Now().UTC()
 	confirmedEvt := events.OrderConfirmedEvent{
 		OrderID:     order.ID,
+		PaymentStatus:   string(model.OrderStatusPaid),
 		ConfirmedAt: now,
 	}
 

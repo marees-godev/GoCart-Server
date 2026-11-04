@@ -14,6 +14,17 @@ service DeliveryService {
   rpc CreatePartnerProfile (CreatePartnerProfileRequest) returns (PartnerProfileResponse);
   rpc GetPartnerProfile (GetPartnerProfileRequest) returns (PartnerProfileResponse);
   rpc UpdatePartnerProfile (UpdatePartnerProfileRequest) returns (PartnerProfileResponse);
+  rpc VerifyGSTIN (VerifyPartnerGSTINRequest) returns (PartnerProfileResponse);
+
+  rpc ActivatePartner (ActivatePartnerRequest) returns (PartnerProfileResponse);
+  rpc DeactivatePartner (DeactivatePartnerRequest) returns (PartnerProfileResponse);
+  rpc DeletePartnerProfile (DeletePartnerProfileRequest) returns (DeletePartnerProfileResponse);
+  rpc ApprovePartner (ApprovePartnerRequest) returns (PartnerProfileResponse);
+  rpc RejectPartner (RejectPartnerRequest) returns (PartnerProfileResponse);
+  rpc AppealRejection (AppealRejectionRequest) returns (PartnerProfileResponse);
+  rpc ListAppealedPartners (ListAppealedPartnersRequest) returns (ListAppealedPartnersResponse);
+  rpc ListApprovedPartners (ListApprovedPartnersRequest) returns (ListApprovedPartnersResponse);
+  rpc ProcessExpiredDeactivations (ProcessExpiredDeactivationsRequest) returns (ProcessExpiredDeactivationsResponse);
 }
 
 message Delivery {
@@ -28,6 +39,7 @@ message Delivery {
   string updated_at = 9;
   string created_at = 10;
   string contact_number = 11;
+  string shipping_address_id = 12;
 }
 
 message CreateDeliveryRequest {
@@ -35,6 +47,7 @@ message CreateDeliveryRequest {
   string delivery_partner = 2;
   string shipping_address = 3;
   string contact_number = 4;
+  string shipping_address_id = 5;
 }
 
 message CreateDeliveryResponse {
@@ -76,6 +89,16 @@ message DeliveryPartnerProfile {
   bool is_active = 6;
   string created_at = 7;
   string updated_at = 8;
+  string approval_status = 9;
+  string rejection_reason = 10;
+  string appeal_reason = 11;
+  string appealed_at = 12;
+  string deactivated_at = 13;
+  string deleted_at = 14;
+  string gstin = 15;
+  bool is_gstin_verified = 16;
+  string deactivation_reason = 17;
+  optional string deletion_reason = 18;
 }
 
 message CreatePartnerProfileRequest {
@@ -83,6 +106,7 @@ message CreatePartnerProfileRequest {
   string company_name = 2;
   string email = 3;
   string contact_number = 4;
+  optional string gstin = 5;
 }
 
 message GetPartnerProfileRequest {
@@ -94,9 +118,83 @@ message UpdatePartnerProfileRequest {
   optional string company_name = 2;
   optional string email = 3;
   optional string contact_number = 4;
+  optional string gstin = 5;
+  string caller_id = 6;
+}
+
+message VerifyPartnerGSTINRequest {
+  string partner_id = 1;
+  string gstin = 2;
+  string caller_id = 3;
 }
 
 message PartnerProfileResponse {
   DeliveryPartnerProfile profile = 1;
 }
 
+message ActivatePartnerRequest {
+  string partner_id = 1;
+  string caller_id = 2;
+}
+
+message DeactivatePartnerRequest {
+  string partner_id = 1;
+  string reason = 2;
+  string caller_id = 3;
+}
+
+message DeletePartnerProfileRequest {
+  string partner_id = 1;
+  string caller_id = 2;
+  optional string reason = 3;
+}
+
+message DeletePartnerProfileResponse {
+  bool success = 1;
+  string message = 2;
+  string status = 3;
+}
+
+message ApprovePartnerRequest {
+  string partner_id = 1;
+}
+
+message RejectPartnerRequest {
+  string partner_id = 1;
+  string reason = 2;
+}
+
+message AppealRejectionRequest {
+  string partner_id = 1;
+  string reason = 2;
+  string caller_id = 3;
+}
+
+message ListAppealedPartnersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListAppealedPartnersResponse {
+  repeated DeliveryPartnerProfile profiles = 1;
+  int32 total = 2;
+}
+
+message ListApprovedPartnersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListApprovedPartnersResponse {
+  repeated DeliveryPartnerProfile profiles = 1;
+  int32 total = 2;
+}
+
+message ProcessExpiredDeactivationsRequest {
+  int32 retention_minutes = 1;
+}
+
+message ProcessExpiredDeactivationsResponse {
+  int32 processed_count = 1;
+  string message = 2;
+}

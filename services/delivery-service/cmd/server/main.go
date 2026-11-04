@@ -24,12 +24,14 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client"
+	gstinClientPkg "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client/gstin"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/consumer"
 	deliveryGRPC "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -126,9 +128,14 @@ func main() {
 	} else if err != nil {
 		log.Warn("Failed to initialize inventory service gRPC client", "error", err)
 	}
-	deliveryService := service.NewDeliveryService(deliveryRepo, orderClient, inventoryClient, log)
+	gstinClient := gstinClientPkg.NewGSTINClient(cfg.GSTIN)
+	deliveryService := service.NewDeliveryService(deliveryRepo, orderClient, inventoryClient, gstinClient, log)
 
-	// 8. Start transactional outbox publisher as a background worker
+	// 8. Start delivery partner retention worker (30-day deactivation auto-soft-delete)
+	retentionWorker := worker.NewRetentionWorker(deliveryService, cfg.Retention.Interval, cfg.Retention.Period)
+	retentionWorker.Start(ctx)
+
+	// 9. Start transactional outbox publisher as a background worker
 	if cfg.Outbox.Enabled {
 		outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
 			ServiceName:    cfg.App.Name,
