@@ -32,11 +32,23 @@ type mockRatingClientForResolvers struct {
 	deleteResp *ratingpb.DeleteRatingResponse
 	deleteErr  error
 
+	flagRatingResp *ratingpb.FlagRatingResponse
+	flagRatingErr  error
+
+	getFlaggedRatingsResp *ratingpb.GetFlaggedRatingsResponse
+	getFlaggedRatingsErr  error
+
+	moderateRatingsResp *ratingpb.ModerateRatingResponse
+	moderateRatingsErr error
+
 	lastCreateReq            *ratingpb.CreateRatingRequest
 	lastGetReq               *ratingpb.GetRatingRequest
 	lastGetProductRatingsReq *ratingpb.GetProductRatingsRequest
 	lastUpdateReq            *ratingpb.UpdateRatingRequest
 	lastDeleteReq            *ratingpb.DeleteRatingRequest
+	lastFlagRatingReq        *ratingpb.FlagRatingRequest
+	lastGetFlaggedRatingsReq *ratingpb.GetFlaggedRatingsRequest
+	lastModerateRatingsReq *ratingpb.ModerateRatingRequest
 }
 
 func (m *mockRatingClientForResolvers) CreateRating(ctx context.Context, in *ratingpb.CreateRatingRequest, opts ...grpcPkg.CallOption) (*ratingpb.CreateRatingResponse, error) {
@@ -77,6 +89,30 @@ func (m *mockRatingClientForResolvers) DeleteRating(ctx context.Context, in *rat
 		return nil, m.deleteErr
 	}
 	return m.deleteResp, nil
+}
+
+func (m *mockRatingClientForResolvers) FlagRating(ctx context.Context, in *ratingpb.FlagRatingRequest, opts ...grpcPkg.CallOption) (*ratingpb.FlagRatingResponse, error) {
+	m.lastFlagRatingReq = in
+	if m.flagRatingErr != nil {
+		return nil, m.flagRatingErr
+	}
+	return m.flagRatingResp, nil
+}
+
+func (m *mockRatingClientForResolvers) GetFlaggedRatings(ctx context.Context, in *ratingpb.GetFlaggedRatingsRequest, opts ...grpcPkg.CallOption) (*ratingpb.GetFlaggedRatingsResponse, error) {
+	m.lastGetFlaggedRatingsReq = in
+	if m.getFlaggedRatingsErr != nil {
+		return nil, m.getFlaggedRatingsErr
+	}
+	return m.getFlaggedRatingsResp, nil
+}
+
+func (m *mockRatingClientForResolvers) ModerateRatings(ctx context.Context, in *ratingpb.ModerateRatingRequest, opts ...grpcPkg.CallOption) (*ratingpb.ModerateRatingResponse, error) {
+	m.lastModerateRatingsReq = in 
+	if m.moderateRatingsErr != nil {
+		return nil, m.moderateRatingsErr
+	}
+	return m.moderateRatingsResp, nil
 }
 
 func newTestRatingResolver(mock *mockRatingClientForResolvers) (*mutationResolver, *queryResolver) {
@@ -682,6 +718,446 @@ func TestRatingResolvers_GetRating_NotFound(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeNotFound {
+		t.Fatalf("expected NOT_FOUND, got %v", err)
+	}
+}
+
+func TestRatingResolvers_FlagRating_Unauthenticated(t *testing.T) {
+	mock := &mockRatingClientForResolvers{}
+	mut, _ := newTestRatingResolver(mock)
+
+	input := model.FlagRatingInput{
+		RatingID: "rate-101",
+		Category: model.FlagCategorySpam,
+	}
+
+	_, err := mut.FlagRating(context.Background(), input)
+	if err == nil {
+		t.Fatal("expected error for unauthenticated user, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeUnauthorized {
+		t.Fatalf("expected UNAUTHORIZED code, got %v", err)
+	}
+}
+
+func TestRatingResolvers_FlagRating_NilClient(t *testing.T) {
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			ClientMgr: nil,
+		},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	input := model.FlagRatingInput{
+		RatingID: "rate-101",
+		Category: model.FlagCategorySpam,
+	}
+
+	_, err := r.FlagRating(ctx, input)
+	if err == nil {
+		t.Fatal("expected error for nil client, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeInternalError {
+		t.Fatalf("expected INTERNAL_SERVER_ERROR, got %v", err)
+	}
+}
+
+func TestRatingResolvers_FlagRating_InvalidCategory(t *testing.T) {
+	mock := &mockRatingClientForResolvers{}
+	mut, _ := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	input := model.FlagRatingInput{
+		RatingID: "rate-101",
+		Category: model.FlagCategory("INVALID_CATEGORY"),
+	}
+
+	_, err := mut.FlagRating(ctx, input)
+	if err == nil {
+		t.Fatal("expected error for invalid category, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeBadRequest {
+		t.Fatalf("expected BAD_REQUEST, got %v", err)
+	}
+}
+
+func TestRatingResolvers_FlagRating_Success(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		flagRatingResp: &ratingpb.FlagRatingResponse{
+			Success: true,
+			Message: "Rating flagged successfully",
+		},
+	}
+	mut, _ := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	input := model.FlagRatingInput{
+		RatingID: "rate-101",
+		Category: model.FlagCategorySpam,
+		Reason:   strPtr("Suspicious promotional link"),
+	}
+
+	res, err := mut.FlagRating(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !res.Success || res.Message != "Rating flagged successfully" {
+		t.Errorf("unexpected f;ag rating response: %+v", res)
+	}
+
+	if mock.lastFlagRatingReq == nil {
+		t.Fatal("expected FlagRating to be called")
+	}
+
+	if mock.lastFlagRatingReq.UserId != "user-123" || mock.lastFlagRatingReq.RatingId != "rate-101" {
+		t.Errorf("unexpected UserId or RatingId in request: %+v", mock.lastFlagRatingReq)
+	}
+
+	if mock.lastFlagRatingReq.Category != ratingpb.FlagCategory_SPAM {
+		t.Errorf("expected category SPAM, got %v", mock.lastFlagRatingReq.Category)
+	}
+
+	if mock.lastFlagRatingReq.Reason != "Suspicious promotional link" {
+		t.Errorf("expected reason text, got %s", mock.lastFlagRatingReq.Reason)
+	}
+
+}
+
+func TestRatingResolvers_FlagRating_GRPCError(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		flagRatingErr: status.Error(codes.AlreadyExists, "user has already submitted a flag for this review"),
+	}
+
+	mut, _ := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleUser,
+	})
+
+	input := model.FlagRatingInput{
+		RatingID: "rate-101",
+		Category: model.FlagCategorySpam,
+	}
+
+	_, err := mut.FlagRating(ctx, input)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeConflict {
+		t.Fatalf("expected CONFLICT error, got %v", err)
+	}
+}
+
+
+func TestRatingResolvers_GetFlaggedRating_Unauthenticated(t *testing.T) {
+	mock := &mockRatingClientForResolvers{}
+	_, query := newTestRatingResolver(mock)
+
+	_, err := query.GetFlaggedRating(context.Background(), nil, nil)
+	if err == nil {
+		t.Fatal("expected error for unauthenticated user, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeUnauthorized {
+		t.Fatalf("expected UNAUTHORIZED code, got %v", err)
+	}
+}
+
+func TestRatingResolvers_GetFlaggedRating_NilClient(t *testing.T) {
+	r := &queryResolver{
+		Resolver: &Resolver{
+			ClientMgr: nil,
+		},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role:   auth.RoleAdmin,
+	})
+
+	_, err := r.GetFlaggedRating(ctx, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for nil client, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeInternalError {
+		t.Fatalf("expected INTERNAL_SERVER_ERROR, got %v", err)
+	}
+}
+
+func TestRatingResolvers_GetFlaggedRating_Success(t *testing.T) {
+	reasonStr := "Spam promotion"
+	mock := &mockRatingClientForResolvers{
+		getFlaggedRatingsResp: &ratingpb.GetFlaggedRatingsResponse{
+			Items: []*ratingpb.FlaggedRatingItem{
+				{
+					Rating: &ratingpb.Rating{
+						Id:        "rate-101",
+						ProductId: "prod-202",
+						UserId:    "user-303",
+						Rating:    1,
+						Review:    "Spam review here",
+						IsFlagged: true,
+						CreatedAt: "2026-11-03T10:00:00Z",
+					},
+					FlagCount: 1,
+					Flags: []*ratingpb.RatingFlag{
+						{
+							Id:        "flag-1",
+							UserId:    "flag-user-1",
+							Category:  ratingpb.FlagCategory_SPAM,
+							Reason:    reasonStr,
+							CreatedAt: "2026-11-03T10:05:00Z",
+						},
+					},
+				},
+			},
+			Total: 1,
+		},
+	}
+
+	_, query := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role:   auth.RoleAdmin,
+	})
+
+	lim := 15
+	off := 30
+	res, err := query.GetFlaggedRating(ctx, &lim, &off)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Total != 1 {
+		t.Fatalf("expected Total 1, got %d", res.Total)
+	}
+
+	if len(res.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(res.Items))
+	}
+
+	item := res.Items[0]
+	if item.Rating == nil || item.Rating.ID != "rate-101" {
+		t.Errorf("unexpected rating: %+v", item.Rating)
+	}
+	if item.FlagCount != 1 {
+		t.Errorf("expected FlagCount 1, got %d", item.FlagCount)
+	}
+	if len(item.Flags) != 1 {
+		t.Fatalf("expected 1 flag, got %d", len(item.Flags))
+	}
+	if item.Flags[0].Category != model.FlagCategorySpam {
+		t.Errorf("expected SPAM category, got %s", item.Flags[0].Category)
+	}
+	if item.Flags[0].Reason == nil || *item.Flags[0].Reason != reasonStr {
+		t.Errorf("expected reason %s, got %v", reasonStr, item.Flags[0].Reason)
+	}
+
+	if mock.lastGetFlaggedRatingsReq == nil {
+		t.Fatal("expected GetFlaggedRatings to be called")
+	}
+	if mock.lastGetFlaggedRatingsReq.Limit != 15 || mock.lastGetFlaggedRatingsReq.Offset != 30 {
+		t.Errorf("expected limit=15, offset=30, got limit=%d, offset=%d", mock.lastGetFlaggedRatingsReq.Limit, mock.lastGetFlaggedRatingsReq.Offset)
+	}
+	if mock.lastGetFlaggedRatingsReq.AdminId != "admin-101" {
+		t.Errorf("expected AdminId admin-101, got %s", mock.lastGetFlaggedRatingsReq.AdminId)
+	}
+}
+
+func TestRatingResolvers_GetFlaggedRating_GRPCError(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		getFlaggedRatingsErr: status.Error(codes.Internal, "internal database failure"),
+	}
+
+	_, query := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role:   auth.RoleAdmin,
+	})
+
+	_, err := query.GetFlaggedRating(ctx, nil, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeInternalError {
+		t.Fatalf("expected INTERNAL_SERVER_ERROR, got %v", err)
+	}
+	
+}
+
+func TestRatingResolvers_ModerateRating_Unauthenticated(t *testing.T) {
+	mock := &mockRatingClientForResolvers{}
+	mut, _ := newTestRatingResolver(mock)
+	input := model.ModerateRatingInput{
+		RatingID: "rate-101",
+		IsHidden: true,
+	}
+
+	_, err := mut.ModerateRating(context.Background(),input)
+	if err == nil {
+		t.Fatal("expected error for unauthenticated user, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeUnauthorized {
+		t.Fatalf("expected UNAUTHORIZED code, got %v",err)
+	}
+
+}
+
+func TestRatingResolvers_ModerateRating_Nilclient(t *testing.T) {
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			ClientMgr: nil,
+		},
+	}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role: auth.RoleAdmin,
+	})
+
+	input := model.ModerateRatingInput{
+		RatingID: "rate-101",
+		IsHidden: true,
+	}
+
+	_, err := r.ModerateRating(ctx, input)
+	if err == nil {
+		t.Fatal("expected error for nil client, got nil")
+	}
+
+	appErr, ok := err.(*appErrors.AppError)
+	if !ok || appErr.Code != appErrors.CodeInternalError {
+		t.Fatalf("expected INTERNAL_SERVER_ERROR, got %v", err)
+	}
+}
+
+func TestRatingResolvers_ModerateRating_Success_Hide(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		moderateRatingsResp: &ratingpb.ModerateRatingResponse{
+			Success: true,
+			Message: "Rating hidden successfully",
+		},
+	}
+
+	mut , _ := newTestRatingResolver(mock)
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role: auth.RoleAdmin,
+	})
+
+	input := model.ModerateRatingInput{
+		RatingID: "rate-101",
+		IsHidden: true,
+	}
+
+	res,err := mut.ModerateRating(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error : %v",err)
+	}
+
+	if !res.Success || res.Message != "Rating hidden successfully" {
+		t.Errorf("unexpected moderate response: %+v",res)
+	}
+
+	if mock.lastModerateRatingsReq == nil {
+		t.Fatal("expected ModerateRatings to be called")
+	}
+
+	if mock.lastModerateRatingsReq.RatingId != "rate-101" {
+		t.Errorf("expected RatingId rate-101, got %s",mock.lastModerateRatingsReq.RatingId)
+	}
+
+	if mock.lastModerateRatingsReq.AdminId != "admin-101" {
+		t.Errorf("expected AdminId admin-101, got %s",mock.lastModerateRatingsReq.AdminId)
+	}
+
+	if !mock.lastModerateRatingsReq.IsHidden {
+		t.Errorf("expected IsHidden true, got false")
+	}
+}
+
+func TestRatingResolvers_ModerateRating_Success_Unhide(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		moderateRatingsResp: &ratingpb.ModerateRatingResponse{
+			Success: true,
+			Message: "Rating unhidden successfully",
+		},
+	}
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role:   auth.RoleAdmin,
+	})
+	input := model.ModerateRatingInput{
+		RatingID: "rate-101",
+		IsHidden: false,
+	}
+	res, err := mut.ModerateRating(ctx, input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res.Success || res.Message != "Rating unhidden successfully" {
+		t.Errorf("unexpected moderate response: %+v", res)
+	}
+	if mock.lastModerateRatingsReq == nil {
+		t.Fatal("expected ModerateRatings to be called")
+	}
+	if mock.lastModerateRatingsReq.IsHidden {
+		t.Errorf("expected IsHidden false, got true")
+	}
+}
+
+func TestRatingResolvers_ModerateRating_GRPCError(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		moderateRatingsErr: status.Error(codes.NotFound, "rating not found"),
+	}
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "admin-101",
+		Role:   auth.RoleAdmin,
+	})
+	input := model.ModerateRatingInput{
+		RatingID: "rate-unknown",
+		IsHidden: true,
+	}
+	_, err := mut.ModerateRating(ctx, input)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
 	appErr, ok := err.(*appErrors.AppError)
 	if !ok || appErr.Code != appErrors.CodeNotFound {
 		t.Fatalf("expected NOT_FOUND, got %v", err)

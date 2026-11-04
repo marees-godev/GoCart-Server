@@ -24,6 +24,9 @@ const (
 	RatingService_GetProductRatings_FullMethodName = "/gocart.rating.v1.RatingService/GetProductRatings"
 	RatingService_UpdateRating_FullMethodName      = "/gocart.rating.v1.RatingService/UpdateRating"
 	RatingService_DeleteRating_FullMethodName      = "/gocart.rating.v1.RatingService/DeleteRating"
+	RatingService_FlagRating_FullMethodName        = "/gocart.rating.v1.RatingService/FlagRating"
+	RatingService_GetFlaggedRatings_FullMethodName = "/gocart.rating.v1.RatingService/GetFlaggedRatings"
+	RatingService_ModerateRatings_FullMethodName   = "/gocart.rating.v1.RatingService/ModerateRatings"
 )
 
 // RatingServiceClient is the client API for RatingService service.
@@ -35,6 +38,9 @@ type RatingServiceClient interface {
 	GetProductRatings(ctx context.Context, in *GetProductRatingsRequest, opts ...grpc.CallOption) (*GetProductRatingsResponse, error)
 	UpdateRating(ctx context.Context, in *UpdateRatingRequest, opts ...grpc.CallOption) (*UpdateRatingResponse, error)
 	DeleteRating(ctx context.Context, in *DeleteRatingRequest, opts ...grpc.CallOption) (*DeleteRatingResponse, error)
+	FlagRating(ctx context.Context, in *FlagRatingRequest, opts ...grpc.CallOption) (*FlagRatingResponse, error)
+	GetFlaggedRatings(ctx context.Context, in *GetFlaggedRatingsRequest, opts ...grpc.CallOption) (*GetFlaggedRatingsResponse, error)
+	ModerateRatings(ctx context.Context, in *ModerateRatingRequest, opts ...grpc.CallOption) (*ModerateRatingResponse, error)
 }
 
 type ratingServiceClient struct {
@@ -95,6 +101,36 @@ func (c *ratingServiceClient) DeleteRating(ctx context.Context, in *DeleteRating
 	return out, nil
 }
 
+func (c *ratingServiceClient) FlagRating(ctx context.Context, in *FlagRatingRequest, opts ...grpc.CallOption) (*FlagRatingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FlagRatingResponse)
+	err := c.cc.Invoke(ctx, RatingService_FlagRating_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingServiceClient) GetFlaggedRatings(ctx context.Context, in *GetFlaggedRatingsRequest, opts ...grpc.CallOption) (*GetFlaggedRatingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFlaggedRatingsResponse)
+	err := c.cc.Invoke(ctx, RatingService_GetFlaggedRatings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingServiceClient) ModerateRatings(ctx context.Context, in *ModerateRatingRequest, opts ...grpc.CallOption) (*ModerateRatingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ModerateRatingResponse)
+	err := c.cc.Invoke(ctx, RatingService_ModerateRatings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServiceServer is the server API for RatingService service.
 // All implementations must embed UnimplementedRatingServiceServer
 // for forward compatibility.
@@ -104,6 +140,9 @@ type RatingServiceServer interface {
 	GetProductRatings(context.Context, *GetProductRatingsRequest) (*GetProductRatingsResponse, error)
 	UpdateRating(context.Context, *UpdateRatingRequest) (*UpdateRatingResponse, error)
 	DeleteRating(context.Context, *DeleteRatingRequest) (*DeleteRatingResponse, error)
+	FlagRating(context.Context, *FlagRatingRequest) (*FlagRatingResponse, error)
+	GetFlaggedRatings(context.Context, *GetFlaggedRatingsRequest) (*GetFlaggedRatingsResponse, error)
+	ModerateRatings(context.Context, *ModerateRatingRequest) (*ModerateRatingResponse, error)
 	mustEmbedUnimplementedRatingServiceServer()
 }
 
@@ -128,6 +167,15 @@ func (UnimplementedRatingServiceServer) UpdateRating(context.Context, *UpdateRat
 }
 func (UnimplementedRatingServiceServer) DeleteRating(context.Context, *DeleteRatingRequest) (*DeleteRatingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteRating not implemented")
+}
+func (UnimplementedRatingServiceServer) FlagRating(context.Context, *FlagRatingRequest) (*FlagRatingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FlagRating not implemented")
+}
+func (UnimplementedRatingServiceServer) GetFlaggedRatings(context.Context, *GetFlaggedRatingsRequest) (*GetFlaggedRatingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFlaggedRatings not implemented")
+}
+func (UnimplementedRatingServiceServer) ModerateRatings(context.Context, *ModerateRatingRequest) (*ModerateRatingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ModerateRatings not implemented")
 }
 func (UnimplementedRatingServiceServer) mustEmbedUnimplementedRatingServiceServer() {}
 func (UnimplementedRatingServiceServer) testEmbeddedByValue()                       {}
@@ -240,6 +288,60 @@ func _RatingService_DeleteRating_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RatingService_FlagRating_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FlagRatingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServiceServer).FlagRating(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RatingService_FlagRating_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServiceServer).FlagRating(ctx, req.(*FlagRatingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RatingService_GetFlaggedRatings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFlaggedRatingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServiceServer).GetFlaggedRatings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RatingService_GetFlaggedRatings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServiceServer).GetFlaggedRatings(ctx, req.(*GetFlaggedRatingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RatingService_ModerateRatings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ModerateRatingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServiceServer).ModerateRatings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RatingService_ModerateRatings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServiceServer).ModerateRatings(ctx, req.(*ModerateRatingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RatingService_ServiceDesc is the grpc.ServiceDesc for RatingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +368,18 @@ var RatingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteRating",
 			Handler:    _RatingService_DeleteRating_Handler,
+		},
+		{
+			MethodName: "FlagRating",
+			Handler:    _RatingService_FlagRating_Handler,
+		},
+		{
+			MethodName: "GetFlaggedRatings",
+			Handler:    _RatingService_GetFlaggedRatings_Handler,
+		},
+		{
+			MethodName: "ModerateRatings",
+			Handler:    _RatingService_ModerateRatings_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

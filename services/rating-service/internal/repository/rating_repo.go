@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"errors"
 	"fmt"
 	"time"
@@ -24,6 +25,9 @@ type RatingRepository interface {
 	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error)
 	UpdateRating(ctx context.Context, id string, rating int, review string) (*model.Rating, error)
 	DeleteRating(ctx context.Context, id string) error
+	CreateFlag(ctx context.Context, f *model.RatingFlag) error
+	GetFlaggedRatings(ctx context.Context, limit, offset int32) ([]*dto.FlaggedRatingItem, int32, error)
+	ModerateRatings(ctx context.Context, ishidden bool, ratingID string) error
 }
 
 type RatingRepo struct {
@@ -234,4 +238,141 @@ func (r *RatingRepo) DeleteRating(ctx context.Context, id string) error {
 
 	return nil
 
+}
+
+func (r *RatingRepo) CreateFlag(ctx context.Context, flagRating *model.RatingFlag) error {
+
+	updateQuery := `
+		UPDATE ratings
+		SET is_flagged = true, updated_at = NOW()
+		WHERE id = $1 AND is_hidden = false AND deleted_at IS NULL`
+	
+	tag, err := r.db.Pool.Exec(ctx, updateQuery, flagRating.RatingID)
+	if err != nil {
+		return fmt.Errorf("failed to update flag in rating: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return ErrRatingNotFound
+	}
+
+	insertQuery := `
+		INSERT INTO rating_flags (
+		rating_id, user_id, category, reason) VALUES (
+			$1, $2, $3, $4
+		)
+		RETURNING id, created_at; `
+
+	err = r.db.Pool.QueryRow(
+		ctx,
+		insertQuery,
+		flagRating.RatingID,
+		flagRating.UserID,
+		flagRating.Category,
+		flagRating.Reason,
+	).Scan(&flagRating.ID, &flagRating.CreatedAt)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrRatingAlreadyExists
+		}
+		return fmt.Errorf("failed to insert rating: %w", err)
+	}
+
+	return nil
+
+}
+
+func (r *RatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset int32) ([]*dto.FlaggedRatingItem, int32, error) {
+	countQuery := `
+		SELECT COUNT(*)
+		FROM ratings
+		WHERE is_flagged = true AND is_hidden = false AND deleted_at IS NULL
+	`
+	var total int32
+	if err := r.db.Pool.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count flagged ratings: %w", err)
+	}
+
+	if total == 0 {
+		return []*dto.FlaggedRatingItem{}, 0, nil
+	}
+
+	listQuery := `
+		SELECT 
+			r.id, r.user_id, r.product_id, r.order_id, r.order_item_id,
+			r.rating, r.review, r.is_verified_purchase, r.is_flagged, r.is_hidden,
+			r.created_at, r.updated_at,
+			f.id, f.user_id, f.rating_id, f.category, f.reason, f.created_at
+		FROM ratings r
+		INNER JOIN rating_flags f ON r.id = f.rating_id
+		WHERE r.is_flagged = true AND r.is_hidden = false AND r.deleted_at IS NULL
+		ORDER BY r.created_at DESC, f.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.Pool.Query(ctx, listQuery, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query flagged ratings: %w", err)
+	}
+	defer rows.Close()
+
+	itemMap := make(map[string]*dto.FlaggedRatingItem)
+	var items []*dto.FlaggedRatingItem
+
+	for rows.Next() {
+		var rt model.Rating
+		var flag model.RatingFlag
+
+		if err := rows.Scan(
+			&rt.ID, &rt.UserID, &rt.ProductID, &rt.OrderID, &rt.OrderItemID,
+			&rt.Rating, &rt.Review, &rt.IsVerifiedPurchase, &rt.IsFlagged, &rt.IsHidden,
+			&rt.CreatedAt, &rt.UpdatedAt,
+			&flag.ID, &flag.UserID, &flag.RatingID, &flag.Category, &flag.Reason, &flag.CreatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan flagged rating row: %w", err)
+		}
+
+		item, exists := itemMap[rt.ID]
+		if !exists {
+			item = &dto.FlaggedRatingItem{
+				Rating:    &rt,
+				FlagCount: 0,
+				Flags:     []*model.RatingFlag{},
+			}
+			itemMap[rt.ID] = item
+			items = append(items, item)
+		}
+
+		item.Flags = append(item.Flags, &flag)
+		item.FlagCount++
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error during flagged rating rows iteration: %w", err)
+	}
+
+	return items, total, nil
+}
+
+func (r *RatingRepo) ModerateRatings(ctx context.Context, isHidden bool, ratingID string) error {
+
+	updateQuery := `UPDATE ratings
+		SET is_hidden = $1,
+		    is_flagged = CASE WHEN $1 = false THEN false ELSE is_flagged END,
+		    updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL`
+		
+	
+	tag, err := r.db.Pool.Exec(ctx, updateQuery, isHidden, ratingID)
+	if err != nil {
+		return fmt.Errorf("failed to update hidden status: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return ErrRatingNotFound
+	}
+
+	return nil
 }

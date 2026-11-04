@@ -20,6 +20,9 @@ type RatingService interface {
 	GetProductRatings(ctx context.Context, productID string, limit, offset int32) ([]*model.Rating, float64, int32, dto.StarRating, error)
 	UpdateRating(ctx context.Context, input dto.UpdateRatingInput) (*model.Rating, error)
 	DeleteRating(ctx context.Context, input dto.DeleteRatingInput) error
+	FlagRating(ctx context.Context, input dto.FlagRatingInput) error
+	GetFlaggedRatings(ctx context.Context, input dto.GetFlaggedRatingsInput) ([]*dto.FlaggedRatingItem, int32, error)
+	ModerateRatings(ctx context.Context, input dto.ModerateRatingInput) error
 }
 
 type ratingService struct {
@@ -211,6 +214,10 @@ func (s *ratingService) UpdateRating(ctx context.Context, input dto.UpdateRating
 		return nil, appErrors.Forbidden("you are not authorized to update this rating")
 	}
 
+	if existing.IsHidden {
+		return nil, appErrors.Forbidden("cannot edit a review that has been hidden by moderation")
+	}
+
 	rating, err := s.repo.UpdateRating(ctx, input.ID, input.Rating, input.Review)
 	if err != nil {
 		return nil, appErrors.Internal(err, "failed to update rating")
@@ -256,4 +263,139 @@ func (s *ratingService) DeleteRating(ctx context.Context, input dto.DeleteRating
 
 	return nil
 
+}
+
+func (s *ratingService) FlagRating(ctx context.Context, input dto.FlagRatingInput) error {
+	if input.RatingID == "" {
+		return appErrors.BadRequest("rating id is required")
+	}
+
+	if _, err := uuid.Parse(input.RatingID); err != nil {
+		return appErrors.BadRequest("invalid rating id format")
+	}
+
+	if input.UserID == "" {
+		return appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if _, err := uuid.Parse(input.UserID); err != nil {
+		return appErrors.BadRequest("invalid user_id format")
+	}
+
+	category := strings.ToUpper(strings.TrimSpace(input.Category))
+	if category == "" || category == "UNSPECIFIED" {
+		return appErrors.BadRequest("category is required")
+	}
+
+	switch category {
+	case "SPAM", "INAPPROPRIATE_CONTENT", "FAKE_REVIEW", "IRRELEVANT", "OTHER":
+	default:
+		return appErrors.BadRequest("invalid category")
+	}
+
+	reason := strings.TrimSpace(input.Reason)
+
+	if category == "OTHER" && reason == "" {
+		return appErrors.BadRequest("reason is required")
+	}
+
+	existing, err := s.repo.GetRatingByID(ctx, input.RatingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingNotFound) {
+			return appErrors.NotFound("rating not found")
+		}
+		return appErrors.Internal(err, "failed to fetch rating")
+	}
+
+	if existing.UserID == input.UserID {
+		return appErrors.BadRequest("you cannot flag your own review")
+	}
+
+	if strings.TrimSpace(existing.Review) == "" {
+		return appErrors.BadRequest("cannot flag a rating without review text")
+	}
+
+	flag := &model.RatingFlag{
+		RatingID: input.RatingID,
+		UserID:   input.UserID,
+		Category: category,
+		Reason:   reason,
+	}
+
+	err = s.repo.CreateFlag(ctx, flag)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingAlreadyExists) {
+			return appErrors.Conflict("user has already submitted a flag for this review")
+		}
+		if errors.Is(err, repository.ErrRatingNotFound) {
+			return appErrors.NotFound("rating not found")
+		}
+		s.log.Error("Failed to persist flag for rating", "error", err)
+		return appErrors.Internal(err, "failed to save flag rating")
+	}
+
+	s.log.Info("Rating flagged by user", "action", "RATING_FLAGGED",
+		"rating_id", input.RatingID,
+		"user_id", input.UserID,
+		"category", category,
+		"reason", reason)
+
+	return nil
+
+}
+
+func (s *ratingService) GetFlaggedRatings(ctx context.Context, input dto.GetFlaggedRatingsInput) ([]*dto.FlaggedRatingItem, int32, error) {
+
+	if input.AdminId == "" {
+		return nil, 0, appErrors.Unauthorized("unauthenticated: admin_id is required")
+	}
+
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+	offset := input.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	items, total, err := s.repo.GetFlaggedRatings(ctx, limit, offset)
+	if err != nil {
+		s.log.Error("Failed to fetch flagged ratings", "error", err)
+		return nil, 0, appErrors.Internal(err, "failed to fetch flagged ratings")
+	}
+	return items, total, nil
+}
+
+func (s *ratingService) ModerateRatings(ctx context.Context, input dto.ModerateRatingInput) error {
+
+	if input.RatingId == "" {
+		return appErrors.BadRequest("rating id is required")
+	}
+
+	if _, err := uuid.Parse(input.RatingId); err != nil {
+		return appErrors.BadRequest("invalid rating id format")
+	}
+
+	if input.AdminId == "" {
+		return appErrors.Unauthorized("unauthenticated: admin_id is required")
+	}
+
+	err := s.repo.ModerateRatings(ctx,input.IsHidden,input.RatingId)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingNotFound) {
+			return appErrors.NotFound("rating not found")
+		}
+		s.log.Error("Failed to moderate rating", "error", err, "rating_id", input.RatingId)
+		return appErrors.Internal(err, "failed to moderate rating")
+	}
+
+	s.log.Info("Rating moderated by admin", 
+    "rating_id", input.RatingId, 
+    "is_hidden", input.IsHidden,
+	)
+
+	return nil
 }

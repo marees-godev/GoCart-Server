@@ -140,6 +140,111 @@ func (h *RatingGRPCHandler) DeleteRating(ctx context.Context, req *ratingpb.Dele
 	}, nil
 }
 
+func (h *RatingGRPCHandler) FlagRating(ctx context.Context, req *ratingpb.FlagRatingRequest) (*ratingpb.FlagRatingResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	category := req.GetCategory().String()
+
+	if category == "UNSPECIFIED" || category == "" {
+		return nil, status.Error(codes.InvalidArgument, "a valid flag category is required")
+	}
+
+	err := h.service.FlagRating(ctx, dto.FlagRatingInput{
+		RatingID: req.GetRatingId(),
+		UserID:   req.GetUserId(),
+		Category: category,
+		Reason:   req.GetReason(),
+	})
+
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &ratingpb.FlagRatingResponse{
+		Success: true,
+		Message: "Rating has been flagged successfully",
+	}, nil
+
+}
+
+func (h *RatingGRPCHandler) GetFlaggedRatings(ctx context.Context, req *ratingpb.GetFlaggedRatingsRequest) (*ratingpb.GetFlaggedRatingsResponse, error) {
+
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request must not be nil")
+	}
+
+	items, total, err := h.service.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
+		AdminId: req.GetAdminId(),
+		Limit:   req.GetLimit(),
+		Offset:  req.GetOffset(),
+	})
+
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	protoItems := make([]*ratingpb.FlaggedRatingItem, 0, len(items))
+	for _, it := range items {
+		if it == nil {
+			continue
+		}
+
+		var protoFlags []*ratingpb.RatingFlag
+		for _, f := range it.Flags {
+			if f == nil {
+				continue
+			}
+			protoFlags = append(protoFlags, &ratingpb.RatingFlag{
+				Id:        f.ID,
+				UserId:    f.UserID,
+				Category:  ratingpb.FlagCategory(ratingpb.FlagCategory_value[f.Category]),
+				Reason:    f.Reason,
+				CreatedAt: f.CreatedAt.Format(time.RFC3339),
+			})
+		}
+
+		protoItems = append(protoItems, &ratingpb.FlaggedRatingItem{
+			Rating:    mapModelToProto(it.Rating),
+			FlagCount: it.FlagCount,
+			Flags:     protoFlags,
+		})
+	}
+
+	return &ratingpb.GetFlaggedRatingsResponse{
+		Items: protoItems,
+		Total: total,
+	}, nil
+
+}
+
+func (h *RatingGRPCHandler) ModerateRatings(ctx context.Context, req *ratingpb.ModerateRatingRequest) (*ratingpb.ModerateRatingResponse, error) {
+
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request must not be nil")
+	}
+
+	err := h.service.ModerateRatings(ctx,dto.ModerateRatingInput{
+		RatingId: req.RatingId,
+		AdminId: req.AdminId,
+		IsHidden: req.IsHidden,
+	})
+
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	msg := "Rating hidden successfully"
+	if !req.IsHidden {
+		msg = "Rating unhidden successfully"
+	}
+	return &ratingpb.ModerateRatingResponse{
+		Success: true,
+		Message: msg,
+	}, nil
+}
+
 func mapModelToProto(r *model.Rating) *ratingpb.Rating {
 	if r == nil {
 		return nil

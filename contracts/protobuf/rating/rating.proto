@@ -4,12 +4,24 @@ package gocart.rating.v1;
 
 option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating;rating";
 
+enum FlagCategory {
+  UNSPECIFIED = 0;
+  SPAM = 1;
+  INAPPROPRIATE_CONTENT = 2;
+  FAKE_REVIEW = 3;
+  IRRELEVANT = 4;
+  OTHER = 5;
+}
+
 service RatingService {
   rpc CreateRating (CreateRatingRequest) returns (CreateRatingResponse);
   rpc GetRating (GetRatingRequest) returns (GetRatingResponse);
   rpc GetProductRatings (GetProductRatingsRequest) returns (GetProductRatingsResponse);
   rpc UpdateRating (UpdateRatingRequest) returns (UpdateRatingResponse);
   rpc DeleteRating (DeleteRatingRequest) returns (DeleteRatingResponse);
+  rpc FlagRating (FlagRatingRequest) returns (FlagRatingResponse);
+  rpc GetFlaggedRatings (GetFlaggedRatingsRequest) returns (GetFlaggedRatingsResponse);
+  rpc ModerateRatings (ModerateRatingRequest) returns (ModerateRatingResponse);
 }
 
 message Rating {
@@ -85,6 +97,54 @@ message DeleteRatingRequest {
 }
 
 message DeleteRatingResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message FlagRatingRequest {
+  string rating_id = 1;
+  string user_id = 2;
+  FlagCategory category = 3;
+  string reason = 4;
+}
+
+message FlagRatingResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message RatingFlag {
+  string id = 1;
+  string user_id = 2;
+  FlagCategory category = 3;
+  string reason = 4;
+  string created_at = 5;
+}
+
+message FlaggedRatingItem {
+  Rating rating = 1;
+  int32 flag_count = 2;
+  repeated RatingFlag flags = 3;
+}
+
+message GetFlaggedRatingsRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+  string admin_id = 3;
+}
+
+message GetFlaggedRatingsResponse {
+  repeated FlaggedRatingItem items = 1;
+  int32 total = 2;
+}
+
+message ModerateRatingRequest {
+  string rating_id = 1;
+  string admin_id = 2;
+  bool is_hidden = 3;
+}
+
+message ModerateRatingResponse {
   bool success = 1;
   string message = 2;
 }

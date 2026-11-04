@@ -1,3 +1,11 @@
+enum FlagCategory {
+  SPAM
+  INAPPROPRIATE_CONTENT
+  FAKE_REVIEW
+  IRRELEVANT
+  OTHER
+}
+
 type Rating {
   id: ID!
   productId: String!
@@ -32,6 +40,11 @@ type DeleteRatingResponse {
   message: String!
 }
 
+type FlagRatingResponse {
+  success: Boolean!
+  message: String!
+}
+
 input CreateRatingInput {
   productId: String!
   orderId: String!
@@ -46,13 +59,51 @@ input UpdateRatingInput {
   review: String
 }
 
+input FlagRatingInput {
+  ratingId: ID!
+  category: FlagCategory!
+  reason: String
+}
+
+type RatingFlagInfo {
+  id: ID!
+  userId: String!
+  category:FlagCategory!
+  reason: String
+  createdAt: String!
+}
+
+type FlaggedRatingItem {
+  rating: Rating!
+  flagCount: Int!
+  flags: [RatingFlagInfo!]!
+}
+
+type FlaggedRatingsResponse {
+  items: [FlaggedRatingItem!]!
+  total: Int!
+}
+
+input ModerateRatingInput{
+  ratingId: ID!
+  isHidden: Boolean!
+}
+
+type ModerateRatingResponse {
+  success: Boolean!
+  message: String!
+}
+
 extend type Query {
   productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
   getRating(id: ID!): Rating @auth
+  getFlaggedRating(limit: Int, offset: Int): FlaggedRatingsResponse! @auth(requires:[ADMIN])
 }
 
 extend type Mutation {
   createRating(input: CreateRatingInput!): Rating @auth
   updateRating(input: UpdateRatingInput!): Rating @auth
   deleteRating(id: ID!): DeleteRatingResponse @auth
+  flagRating(input: FlagRatingInput!): FlagRatingResponse @auth
+  moderateRating(input: ModerateRatingInput!): ModerateRatingResponse! @auth(requires:[ADMIN])
 }

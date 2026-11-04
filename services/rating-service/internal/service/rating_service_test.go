@@ -20,12 +20,14 @@ import (
 
 type mockRatingRepo struct {
 	ratings   map[string]*model.Rating
+	flags     map[string]*model.RatingFlag
 	idCounter int
 }
 
 func newMockRatingRepo() *mockRatingRepo {
 	return &mockRatingRepo{
 		ratings: make(map[string]*model.Rating),
+		flags: make(map[string]*model.RatingFlag),
 	}
 }
 
@@ -128,6 +130,65 @@ func (m *mockRatingRepo) DeleteRating(ctx context.Context, id string) error {
 	now := time.Now().UTC()
 	r.DeletedAt = &now
 	return nil
+}
+
+func (m *mockRatingRepo) ModerateRatings(ctx context.Context, isHidden bool, ratingID string) error {
+	r, ok := m.ratings[ratingID]
+	if !ok || r.DeletedAt != nil {
+		return repository.ErrRatingNotFound
+	}
+
+	r.IsHidden = isHidden
+	if !isHidden {
+		r.IsFlagged = false
+	}
+	r.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+func (m *mockRatingRepo) CreateFlag(ctx context.Context, f *model.RatingFlag) error {
+	r, ok := m.ratings[f.RatingID]
+	if !ok || r.DeletedAt != nil {
+		return repository.ErrRatingNotFound
+	}
+	key := fmt.Sprintf("%s:%s", f.RatingID, f.UserID)
+	if _, exists := m.flags[key]; exists {
+		return repository.ErrRatingAlreadyExists
+	}
+	r.IsFlagged = true
+	m.flags[key] = f
+	return nil
+}
+
+func (m *mockRatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset int32) ([]*dto.FlaggedRatingItem, int32, error) {
+	var items []*dto.FlaggedRatingItem
+	for _, r := range m.ratings {
+		if r.IsFlagged && !r.IsHidden && r.DeletedAt == nil {
+			var flags []*model.RatingFlag
+			for _, f := range m.flags {
+				if f.RatingID == r.ID {
+					cp := *f
+					flags = append(flags, &cp)
+				}
+			}
+			cp := *r
+			items = append(items, &dto.FlaggedRatingItem{
+				Rating:    &cp,
+				FlagCount: int32(len(flags)),
+				Flags:     flags,
+			})
+		}
+	}
+	total := int32(len(items))
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if limit <= 0 || end > total {
+		end = total
+	}
+	return items[start:end], total, nil
 }
 
 type mockOrderClient struct {
@@ -550,4 +611,237 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 		t.Errorf("expected clamped pagination to return all 3 items, got len=%d total=%d avg=%f",
 			len(clampedRatings), clampedTotal, clampedAvg)
 	}
+}
+
+func TestRatingService_FlagRating(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
+
+	// 1. Missing rating ID
+	err := svc.FlagRating(ctx, dto.FlagRatingInput{
+		RatingID: "",
+		UserID:   uuid.New().String(),
+		Category: "SPAM",
+	})
+	if err == nil || !strings.Contains(err.Error(), "rating id is required") {
+		t.Errorf("expected rating id required error, got: %v", err)
+	}
+
+	// 2. Invalid category
+	r, err := repo.CreateRating(ctx, &model.Rating{
+		UserID:      uuid.New().String(),
+		ProductID:   uuid.New().String(),
+		OrderID:     uuid.New().String(),
+		OrderItemID: uuid.New().String(),
+		Rating:      5,
+		Review:      "Legit review",
+	})
+	if err != nil {
+		t.Fatalf("failed to create rating: %v", err)
+	}
+
+	err = svc.FlagRating(ctx, dto.FlagRatingInput{
+		RatingID: r.ID,
+		UserID:   uuid.New().String(),
+		Category: "INVALID_CAT",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid category") {
+		t.Errorf("expected invalid category error, got: %v", err)
+	}
+
+	// 3. Flagging a rating without review text should fail
+	rNoReview, err := repo.CreateRating(ctx, &model.Rating{
+		UserID:      uuid.New().String(),
+		ProductID:   uuid.New().String(),
+		OrderID:     uuid.New().String(),
+		OrderItemID: uuid.New().String(),
+		Rating:      5,
+		Review:      "",
+	})
+	if err != nil {
+		t.Fatalf("failed to create rating: %v", err)
+	}
+
+	err = svc.FlagRating(ctx, dto.FlagRatingInput{
+		RatingID: rNoReview.ID,
+		UserID:   uuid.New().String(),
+		Category: "SPAM",
+		Reason:   "Spam",
+	})
+	if err == nil || !strings.Contains(err.Error(), "cannot flag a rating without review text") {
+		t.Errorf("expected error for flagging rating without review text, got: %v", err)
+	}
+
+	// 4. Success flagging
+	err = svc.FlagRating(ctx, dto.FlagRatingInput{
+		RatingID: r.ID,
+		UserID:   uuid.New().String(),
+		Category: "SPAM",
+		Reason:   "Suspicious link",
+	})
+	if err != nil {
+		t.Fatalf("expected successful flag, got: %v", err)
+	}
+}
+
+func TestRatingService_GetFlaggedRatings(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	svc := service.NewRatingService(repo, &mockOrderClient{},nil)
+
+	// 1. Missing admin ID
+	_, _, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
+		AdminId: "",
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "admin_id is required") {
+		t.Errorf("expected admin_id required error, got: %v",err)
+	}
+
+	// 2. Success with flagged rating
+	r, err := repo.CreateRating(ctx, &model.Rating{
+		UserID: uuid.New().String(),
+		ProductID: uuid.New().String(),
+		OrderID: uuid.New().String(),
+		OrderItemID: uuid.New().String(),
+		Rating: 5,
+		Review: "Spam product",
+	})
+	if err != nil {
+		t.Fatalf("failed to create rating: %v",err)
+	}
+
+	_ = repo.CreateFlag(ctx, &model.RatingFlag{
+		RatingID: r.ID,
+		UserID: uuid.New().String(),
+		Category: "SPAM",
+		Reason: "Bot link",
+	})
+
+	items, total, err := svc.GetFlaggedRatings(ctx , dto.GetFlaggedRatingsInput{
+		AdminId: "admin-101",
+		Limit: 10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error fetching flagged ratings: %v", err)
+	}
+
+	if total != 1 || len(items) != 1 {
+		t.Errorf("expected 1 flagged rating, got total %d items %d", total, len(items))
+	}
+
+	if items[0].FlagCount != 1 || len(items[0].Flags) != 1 {
+		t.Errorf("expected 1 flag attached, got flagCount %d", items[0].FlagCount)
+	}
+}
+
+func TestRatingService_ModerateRatings(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	svc := service.NewRatingService(repo, &mockOrderClient{},nil)
+
+	// 1. Missing rating ID
+	err := svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: "",
+		AdminId: "admin-101",
+		IsHidden: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "rating id is required") {
+		t.Fatalf("expected 'rating id is required', got: %v",err)
+	}
+
+	// 2. Invalid UUID format
+	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: "invalid-uuid",
+		AdminId: "admin-101",
+		IsHidden: true,
+	})
+
+	if err == nil || !strings.Contains(err.Error(), "invalid rating id format") {
+		t.Fatalf("expected 'invalid rating id format', got: %v",err)
+	}
+
+	// 3. Missing Admin ID
+	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: uuid.New().String(),
+		AdminId: "",
+		IsHidden: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "admin_id is required") {
+		t.Fatalf("expected 'admin_id is required', got: %v",err)
+	}
+
+	// 4. Rating Not Found
+	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: uuid.New().String(),
+		AdminId: "admin-101",
+		IsHidden: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "rating not found") {
+		t.Fatalf("expected 'rating not found', got: %v", err)
+	}
+
+	// 5. Success: Hide Rating
+	r, err := repo.CreateRating(ctx, &model.Rating{
+		UserID: uuid.New().String(),
+		ProductID: uuid.New().String(),
+		OrderID: uuid.New().String(),
+		OrderItemID: uuid.New().String(),
+		Rating: 4,
+		Review: "Questionable review",
+	})
+	if err != nil {
+		t.Fatalf("failed to create rating: %v", err)
+	}
+
+	_ = repo.CreateFlag(ctx, &model.RatingFlag{
+		RatingID: r.ID,
+		UserID: uuid.New().String(),
+		Category: "INAPPROPRIATE_CONTENT",
+		Reason: "Bad words",
+	})
+
+	err  = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: r.ID,
+		AdminId: "admin-101",
+		IsHidden: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error moderating rating: %v",err)
+	}
+
+	flagged, total, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
+		AdminId: "admin-101",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error fetching flagged ratings: %v", err)
+	}
+	if total != 0 || len(flagged) != 0 {
+		t.Fatalf("expected 0 flagged rating after hiding, got: %v",err)
+	}
+
+	// 6. Success: Unhide and clear flag
+	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+		RatingId: r.ID,
+		AdminId: "admin-101",
+		IsHidden: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error unhiding rating: %v", err)
+	}
+
+	updated, err := repo.GetRatingByID(ctx, r.ID)
+	if err != nil {
+		t.Fatalf("failed to get rating: %v", err)
+	}
+
+	if updated.IsHidden {
+		t.Errorf("expected IsHidden to be false, got true")
+	}
+	if updated.IsFlagged {
+		t.Errorf("expected IsFlagged to be cleared to false, got true")
+	}
+
 }

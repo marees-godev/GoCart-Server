@@ -11,6 +11,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/handler"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type mockRatingService struct {
@@ -101,6 +103,59 @@ func (m *mockRatingService) DeleteRating(ctx context.Context, input dto.DeleteRa
 	return nil
 }
 
+func (m *mockRatingService) FlagRating(ctx context.Context, input dto.FlagRatingInput) error {
+	r, ok := m.ratings[input.RatingID]
+	if !ok {
+		return appErrors.NotFound("rating not found")
+	}
+
+	r.IsFlagged = true
+	return nil
+}
+
+func (m *mockRatingService) GetFlaggedRatings(ctx context.Context, input dto.GetFlaggedRatingsInput) ([]*dto.FlaggedRatingItem, int32, error) {
+	var items []*dto.FlaggedRatingItem
+	for _, r := range m.ratings {
+		if r.IsFlagged {
+			cp := *r
+			items = append(items, &dto.FlaggedRatingItem{
+				Rating:    &cp,
+				FlagCount: 1,
+				Flags: []*model.RatingFlag{
+					{
+						ID:        "flag-1",
+						RatingID:  r.ID,
+						UserID:    "user-flag",
+						Category:  "SPAM",
+						Reason:    "Spam comment",
+						CreatedAt: time.Now().UTC(),
+					},
+				},
+			})
+		}
+	}
+
+	return items, int32(len(items)), nil
+}
+
+func (m *mockRatingService) ModerateRatings(ctx context.Context, input dto.ModerateRatingInput) error {
+	if input.AdminId == "" {
+		return appErrors.Unauthorized("unauthenticated: admin_id is required")
+	}
+
+	r,ok := m.ratings[input.RatingId]
+	if !ok {
+		return appErrors.NotFound("rating not found")
+	}
+
+	r.IsHidden = input.IsHidden
+	if !input.IsHidden {
+		r.IsFlagged = false
+	}
+
+	return nil
+}
+
 func TestRatingGRPCHandler(t *testing.T) {
 	svc := newMockRatingService()
 	h := handler.NewRatingGRPCHandler(svc, nil)
@@ -176,6 +231,76 @@ func TestRatingGRPCHandler(t *testing.T) {
 		}
 		if resp.GetRating().GetRating() != 4 {
 			t.Errorf("expected updated rating 4, got %d", resp.GetRating().GetRating())
+		}
+	})
+
+	t.Run("FlagRating RPC", func(t *testing.T) {
+		resp, err := h.FlagRating(ctx, &ratingpb.FlagRatingRequest{
+			RatingId: ratingID,
+			UserId:   userID,
+			Category: ratingpb.FlagCategory_SPAM,
+			Reason:   "Spam comment",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !resp.GetSuccess() {
+			t.Errorf("expected success true, got %v", resp.GetSuccess())
+		}
+	})
+
+	t.Run("GetFlaggedRatings RPC", func(t *testing.T) {
+		resp, err := h.GetFlaggedRatings(ctx, &ratingpb.GetFlaggedRatingsRequest{
+			AdminId: uuid.New().String(),
+			Limit:   10,
+			Offset:  0,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.GetTotal() != 1 || len(resp.GetItems()) != 1 {
+			t.Errorf("expected 1 item, got total %d, items %d", resp.GetTotal(), len(resp.GetItems()))
+		}
+	})
+
+	t.Run("ModerateRatings RPC", func(t *testing.T) {
+
+		_,err := h.ModerateRatings(ctx, nil)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument for nil request, got %v",err)
+		}
+
+		_, err = h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
+			RatingId: uuid.New().String(),
+			AdminId: "admin-101",
+			IsHidden: true,
+		})
+		if status.Code(err) != codes.NotFound {
+			t.Errorf("expected NotFound for non-existent rating, got %v", err)
+		}
+
+		hideResp, err := h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
+			RatingId: ratingID,
+			AdminId: "admin-101",
+			IsHidden: true,
+		})
+		if err != nil {
+			t.Fatalf("ModerateRatings hide failed: %v",err)
+		}
+		if !hideResp.GetSuccess() || hideResp.GetMessage() != "Rating hidden successfully" {
+			t.Errorf("unexpected hide response: %+v",hideResp)
+		}
+
+		unhideResp, err := h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
+			RatingId: ratingID,
+			AdminId: "admin-101",
+			IsHidden: false,
+		})
+		if err != nil {
+			t.Fatalf("ModerateRatings unhide failed: %v", err)
+		}
+		if !unhideResp.GetSuccess() || unhideResp.GetMessage() != "Rating unhidden successfully" {
+			t.Errorf("unexpected unhide response: %+v", unhideResp)
 		}
 	})
 
