@@ -45,13 +45,14 @@ func (m *mockDeliveryService) HandleOrderConfirmed(ctx context.Context, payload 
 	}
 
 	d := &model.Delivery{
-		ID:              "del-123",
-		OrderID:         payload.OrderID,
-		DeliveryPartner: payload.DeliveryPartner,
-		TrackingNumber:  "TRK-12345",
-		Status:          model.StatusCreated,
-		CreatedAt:       time.Now().UTC(),
-		UpdatedAt:       time.Now().UTC(),
+		ID:                "del-123",
+		OrderID:           payload.OrderID,
+		DeliveryPartner:   payload.DeliveryPartner,
+		TrackingNumber:    "TRK-12345",
+		ShippingAddressID: payload.ShippingAddressID,
+		Status:            model.StatusCreated,
+		CreatedAt:         time.Now().UTC(),
+		UpdatedAt:         time.Now().UTC(),
 	}
 	if payload.ShippingAddress != nil {
 		d.ShippingAddress = *payload.ShippingAddress
@@ -193,7 +194,10 @@ func (m *mockDeliveryService) GetPartnerProfile(ctx context.Context, partnerID s
 	return p, nil
 }
 
-func (m *mockDeliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
+func (m *mockDeliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber, gstin *string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return nil, appErrors.Forbidden("forbidden")
+	}
 	if m.partnerProfiles == nil {
 		m.partnerProfiles = make(map[string]*model.DeliveryPartnerProfile)
 	}
@@ -219,9 +223,183 @@ func (m *mockDeliveryService) UpdatePartnerProfile(ctx context.Context, partnerI
 	if contactNumber != nil {
 		p.ContactNumber = *contactNumber
 	}
+	if gstin != nil && *gstin != "" {
+		p.GSTIN = gstin
+		p.IsGSTINVerified = true
+	}
 	p.UpdatedAt = time.Now().UTC()
 	m.partnerProfiles[partnerID] = p
 	return p, nil
+}
+
+func (m *mockDeliveryService) VerifyGSTIN(ctx context.Context, partnerID string, gstin string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return nil, appErrors.Forbidden("forbidden")
+	}
+	if m.partnerProfiles == nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p.GSTIN = &gstin
+	p.IsGSTINVerified = true
+	p.ApprovalStatus = model.ApprovalStatusPending
+	return p, nil
+}
+
+func (m *mockDeliveryService) ActivatePartner(ctx context.Context, partnerID string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return nil, appErrors.Forbidden("forbidden")
+	}
+	if m.partnerProfiles == nil {
+		m.partnerProfiles = make(map[string]*model.DeliveryPartnerProfile)
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p.IsActive = true
+	p.DeactivatedAt = nil
+	p.DeactivationReason = nil
+	return p, nil
+}
+
+func (m *mockDeliveryService) DeactivatePartner(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return nil, appErrors.Forbidden("forbidden")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return nil, appErrors.BadRequest("deactivation reason is required")
+	}
+	if m.partnerProfiles == nil {
+		m.partnerProfiles = make(map[string]*model.DeliveryPartnerProfile)
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	now := time.Now().UTC()
+	p.IsActive = false
+	p.DeactivatedAt = &now
+	p.DeactivationReason = &reason
+	return p, nil
+}
+
+func (m *mockDeliveryService) DeletePartnerProfile(ctx context.Context, partnerID string, reason string, callerID ...string) error {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return appErrors.Forbidden("forbidden")
+	}
+	if m.partnerProfiles == nil {
+		return appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return appErrors.NotFound("partner profile not found")
+	}
+	now := time.Now().UTC()
+	p.DeletedAt = &now
+	p.IsActive = false
+	if reason != "" {
+		p.DeletionReason = &reason
+	}
+	return nil
+}
+
+func (m *mockDeliveryService) ApprovePartner(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	if m.partnerProfiles == nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	if p.GSTIN == nil || *p.GSTIN == "" || !p.IsGSTINVerified {
+		return nil, appErrors.BadRequest("cannot approve delivery partner: GSTIN must be provided and verified")
+	}
+	if p.ApprovalStatus != model.ApprovalStatusPending && p.ApprovalStatus != model.ApprovalStatusAppealed {
+		return nil, appErrors.BadRequest("only profiles in PENDING or APPEALED status can be approved")
+	}
+	p.ApprovalStatus = model.ApprovalStatusApproved
+	p.RejectionReason = nil
+	return p, nil
+}
+
+func (m *mockDeliveryService) RejectPartner(ctx context.Context, partnerID string, reason string) (*model.DeliveryPartnerProfile, error) {
+	if strings.TrimSpace(reason) == "" {
+		return nil, appErrors.BadRequest("rejection reason is required")
+	}
+	if m.partnerProfiles == nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	if p.ApprovalStatus != model.ApprovalStatusPending && p.ApprovalStatus != model.ApprovalStatusAppealed {
+		return nil, appErrors.BadRequest("only profiles in PENDING or APPEALED status can be rejected")
+	}
+	p.ApprovalStatus = model.ApprovalStatusRejected
+	p.RejectionReason = &reason
+	return p, nil
+}
+
+func (m *mockDeliveryService) AppealRejection(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	if len(callerID) > 0 && callerID[0] != "" && callerID[0] != partnerID {
+		return nil, appErrors.Forbidden("forbidden")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return nil, appErrors.BadRequest("appeal reason is required")
+	}
+	if m.partnerProfiles == nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	p, ok := m.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return nil, appErrors.NotFound("partner profile not found")
+	}
+	if p.ApprovalStatus != model.ApprovalStatusRejected {
+		return nil, appErrors.BadRequest("only rejected profiles can be appealed")
+	}
+	now := time.Now().UTC()
+	p.ApprovalStatus = model.ApprovalStatusAppealed
+	p.AppealReason = &reason
+	p.AppealedAt = &now
+	return p, nil
+}
+
+func (m *mockDeliveryService) ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	var list []*model.DeliveryPartnerProfile
+	for _, p := range m.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusAppealed && p.DeletedAt == nil {
+			list = append(list, p)
+		}
+	}
+	return list, len(list), nil
+}
+
+func (m *mockDeliveryService) ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	var list []*model.DeliveryPartnerProfile
+	for _, p := range m.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusApproved && p.IsActive && p.DeletedAt == nil {
+			list = append(list, p)
+		}
+	}
+	return list, len(list), nil
+}
+
+func (m *mockDeliveryService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
+	count := 0
+	cutoff := time.Now().UTC().Add(-retentionPeriod)
+	now := time.Now().UTC()
+	for _, p := range m.partnerProfiles {
+		if !p.IsActive && p.DeactivatedAt != nil && p.DeactivatedAt.Before(cutoff) && p.DeletedAt == nil {
+			p.DeletedAt = &now
+			count++
+		}
+	}
+	return count, nil
 }
 
 
@@ -261,11 +439,28 @@ func TestGRPC_CreateDelivery(t *testing.T) {
 	client, cleanup := setupTestGRPCServer(t, svc)
 	defer cleanup()
 
-	resp, err := client.CreateDelivery(context.Background(), &deliverypb.CreateDeliveryRequest{
+	// Missing shipping_address_id should fail
+	_, err := client.CreateDelivery(context.Background(), &deliverypb.CreateDeliveryRequest{
 		OrderId:         "order-101",
 		DeliveryPartner: "BLUEDART",
 		ShippingAddress: `{"street":"123 Main St","city":"Mumbai"}`,
 		ContactNumber:   "+919876543210",
+	})
+	if err == nil {
+		t.Fatal("expected error when shipping_address_id is empty, got nil")
+	}
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument code, got %v", err)
+	}
+
+	// Valid creation with shipping_address_id
+	resp, err := client.CreateDelivery(context.Background(), &deliverypb.CreateDeliveryRequest{
+		OrderId:           "order-101",
+		DeliveryPartner:   "BLUEDART",
+		ShippingAddress:   `{"street":"123 Main St","city":"Mumbai"}`,
+		ContactNumber:     "+919876543210",
+		ShippingAddressId: "addr-uuid-101",
 	})
 	if err != nil {
 		t.Fatalf("CreateDelivery failed: %v", err)
@@ -281,6 +476,9 @@ func TestGRPC_CreateDelivery(t *testing.T) {
 	}
 	if resp.Delivery.ContactNumber != "+919876543210" {
 		t.Errorf("expected contact_number '+919876543210', got %s", resp.Delivery.ContactNumber)
+	}
+	if resp.Delivery.ShippingAddressId != "addr-uuid-101" {
+		t.Errorf("expected shipping_address_id 'addr-uuid-101', got %s", resp.Delivery.ShippingAddressId)
 	}
 }
 
@@ -431,6 +629,53 @@ func TestGRPC_PartnerProfile(t *testing.T) {
 	}
 	if updateResp.Profile.ContactNumber != "+1-555-9999" {
 		t.Errorf("expected updated contact_number, got %s", updateResp.Profile.ContactNumber)
+	}
+
+	// 4. Verify GSTIN & ApprovePartner
+	gstin := "29ABCDE1234F1Z5"
+	verifyResp, err := client.VerifyGSTIN(ctx, &deliverypb.VerifyPartnerGSTINRequest{
+		PartnerId: partnerID,
+		Gstin:     gstin,
+		CallerId:  partnerID,
+	})
+	if err != nil {
+		t.Fatalf("VerifyGSTIN failed: %v", err)
+	}
+	if !verifyResp.Profile.IsGstinVerified {
+		t.Fatalf("expected is_gstin_verified to be true")
+	}
+
+	approveResp, err := client.ApprovePartner(ctx, &deliverypb.ApprovePartnerRequest{
+		PartnerId: partnerID,
+	})
+	if err != nil {
+		t.Fatalf("ApprovePartner failed: %v", err)
+	}
+	if !approveResp.Profile.IsGstinVerified {
+		t.Fatalf("expected is_gstin_verified to be true on approval")
+	}
+	if approveResp.Profile.ApprovalStatus != "APPROVED" {
+		t.Fatalf("expected approval status APPROVED, got %s", approveResp.Profile.ApprovalStatus)
+	}
+
+	// 5. DeletePartnerProfile with Reason
+	deleteReason := "Closing warehouse operations"
+	delResp, err := client.DeletePartnerProfile(ctx, &deliverypb.DeletePartnerProfileRequest{
+		PartnerId: partnerID,
+		CallerId:  partnerID,
+		Reason:    &deleteReason,
+	})
+	if err != nil {
+		t.Fatalf("DeletePartnerProfile failed: %v", err)
+	}
+	if !delResp.Success {
+		t.Fatalf("expected DeletePartnerProfile success to be true")
+	}
+	if delResp.Status != "deleted" {
+		t.Fatalf("expected DeletePartnerProfile status to be 'deleted', got %s", delResp.Status)
+	}
+	if delResp.Message != "account deleted successfully" {
+		t.Fatalf("expected message 'account deleted successfully', got %s", delResp.Message)
 	}
 }
 

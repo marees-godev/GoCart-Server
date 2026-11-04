@@ -12,6 +12,7 @@ type TrackingResponse struct {
 	DeliveryPartner   string                `json:"delivery_partner"`
 	Status            model.DeliveryStatus  `json:"status"`
 	ShippingAddress   model.ShippingAddress `json:"shipping_address"`
+	ShippingAddressID string                `json:"shipping_address_id,omitempty"`
 	EstimatedDelivery *string               `json:"estimated_delivery,omitempty"`
 	ActualDelivery    *string               `json:"actual_delivery,omitempty"`
 	UpdatedAt         string                `json:"updated_at"`
@@ -22,12 +23,13 @@ func FromDelivery(d *model.Delivery) *TrackingResponse {
 		return nil
 	}
 	res := &TrackingResponse{
-		OrderID:         d.OrderID,
-		TrackingNumber:  d.TrackingNumber,
-		DeliveryPartner: d.DeliveryPartner,
-		Status:          d.Status,
-		ShippingAddress: d.ShippingAddress,
-		UpdatedAt:       d.UpdatedAt.Format(time.RFC3339),
+		OrderID:           d.OrderID,
+		TrackingNumber:    d.TrackingNumber,
+		DeliveryPartner:   d.DeliveryPartner,
+		Status:            d.Status,
+		ShippingAddress:   d.ShippingAddress,
+		ShippingAddressID: d.ShippingAddressID,
+		UpdatedAt:         d.UpdatedAt.Format(time.RFC3339),
 	}
 	if d.EstimatedDelivery != nil {
 		est := d.EstimatedDelivery.Format(time.RFC3339)
@@ -60,10 +62,11 @@ type DeliveryStatusUpdateRequest struct {
 }
 
 type OrderConfirmedPayload struct {
-	OrderID         string                 `json:"order_id"`
-	DeliveryPartner string                 `json:"delivery_partner,omitempty"`
-	ShippingAddress *model.ShippingAddress `json:"shipping_address,omitempty"`
-	ConfirmedAt     time.Time              `json:"confirmed_at,omitempty"`
+	OrderID           string                 `json:"order_id"`
+	DeliveryPartner   string                 `json:"delivery_partner,omitempty"`
+	ShippingAddress   *model.ShippingAddress `json:"shipping_address,omitempty"`
+	ShippingAddressID string                 `json:"shipping_address_id,omitempty"`
+	ConfirmedAt       time.Time              `json:"confirmed_at,omitempty"`
 }
 
 type WarehouseResponse struct {
@@ -131,36 +134,48 @@ type AssignWarehousesRequest struct {
 }
 
 type PartnerProfileResponse struct {
-	ID            string `json:"id"`
-	PartnerID     string `json:"partner_id"`
-	CompanyName   string `json:"company_name"`
-	Email         string `json:"email"`
-	ContactNumber string `json:"contact_number"`
-	IsActive      bool   `json:"is_active"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	ID                 string `json:"id"`
+	PartnerID          string `json:"partner_id"`
+	CompanyName        string `json:"company_name"`
+	Email              string `json:"email"`
+	ContactNumber      string `json:"contact_number"`
+	GSTIN              string `json:"gstin,omitempty"`
+	IsGSTINVerified    bool   `json:"is_gstin_verified"`
+	IsActive           bool   `json:"is_active"`
+	DeactivationReason string `json:"deactivation_reason,omitempty"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
 }
 
 func FromPartnerProfile(p *model.DeliveryPartnerProfile) *PartnerProfileResponse {
 	if p == nil {
 		return nil
 	}
-	return &PartnerProfileResponse{
-		ID:            p.ID.String(),
-		PartnerID:     p.PartnerID.String(),
-		CompanyName:   p.CompanyName,
-		Email:         p.Email,
-		ContactNumber: p.ContactNumber,
-		IsActive:      p.IsActive,
-		CreatedAt:     p.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:     p.UpdatedAt.Format(time.RFC3339),
+	res := &PartnerProfileResponse{
+		ID:              p.ID.String(),
+		PartnerID:       p.PartnerID.String(),
+		CompanyName:     p.CompanyName,
+		Email:           p.Email,
+		ContactNumber:   p.ContactNumber,
+		IsGSTINVerified: p.IsGSTINVerified,
+		IsActive:        p.IsActive,
+		CreatedAt:       p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:       p.UpdatedAt.Format(time.RFC3339),
 	}
+	if p.GSTIN != nil {
+		res.GSTIN = *p.GSTIN
+	}
+	if p.DeactivationReason != nil {
+		res.DeactivationReason = *p.DeactivationReason
+	}
+	return res
 }
 
 type UpdatePartnerProfileRequest struct {
 	CompanyName   *string `json:"company_name,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	ContactNumber *string `json:"contact_number,omitempty"`
+	GSTIN         *string `json:"gstin,omitempty"`
 }
 
 type EstimatedDeliveryResponse struct {

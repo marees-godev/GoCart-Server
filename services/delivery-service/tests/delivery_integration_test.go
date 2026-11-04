@@ -313,6 +313,74 @@ func (r *memoryDeliveryRepo) GetPartnerProfileByCompanyName(ctx context.Context,
 	return nil, appErrors.NotFound("partner profile not found")
 }
 
+func (r *memoryDeliveryRepo) GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	clean := strings.ToUpper(strings.TrimSpace(gstin))
+	for _, p := range r.partnerProfiles {
+		if p.GSTIN != nil && strings.ToUpper(strings.TrimSpace(*p.GSTIN)) == clean && p.DeletedAt == nil {
+			cp := *p
+			return &cp, nil
+		}
+	}
+	return nil, appErrors.NotFound("delivery partner profile not found")
+}
+
+func (r *memoryDeliveryRepo) ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.DeliveryPartnerProfile, 0)
+	for _, p := range r.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusAppealed && p.DeletedAt == nil {
+			cp := *p
+			res = append(res, &cp)
+		}
+	}
+	return res, len(res), nil
+}
+
+func (r *memoryDeliveryRepo) ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	res := make([]*model.DeliveryPartnerProfile, 0)
+	for _, p := range r.partnerProfiles {
+		if p.ApprovalStatus == model.ApprovalStatusApproved && p.IsActive && p.DeletedAt == nil {
+			cp := *p
+			res = append(res, &cp)
+		}
+	}
+	return res, len(res), nil
+}
+
+func (r *memoryDeliveryRepo) SoftDeletePartnerProfile(ctx context.Context, partnerID uuid.UUID, deletedAt time.Time, reason ...string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, ok := r.partnerProfiles[partnerID]
+	if !ok || p.DeletedAt != nil {
+		return appErrors.NotFound("partner profile not found")
+	}
+	p.DeletedAt = &deletedAt
+	p.IsActive = false
+	if len(reason) > 0 && reason[0] != "" {
+		p.DeletionReason = &reason[0]
+	}
+	return nil
+}
+
+func (r *memoryDeliveryRepo) SoftDeleteExpiredDeactivatedPartners(ctx context.Context, cutoff time.Time) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	now := time.Now().UTC()
+	for _, p := range r.partnerProfiles {
+		if !p.IsActive && p.DeactivatedAt != nil && (p.DeactivatedAt.Before(cutoff) || p.DeactivatedAt.Equal(cutoff)) && p.DeletedAt == nil {
+			p.DeletedAt = &now
+			count++
+		}
+	}
+	return count, nil
+}
+
 
 
 
@@ -339,9 +407,11 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	}
 
 	payload := events.OrderConfirmedEvent{
-		OrderID:         orderID,
-		ShippingAddress: &shippingAddr,
-		ConfirmedAt:     time.Now().UTC(),
+		OrderID:           orderID,
+		ShippingAddressID: "addr-e2e-1",
+		ShippingAddress:   &shippingAddr,
+		PaymentStatus:     "PAID",
+		ConfirmedAt:       time.Now().UTC(),
 	}
 
 	// 1. Emit OrderConfirmed event
@@ -378,6 +448,9 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	}
 	if delivery.ShippingAddress.ContactNumber != shippingAddr.ContactNumber {
 		t.Errorf("expected contact number %s, got %s", shippingAddr.ContactNumber, delivery.ShippingAddress.ContactNumber)
+	}
+	if delivery.ShippingAddressID != "addr-e2e-1" {
+		t.Errorf("expected shippingAddressID 'addr-e2e-1', got %s", delivery.ShippingAddressID)
 	}
 
 	// 3. Emit duplicate OrderConfirmed events for the same order_id (idempotency assertion)
@@ -433,6 +506,9 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	}
 	if trackingResp.ShippingAddress.ContactNumber != shippingAddr.ContactNumber {
 		t.Errorf("expected contact number %s, got %s", shippingAddr.ContactNumber, trackingResp.ShippingAddress.ContactNumber)
+	}
+	if trackingResp.ShippingAddressID != "addr-e2e-1" {
+		t.Errorf("expected shippingAddressID 'addr-e2e-1', got %s", trackingResp.ShippingAddressID)
 	}
 
 	// 5. Query Tracking by Tracking Number (GET /deliveries/:trackingNumber)
@@ -520,6 +596,9 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	if grpcResp.Delivery.ContactNumber != shippingAddr.ContactNumber {
 		t.Errorf("expected gRPC contact_number %s, got %s", shippingAddr.ContactNumber, grpcResp.Delivery.ContactNumber)
 	}
+	if grpcResp.Delivery.ShippingAddressId != "addr-e2e-1" {
+		t.Errorf("expected gRPC shipping_address_id 'addr-e2e-1', got %s", grpcResp.Delivery.ShippingAddressId)
+	}
 
 	// 8. Verify lookup and status updates via Order ID work seamlessly
 	orderIDResp, err := grpcHandler.GetDelivery(ctx, &deliverypb.GetDeliveryRequest{
@@ -542,5 +621,31 @@ func TestEndToEnd_DeliveryLifecycleAndAPIs(t *testing.T) {
 	}
 	if sameStatusResp.Delivery.Status != string(model.StatusDelivered) {
 		t.Errorf("expected status DELIVERED, got %s", sameStatusResp.Delivery.Status)
+	}
+
+	// 10. Verify gRPC CreateDelivery requires shipping_address_id and succeeds when provided
+	_, createErrNoAddr := grpcHandler.CreateDelivery(ctx, &deliverypb.CreateDeliveryRequest{
+		OrderId:         "ord-grpc-" + uuid.NewString(),
+		DeliveryPartner: "DELHIVERY",
+		ShippingAddress: `{"street":"100 Pine St","city":"San Francisco"}`,
+		ContactNumber:   "+1-555-0100",
+	})
+	if createErrNoAddr == nil {
+		t.Fatal("expected error when CreateDelivery is called without shipping_address_id")
+	}
+
+	newOrderID := "ord-grpc-" + uuid.NewString()
+	createResp, createErr := grpcHandler.CreateDelivery(ctx, &deliverypb.CreateDeliveryRequest{
+		OrderId:           newOrderID,
+		DeliveryPartner:   "DELHIVERY",
+		ShippingAddress:   `{"street":"100 Pine St","city":"San Francisco"}`,
+		ContactNumber:     "+1-555-0100",
+		ShippingAddressId: "addr-e2e-grpc",
+	})
+	if createErr != nil {
+		t.Fatalf("CreateDelivery with shipping_address_id failed: %v", createErr)
+	}
+	if createResp.Delivery.ShippingAddressId != "addr-e2e-grpc" {
+		t.Errorf("expected shipping_address_id 'addr-e2e-grpc', got %s", createResp.Delivery.ShippingAddressId)
 	}
 }

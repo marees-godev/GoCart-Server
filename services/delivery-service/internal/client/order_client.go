@@ -14,11 +14,13 @@ import (
 )
 
 type OrderDetails struct {
-	ID              string
-	UserID          string
-	Status          string
-	OrderNumber     string
-	ShippingAddress model.ShippingAddress
+	ID                string
+	UserID            string
+	Status            string
+	PaymentStatus     string
+	OrderNumber       string
+	ShippingAddress   model.ShippingAddress
+	ShippingAddressID string
 }
 
 type OrderClient interface {
@@ -77,10 +79,12 @@ func (c *grpcOrderClient) GetOrder(ctx context.Context, orderID string) (*OrderD
 	}
 
 	return &OrderDetails{
-		ID:              ord.Id,
-		UserID:          ord.UserId,
-		Status:          ord.Status,
-		OrderNumber:     ord.OrderNumber,
-		ShippingAddress: addr,
+		ID:                ord.Id,
+		UserID:            ord.UserId,
+		Status:            ord.Status,
+		PaymentStatus:     ord.PaymentStatus,
+		OrderNumber:       ord.OrderNumber,
+		ShippingAddress:   addr,
+		ShippingAddressID: ord.ShippingAddressId,
 	}, nil
 }

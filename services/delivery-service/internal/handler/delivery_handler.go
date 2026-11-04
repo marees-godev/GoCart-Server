@@ -222,7 +222,7 @@ func (h *DeliveryHandler) UpdateMyProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	profile, err := h.deliveryService.UpdatePartnerProfile(c.UserContext(), partnerID, req.CompanyName, req.Email, req.ContactNumber)
+	profile, err := h.deliveryService.UpdatePartnerProfile(c.UserContext(), partnerID, req.CompanyName, req.Email, req.ContactNumber, req.GSTIN)
 	if err != nil {
 		return h.handleError(c, err)
 	}

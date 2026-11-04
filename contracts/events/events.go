@@ -270,9 +270,11 @@ type ShippingAddressPayload struct {
 
 // OrderConfirmedEvent represents the payload for OrderConfirmed domain event.
 type OrderConfirmedEvent struct {
-	OrderID         string                  `json:"order_id"`
-	ShippingAddress *ShippingAddressPayload `json:"shipping_address,omitempty"`
-	ConfirmedAt     time.Time               `json:"confirmed_at"`
+	OrderID           string                  `json:"order_id"`
+	ShippingAddressID string                  `json:"shipping_address_id,omitempty"`
+	ShippingAddress   *ShippingAddressPayload `json:"shipping_address,omitempty"`
+	PaymentStatus     string                  `json:"payment_status,omitempty"`
+	ConfirmedAt       time.Time               `json:"confirmed_at"`
 }
 
 // OrderPaymentFailedEvent represents the payload for OrderPaymentFailed domain event.

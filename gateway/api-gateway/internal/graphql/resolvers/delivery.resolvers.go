@@ -59,18 +59,30 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 	var shippingAddr string
 
 	orderClient, oErr := r.getOrderClient()
-	var ord *orderpb.Order
-	if oErr == nil && orderClient != nil {
-		orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
-		if err == nil && orderResp != nil && orderResp.Order != nil {
-			ord = orderResp.Order
-			if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
-				shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
-			}
-		}
+	if oErr != nil {
+		return nil, grpcclient.TranslateGRPCError(oErr)
+	}
+	if orderClient == nil {
+		return nil, appErrors.Internal(nil, "order service unavailable")
 	}
 
-	if shippingAddressID == "" && (ord == nil || strings.TrimSpace(ord.ShippingAddress) == "") {
+	orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if orderResp == nil || orderResp.Order == nil || strings.TrimSpace(orderResp.Order.Id) == "" {
+		return nil, appErrors.BadRequest("incomplete or invalid order response from order service")
+	}
+
+	ord := orderResp.Order
+	if !strings.EqualFold(strings.TrimSpace(ord.PaymentStatus), "PAID") {
+		return nil, appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
+	}
+	if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressId) != "" {
+		shippingAddressID = strings.TrimSpace(ord.ShippingAddressId)
+	}
+
+	if shippingAddressID == "" {
 		return nil, appErrors.BadRequest("shippingAddressId is required")
 	}
 
@@ -142,10 +154,11 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 	}
 
 	req := &deliverypb.CreateDeliveryRequest{
-		OrderId:         orderID,
-		DeliveryPartner: partnerName,
-		ShippingAddress: shippingAddr,
-		ContactNumber:   contactNum,
+		OrderId:           orderID,
+		DeliveryPartner:   partnerName,
+		ShippingAddress:   shippingAddr,
+		ContactNumber:     contactNum,
+		ShippingAddressId: shippingAddressID,
 	}
 
 	res, err := r.Clients.DeliveryClient.CreateDelivery(ctx, req)
@@ -206,8 +219,22 @@ func (r *mutationResolver) UpdateDeliveryPartnerProfile(ctx context.Context, inp
 		userPartnerID = userCtx.UserID
 	}
 
-	if role != "ADMIN" && (role != "DELIVERY_PARTNER" || (!strings.EqualFold(userCtx.UserID, partnerID) && !strings.EqualFold(userPartnerID, partnerID))) {
+	if role == "DELIVERY_PARTNER" && !strings.EqualFold(userCtx.UserID, partnerID) && !strings.EqualFold(userPartnerID, partnerID) {
+		profileResp, pErr := r.Clients.DeliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{
+			PartnerId: userPartnerID,
+		})
+		if pErr == nil && profileResp != nil && profileResp.Profile != nil && strings.EqualFold(profileResp.Profile.Id, partnerID) {
+			partnerID = profileResp.Profile.PartnerId
+		} else {
+			return nil, appErrors.Forbidden("you can only update your own delivery partner profile")
+		}
+	} else if role != "ADMIN" && role != "DELIVERY_PARTNER" {
 		return nil, appErrors.Forbidden("you can only update your own delivery partner profile")
+	}
+
+	callerID := userCtx.UserID
+	if role == "ADMIN" {
+		callerID = partnerID
 	}
 
 	req := &deliverypb.UpdatePartnerProfileRequest{
@@ -215,9 +242,277 @@ func (r *mutationResolver) UpdateDeliveryPartnerProfile(ctx context.Context, inp
 		CompanyName:   input.CompanyName,
 		Email:         input.Email,
 		ContactNumber: input.ContactNumber,
+		Gstin:         input.Gstin,
+		CallerId:      callerID,
 	}
 
 	res, err := r.Clients.DeliveryClient.UpdatePartnerProfile(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
+}
+
+// VerifyDeliveryPartnerGstin is the resolver for the verifyDeliveryPartnerGSTIN field.
+func (r *mutationResolver) VerifyDeliveryPartnerGstin(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	if !strings.EqualFold(userCtx.Role, auth.RoleAdmin) {
+		return nil, appErrors.Forbidden("only admin can verify delivery partner GSTIN application")
+	}
+
+	targetPartnerID := strings.TrimSpace(partnerID)
+	if targetPartnerID == "" {
+		return nil, appErrors.BadRequest("partnerId is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.VerifyGSTIN(ctx, &deliverypb.VerifyPartnerGSTINRequest{
+		PartnerId: targetPartnerID,
+		CallerId:  "",
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
+}
+
+// ActivateDeliveryPartner is the resolver for the activateDeliveryPartner field.
+func (r *mutationResolver) ActivateDeliveryPartner(ctx context.Context) (*model.DeliveryPartnerActionResponse, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	if !strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
+		return nil, appErrors.Forbidden("only owner delivery partner can activate profile")
+	}
+
+	partnerID := userCtx.PartnerID
+	if partnerID == "" {
+		partnerID = userCtx.UserID
+	}
+	if strings.TrimSpace(partnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	_, err := r.Clients.DeliveryClient.ActivatePartner(ctx, &deliverypb.ActivatePartnerRequest{
+		PartnerId: strings.TrimSpace(partnerID),
+		CallerId:  userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeliveryPartnerActionResponse{
+		Success: true,
+		Message: "account reactivated successfully",
+		Status:  "active",
+	}, nil
+}
+
+// ReactivateDeliveryPartner is the resolver for the reactivateDeliveryPartner field.
+func (r *mutationResolver) ReactivateDeliveryPartner(ctx context.Context) (*model.DeliveryPartnerActionResponse, error) {
+	return r.ActivateDeliveryPartner(ctx)
+}
+
+// DeactivateDeliveryPartner is the resolver for the deactivateDeliveryPartner field.
+func (r *mutationResolver) DeactivateDeliveryPartner(ctx context.Context, reason string) (*model.DeliveryPartnerActionResponse, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("deactivation reason is required")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	if !strings.EqualFold(userCtx.Role, auth.RoleDeliveryPartner) {
+		return nil, appErrors.Forbidden("only owner delivery partner can deactivate profile")
+	}
+
+	partnerID := userCtx.PartnerID
+	if partnerID == "" {
+		partnerID = userCtx.UserID
+	}
+	if strings.TrimSpace(partnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	_, err := r.Clients.DeliveryClient.DeactivatePartner(ctx, &deliverypb.DeactivatePartnerRequest{
+		PartnerId: strings.TrimSpace(partnerID),
+		Reason:    cleanReason,
+		CallerId:  userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeliveryPartnerActionResponse{
+		Success: true,
+		Message: "account deactivated successfully",
+		Status:  "deactivated",
+	}, nil
+}
+
+// DeleteDeliveryPartner is the resolver for the deleteDeliveryPartner field.
+func (r *mutationResolver) DeleteDeliveryPartner(ctx context.Context, reason *string) (*model.DeliveryPartnerActionResponse, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	partnerID := userCtx.PartnerID
+	if partnerID == "" {
+		partnerID = userCtx.UserID
+	}
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" {
+		return nil, appErrors.Forbidden("you can only delete your own delivery partner profile")
+	}
+	if strings.TrimSpace(partnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	var cleanReason *string
+	if reason != nil && strings.TrimSpace(*reason) != "" {
+		cr := strings.TrimSpace(*reason)
+		cleanReason = &cr
+	}
+
+	res, err := r.Clients.DeliveryClient.DeletePartnerProfile(ctx, &deliverypb.DeletePartnerProfileRequest{
+		PartnerId: strings.TrimSpace(partnerID),
+		CallerId:  userCtx.UserID,
+		Reason:    cleanReason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	status := "deleted"
+	if res.Status != "" {
+		status = res.Status
+	}
+	message := "account deleted successfully"
+	if res.Message != "" {
+		message = res.Message
+	}
+
+	return &model.DeliveryPartnerActionResponse{
+		Success: res.Success,
+		Message: message,
+		Status:  status,
+	}, nil
+}
+
+// AppealDeliveryPartnerRejection is the resolver for the appealDeliveryPartnerRejection field.
+func (r *mutationResolver) AppealDeliveryPartnerRejection(ctx context.Context, reason string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("reason is required")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	role := strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	if role != "ADMIN" && role != "DELIVERY_PARTNER" {
+		return nil, appErrors.Forbidden("you can only appeal your own profile rejection")
+	}
+
+	partnerID := userCtx.PartnerID
+	if partnerID == "" {
+		partnerID = userCtx.UserID
+	}
+	if strings.TrimSpace(partnerID) == "" {
+		return nil, appErrors.BadRequest("partner id is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.AppealRejection(ctx, &deliverypb.AppealRejectionRequest{
+		PartnerId: strings.TrimSpace(partnerID),
+		Reason:    cleanReason,
+		CallerId:  userCtx.UserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return toModelDeliveryPartnerProfile(res.Profile), nil
+}
+
+// ApproveDeliveryPartner is the resolver for the approveDeliveryPartner field.
+func (r *mutationResolver) ApproveDeliveryPartner(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	cleanID := strings.TrimSpace(partnerID)
+	if cleanID == "" {
+		return nil, appErrors.BadRequest("partnerId is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.ApprovePartner(ctx, &deliverypb.ApprovePartnerRequest{
+		PartnerId: cleanID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	modelProfile := toModelDeliveryPartnerProfile(res.Profile)
+	if modelProfile != nil {
+		modelProfile.IsGstinVerified = true
+	}
+
+	return modelProfile, nil
+}
+
+// RejectDeliveryPartner is the resolver for the rejectDeliveryPartner field.
+func (r *mutationResolver) RejectDeliveryPartner(ctx context.Context, partnerID string, reason string) (*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	cleanID := strings.TrimSpace(partnerID)
+	if cleanID == "" {
+		return nil, appErrors.BadRequest("partnerId is required")
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("reason is required")
+	}
+
+	res, err := r.Clients.DeliveryClient.RejectPartner(ctx, &deliverypb.RejectPartnerRequest{
+		PartnerId: cleanID,
+		Reason:    cleanReason,
+	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
@@ -307,4 +602,52 @@ func (r *queryResolver) DeliveryPartnerProfile(ctx context.Context, partnerID *s
 	}
 
 	return toModelDeliveryPartnerProfile(res.Profile), nil
+}
+
+// AppealDeliveryPartners is the resolver for the appealDeliveryPartners field.
+func (r *queryResolver) AppealDeliveryPartners(ctx context.Context) ([]*model.DeliveryPartnerProfile, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	userCtx := getAuthUser(ctx)
+	if userCtx == nil {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	if !strings.EqualFold(userCtx.Role, auth.RoleAdmin) {
+		return nil, appErrors.Forbidden("only admin can view appealed delivery partners")
+	}
+
+	res, err := r.Clients.DeliveryClient.ListAppealedPartners(ctx, &deliverypb.ListAppealedPartnersRequest{
+		Limit:  100,
+		Offset: 0,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := make([]*model.DeliveryPartnerProfile, 0, len(res.Profiles))
+	for _, p := range res.Profiles {
+		result = append(result, toModelDeliveryPartnerProfile(p))
+	}
+
+	return result, nil
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func getAuthUser(ctx context.Context) *auth.UserContext {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		if u, ok2 := auth.FromContext(ctx); ok2 && u != nil {
+			return u
+		}
+		return nil
+	}
+	return userCtx
 }
