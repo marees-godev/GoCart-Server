@@ -197,6 +197,9 @@ func TestPreferenceService_OptOut(t *testing.T) {
 	if !allowed {
 		t.Errorf("expected allowed to be true by default")
 	}
+	if ch == nil || ch.Code != "EMAIL" {
+		t.Errorf("expected EMAIL channel, got %v", ch)
+	}
 }
 
 func TestNotificationPipeline_CorrelationIDAndJobStructure(t *testing.T) {
