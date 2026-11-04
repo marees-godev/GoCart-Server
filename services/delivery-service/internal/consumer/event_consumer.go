@@ -26,12 +26,14 @@ func NewDeliveryEventConsumer(deliveryService service.DeliveryService) *Delivery
 }
 
 type orderConfirmedRawPayload struct {
-	OrderID         string          `json:"order_id"`
-	DeliveryPartner string          `json:"delivery_partner"`
-	ShippingAddress json.RawMessage `json:"shipping_address"`
-	ContactNumber   string          `json:"contact_number,omitempty"`
-	Phone           string          `json:"phone,omitempty"`
-	ConfirmedAt     time.Time       `json:"confirmed_at"`
+	OrderID           string          `json:"order_id"`
+	DeliveryPartner   string          `json:"delivery_partner"`
+	ShippingAddress   json.RawMessage `json:"shipping_address"`
+	ShippingAddressID string          `json:"shipping_address_id,omitempty"`
+	ContactNumber     string          `json:"contact_number,omitempty"`
+	Phone             string          `json:"phone,omitempty"`
+	PaymentStatus     string          `json:"payment_status,omitempty"`
+	ConfirmedAt       time.Time       `json:"confirmed_at"`
 }
 
 func (c *DeliveryEventConsumer) HandleEvent(ctx context.Context, envelope *events.EventEnvelope) error {
@@ -63,6 +65,10 @@ func (c *DeliveryEventConsumer) handleOrderConfirmed(ctx context.Context, envelo
 		return appErrors.BadRequest("order_id is required in OrderConfirmed payload")
 	}
 
+	if !strings.EqualFold(strings.TrimSpace(raw.PaymentStatus), "PAID") {
+		return appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
+	}
+
 	var addr model.ShippingAddress
 	if len(raw.ShippingAddress) > 0 {
 		if err := json.Unmarshal(raw.ShippingAddress, &addr); err != nil || (addr.Street == "" && addr.City == "") {
@@ -88,10 +94,11 @@ func (c *DeliveryEventConsumer) handleOrderConfirmed(ctx context.Context, envelo
 	}
 
 	payload := &dto.OrderConfirmedPayload{
-		OrderID:         orderID,
-		DeliveryPartner: raw.DeliveryPartner,
-		ShippingAddress: &addr,
-		ConfirmedAt:     raw.ConfirmedAt,
+		OrderID:           orderID,
+		DeliveryPartner:   raw.DeliveryPartner,
+		ShippingAddress:   &addr,
+		ShippingAddressID: strings.TrimSpace(raw.ShippingAddressID),
+		ConfirmedAt:       raw.ConfirmedAt,
 	}
 
 	_, err := c.deliveryService.HandleOrderConfirmed(ctx, payload)

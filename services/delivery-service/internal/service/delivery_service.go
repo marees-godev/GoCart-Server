@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client"
+	gstinClientPkg "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/client/gstin"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/repository"
@@ -31,16 +34,27 @@ type DeliveryService interface {
 	// Estimated delivery using order_service and transit rules
 	EstimateDelivery(ctx context.Context, orderID string, partnerID ...string) (*dto.EstimatedDeliveryResponse, error)
 
-	// Partner Management
+	// Partner Management & Lifecycle
 	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
 	GetPartnerProfile(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
-	UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error)
+	UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber, gstin *string, callerID ...string) (*model.DeliveryPartnerProfile, error)
+	VerifyGSTIN(ctx context.Context, partnerID string, gstin string, callerID ...string) (*model.DeliveryPartnerProfile, error)
+	ActivatePartner(ctx context.Context, partnerID string, callerID ...string) (*model.DeliveryPartnerProfile, error)
+	DeactivatePartner(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error)
+	DeletePartnerProfile(ctx context.Context, partnerID string, reason string, callerID ...string) error
+	ApprovePartner(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
+	RejectPartner(ctx context.Context, partnerID string, reason string) (*model.DeliveryPartnerProfile, error)
+	AppealRejection(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error)
+	ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error)
+	ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error)
+	ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error)
 }
 
 type deliveryService struct {
 	repo            repository.DeliveryRepository
 	orderClient     client.OrderClient
 	inventoryClient client.InventoryClient
+	gstinClient     gstinClientPkg.GSTINClient
 	logger          *slog.Logger
 }
 
@@ -55,6 +69,8 @@ func NewDeliveryService(repo repository.DeliveryRepository, args ...any) Deliver
 			s.orderClient = v
 		case client.InventoryClient:
 			s.inventoryClient = v
+		case gstinClientPkg.GSTINClient:
+			s.gstinClient = v
 		case *slog.Logger:
 			if v != nil {
 				s.logger = v
@@ -83,10 +99,18 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	if payload.ShippingAddress != nil {
 		addr = *payload.ShippingAddress
 	}
+	shippingAddressID := strings.TrimSpace(payload.ShippingAddressID)
 
 	// Retrieve order from order_service if orderClient is configured and address info is needed or for authoritative enrichment
 	if s.orderClient != nil {
 		if ord, oErr := s.orderClient.GetOrder(ctx, orderID); oErr == nil && ord != nil {
+			if !strings.EqualFold(strings.TrimSpace(ord.PaymentStatus), "PAID") {
+				s.logger.Warn("HandleOrderConfirmed rejected: order payment_status is not PAID", slog.String("order_id", orderID), slog.String("payment_status", ord.PaymentStatus))
+				return nil, appErrors.BadRequest("cannot create delivery: order payment_status must be PAID")
+			}
+			if shippingAddressID == "" && strings.TrimSpace(ord.ShippingAddressID) != "" {
+				shippingAddressID = strings.TrimSpace(ord.ShippingAddressID)
+			}
 			if strings.TrimSpace(addr.City) == "" && strings.TrimSpace(ord.ShippingAddress.City) != "" {
 				addr.City = ord.ShippingAddress.City
 			}
@@ -121,12 +145,22 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 	if rawPartner != "" {
 		if pUUID, pErr := uuid.Parse(rawPartner); pErr == nil {
 			partnerUUID = pUUID
-			if prof, profErr := s.repo.GetPartnerProfile(ctx, partnerUUID); profErr == nil && prof != nil && strings.TrimSpace(prof.CompanyName) != "" {
-				partnerName = strings.TrimSpace(prof.CompanyName)
+			if prof, profErr := s.repo.GetPartnerProfile(ctx, partnerUUID); profErr == nil && prof != nil {
+				if prof.ApprovalStatus != model.ApprovalStatusApproved || !prof.IsActive || !prof.IsGSTINVerified {
+					s.logger.Warn("HandleOrderConfirmed rejected: delivery partner is not approved or active", slog.String("partner_id", partnerUUID.String()), slog.String("approval_status", string(prof.ApprovalStatus)), slog.Bool("is_active", prof.IsActive), slog.Bool("is_gstin_verified", prof.IsGSTINVerified))
+					return nil, appErrors.BadRequest("cannot assign delivery: partner is not approved or active for delivery operations")
+				}
+				if strings.TrimSpace(prof.CompanyName) != "" {
+					partnerName = strings.TrimSpace(prof.CompanyName)
+				}
 			}
 		} else {
 			partnerName = rawPartner
 			if prof, profErr := s.repo.GetPartnerProfileByCompanyName(ctx, rawPartner); profErr == nil && prof != nil {
+				if prof.ApprovalStatus != model.ApprovalStatusApproved || !prof.IsActive || !prof.IsGSTINVerified {
+					s.logger.Warn("HandleOrderConfirmed rejected: delivery partner is not approved or active", slog.String("partner_name", rawPartner), slog.String("approval_status", string(prof.ApprovalStatus)), slog.Bool("is_active", prof.IsActive), slog.Bool("is_gstin_verified", prof.IsGSTINVerified))
+					return nil, appErrors.BadRequest("cannot assign delivery: partner is not approved or active for delivery operations")
+				}
 				partnerUUID = prof.PartnerID
 			}
 		}
@@ -188,6 +222,7 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 		DeliveryPartner:   partnerName,
 		TrackingNumber:    trackingNumber,
 		ShippingAddress:   addr,
+		ShippingAddressID: shippingAddressID,
 		Status:            model.StatusCreated,
 		EstimatedDelivery: &targetDate,
 		CreatedAt:         now,
@@ -476,6 +511,9 @@ func (s *deliveryService) CreateOrUpdatePartnerProfile(ctx context.Context, prof
 	if profile.PartnerID == uuid.Nil {
 		return appErrors.BadRequest("partner_id is required")
 	}
+	if profile.ApprovalStatus == "" {
+		profile.ApprovalStatus = model.ApprovalStatusPending
+	}
 	return s.repo.CreateOrUpdatePartnerProfile(ctx, profile)
 }
 
@@ -488,10 +526,19 @@ func (s *deliveryService) GetPartnerProfile(ctx context.Context, partnerID strin
 	if err != nil {
 		return nil, appErrors.BadRequest("invalid partner_id uuid format")
 	}
-	return s.repo.GetPartnerProfile(ctx, partnerUUID)
+	profile, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if profile.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+	return profile, nil
 }
 
-func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber *string) (*model.DeliveryPartnerProfile, error) {
+var gstinRegex = regexp.MustCompile(`^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$`)
+
+func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID string, companyName, email, contactNumber, gstin *string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
 	targetPartner := strings.TrimSpace(partnerID)
 	if targetPartner == "" {
 		return nil, appErrors.BadRequest("partner_id is required")
@@ -506,19 +553,35 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 		if appErrors.IsNotFound(err) {
 			now := time.Now().UTC()
 			existing = &model.DeliveryPartnerProfile{
-				ID:        uuid.New(),
-				PartnerID: partnerUUID,
-				IsActive:  true,
-				CreatedAt: now,
-				UpdatedAt: now,
+				ID:             uuid.New(),
+				PartnerID:      partnerUUID,
+				IsActive:       true,
+				ApprovalStatus: model.ApprovalStatusPending,
+				CreatedAt:      now,
+				UpdatedAt:      now,
 			}
 		} else {
 			return nil, err
 		}
+	} else if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, targetPartner) && !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return nil, appErrors.Forbidden("forbidden: you can only update your own delivery partner profile")
+		}
 	}
 
 	if companyName != nil {
-		existing.CompanyName = strings.TrimSpace(*companyName)
+		newCompany := strings.TrimSpace(*companyName)
+		if existing.CompanyName != newCompany {
+			existing.CompanyName = newCompany
+			existing.IsGSTINVerified = false
+			existing.ApprovalStatus = model.ApprovalStatusPending
+			existing.IsActive = false
+		}
 	}
 	if email != nil {
 		trimmedEmail := strings.TrimSpace(*email)
@@ -530,11 +593,481 @@ func (s *deliveryService) UpdatePartnerProfile(ctx context.Context, partnerID st
 	if contactNumber != nil {
 		existing.ContactNumber = strings.TrimSpace(*contactNumber)
 	}
+
+	if gstin != nil {
+		cleanGSTIN := strings.ToUpper(strings.TrimSpace(*gstin))
+		if cleanGSTIN != "" && !gstinRegex.MatchString(cleanGSTIN) {
+			return nil, appErrors.BadRequest("invalid GSTIN format")
+		}
+		if cleanGSTIN == "" {
+			if existing.GSTIN != nil {
+				existing.GSTIN = nil
+				existing.IsGSTINVerified = false
+				existing.ApprovalStatus = model.ApprovalStatusPending
+				existing.IsActive = false
+			}
+		} else if existing.GSTIN == nil || *existing.GSTIN != cleanGSTIN {
+			existing.GSTIN = &cleanGSTIN
+			existing.IsGSTINVerified = false
+			existing.ApprovalStatus = model.ApprovalStatusPending
+			existing.IsActive = false
+		}
+	}
+
 	existing.UpdatedAt = time.Now().UTC()
 	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
 		return nil, err
 	}
 	return existing, nil
+}
+
+func (s *deliveryService) VerifyGSTIN(ctx context.Context, partnerID string, gstinStr string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	targetPartner := strings.TrimSpace(partnerID)
+	cleanGSTIN := strings.ToUpper(strings.TrimSpace(gstinStr))
+
+	if targetPartner == "" && cleanGSTIN == "" {
+		return nil, appErrors.BadRequest("partner_id or gstin is required")
+	}
+
+	var existing *model.DeliveryPartnerProfile
+	var err error
+
+	if targetPartner != "" {
+		partnerUUID, parseErr := uuid.Parse(targetPartner)
+		if parseErr != nil {
+			return nil, appErrors.BadRequest("invalid partner_id uuid format")
+		}
+		existing, err = s.repo.GetPartnerProfile(ctx, partnerUUID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		existing, err = s.repo.GetPartnerProfileByGSTIN(ctx, cleanGSTIN)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return nil, appErrors.Forbidden("forbidden: you can only verify your own delivery partner profile")
+		}
+	}
+
+	if cleanGSTIN == "" {
+		if existing.GSTIN != nil && strings.TrimSpace(*existing.GSTIN) != "" {
+			cleanGSTIN = strings.ToUpper(strings.TrimSpace(*existing.GSTIN))
+		} else {
+			return nil, appErrors.BadRequest("GSTIN is required")
+		}
+	}
+
+	if !gstinRegex.MatchString(cleanGSTIN) {
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: invalid GSTIN format '%s'", cleanGSTIN))
+	}
+
+	if s.gstinClient == nil {
+		s.gstinClient = gstinClientPkg.NewGSTINClient(config.LoadEnv().GSTIN)
+	}
+	if !s.gstinClient.IsEnabled() {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest("GSTIN verification is disabled")
+	}
+	resp, gErr := s.gstinClient.VerifyGSTIN(ctx, cleanGSTIN)
+	if gErr != nil {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		if errors.Is(gErr, gstinClientPkg.ErrGSTINVerificationDisabled) {
+			return nil, appErrors.BadRequest("GSTIN verification is disabled")
+		}
+		errStr := strings.ToLower(gErr.Error())
+		if strings.Contains(errStr, "not found") || strings.Contains(errStr, "no record") {
+			return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' is not found in GST database", cleanGSTIN))
+		}
+		if strings.Contains(errStr, "invalid credential") || strings.Contains(errStr, "401") || strings.Contains(errStr, "403") || strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "authentication failed") {
+			return nil, appErrors.BadRequest("invalid credential: GSTIN API authentication failed (check server GSTIN_API_KEY)")
+		}
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' verification failed: %v", cleanGSTIN, gErr))
+	}
+	if !resp.Success {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		msg := resp.Message
+		if msg == "" {
+			msg = resp.Error
+		}
+		if msg == "" {
+			msg = "GSTIN verification failed"
+		}
+		lowerMsg := strings.ToLower(msg)
+		if strings.Contains(lowerMsg, "not found") || strings.Contains(lowerMsg, "no record") {
+			return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' is not found in GST database", cleanGSTIN))
+		}
+		if strings.Contains(lowerMsg, "invalid credential") || strings.Contains(lowerMsg, "401") || strings.Contains(lowerMsg, "unauthorized") || strings.Contains(lowerMsg, "authentication failed") {
+			return nil, appErrors.BadRequest("invalid credential: GSTIN API authentication failed")
+		}
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' verification failed: %s", cleanGSTIN, msg))
+	}
+	if resp.Data == nil || !strings.EqualFold(resp.Data.Status, "Active") {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		status := "unknown"
+		if resp.Data != nil && resp.Data.Status != "" {
+			status = resp.Data.Status
+		}
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' is not active (status: %s)", cleanGSTIN, status))
+	}
+	if strings.EqualFold(resp.Data.BlockStatus, "Blocked") {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: GSTIN '%s' is blocked", cleanGSTIN))
+	}
+
+	if strings.TrimSpace(existing.CompanyName) == "" {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest("invalid credential: company_name is missing in delivery partner table")
+	}
+
+	legalName := strings.TrimSpace(resp.Data.LegalName)
+	tradeName := strings.TrimSpace(resp.Data.TradeName)
+	registeredName := legalName
+	if registeredName == "" {
+		registeredName = tradeName
+	}
+	if registeredName == "" {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest("invalid credential: GSTIN registered name is unavailable")
+	}
+
+	if !matchCompanyName(existing.CompanyName, legalName, tradeName) {
+		existing.IsGSTINVerified = false
+		_ = s.repo.CreateOrUpdatePartnerProfile(ctx, existing)
+		return nil, appErrors.BadRequest(fmt.Sprintf("invalid credential: company_name '%s' in delivery partner table does not match GSTIN registered name '%s'", existing.CompanyName, registeredName))
+	}
+
+	existing.GSTIN = &cleanGSTIN
+	existing.IsGSTINVerified = true
+	if existing.ApprovalStatus != model.ApprovalStatusApproved {
+		existing.ApprovalStatus = model.ApprovalStatusPending
+	}
+	existing.UpdatedAt = time.Now().UTC()
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func normalizeCompanyName(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var sb strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune(' ')
+		}
+	}
+	words := strings.Fields(sb.String())
+	filtered := make([]string, 0, len(words))
+	for _, w := range words {
+		switch w {
+		case "private", "pvt", "limited", "ltd", "llp", "inc", "corp", "corporation", "co", "company":
+			continue
+		default:
+			filtered = append(filtered, w)
+		}
+	}
+	return strings.Join(filtered, " ")
+}
+
+func matchCompanyName(partnerCompany, legalName, tradeName string) bool {
+	normPartner := normalizeCompanyName(partnerCompany)
+	if normPartner == "" {
+		return false
+	}
+
+	normLegal := normalizeCompanyName(legalName)
+	if normLegal != "" && normPartner == normLegal {
+		return true
+	}
+
+	normTrade := normalizeCompanyName(tradeName)
+	if normTrade != "" && normPartner == normTrade {
+		return true
+	}
+
+	return false
+}
+
+func (s *deliveryService) ActivatePartner(ctx context.Context, partnerID string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, targetPartner) && !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return nil, appErrors.Forbidden("forbidden: only the owner delivery partner can activate this profile")
+		}
+	}
+
+	if existing.ApprovalStatus != model.ApprovalStatusApproved || !existing.IsGSTINVerified {
+		return nil, appErrors.BadRequest("cannot activate delivery partner: partner must be approved with verified GSTIN")
+	}
+	existing.IsActive = true
+	existing.DeactivatedAt = nil
+	existing.DeactivationReason = nil
+	existing.UpdatedAt = time.Now().UTC()
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *deliveryService) DeactivatePartner(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("deactivation reason is required")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, targetPartner) && !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return nil, appErrors.Forbidden("forbidden: only the owner delivery partner can deactivate this profile")
+		}
+	}
+
+	now := time.Now().UTC()
+	existing.IsActive = false
+	existing.DeactivatedAt = &now
+	existing.DeactivationReason = &cleanReason
+	existing.UpdatedAt = now
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *deliveryService) DeletePartnerProfile(ctx context.Context, partnerID string, reason string, callerID ...string) error {
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return err
+	}
+	if existing.DeletedAt != nil {
+		return appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, targetPartner) && !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return appErrors.Forbidden("forbidden: you can only delete your own delivery partner profile")
+		}
+	}
+
+	return s.repo.SoftDeletePartnerProfile(ctx, partnerUUID, time.Now().UTC(), strings.TrimSpace(reason))
+}
+
+func (s *deliveryService) ApprovePartner(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error) {
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if existing.GSTIN == nil || strings.TrimSpace(*existing.GSTIN) == "" || !existing.IsGSTINVerified {
+		return nil, appErrors.BadRequest("cannot approve delivery partner: GSTIN must be provided and verified")
+	}
+
+	if existing.ApprovalStatus != model.ApprovalStatusPending && existing.ApprovalStatus != model.ApprovalStatusAppealed {
+		return nil, appErrors.BadRequest("only profiles in PENDING or APPEALED status can be approved")
+	}
+
+	existing.ApprovalStatus = model.ApprovalStatusApproved
+	existing.IsGSTINVerified = true
+	existing.IsActive = true
+	existing.RejectionReason = nil
+	existing.UpdatedAt = time.Now().UTC()
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *deliveryService) RejectPartner(ctx context.Context, partnerID string, reason string) (*model.DeliveryPartnerProfile, error) {
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("rejection reason is required")
+	}
+
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if existing.ApprovalStatus != model.ApprovalStatusPending && existing.ApprovalStatus != model.ApprovalStatusAppealed {
+		return nil, appErrors.BadRequest("only profiles in PENDING or APPEALED status can be rejected")
+	}
+
+	existing.ApprovalStatus = model.ApprovalStatusRejected
+	existing.RejectionReason = &cleanReason
+	existing.UpdatedAt = time.Now().UTC()
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *deliveryService) AppealRejection(ctx context.Context, partnerID string, reason string, callerID ...string) (*model.DeliveryPartnerProfile, error) {
+	targetPartner := strings.TrimSpace(partnerID)
+	if targetPartner == "" {
+		return nil, appErrors.BadRequest("partner_id is required")
+	}
+	partnerUUID, err := uuid.Parse(targetPartner)
+	if err != nil {
+		return nil, appErrors.BadRequest("invalid partner_id uuid format")
+	}
+
+	existing, err := s.repo.GetPartnerProfile(ctx, partnerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.DeletedAt != nil {
+		return nil, appErrors.NotFound("delivery partner profile not found")
+	}
+
+	if len(callerID) > 0 && strings.TrimSpace(callerID[0]) != "" {
+		caller := strings.TrimSpace(callerID[0])
+		if !strings.EqualFold(caller, targetPartner) && !strings.EqualFold(caller, existing.PartnerID.String()) && !strings.EqualFold(caller, existing.ID.String()) {
+			return nil, appErrors.Forbidden("forbidden: you can only appeal your own profile rejection")
+		}
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		return nil, appErrors.BadRequest("appeal reason is required")
+	}
+
+	if existing.ApprovalStatus != model.ApprovalStatusRejected {
+		return nil, appErrors.BadRequest("only rejected profiles can be appealed")
+	}
+
+	now := time.Now().UTC()
+	existing.ApprovalStatus = model.ApprovalStatusAppealed
+	existing.AppealReason = &cleanReason
+	existing.AppealedAt = &now
+	existing.UpdatedAt = now
+
+	if err := s.repo.CreateOrUpdatePartnerProfile(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *deliveryService) ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.repo.ListAppealedPartners(ctx, limit, offset)
+}
+
+func (s *deliveryService) ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.repo.ListApprovedPartners(ctx, limit, offset)
+}
+
+func (s *deliveryService) ProcessExpiredDeactivations(ctx context.Context, retentionPeriod time.Duration) (int, error) {
+	if retentionPeriod <= 0 {
+		retentionPeriod = 30 * 24 * time.Hour
+	}
+	cutoff := time.Now().UTC().Add(-retentionPeriod)
+	return s.repo.SoftDeleteExpiredDeactivatedPartners(ctx, cutoff)
 }
 
 // resolveProvisionalWarehouse selects an available origin warehouse for preliminary transit calculation.

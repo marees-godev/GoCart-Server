@@ -233,6 +233,12 @@ type DeleteCategoryResponse struct {
 	Message string `json:"message"`
 }
 
+type DeletePartnerResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type DeleteProductResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
@@ -262,20 +268,37 @@ type Delivery struct {
 	DeliveredAt         *string        `json:"deliveredAt,omitempty"`
 	DeliveryPartner     string         `json:"deliveryPartner"`
 	ShippingAddress     *string        `json:"shippingAddress,omitempty"`
+	ShippingAddressID   *string        `json:"shippingAddressId,omitempty"`
 	ContactNumber       *string        `json:"contactNumber,omitempty"`
 	CreatedAt           *string        `json:"createdAt,omitempty"`
 	UpdatedAt           *string        `json:"updatedAt,omitempty"`
 }
 
+type DeliveryPartnerActionResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type DeliveryPartnerProfile struct {
-	ID            string  `json:"id"`
-	PartnerID     string  `json:"partnerId"`
-	CompanyName   *string `json:"companyName,omitempty"`
-	Email         string  `json:"email"`
-	ContactNumber *string `json:"contactNumber,omitempty"`
-	IsActive      bool    `json:"isActive"`
-	CreatedAt     *string `json:"createdAt,omitempty"`
-	UpdatedAt     *string `json:"updatedAt,omitempty"`
+	ID                 string                `json:"id"`
+	PartnerID          string                `json:"partnerId"`
+	CompanyName        *string               `json:"companyName,omitempty"`
+	Email              string                `json:"email"`
+	ContactNumber      *string               `json:"contactNumber,omitempty"`
+	Gstin              *string               `json:"gstin,omitempty"`
+	IsGstinVerified    bool                  `json:"isGstinVerified"`
+	IsActive           bool                  `json:"isActive"`
+	ApprovalStatus     PartnerApprovalStatus `json:"approvalStatus"`
+	RejectionReason    *string               `json:"rejectionReason,omitempty"`
+	AppealReason       *string               `json:"appealReason,omitempty"`
+	DeactivationReason *string               `json:"deactivationReason,omitempty"`
+	DeletionReason     *string               `json:"deletionReason,omitempty"`
+	AppealedAt         *string               `json:"appealedAt,omitempty"`
+	DeactivatedAt      *string               `json:"deactivatedAt,omitempty"`
+	DeletedAt          *string               `json:"deletedAt,omitempty"`
+	CreatedAt          *string               `json:"createdAt,omitempty"`
+	UpdatedAt          *string               `json:"updatedAt,omitempty"`
 }
 
 type Exchange struct {
@@ -758,6 +781,7 @@ type UpdateDeliveryPartnerProfileInput struct {
 	CompanyName   *string `json:"companyName,omitempty"`
 	Email         *string `json:"email,omitempty"`
 	ContactNumber *string `json:"contactNumber,omitempty"`
+	Gstin         *string `json:"gstin,omitempty"`
 }
 
 type UpdateMerchantInput struct {
@@ -1123,6 +1147,51 @@ func (e *MerchantStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e MerchantStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type PartnerApprovalStatus string
+
+const (
+	PartnerApprovalStatusPending  PartnerApprovalStatus = "PENDING"
+	PartnerApprovalStatusApproved PartnerApprovalStatus = "APPROVED"
+	PartnerApprovalStatusRejected PartnerApprovalStatus = "REJECTED"
+	PartnerApprovalStatusAppealed PartnerApprovalStatus = "APPEALED"
+)
+
+var AllPartnerApprovalStatus = []PartnerApprovalStatus{
+	PartnerApprovalStatusPending,
+	PartnerApprovalStatusApproved,
+	PartnerApprovalStatusRejected,
+	PartnerApprovalStatusAppealed,
+}
+
+func (e PartnerApprovalStatus) IsValid() bool {
+	switch e {
+	case PartnerApprovalStatusPending, PartnerApprovalStatusApproved, PartnerApprovalStatusRejected, PartnerApprovalStatusAppealed:
+		return true
+	}
+	return false
+}
+
+func (e PartnerApprovalStatus) String() string {
+	return string(e)
+}
+
+func (e *PartnerApprovalStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PartnerApprovalStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PartnerApprovalStatus", str)
+	}
+	return nil
+}
+
+func (e PartnerApprovalStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

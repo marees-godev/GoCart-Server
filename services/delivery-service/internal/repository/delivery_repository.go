@@ -39,6 +39,11 @@ type DeliveryRepository interface {
 	CreateOrUpdatePartnerProfile(ctx context.Context, profile *model.DeliveryPartnerProfile) error
 	GetPartnerProfile(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error)
 	GetPartnerProfileByCompanyName(ctx context.Context, name string) (*model.DeliveryPartnerProfile, error)
+	GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error)
+	ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error)
+	ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error)
+	SoftDeletePartnerProfile(ctx context.Context, partnerID uuid.UUID, deletedAt time.Time, reason ...string) error
+	SoftDeleteExpiredDeactivatedPartners(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 type pgDeliveryRepository struct {
@@ -96,13 +101,21 @@ func (r *pgDeliveryRepository) Create(ctx context.Context, delivery *model.Deliv
 		return appErrors.BadRequest("failed to marshal shipping address")
 	}
 
+	var shippingAddrUUID *uuid.UUID
+	if strings.TrimSpace(delivery.ShippingAddressID) != "" {
+		if u, pErr := uuid.Parse(strings.TrimSpace(delivery.ShippingAddressID)); pErr == nil {
+			shippingAddrUUID = &u
+		}
+	}
+
 	query := `
 		INSERT INTO deliveries (
 			id, order_id, delivery_partner, tracking_number, status,
 			street, city, state, postal_code, country, contact_number, shipping_address,
+			shipping_address_id,
 			estimated_delivery, actual_delivery,
 			created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (order_id) DO NOTHING
 		RETURNING id, created_at, updated_at
 	`
@@ -120,6 +133,7 @@ func (r *pgDeliveryRepository) Create(ctx context.Context, delivery *model.Deliv
 		delivery.ShippingAddress.Country,
 		delivery.ShippingAddress.ContactNumber,
 		addrBytes,
+		shippingAddrUUID,
 		delivery.EstimatedDelivery,
 		delivery.ActualDelivery,
 		delivery.CreatedAt,
@@ -198,6 +212,7 @@ func (r *pgDeliveryRepository) GetByID(ctx context.Context, id string) (*model.D
 		query = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -207,6 +222,7 @@ func (r *pgDeliveryRepository) GetByID(ctx context.Context, id string) (*model.D
 		query = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -229,6 +245,7 @@ func (r *pgDeliveryRepository) GetByOrderID(ctx context.Context, orderID string)
 	query := `
 		SELECT id, order_id, delivery_partner, tracking_number, status,
 		       street, city, state, postal_code, country, contact_number, shipping_address,
+		       shipping_address_id,
 		       estimated_delivery, actual_delivery,
 		       created_at, updated_at
 		FROM deliveries
@@ -250,6 +267,7 @@ func (r *pgDeliveryRepository) GetByTrackingNumber(ctx context.Context, tracking
 	query := `
 		SELECT id, order_id, delivery_partner, tracking_number, status,
 		       street, city, state, postal_code, country, contact_number, shipping_address,
+		       shipping_address_id,
 		       estimated_delivery, actual_delivery,
 		       created_at, updated_at
 		FROM deliveries
@@ -286,6 +304,7 @@ func (r *pgDeliveryRepository) List(ctx context.Context, limit, offset int, stat
 		listQuery = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -299,6 +318,7 @@ func (r *pgDeliveryRepository) List(ctx context.Context, limit, offset int, stat
 		listQuery = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -353,6 +373,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 		queryFetch = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -363,6 +384,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 		queryFetch = `
 			SELECT id, order_id, delivery_partner, tracking_number, status,
 			       street, city, state, postal_code, country, contact_number, shipping_address,
+			       shipping_address_id,
 			       estimated_delivery, actual_delivery,
 			       created_at, updated_at
 			FROM deliveries
@@ -408,6 +430,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 				WHERE id = $1
 				RETURNING id, order_id, delivery_partner, tracking_number, status,
 				          street, city, state, postal_code, country, contact_number, shipping_address,
+				          shipping_address_id,
 				          estimated_delivery, actual_delivery,
 				          created_at, updated_at
 			`
@@ -459,6 +482,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 		WHERE id = $1
 		RETURNING id, order_id, delivery_partner, tracking_number, status,
 		          street, city, state, postal_code, country, contact_number, shipping_address,
+		          shipping_address_id,
 		          estimated_delivery, actual_delivery,
 		          created_at, updated_at
 	`
@@ -543,6 +567,7 @@ func (r *pgDeliveryRepository) scanOne(row pgx.Row) (*model.Delivery, error) {
 	var d model.Delivery
 	var street, city, state, postalCode, country, contactNumber string
 	var addrBytes []byte
+	var shippingAddrUUID *uuid.UUID
 
 	err := row.Scan(
 		&d.ID,
@@ -557,6 +582,7 @@ func (r *pgDeliveryRepository) scanOne(row pgx.Row) (*model.Delivery, error) {
 		&country,
 		&contactNumber,
 		&addrBytes,
+		&shippingAddrUUID,
 		&d.EstimatedDelivery,
 		&d.ActualDelivery,
 		&d.CreatedAt,
@@ -564,6 +590,10 @@ func (r *pgDeliveryRepository) scanOne(row pgx.Row) (*model.Delivery, error) {
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if shippingAddrUUID != nil {
+		d.ShippingAddressID = shippingAddrUUID.String()
 	}
 
 	if len(addrBytes) > 0 {
@@ -819,17 +849,38 @@ func (r *pgDeliveryRepository) CreateOrUpdatePartnerProfile(ctx context.Context,
 	if profile.UpdatedAt.IsZero() {
 		profile.UpdatedAt = now
 	}
+	if profile.ApprovalStatus == "" {
+		profile.ApprovalStatus = model.ApprovalStatusPending
+	}
 	query := `
-		INSERT INTO delivery_partner_profiles (id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO delivery_partner_profiles (
+			id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+			approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+			created_at, updated_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (partner_id) DO UPDATE SET
 			company_name = CASE WHEN EXCLUDED.company_name <> '' THEN EXCLUDED.company_name ELSE delivery_partner_profiles.company_name END,
 			email = CASE WHEN EXCLUDED.email <> '' THEN EXCLUDED.email ELSE delivery_partner_profiles.email END,
 			contact_number = CASE WHEN EXCLUDED.contact_number <> '' THEN EXCLUDED.contact_number ELSE delivery_partner_profiles.contact_number END,
+			gstin = CASE WHEN EXCLUDED.gstin IS NOT NULL THEN EXCLUDED.gstin ELSE delivery_partner_profiles.gstin END,
+			is_gstin_verified = EXCLUDED.is_gstin_verified,
 			is_active = EXCLUDED.is_active,
+			approval_status = EXCLUDED.approval_status,
+			rejection_reason = EXCLUDED.rejection_reason,
+			appeal_reason = EXCLUDED.appeal_reason,
+			deactivation_reason = EXCLUDED.deactivation_reason,
+			deletion_reason = EXCLUDED.deletion_reason,
+			appealed_at = EXCLUDED.appealed_at,
+			deactivated_at = EXCLUDED.deactivated_at,
+			deleted_at = EXCLUDED.deleted_at,
 			updated_at = EXCLUDED.updated_at
 	`
-	_, err := r.db.Pool.Exec(ctx, query, profile.ID, profile.PartnerID, profile.CompanyName, profile.Email, profile.ContactNumber, profile.IsActive, profile.CreatedAt, profile.UpdatedAt)
+	_, err := r.db.Pool.Exec(ctx, query,
+		profile.ID, profile.PartnerID, profile.CompanyName, profile.Email, profile.ContactNumber, profile.GSTIN, profile.IsGSTINVerified, profile.IsActive,
+		profile.ApprovalStatus, profile.RejectionReason, profile.AppealReason, profile.DeactivationReason, profile.DeletionReason, profile.AppealedAt, profile.DeactivatedAt, profile.DeletedAt,
+		profile.CreatedAt, profile.UpdatedAt,
+	)
 	if err != nil {
 		r.logger.Error("Repository: failed to upsert delivery partner profile", slog.String("partner_id", profile.PartnerID.String()), slog.Any("error", err))
 		return appErrors.Internal(err, "failed to upsert partner profile")
@@ -839,9 +890,11 @@ func (r *pgDeliveryRepository) CreateOrUpdatePartnerProfile(ctx context.Context,
 
 func (r *pgDeliveryRepository) GetPartnerProfile(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error) {
 	query := `
-		SELECT id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at
+		SELECT id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+		       approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+		       created_at, updated_at
 		FROM delivery_partner_profiles
-		WHERE partner_id = $1
+		WHERE partner_id = $1 OR id = $1
 	`
 	var p model.DeliveryPartnerProfile
 	err := r.db.Pool.QueryRow(ctx, query, partnerID).Scan(
@@ -850,7 +903,17 @@ func (r *pgDeliveryRepository) GetPartnerProfile(ctx context.Context, partnerID 
 		&p.CompanyName,
 		&p.Email,
 		&p.ContactNumber,
+		&p.GSTIN,
+		&p.IsGSTINVerified,
 		&p.IsActive,
+		&p.ApprovalStatus,
+		&p.RejectionReason,
+		&p.AppealReason,
+		&p.DeactivationReason,
+		&p.DeletionReason,
+		&p.AppealedAt,
+		&p.DeactivatedAt,
+		&p.DeletedAt,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 	)
@@ -869,7 +932,9 @@ func (r *pgDeliveryRepository) GetPartnerProfileByCompanyName(ctx context.Contex
 		return nil, appErrors.BadRequest("company name is required")
 	}
 	query := `
-		SELECT id, partner_id, company_name, email, contact_number, is_active, created_at, updated_at
+		SELECT id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+		       approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+		       created_at, updated_at
 		FROM delivery_partner_profiles
 		WHERE LOWER(company_name) = LOWER($1)
 		LIMIT 1
@@ -881,7 +946,17 @@ func (r *pgDeliveryRepository) GetPartnerProfileByCompanyName(ctx context.Contex
 		&p.CompanyName,
 		&p.Email,
 		&p.ContactNumber,
+		&p.GSTIN,
+		&p.IsGSTINVerified,
 		&p.IsActive,
+		&p.ApprovalStatus,
+		&p.RejectionReason,
+		&p.AppealReason,
+		&p.DeactivationReason,
+		&p.DeletionReason,
+		&p.AppealedAt,
+		&p.DeactivatedAt,
+		&p.DeletedAt,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 	)
@@ -892,4 +967,214 @@ func (r *pgDeliveryRepository) GetPartnerProfileByCompanyName(ctx context.Contex
 		return nil, appErrors.Internal(err, "failed to get partner profile")
 	}
 	return &p, nil
+}
+
+func (r *pgDeliveryRepository) GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error) {
+	clean := strings.ToUpper(strings.TrimSpace(gstin))
+	if clean == "" {
+		return nil, appErrors.BadRequest("GSTIN is required")
+	}
+	query := `
+		SELECT id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+		       approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+		       created_at, updated_at
+		FROM delivery_partner_profiles
+		WHERE UPPER(gstin) = $1 AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	var p model.DeliveryPartnerProfile
+	err := r.db.Pool.QueryRow(ctx, query, clean).Scan(
+		&p.ID,
+		&p.PartnerID,
+		&p.CompanyName,
+		&p.Email,
+		&p.ContactNumber,
+		&p.GSTIN,
+		&p.IsGSTINVerified,
+		&p.IsActive,
+		&p.ApprovalStatus,
+		&p.RejectionReason,
+		&p.AppealReason,
+		&p.DeactivationReason,
+		&p.DeletionReason,
+		&p.AppealedAt,
+		&p.DeactivatedAt,
+		&p.DeletedAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("delivery partner profile not found")
+		}
+		return nil, appErrors.Internal(err, "failed to get delivery partner profile by GSTIN")
+	}
+	return &p, nil
+}
+
+func (r *pgDeliveryRepository) ListAppealedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	countQuery := `
+		SELECT COUNT(*)
+		FROM delivery_partner_profiles
+		WHERE approval_status = 'APPEALED'
+		  AND deleted_at IS NULL
+	`
+	var total int
+	if err := r.db.Pool.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+		r.logger.Error("Repository: failed to count appealed delivery partners", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to count appealed delivery partners")
+	}
+
+	query := `
+		SELECT id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+		       approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+		       created_at, updated_at
+		FROM delivery_partner_profiles
+		WHERE approval_status = 'APPEALED'
+		  AND deleted_at IS NULL
+		ORDER BY appealed_at DESC, created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := r.db.Pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		r.logger.Error("Repository: failed to list appealed delivery partners", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to list appealed delivery partners")
+	}
+	defer rows.Close()
+
+	var profiles []*model.DeliveryPartnerProfile
+	for rows.Next() {
+		var p model.DeliveryPartnerProfile
+		if err := rows.Scan(
+			&p.ID,
+			&p.PartnerID,
+			&p.CompanyName,
+			&p.Email,
+			&p.ContactNumber,
+			&p.GSTIN,
+			&p.IsGSTINVerified,
+			&p.IsActive,
+			&p.ApprovalStatus,
+			&p.RejectionReason,
+			&p.AppealReason,
+			&p.DeactivationReason,
+			&p.DeletionReason,
+			&p.AppealedAt,
+			&p.DeactivatedAt,
+			&p.DeletedAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			r.logger.Error("Repository: failed to scan appealed delivery partner", slog.Any("error", err))
+			return nil, 0, appErrors.Internal(err, "failed to scan delivery partner profile")
+		}
+		profiles = append(profiles, &p)
+	}
+
+	return profiles, total, nil
+}
+
+func (r *pgDeliveryRepository) ListApprovedPartners(ctx context.Context, limit, offset int) ([]*model.DeliveryPartnerProfile, int, error) {
+	countQuery := `
+		SELECT COUNT(*)
+		FROM delivery_partner_profiles
+		WHERE approval_status = 'APPROVED'
+		  AND is_active = TRUE
+		  AND deleted_at IS NULL
+	`
+	var total int
+	if err := r.db.Pool.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+		r.logger.Error("Repository: failed to count approved delivery partners", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to count approved delivery partners")
+	}
+
+	query := `
+		SELECT id, partner_id, company_name, email, contact_number, gstin, is_gstin_verified, is_active,
+		       approval_status, rejection_reason, appeal_reason, deactivation_reason, deletion_reason, appealed_at, deactivated_at, deleted_at,
+		       created_at, updated_at
+		FROM delivery_partner_profiles
+		WHERE approval_status = 'APPROVED'
+		  AND is_active = TRUE
+		  AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := r.db.Pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		r.logger.Error("Repository: failed to list approved delivery partners", slog.Any("error", err))
+		return nil, 0, appErrors.Internal(err, "failed to list approved delivery partners")
+	}
+	defer rows.Close()
+
+	var profiles []*model.DeliveryPartnerProfile
+	for rows.Next() {
+		var p model.DeliveryPartnerProfile
+		if err := rows.Scan(
+			&p.ID,
+			&p.PartnerID,
+			&p.CompanyName,
+			&p.Email,
+			&p.ContactNumber,
+			&p.GSTIN,
+			&p.IsGSTINVerified,
+			&p.IsActive,
+			&p.ApprovalStatus,
+			&p.RejectionReason,
+			&p.AppealReason,
+			&p.DeactivationReason,
+			&p.DeletionReason,
+			&p.AppealedAt,
+			&p.DeactivatedAt,
+			&p.DeletedAt,
+			&p.CreatedAt,
+			&p.UpdatedAt,
+		); err != nil {
+			r.logger.Error("Repository: failed to scan approved delivery partner", slog.Any("error", err))
+			return nil, 0, appErrors.Internal(err, "failed to scan delivery partner profile")
+		}
+		profiles = append(profiles, &p)
+	}
+
+	return profiles, total, nil
+}
+
+func (r *pgDeliveryRepository) SoftDeletePartnerProfile(ctx context.Context, partnerID uuid.UUID, deletedAt time.Time, reason ...string) error {
+	var cleanReason *string
+	if len(reason) > 0 && strings.TrimSpace(reason[0]) != "" {
+		cr := strings.TrimSpace(reason[0])
+		cleanReason = &cr
+	}
+
+	query := `
+		UPDATE delivery_partner_profiles
+		SET deleted_at = $1, is_active = FALSE, updated_at = $1, deletion_reason = $3
+		WHERE (partner_id = $2 OR id = $2) AND deleted_at IS NULL
+	`
+	tag, err := r.db.Pool.Exec(ctx, query, deletedAt, partnerID, cleanReason)
+	if err != nil {
+		r.logger.Error("Repository: failed to soft delete delivery partner profile", slog.String("partner_id", partnerID.String()), slog.Any("error", err))
+		return appErrors.Internal(err, "failed to delete partner profile")
+	}
+	if tag.RowsAffected() == 0 {
+		return appErrors.NotFound("delivery partner profile not found")
+	}
+	return nil
+}
+
+func (r *pgDeliveryRepository) SoftDeleteExpiredDeactivatedPartners(ctx context.Context, cutoff time.Time) (int, error) {
+	query := `
+		UPDATE delivery_partner_profiles
+		SET deleted_at = NOW(), is_active = FALSE, updated_at = NOW()
+		WHERE is_active = FALSE
+		  AND deactivated_at IS NOT NULL
+		  AND deactivated_at <= $1
+		  AND deleted_at IS NULL
+	`
+	tag, err := r.db.Pool.Exec(ctx, query, cutoff)
+	if err != nil {
+		r.logger.Error("Repository: failed to process expired deactivations", slog.Any("error", err))
+		return 0, appErrors.Internal(err, "failed to process expired deactivations")
+	}
+	return int(tag.RowsAffected()), nil
 }
