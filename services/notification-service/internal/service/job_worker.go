@@ -41,9 +41,9 @@ func (w *JobWorker) Start(ctx context.Context) {
 }
 
 func (w *JobWorker) processBatch(ctx context.Context) {
-	jobs, err := w.jobRepo.ListPendingJobs(ctx, 50)
+	jobs, err := w.jobRepo.ClaimPendingJobs(ctx, 50)
 	if err != nil {
-		w.logger.ErrorContext(ctx, "failed listing pending notification jobs", "error", err)
+		w.logger.ErrorContext(ctx, "failed claiming pending notification jobs", "error", err)
 		return
 	}
 
@@ -56,8 +56,6 @@ func (w *JobWorker) processBatch(ctx context.Context) {
 }
 
 func (w *JobWorker) processSingleJob(ctx context.Context, job *model.NotificationJob) {
-	_ = w.jobRepo.UpdateJobStatus(ctx, job.ID, model.JobStatusProcessing, nil)
-
 	// Simulated notification delivery (e.g., SMTP / SMS gateway / Push)
 	w.logger.InfoContext(ctx, "Delivering notification job",
 		"job_id", job.ID,
@@ -72,4 +70,3 @@ func (w *JobWorker) processSingleJob(ctx context.Context, job *model.Notificatio
 		_ = w.jobRepo.IncrementRetry(ctx, job.ID, err.Error())
 	}
 }
-

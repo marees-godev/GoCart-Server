@@ -216,6 +216,25 @@ func (r *memoryNotificationRepo) ListPendingJobs(ctx context.Context, limit int)
 	return list, nil
 }
 
+func (r *memoryNotificationRepo) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var list []*model.NotificationJob
+	for _, j := range r.jobs {
+		if j.Status == model.JobStatusPending && j.RetryCount < j.MaxRetries {
+			j.Status = model.JobStatusProcessing
+			now := time.Now().UTC()
+			j.UpdatedAt = now
+			c := *j
+			list = append(list, &c)
+			if len(list) >= limit {
+				break
+			}
+		}
+	}
+	return list, nil
+}
+
 func (r *memoryNotificationRepo) IsEventProcessed(ctx context.Context, eventID string) (bool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -649,6 +668,43 @@ func TestJobWorker_ProcessBatchAndRetry(t *testing.T) {
 	updatedJob, _ := repo.GetJobByID(ctx, job.ID)
 	if updatedJob.Status != model.JobStatusCompleted {
 		t.Errorf("expected job status COMPLETED after worker execution, got: %s", updatedJob.Status)
+	}
+}
+
+// 7. Test Non-UUID user_id safe handling
+func TestNotificationConsumer_NonUUIDUserID_SafeHandling(t *testing.T) {
+	c, repo := setupConsumerTest()
+	ctx := context.Background()
+
+	// RefundCompletedEvent with non-UUID AggregateID and empty UserID
+	env, err := events.NewEventEnvelope(events.EventTypeRefundCompleted, "payment-service", events.RefundCompletedEvent{
+		RefundID:    "ref-9999",
+		PaymentID:   "pay-1111",
+		OrderID:     "ord-2222",
+		Amount:      50.00,
+		Currency:    "USD",
+		CompletedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("failed creating envelope: %v", err)
+	}
+	env.AggregateID = "non-uuid-refund-aggregate-id"
+
+	err = c.HandleEvent(ctx, env)
+	if err != nil {
+		t.Fatalf("unexpected error with non-uuid fallback: %v", err)
+	}
+
+	job, err := repo.GetJobByEventID(ctx, env.EventID)
+	if err != nil || job == nil {
+		t.Fatalf("expected job to be created, got error: %v", err)
+	}
+
+	if job.UserID != nil {
+		t.Errorf("expected UserID to be nil for non-UUID input, got: %s", *job.UserID)
+	}
+	if job.Recipient != "ord-2222" {
+		t.Errorf("expected recipient ord-2222, got: %s", job.Recipient)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/model"
@@ -241,12 +242,17 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 			return nil, nil
 		}
 		userID = payload.UserID
-		if userID == "" {
-			userID = envelope.AggregateID
+		if userID == "" && envelope.AggregateID != "" {
+			if _, err := uuid.Parse(envelope.AggregateID); err == nil {
+				userID = envelope.AggregateID
+			}
 		}
-		recipient = userID
+		recipient = payload.UserID
 		if recipient == "" {
 			recipient = payload.OrderID
+			if recipient == "" {
+				recipient = envelope.AggregateID
+			}
 		}
 		templateData["RefundID"] = payload.RefundID
 		templateData["PaymentID"] = payload.PaymentID
@@ -294,7 +300,9 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 	var uID *string
 	if userID != "" {
 		trimmed := strings.TrimSpace(userID)
-		uID = &trimmed
+		if _, err := uuid.Parse(trimmed); err == nil {
+			uID = &trimmed
+		}
 	}
 
 	job := &model.NotificationJob{

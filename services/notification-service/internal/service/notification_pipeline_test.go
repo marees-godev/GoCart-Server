@@ -96,6 +96,20 @@ func (m *mockJobRepo) ListPendingJobs(ctx context.Context, limit int) ([]*model.
 	return list, nil
 }
 
+func (m *mockJobRepo) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
+	var list []*model.NotificationJob
+	for _, j := range m.jobs {
+		if j.Status == model.JobStatusPending {
+			j.Status = model.JobStatusProcessing
+			list = append(list, j)
+			if len(list) >= limit {
+				break
+			}
+		}
+	}
+	return list, nil
+}
+
 type mockIdempotencyRepo struct {
 	processed map[string]*model.ProcessedEvent
 }

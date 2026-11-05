@@ -28,10 +28,10 @@ type JobRepository interface {
 	UpdateJobStatus(ctx context.Context, id string, status model.JobStatus, errMsg *string) error
 	IncrementRetry(ctx context.Context, id string, errMsg string) error
 	ListPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error)
+	ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error)
 }
 
 type IdempotencyRepository interface {
 	IsEventProcessed(ctx context.Context, eventID string) (bool, error)
 	RecordProcessedEvent(ctx context.Context, event *model.ProcessedEvent) error
 }
-

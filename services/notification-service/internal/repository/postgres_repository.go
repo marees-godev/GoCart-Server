@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,9 +25,9 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 // ChannelRepository implementation
 func (r *PostgresRepository) GetByCode(ctx context.Context, code string) (*model.Channel, error) {
 	query := `
-		SELECT id, code, name, is_active, created_at
+		SELECT id, code::text, name, is_active, created_at
 		FROM notification_channels
-		WHERE code = $1 AND is_active = TRUE
+		WHERE code::text = $1 AND is_active = TRUE
 		LIMIT 1
 	`
 	var c model.Channel
@@ -41,9 +43,9 @@ func (r *PostgresRepository) GetByCode(ctx context.Context, code string) (*model
 
 func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*model.Channel, error) {
 	query := `
-		SELECT id, code, name, is_active, created_at
+		SELECT id, code::text, name, is_active, created_at
 		FROM notification_channels
-		WHERE id = $1
+		WHERE id = $1::uuid
 		LIMIT 1
 	`
 	var c model.Channel
@@ -82,7 +84,7 @@ func (r *PostgresRepository) GetByEventTypeAndChannel(ctx context.Context, event
 	query := `
 		SELECT id, event_type, channel_id, subject_template, body_template, is_active, created_at, updated_at
 		FROM notification_templates
-		WHERE event_type = $1 AND channel_id = $2 AND is_active = TRUE
+		WHERE event_type = $1 AND channel_id = $2::uuid AND is_active = TRUE
 		LIMIT 1
 	`
 	var t model.Template
@@ -103,7 +105,7 @@ func (r *PostgresRepository) GetPreference(ctx context.Context, userID, channelI
 	query := `
 		SELECT id, user_id, channel_id, event_type, is_enabled, created_at, updated_at
 		FROM user_notification_preferences
-		WHERE user_id = $1 AND channel_id = $2 AND event_type = $3
+		WHERE user_id = $1::uuid AND channel_id = $2::uuid AND event_type = $3
 		LIMIT 1
 	`
 	var p model.Preference
@@ -122,7 +124,7 @@ func (r *PostgresRepository) GetPreference(ctx context.Context, userID, channelI
 func (r *PostgresRepository) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	query := `
 		INSERT INTO user_notification_preferences (user_id, channel_id, event_type, is_enabled, updated_at)
-		VALUES ($1, $2, $3, $4, NOW())
+		VALUES ($1::uuid, $2::uuid, $3, $4, NOW())
 		ON CONFLICT (user_id, channel_id, event_type)
 		DO UPDATE SET is_enabled = EXCLUDED.is_enabled, updated_at = NOW()
 	`
@@ -144,20 +146,23 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.Notificat
 		VALUES (
 			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()),
 			$2, NULLIF($3, '')::uuid, $4::uuid, $5::uuid, $6, $7,
-			$8, $9, $10, $11, $12, $13, $14,
+			$8, $9, $10::notification_job_status, $11, $12, $13, $14,
 			NOW(), NOW()
 		)
 		RETURNING id, created_at, updated_at
 	`
 	var userIDVal *string
 	if job.UserID != nil && *job.UserID != "" {
-		userIDVal = job.UserID
+		trimmed := strings.TrimSpace(*job.UserID)
+		if _, err := uuid.Parse(trimmed); err == nil {
+			userIDVal = &trimmed
+		}
 	}
 
 	err := r.pool.QueryRow(
 		ctx, query,
 		job.ID, job.EventID, userIDVal, job.ChannelID, job.TemplateID, job.EventType, job.Recipient,
-		job.Subject, job.Content, job.Status, job.RetryCount, job.MaxRetries, job.CorrelationID, job.ErrorMessage,
+		job.Subject, job.Content, string(job.Status), job.RetryCount, job.MaxRetries, job.CorrelationID, job.ErrorMessage,
 	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -171,11 +176,13 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.Notificat
 
 func (r *PostgresRepository) GetJobByEventID(ctx context.Context, eventID string) (*model.NotificationJob, error) {
 	query := `
-		SELECT id, event_id, user_id::text, channel_id::text, template_id::text, event_type, recipient,
-		       subject, content, status, retry_count, max_retries, correlation_id, error_message,
-		       created_at, updated_at, processed_at
-		FROM notification_jobs
-		WHERE event_id = $1
+		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
+		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
+		       j.created_at, j.updated_at, j.processed_at
+		FROM notification_jobs j
+		LEFT JOIN notification_channels c ON j.channel_id = c.id
+		WHERE j.event_id = $1
 		LIMIT 1
 	`
 	var j model.NotificationJob
@@ -185,8 +192,9 @@ func (r *PostgresRepository) GetJobByEventID(ctx context.Context, eventID string
 	var corrID *string
 
 	err := r.pool.QueryRow(ctx, query, eventID).Scan(
-		&j.ID, &j.EventID, &userID, &j.ChannelID, &j.TemplateID, &j.EventType, &j.Recipient,
-		&j.Subject, &j.Content, &j.Status, &j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
+		&j.ID, &j.EventID, &userID, &j.ChannelID, &j.ChannelCode,
+		&j.TemplateID, &j.EventType, &j.Recipient, &j.Subject, &j.Content, &j.Status,
+		&j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
 		&j.CreatedAt, &j.UpdatedAt, &processedAt,
 	)
 	if err != nil {
@@ -206,11 +214,13 @@ func (r *PostgresRepository) GetJobByEventID(ctx context.Context, eventID string
 
 func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*model.NotificationJob, error) {
 	query := `
-		SELECT id, event_id, user_id::text, channel_id::text, template_id::text, event_type, recipient,
-		       subject, content, status, retry_count, max_retries, correlation_id, error_message,
-		       created_at, updated_at, processed_at
-		FROM notification_jobs
-		WHERE id = $1::uuid
+		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
+		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
+		       j.created_at, j.updated_at, j.processed_at
+		FROM notification_jobs j
+		LEFT JOIN notification_channels c ON j.channel_id = c.id
+		WHERE j.id = $1::uuid
 		LIMIT 1
 	`
 	var j model.NotificationJob
@@ -220,8 +230,9 @@ func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*model.
 	var corrID *string
 
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&j.ID, &j.EventID, &userID, &j.ChannelID, &j.TemplateID, &j.EventType, &j.Recipient,
-		&j.Subject, &j.Content, &j.Status, &j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
+		&j.ID, &j.EventID, &userID, &j.ChannelID, &j.ChannelCode,
+		&j.TemplateID, &j.EventType, &j.Recipient, &j.Subject, &j.Content, &j.Status,
+		&j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
 		&j.CreatedAt, &j.UpdatedAt, &processedAt,
 	)
 	if err != nil {
@@ -242,11 +253,11 @@ func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*model.
 func (r *PostgresRepository) UpdateJobStatus(ctx context.Context, id string, status model.JobStatus, errMsg *string) error {
 	query := `
 		UPDATE notification_jobs
-		SET status = $2, error_message = $3, updated_at = NOW(),
-		    processed_at = CASE WHEN $2 IN ('COMPLETED', 'OPTED_OUT', 'FAILED') THEN NOW() ELSE processed_at END
+		SET status = $2::notification_job_status, error_message = $3, updated_at = NOW(),
+		    processed_at = CASE WHEN $2::notification_job_status IN ('COMPLETED'::notification_job_status, 'OPTED_OUT'::notification_job_status, 'FAILED'::notification_job_status) THEN NOW() ELSE processed_at END
 		WHERE id = $1::uuid
 	`
-	_, err := r.pool.Exec(ctx, query, id, status, errMsg)
+	_, err := r.pool.Exec(ctx, query, id, string(status), errMsg)
 	if err != nil {
 		return fmt.Errorf("failed to update job status: %w", err)
 	}
@@ -271,12 +282,14 @@ func (r *PostgresRepository) IncrementRetry(ctx context.Context, id string, errM
 
 func (r *PostgresRepository) ListPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
-		SELECT id, event_id, user_id::text, channel_id::text, template_id::text, event_type, recipient,
-		       subject, content, status, retry_count, max_retries, correlation_id, error_message,
-		       created_at, updated_at, processed_at
-		FROM notification_jobs
-		WHERE status = 'PENDING' AND retry_count < max_retries
-		ORDER BY created_at ASC
+		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
+		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
+		       j.created_at, j.updated_at, j.processed_at
+		FROM notification_jobs j
+		LEFT JOIN notification_channels c ON j.channel_id = c.id
+		WHERE j.status = 'PENDING'::notification_job_status AND j.retry_count < j.max_retries
+		ORDER BY j.created_at ASC
 		LIMIT $1
 	`
 	rows, err := r.pool.Query(ctx, query, limit)
@@ -293,11 +306,65 @@ func (r *PostgresRepository) ListPendingJobs(ctx context.Context, limit int) ([]
 		var errMsg *string
 		var corrID *string
 		if err := rows.Scan(
-			&j.ID, &j.EventID, &userID, &j.ChannelID, &j.TemplateID, &j.EventType, &j.Recipient,
-			&j.Subject, &j.Content, &j.Status, &j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
+			&j.ID, &j.EventID, &userID, &j.ChannelID, &j.ChannelCode,
+			&j.TemplateID, &j.EventType, &j.Recipient, &j.Subject, &j.Content, &j.Status,
+			&j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
 			&j.CreatedAt, &j.UpdatedAt, &processedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan job: %w", err)
+		}
+		j.UserID = userID
+		j.ProcessedAt = processedAt
+		j.ErrorMessage = errMsg
+		if corrID != nil {
+			j.CorrelationID = *corrID
+		}
+		jobs = append(jobs, &j)
+	}
+	return jobs, nil
+}
+
+// ClaimPendingJobs atomically claims pending jobs to PROCESSING using SKIP LOCKED to prevent duplicate processing across replicas
+func (r *PostgresRepository) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
+	query := `
+		WITH claimable AS (
+			SELECT id
+			FROM notification_jobs
+			WHERE status = 'PENDING'::notification_job_status AND retry_count < max_retries
+			ORDER BY created_at ASC
+			LIMIT $1
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE notification_jobs j
+		SET status = 'PROCESSING'::notification_job_status, updated_at = NOW()
+		FROM claimable
+		LEFT JOIN notification_channels c ON j.channel_id = c.id
+		WHERE j.id = claimable.id
+		RETURNING j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
+		          j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		          j.retry_count, j.max_retries, j.correlation_id, j.error_message,
+		          j.created_at, j.updated_at, j.processed_at
+	`
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim pending jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*model.NotificationJob
+	for rows.Next() {
+		var j model.NotificationJob
+		var userID *string
+		var processedAt *time.Time
+		var errMsg *string
+		var corrID *string
+		if err := rows.Scan(
+			&j.ID, &j.EventID, &userID, &j.ChannelID, &j.ChannelCode,
+			&j.TemplateID, &j.EventType, &j.Recipient, &j.Subject, &j.Content, &j.Status,
+			&j.RetryCount, &j.MaxRetries, &corrID, &errMsg,
+			&j.CreatedAt, &j.UpdatedAt, &processedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan claimed job: %w", err)
 		}
 		j.UserID = userID
 		j.ProcessedAt = processedAt
@@ -335,4 +402,3 @@ func (r *PostgresRepository) RecordProcessedEvent(ctx context.Context, event *mo
 	}
 	return nil
 }
-

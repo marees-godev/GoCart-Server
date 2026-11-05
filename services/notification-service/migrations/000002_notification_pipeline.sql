@@ -13,6 +13,20 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+-- Alter notification_channels to use explicit ENUM for code
+ALTER TABLE notification_channels 
+    ALTER COLUMN code TYPE channel_type USING code::channel_type;
+
+-- Allow multiple channels per event type by scoping uniqueness to (event_type, channel_id)
+ALTER TABLE notification_templates DROP CONSTRAINT IF EXISTS notification_templates_event_type_key;
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_notification_templates_event_channel'
+    ) THEN
+        ALTER TABLE notification_templates ADD CONSTRAINT uq_notification_templates_event_channel UNIQUE (event_type, channel_id);
+    END IF;
+END $$;
+
 -- User notification preferences (relational 3NF)
 CREATE TABLE IF NOT EXISTS user_notification_preferences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,7 +109,6 @@ FROM (
 CROSS JOIN (
     SELECT id FROM notification_channels WHERE code = 'EMAIL' LIMIT 1
 ) AS c
-ON CONFLICT (event_type) DO UPDATE SET
+ON CONFLICT (event_type, channel_id) DO UPDATE SET
     subject_template = EXCLUDED.subject_template,
     body_template = EXCLUDED.body_template;
-
