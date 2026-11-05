@@ -62,9 +62,9 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 	query := `
 		INSERT INTO products (
-			store_id, category_id, sku, name, description, price, mrp, tax, currency, status, image_url, avg_rating
+			store_id, category_id, sku, name, description, price, mrp, tax, currency, status, image_url, avg_rating, is_exchange_eligible, max_exchange_discount
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -76,6 +76,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 	err = tx.QueryRow(ctx, query,
 		p.StoreID, p.CategoryID, p.SKU, p.Name, p.Description,
 		p.Price, p.MRP, p.Tax, currency, p.Status, p.ImageURL, p.AvgRating,
+		p.IsExchangeEligible, p.MaxExchangeDiscount,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 
 	if err != nil {
@@ -167,7 +168,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 func (r *pgProductRepository) GetProductByID(ctx context.Context, id string) (*model.Product, error) {
 	query := `
-		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at
+		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
 		FROM products
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -176,6 +177,7 @@ func (r *pgProductRepository) GetProductByID(ctx context.Context, id string) (*m
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&p.ID, &p.StoreID, &p.CategoryID, &p.SKU, &p.Name, &p.Description,
 		&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.IsExchangeEligible, &p.MaxExchangeDiscount,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -287,7 +289,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 	}
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at
+		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
 		FROM products
 		WHERE %s
 		ORDER BY created_at DESC
@@ -308,6 +310,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 		err := rows.Scan(
 			&p.ID, &p.StoreID, &p.CategoryID, &p.SKU, &p.Name, &p.Description,
 			&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.IsExchangeEligible, &p.MaxExchangeDiscount,
 		)
 		if err != nil {
 			return nil, 0, appErrors.Internal(err, "failed to scan product row")
@@ -378,13 +381,13 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 
 	query := `
 		UPDATE products
-		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, updated_at = NOW()
-		WHERE id = $9 AND deleted_at IS NULL
+		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, is_exchange_eligible = $9, max_exchange_discount = $10, updated_at = NOW()
+		WHERE id = $11 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 
 	err = tx.QueryRow(ctx, query,
-		p.CategoryID, p.Name, p.Description, p.Price, p.MRP, p.Tax, p.Status, p.ImageURL, p.ID,
+		p.CategoryID, p.Name, p.Description, p.Price, p.MRP, p.Tax, p.Status, p.ImageURL, p.IsExchangeEligible, p.MaxExchangeDiscount, p.ID,
 	).Scan(&p.UpdatedAt)
 
 	if err != nil {

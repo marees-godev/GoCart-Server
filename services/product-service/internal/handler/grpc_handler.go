@@ -52,18 +52,20 @@ func (h *ProductGRPCHandler) CreateProduct(ctx context.Context, req *productpb.C
 	}
 
 	createReq := dto.CreateProductRequest{
-		StoreID:     req.StoreId,
-		CategoryID:  req.CategoryId,
-		SKU:         req.Sku,
-		Name:        name,
-		Description: req.Description,
-		Price:       req.Price,
-		MRP:         req.Mrp,
-		Tax:         req.Tax,
-		Status:      req.Status,
-		ImageURL:    req.ImageUrl,
-		Images:      req.Images,
-		Variants:    variants,
+		StoreID:             req.StoreId,
+		CategoryID:          req.CategoryId,
+		SKU:                 req.Sku,
+		Name:                name,
+		Description:         req.Description,
+		Price:               req.Price,
+		MRP:                 req.Mrp,
+		Tax:                 req.Tax,
+		Status:              req.Status,
+		ImageURL:            req.ImageUrl,
+		IsExchangeEligible:  req.IsExchangeEligible,
+		MaxExchangeDiscount: req.MaxExchangeDiscount,
+		Images:              req.Images,
+		Variants:            variants,
 	}
 
 	prod, err := h.productService.CreateProduct(ctx, createReq)
@@ -162,6 +164,12 @@ func (h *ProductGRPCHandler) UpdateProduct(ctx context.Context, req *productpb.U
 	}
 	if req.ImageUrl != nil {
 		updateReq.ImageURL = req.ImageUrl
+	}
+	if req.IsExchangeEligible != nil {
+		updateReq.IsExchangeEligible = req.IsExchangeEligible
+	}
+	if req.MaxExchangeDiscount != nil {
+		updateReq.MaxExchangeDiscount = req.MaxExchangeDiscount
 	}
 
 	if len(req.Variants) > 0 {

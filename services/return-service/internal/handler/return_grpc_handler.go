@@ -262,16 +262,14 @@ func (h *ReturnGRPCHandler) CreateExchange(ctx context.Context, req *returns.Cre
 	}
 
 	exc, err := h.svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           req.GetOrderId(),
-		OrderItemID:       req.GetOrderItemId(),
-		UserID:            req.GetUserId(),
-		NewProductID:      req.GetNewProductId(),
-		OldBrand:          req.GetOldBrand(),
-		OldModel:          req.GetOldModel(),
-		OldVariant:        req.GetOldVariant(),
-		SerialOrIMEI:      req.GetSerialOrImei(),
-		BaseExchangeValue: req.GetBaseExchangeValue(),
-		Answers:           answersDTO,
+		ProductID:               req.GetProductId(),
+		ExchangeDeviceCatalogID: req.GetExchangeDeviceCatalogId(),
+		UserID:                  req.GetUserId(),
+		OldBrand:                req.GetOldBrand(),
+		OldModel:                req.GetOldModel(),
+		OldVariant:              req.GetOldVariant(),
+		SerialOrIMEI:            req.GetSerialOrImei(),
+		Answers:                 answersDTO,
 	})
 	if err != nil {
 		return nil, mapErrorToGRPC(err)
@@ -329,6 +327,204 @@ func (h *ReturnGRPCHandler) VerifyExchangeProduct(ctx context.Context, req *retu
 	return &returns.VerifyExchangeProductResponse{
 		Exchange:     mapExchangeToProto(exc),
 		Verification: mapExchangeVerificationToProto(v),
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) GetExchangeQuestions(ctx context.Context, req *returns.GetExchangeQuestionsRequest) (*returns.GetExchangeQuestionsResponse, error) {
+	if req == nil {
+		req = &returns.GetExchangeQuestionsRequest{}
+	}
+
+	productID := ""
+	if req.ProductId != nil {
+		productID = *req.ProductId
+	}
+
+	questions, devices, err := h.svc.GetExchangeQuestions(ctx, &dto.GetExchangeQuestionsDTO{
+		CategoryCode: req.GetCategoryCode(),
+		ProductID:    productID,
+	})
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	protoQuestions := make([]*returns.ExchangeDiagnosticQuestion, 0, len(questions))
+	for _, q := range questions {
+		protoOpts := make([]*returns.ExchangeQuestionOption, 0, len(q.Options))
+		for _, opt := range q.Options {
+			protoOpts = append(protoOpts, &returns.ExchangeQuestionOption{
+				Id:                  opt.ID,
+				QuestionId:          opt.QuestionID,
+				OptionKey:           opt.OptionKey,
+				OptionLabel:         opt.OptionLabel,
+				DeductionAmount:     opt.DeductionAmount,
+				IsFatalDisqualifier: opt.IsFatalDisqualifier,
+				RejectionReason:     opt.RejectionReason,
+				DisplayOrder:        int32(opt.DisplayOrder),
+			})
+		}
+		protoQuestions = append(protoQuestions, &returns.ExchangeDiagnosticQuestion{
+			Id:           q.ID,
+			CategoryCode: q.CategoryCode,
+			QuestionKey:  q.QuestionKey,
+			QuestionText: q.QuestionText,
+			DisplayOrder: int32(q.DisplayOrder),
+			Options:      protoOpts,
+		})
+	}
+
+	protoDevices := make([]*returns.ExchangeDeviceOption, 0, len(devices))
+	for _, d := range devices {
+		protoDevices = append(protoDevices, &returns.ExchangeDeviceOption{
+			Id:                d.ID,
+			CategoryCode:      d.CategoryCode,
+			Brand:             d.Brand,
+			Model:             d.Model,
+			Variant:           d.Variant,
+			BaseExchangeValue: d.BaseExchangeValue,
+		})
+	}
+
+	return &returns.GetExchangeQuestionsResponse{
+		Questions: protoQuestions,
+		Devices:   protoDevices,
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) CalculateExchangeValuation(ctx context.Context, req *returns.CalculateExchangeValuationRequest) (*returns.CalculateExchangeValuationResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	dtoAnswers := make([]*dto.ExchangeUserAnswerDTO, 0, len(req.GetAnswers()))
+	for _, a := range req.GetAnswers() {
+		if a != nil {
+			dtoAnswers = append(dtoAnswers, &dto.ExchangeUserAnswerDTO{
+				QuestionKey: a.GetQuestionKey(),
+				OptionKey:   a.GetOptionKey(),
+			})
+		}
+	}
+
+	valRes, err := h.svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+		ProductID:    req.GetProductId(),
+		CategoryCode: req.GetCategoryCode(),
+		OldBrand:     req.GetOldBrand(),
+		OldModel:     req.GetOldModel(),
+		OldVariant:   req.GetOldVariant(),
+		Answers:      dtoAnswers,
+	})
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	protoDeductions := make([]*returns.ExchangeDeductionDetail, 0, len(valRes.Deductions))
+	for _, d := range valRes.Deductions {
+		protoDeductions = append(protoDeductions, &returns.ExchangeDeductionDetail{
+			QuestionKey:     d.QuestionKey,
+			OptionKey:       d.OptionKey,
+			DeductionAmount: d.DeductionAmount,
+			IsFatal:         d.IsFatal,
+			RejectionReason: d.RejectionReason,
+		})
+	}
+
+	return &returns.CalculateExchangeValuationResponse{
+		IsEligible:        valRes.IsEligible,
+		RejectionReason:   valRes.RejectionReason,
+		BaseExchangeValue: valRes.BaseExchangeValue,
+		TotalDeductions:   valRes.TotalDeductions,
+		FinalDiscount:     valRes.FinalDiscount,
+		Deductions:        protoDeductions,
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) LockExchangeQuote(ctx context.Context, req *returns.LockExchangeQuoteRequest) (*returns.LockExchangeQuoteResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	dtoAnswers := make([]*dto.ExchangeUserAnswerDTO, 0, len(req.GetAnswers()))
+	for _, a := range req.GetAnswers() {
+		if a != nil {
+			dtoAnswers = append(dtoAnswers, &dto.ExchangeUserAnswerDTO{
+				QuestionKey: a.GetQuestionKey(),
+				OptionKey:   a.GetOptionKey(),
+			})
+		}
+	}
+
+	quote, err := h.svc.LockExchangeQuote(ctx, &dto.LockExchangeQuoteDTO{
+		UserID:       req.GetUserId(),
+		ProductID:    req.GetProductId(),
+		CategoryCode: req.GetCategoryCode(),
+		OldBrand:     req.GetOldBrand(),
+		OldModel:     req.GetOldModel(),
+		OldVariant:   req.GetOldVariant(),
+		SerialOrIMEI: req.GetSerialOrImei(),
+		Answers:      dtoAnswers,
+	})
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	return &returns.LockExchangeQuoteResponse{
+		Quote: mapExchangeQuoteToProto(quote),
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) GetExchangeQuote(ctx context.Context, req *returns.GetExchangeQuoteRequest) (*returns.GetExchangeQuoteResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	quote, err := h.svc.GetExchangeQuote(ctx, req.GetId())
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	return &returns.GetExchangeQuoteResponse{
+		Quote: mapExchangeQuoteToProto(quote),
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) ApplyExchangeToOrder(ctx context.Context, req *returns.ApplyExchangeToOrderRequest) (*returns.ApplyExchangeToOrderResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	exc, err := h.svc.ApplyExchangeToOrder(ctx, &dto.ApplyExchangeToOrderDTO{
+		QuoteID:     req.GetQuoteId(),
+		OrderID:     req.GetOrderId(),
+		OrderItemID: req.GetOrderItemId(),
+		UserID:      req.GetUserId(),
+	})
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	return &returns.ApplyExchangeToOrderResponse{
+		Exchange: mapExchangeToProto(exc),
+	}, nil
+}
+
+func (h *ReturnGRPCHandler) ResolveExchangeMismatch(ctx context.Context, req *returns.ResolveExchangeMismatchRequest) (*returns.ResolveExchangeMismatchResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	exc, err := h.svc.ResolveExchangeMismatch(ctx, &dto.ResolveExchangeMismatchDTO{
+		ExchangeID:    req.GetExchangeId(),
+		Action:        req.GetAction(),
+		PaymentMethod: req.GetPaymentMethod(),
+		Notes:         req.GetNotes(),
+	})
+	if err != nil {
+		return nil, mapErrorToGRPC(err)
+	}
+
+	return &returns.ResolveExchangeMismatchResponse{
+		Exchange: mapExchangeToProto(exc),
 	}, nil
 }
 
@@ -401,11 +597,8 @@ func mapExchangeToProto(exc *model.Exchange) *returns.Exchange {
 	}
 
 	res := &returns.Exchange{
-		Id:                exc.ID,
-		OrderId:           exc.OrderID,
-		OrderItemId:       exc.OrderItemID,
-		UserId:            exc.UserID,
-		NewProductId:      exc.NewProductID,
+		Id:                      exc.ID,
+		UserId:                  exc.UserID,
 		OldBrand:          exc.OldBrand,
 		OldModel:          exc.OldModel,
 		OldVariant:        exc.OldVariant,
@@ -414,8 +607,11 @@ func mapExchangeToProto(exc *model.Exchange) *returns.Exchange {
 		EstimatedDiscount: exc.EstimatedDiscount,
 		FinalDiscount:     exc.FinalDiscount,
 		PriceDifference:   exc.PriceDifference,
-		Status:            string(exc.Status),
-		Answers:           protoAnswers,
+		Status:                  string(exc.Status),
+		QuoteId:                 exc.QuoteID,
+		ProductId:               exc.ProductID,
+		ExchangeDeviceCatalogId: exc.ExchangeDeviceCatalogID,
+		Answers:                 protoAnswers,
 		CreatedAt:         exc.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:         exc.UpdatedAt.Format(time.RFC3339),
 	}
@@ -425,6 +621,45 @@ func mapExchangeToProto(exc *model.Exchange) *returns.Exchange {
 	}
 
 	return res
+}
+
+func mapExchangeQuoteToProto(q *model.ExchangeQuote) *returns.ExchangeQuote {
+	if q == nil {
+		return nil
+	}
+
+	protoAnswers := make([]*returns.ExchangeQuoteAnswer, 0, len(q.Answers))
+	for _, a := range q.Answers {
+		protoAnswers = append(protoAnswers, &returns.ExchangeQuoteAnswer{
+			Id:              a.ID,
+			QuoteId:         a.QuoteID,
+			QuestionKey:     a.QuestionKey,
+			OptionKey:       a.OptionKey,
+			DeductionAmount: a.DeductionAmount,
+			IsFatal:         a.IsFatal,
+		})
+	}
+
+	return &returns.ExchangeQuote{
+		Id:                     q.ID,
+		UserId:                 q.UserID,
+		ProductId:              q.ProductID,
+		CategoryCode:           q.CategoryCode,
+		OldBrand:               q.OldBrand,
+		OldModel:               q.OldModel,
+		OldVariant:             q.OldVariant,
+		SerialOrImei:           q.SerialOrIMEI,
+		BaseExchangeValue:      q.BaseExchangeValue,
+		TotalDeductions:        q.TotalDeductions,
+		FinalDiscount:          q.FinalDiscount,
+		IsDisqualified:         q.IsDisqualified,
+		DisqualificationReason: q.DisqualificationReason,
+		Status:                 string(q.Status),
+		ExpiresAt:              q.ExpiresAt.Format(time.RFC3339),
+		Answers:                protoAnswers,
+		CreatedAt:              q.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:              q.UpdatedAt.Format(time.RFC3339),
+	}
 }
 
 func mapExchangeVerificationToProto(v *model.ExchangeVerification) *returns.ExchangeVerification {
@@ -469,36 +704,55 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrInvalidReturnType),
 		errors.Is(err, service.ErrMultipleItemsNotSupported),
 		errors.Is(err, service.ErrOrderItemMismatch),
-		errors.Is(err, service.ErrProofImagesRequired),
 		errors.Is(err, service.ErrVerifiedByRequired),
 		errors.Is(err, service.ErrRejectionReasonRequired),
 		errors.Is(err, service.ErrInvalidVerificationCondition),
 		errors.Is(err, service.ErrInvalidExchangeConditionRating),
 		errors.Is(err, service.ErrExchangeBrandModelRequired),
-		errors.Is(err, service.ErrExchangeNewProductRequired):
+		errors.Is(err, service.ErrExchangeProductIDRequired),
+		errors.Is(err, service.ErrExchangeDeviceCatalogIDRequired),
+		errors.Is(err, service.ErrExchangeProductRequired),
+		errors.Is(err, service.ErrUnknownExchangeQuestion),
+		errors.Is(err, service.ErrUnknownExchangeOption),
+		errors.Is(err, service.ErrDuplicateExchangeAnswer),
+		errors.Is(err, service.ErrMissingRequiredQuestion):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, service.ErrDuplicateReturnRequest):
 		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, service.ErrOrderNotDelivered),
 		errors.Is(err, service.ErrReturnWindowExpired),
 		errors.Is(err, service.ErrProductNotReturnable),
+		errors.Is(err, service.ErrProductNotExchangeEligible),
+		errors.Is(err, service.ErrProductCategoryNotExchangeable),
+		errors.Is(err, service.ErrSmallProductExchangeRestricted),
+		errors.Is(err, service.ErrExchangeDeviceInactive),
+		errors.Is(err, service.ErrIncompatibleExchangeCategory),
 		errors.Is(err, service.ErrReturnNotVerifiable),
 		errors.Is(err, service.ErrInvalidStateTransition),
 		errors.Is(err, service.ErrExchangeNotVerifiable),
-		errors.Is(err, service.ErrExchangeFunctionalRequired):
+		errors.Is(err, service.ErrExchangeFunctionalRequired),
+		errors.Is(err, service.ErrExchangeQuoteExpired),
+		errors.Is(err, service.ErrExchangeQuoteNotApplicable),
+		errors.Is(err, repository.ErrQuoteNotApplicable),
+		errors.Is(err, service.ErrExchangeDisqualified):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, service.ErrOrderItemNotFound),
 		errors.Is(err, service.ErrOrderNotFound),
 		errors.Is(err, service.ErrReturnNotFound),
 		errors.Is(err, repository.ErrReturnNotFound),
 		errors.Is(err, service.ErrExchangeNotFound),
-		errors.Is(err, repository.ErrExchangeNotFound):
+		errors.Is(err, repository.ErrExchangeNotFound),
+		errors.Is(err, service.ErrExchangeQuoteNotFound),
+		errors.Is(err, repository.ErrExchangeQuoteNotFound),
+		errors.Is(err, service.ErrExchangeDeviceNotFound),
+		errors.Is(err, service.ErrProductNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, service.ErrUnauthorizedReturnRequest),
 		errors.Is(err, service.ErrCustomerCannotReviewOwnReturn):
 		return status.Error(codes.PermissionDenied, err.Error())
+	case errors.Is(err, service.ErrProductServiceUnavailable):
+		return status.Error(codes.Unavailable, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
 }
-

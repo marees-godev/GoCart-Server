@@ -94,24 +94,29 @@ func MapProduct(p *productpb.Product) *model.Product {
 		imgURL = &p.ImageUrl
 	}
 
+	isExchangeEligible := p.IsExchangeEligible
+	maxExchangeDiscount := p.MaxExchangeDiscount
+
 	return &model.Product{
-		ID:          p.Id,
-		StoreID:     p.StoreId,
-		CategoryID:  p.CategoryId,
-		Sku:         p.Sku,
-		Name:        name,
-		Description: desc,
-		Price:       p.Price,
-		Mrp:         p.Mrp,
-		Tax:         p.Tax,
-		Status:      model.ProductStatus(p.Status),
-		ImageURL:    imgURL,
-		Images:      p.Images,
-		Variants:    MapProductVariants(p.Variants),
-		AvgRating:   p.AvgRating,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
-		DeletedAt:   deletedAt,
+		ID:                  p.Id,
+		StoreID:             p.StoreId,
+		CategoryID:          p.CategoryId,
+		Sku:                 p.Sku,
+		Name:                name,
+		Description:         desc,
+		Price:               p.Price,
+		Mrp:                 p.Mrp,
+		Tax:                 p.Tax,
+		Status:              model.ProductStatus(p.Status),
+		ImageURL:            imgURL,
+		Images:              p.Images,
+		Variants:            MapProductVariants(p.Variants),
+		AvgRating:           p.AvgRating,
+		IsExchangeEligible:  &isExchangeEligible,
+		MaxExchangeDiscount: &maxExchangeDiscount,
+		CreatedAt:           createdAt,
+		UpdatedAt:           updatedAt,
+		DeletedAt:           deletedAt,
 	}
 }
 

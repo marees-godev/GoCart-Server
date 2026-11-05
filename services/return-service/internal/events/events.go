@@ -206,19 +206,18 @@ func BuildReturnStatusUpdatedOutboxEvent(ret *model.Return, prevStatus, newStatu
 
 func BuildExchangeCreatedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
 	payload := map[string]interface{}{
-		"exchange_id":         exc.ID,
-		"order_id":            exc.OrderID,
-		"order_item_id":       exc.OrderItemID,
-		"user_id":             exc.UserID,
-		"new_product_id":      exc.NewProductID,
-		"old_brand":           exc.OldBrand,
-		"old_model":           exc.OldModel,
-		"old_variant":         exc.OldVariant,
-		"serial_or_imei":      exc.SerialOrIMEI,
-		"base_exchange_value": exc.BaseExchangeValue,
-		"estimated_discount":  exc.EstimatedDiscount,
-		"status":              string(exc.Status),
-		"created_at":          exc.CreatedAt,
+		"exchange_id":                exc.ID,
+		"product_id":                 exc.ProductID,
+		"exchange_device_catalog_id": exc.ExchangeDeviceCatalogID,
+		"user_id":                    exc.UserID,
+		"old_brand":                  exc.OldBrand,
+		"old_model":                  exc.OldModel,
+		"old_variant":                exc.OldVariant,
+		"serial_or_imei":             exc.SerialOrIMEI,
+		"base_exchange_value":        exc.BaseExchangeValue,
+		"estimated_discount":         exc.EstimatedDiscount,
+		"status":                     string(exc.Status),
+		"created_at":                 exc.CreatedAt,
 	}
 
 	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeCreated, SourceReturnService, exc.ID, payload)
@@ -240,10 +239,70 @@ func BuildExchangeCreatedOutboxEvent(exc *model.Exchange) (*outbox.Event, error)
 	}, nil
 }
 
+func BuildExchangeOfferAppliedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
+	payload := events.ExchangeOfferAppliedEvent{
+		ExchangeID:        exc.ID,
+		QuoteID:           exc.QuoteID,
+		UserID:            exc.UserID,
+		ProductID:         exc.ProductID,
+		OldBrand:          exc.OldBrand,
+		OldModel:          exc.OldModel,
+		OldVariant:        exc.OldVariant,
+		SerialOrIMEI:      exc.SerialOrIMEI,
+		BaseExchangeValue: exc.BaseExchangeValue,
+		DiscountAmount:    exc.EstimatedDiscount,
+		AppliedAt:         exc.CreatedAt,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeOfferApplied, SourceReturnService, exc.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "exchange",
+		AggregateID:   exc.ID,
+		EventType:     events.EventTypeExchangeOfferApplied,
+		Payload:       bytes,
+		Topic:         events.TopicExchangeOfferApplied,
+	}, nil
+}
+
+func BuildExchangeCompletedOutboxEvent(exc *model.Exchange) (*outbox.Event, error) {
+	payload := events.ExchangeCompletedEvent{
+		ExchangeID:    exc.ID,
+		UserID:        exc.UserID,
+		FinalDiscount: exc.FinalDiscount,
+		CompletedAt:   exc.UpdatedAt,
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeExchangeCompleted, SourceReturnService, exc.ID, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &outbox.Event{
+		AggregateType: "exchange",
+		AggregateID:   exc.ID,
+		EventType:     events.EventTypeExchangeCompleted,
+		Payload:       bytes,
+		Topic:         events.TopicExchangeCompleted,
+	}, nil
+}
+
 func BuildExchangeVerifiedOutboxEvent(exc *model.Exchange, v *model.ExchangeVerification) (*outbox.Event, error) {
 	payload := map[string]interface{}{
 		"exchange_id":       exc.ID,
-		"order_id":          exc.OrderID,
 		"verified_by":       v.VerifiedBy,
 		"condition_rating":  string(v.ConditionRating),
 		"is_approved":       v.IsApproved,

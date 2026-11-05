@@ -17,14 +17,14 @@ import (
 )
 
 type mockReturnService struct {
-	requestReturnFunc        func(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error)
-	getReturnFunc            func(ctx context.Context, id string) (*model.Return, error)
-	updateReturnStatusFunc   func(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error)
-	approveReturnFunc        func(ctx context.Context, id string, reviewerID string) (*model.Return, error)
-	rejectReturnFunc         func(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error)
-	verifyProductFunc        func(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error)
-	listReturnsFunc          func(ctx context.Context, req *dto.ListReturnsDTO) ([]*model.Return, int, error)
-	listReturnsByOrderIDFunc func(ctx context.Context, orderID string) ([]*model.Return, error)
+	requestReturnFunc         func(ctx context.Context, req *dto.RequestReturnDTO) (*model.Return, error)
+	getReturnFunc             func(ctx context.Context, id string) (*model.Return, error)
+	updateReturnStatusFunc    func(ctx context.Context, id string, status model.ReturnStatus, rejectionReason ...string) (*model.Return, error)
+	approveReturnFunc         func(ctx context.Context, id string, reviewerID string) (*model.Return, error)
+	rejectReturnFunc          func(ctx context.Context, id string, rejectionReason string, reviewerID string) (*model.Return, error)
+	verifyProductFunc         func(ctx context.Context, req *dto.VerifyProductDTO) (*model.Return, *model.ProductVerification, error)
+	listReturnsFunc           func(ctx context.Context, req *dto.ListReturnsDTO) ([]*model.Return, int, error)
+	listReturnsByOrderIDFunc  func(ctx context.Context, orderID string) ([]*model.Return, error)
 	createExchangeFunc        func(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error)
 	getExchangeFunc           func(ctx context.Context, id string) (*model.Exchange, error)
 	verifyExchangeProductFunc func(ctx context.Context, req *dto.VerifyExchangeProductDTO) (*model.Exchange, *model.ExchangeVerification, error)
@@ -113,6 +113,30 @@ func (m *mockReturnService) TriggerRefund(ctx context.Context, returnID string) 
 
 func (m *mockReturnService) ProcessRefund(ctx context.Context, returnID string) (*model.Return, error) {
 	return nil, nil
+}
+
+func (m *mockReturnService) GetExchangeQuestions(ctx context.Context, req *dto.GetExchangeQuestionsDTO) ([]*model.ExchangeDiagnosticQuestion, []*model.ExchangeDeviceCatalog, error) {
+	return nil, nil, nil
+}
+
+func (m *mockReturnService) CalculateExchangeValuation(ctx context.Context, req *dto.CalculateExchangeValuationDTO) (*dto.ExchangeValuationResultDTO, error) {
+	return &dto.ExchangeValuationResultDTO{IsEligible: true, BaseExchangeValue: 20000, FinalDiscount: 18000}, nil
+}
+
+func (m *mockReturnService) LockExchangeQuote(ctx context.Context, req *dto.LockExchangeQuoteDTO) (*model.ExchangeQuote, error) {
+	return &model.ExchangeQuote{ID: "quote-1", UserID: req.UserID, FinalDiscount: 18000, Status: model.ExchangeQuoteStatusLocked}, nil
+}
+
+func (m *mockReturnService) GetExchangeQuote(ctx context.Context, quoteID string) (*model.ExchangeQuote, error) {
+	return &model.ExchangeQuote{ID: quoteID, UserID: "u1", FinalDiscount: 18000, Status: model.ExchangeQuoteStatusLocked}, nil
+}
+
+func (m *mockReturnService) ApplyExchangeToOrder(ctx context.Context, req *dto.ApplyExchangeToOrderDTO) (*model.Exchange, error) {
+	return &model.Exchange{ID: "exc-1", UserID: req.UserID, FinalDiscount: 18000, Status: model.ExchangeStatusRequested}, nil
+}
+
+func (m *mockReturnService) ResolveExchangeMismatch(ctx context.Context, req *dto.ResolveExchangeMismatchDTO) (*model.Exchange, error) {
+	return &model.Exchange{ID: req.ExchangeID, Status: model.ExchangeStatusCompleted}, nil
 }
 
 func TestReturnGRPCHandler_RequestReturn_Success(t *testing.T) {
@@ -673,28 +697,27 @@ func TestReturnGRPCHandler_CreateExchange_Success(t *testing.T) {
 	svc := &mockReturnService{
 		createExchangeFunc: func(ctx context.Context, req *dto.CreateExchangeDTO) (*model.Exchange, error) {
 			return &model.Exchange{
-				ID:                "exc-101",
-				OrderID:           req.OrderID,
-				UserID:            req.UserID,
-				NewProductID:      req.NewProductID,
-				OldBrand:          req.OldBrand,
-				OldModel:          req.OldModel,
-				BaseExchangeValue: req.BaseExchangeValue,
-				EstimatedDiscount: 150.0,
-				Status:            model.ExchangeStatusOfferCreated,
-				CreatedAt:         now,
-				UpdatedAt:         now,
+				ID:                      "exc-101",
+				ProductID:               req.ProductID,
+				ExchangeDeviceCatalogID: req.ExchangeDeviceCatalogID,
+				UserID:                  req.UserID,
+				OldBrand:                req.OldBrand,
+				OldModel:                req.OldModel,
+				BaseExchangeValue:       200.0,
+				EstimatedDiscount:       150.0,
+				Status:                  model.ExchangeStatusOfferCreated,
+				CreatedAt:               now,
+				UpdatedAt:               now,
 			}, nil
 		},
 	}
 	h := handler.NewReturnGRPCHandler(svc, nil)
 	resp, err := h.CreateExchange(ctx, &returns.CreateExchangeRequest{
-		OrderId:           "order-101",
-		UserId:            "user-101",
-		NewProductId:      "prod-101",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 11",
-		BaseExchangeValue: 200.0,
+		ProductId:               "prod-101",
+		ExchangeDeviceCatalogId: "catalog-101",
+		UserId:                  "user-101",
+		OldBrand:                "Apple",
+		OldModel:                "iPhone 11",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -717,25 +740,25 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 				finalDiscount = *req.AdjustedDiscount
 			}
 			return &model.Exchange{
-					ID:            req.ExchangeID,
-					FinalDiscount: finalDiscount,
-					Status:        model.ExchangeStatusVerified,
-					CreatedAt:     now,
-					UpdatedAt:     now,
-				}, &model.ExchangeVerification{
-					ID:               "ver-202",
-					ExchangeID:       req.ExchangeID,
-					VerifiedBy:       req.VerifiedBy,
-					ConditionRating:  model.RatingGood,
-					IsApproved:       req.IsApproved,
-					ScreenIntact:     req.ScreenIntact,
-					Functional:       req.Functional,
-					SerialMatches:    req.SerialMatches,
-					AdjustedDiscount: finalDiscount,
-					VerifiedAt:       now,
-					CreatedAt:        now,
-					UpdatedAt:        now,
-				}, nil
+				ID:            req.ExchangeID,
+				FinalDiscount: finalDiscount,
+				Status:        model.ExchangeStatusVerified,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+			}, &model.ExchangeVerification{
+				ID:               "ver-202",
+				ExchangeID:       req.ExchangeID,
+				VerifiedBy:       req.VerifiedBy,
+				ConditionRating:  model.RatingGood,
+				IsApproved:       req.IsApproved,
+				ScreenIntact:     req.ScreenIntact,
+				Functional:       req.Functional,
+				SerialMatches:    req.SerialMatches,
+				AdjustedDiscount: finalDiscount,
+				VerifiedAt:       now,
+				CreatedAt:        now,
+				UpdatedAt:        now,
+			}, nil
 		},
 	}
 	h := handler.NewReturnGRPCHandler(svc, nil)
@@ -762,5 +785,3 @@ func TestReturnGRPCHandler_VerifyExchangeProduct_Success(t *testing.T) {
 		t.Errorf("expected verification to be approved")
 	}
 }
-
-

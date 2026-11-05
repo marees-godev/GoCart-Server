@@ -57,6 +57,8 @@ message Product {
   string deleted_at = 17;
   string image_url = 18;
   bool is_returnable = 19;
+  bool is_exchange_eligible = 20;
+  double max_exchange_discount = 21;
 }
 
 message GetProductRequest {
@@ -103,6 +105,8 @@ message CreateProductRequest {
   repeated CreateProductVariantInput variants = 11;
   string productname = 12;
   string image_url = 13;
+  bool is_exchange_eligible = 14;
+  double max_exchange_discount = 15;
 }
 
 message CreateProductResponse {
@@ -133,6 +137,8 @@ message UpdateProductRequest {
   repeated UpdateProductVariantInput variants = 10;
   optional string productname = 11;
   optional string image_url = 12;
+  optional bool is_exchange_eligible = 13;
+  optional double max_exchange_discount = 14;
 }
 
 message UpdateProductResponse {

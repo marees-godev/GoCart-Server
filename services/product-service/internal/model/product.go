@@ -26,24 +26,26 @@ const (
 )
 
 type Product struct {
-	ID          string           `json:"id" db:"id"`
-	StoreID     string           `json:"store_id" db:"store_id"`
-	CategoryID  string           `json:"category_id" db:"category_id"`
-	SKU         string           `json:"sku" db:"sku"`
-	Name        string           `json:"name" db:"name"`
-	Description string           `json:"description" db:"description"`
-	Price       float64          `json:"price" db:"price"`
-	MRP         float64          `json:"mrp" db:"mrp"`
-	Tax         float64          `json:"tax" db:"tax"`
-	Currency    string           `json:"currency" db:"currency"`
-	Status      ProductStatus    `json:"status" db:"status"`
-	ImageURL    string           `json:"image_url,omitempty" db:"image_url"`
-	AvgRating   float64          `json:"avg_rating" db:"avg_rating"`
-	Images      []ProductImage   `json:"images,omitempty"`
-	Variants    []ProductVariant `json:"variants,omitempty"`
-	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
-	DeletedAt   *time.Time       `json:"deleted_at,omitempty" db:"deleted_at"`
+	ID                  string           `json:"id" db:"id"`
+	StoreID             string           `json:"store_id" db:"store_id"`
+	CategoryID          string           `json:"category_id" db:"category_id"`
+	SKU                 string           `json:"sku" db:"sku"`
+	Name                string           `json:"name" db:"name"`
+	Description         string           `json:"description" db:"description"`
+	Price               float64          `json:"price" db:"price"`
+	MRP                 float64          `json:"mrp" db:"mrp"`
+	Tax                 float64          `json:"tax" db:"tax"`
+	Currency            string           `json:"currency" db:"currency"`
+	Status              ProductStatus    `json:"status" db:"status"`
+	ImageURL            string           `json:"image_url,omitempty" db:"image_url"`
+	AvgRating           float64          `json:"avg_rating" db:"avg_rating"`
+	IsExchangeEligible  bool             `json:"is_exchange_eligible" db:"is_exchange_eligible"`
+	MaxExchangeDiscount float64          `json:"max_exchange_discount" db:"max_exchange_discount"`
+	Images              []ProductImage   `json:"images,omitempty"`
+	Variants            []ProductVariant `json:"variants,omitempty"`
+	CreatedAt           time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at" db:"updated_at"`
+	DeletedAt           *time.Time       `json:"deleted_at,omitempty" db:"deleted_at"`
 }
 
 func (p *Product) ValidateForPublishing() error {

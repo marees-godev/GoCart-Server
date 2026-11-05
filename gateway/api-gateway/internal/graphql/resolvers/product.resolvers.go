@@ -98,6 +98,13 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		Variants:    variants,
 	}
 
+	if input.IsExchangeEligible != nil {
+		req.IsExchangeEligible = *input.IsExchangeEligible
+	}
+	if input.MaxExchangeDiscount != nil {
+		req.MaxExchangeDiscount = *input.MaxExchangeDiscount
+	}
+
 	resp, err := client.CreateProduct(ctx, req)
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -165,6 +172,13 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id string, input m
 		req.ImageUrl = input.ImageURL
 	} else if len(images) > 0 {
 		req.ImageUrl = &images[0]
+	}
+
+	if input.IsExchangeEligible != nil {
+		req.IsExchangeEligible = input.IsExchangeEligible
+	}
+	if input.MaxExchangeDiscount != nil {
+		req.MaxExchangeDiscount = input.MaxExchangeDiscount
 	}
 
 	if len(input.Variants) > 0 {

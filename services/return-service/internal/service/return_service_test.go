@@ -73,6 +73,7 @@ type mockReturnRepo struct {
 	returns      map[string]*model.Return
 	byOrderItem  map[string]*model.Return
 	exchanges    map[string]*model.Exchange
+	quotes       map[string]*model.ExchangeQuote
 	outboxEvents []*outbox.Event
 }
 
@@ -81,6 +82,7 @@ func newMockReturnRepo() *mockReturnRepo {
 		returns:      make(map[string]*model.Return),
 		byOrderItem:  make(map[string]*model.Return),
 		exchanges:    make(map[string]*model.Exchange),
+		quotes:       make(map[string]*model.ExchangeQuote),
 		outboxEvents: make([]*outbox.Event, 0),
 	}
 }
@@ -237,18 +239,6 @@ func (m *mockReturnRepo) GetExchangeByID(ctx context.Context, id string) (*model
 	return &cp, nil
 }
 
-func (m *mockReturnRepo) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, exc := range m.exchanges {
-		if exc.OrderID == orderID {
-			cp := *exc
-			return &cp, nil
-		}
-	}
-	return nil, repository.ErrExchangeNotFound
-}
-
 func (m *mockReturnRepo) CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -285,6 +275,114 @@ func (m *mockReturnRepo) GetExchangeQuestionAnswers(ctx context.Context, exchang
 		return nil, nil
 	}
 	return exc.Answers, nil
+}
+
+func (m *mockReturnRepo) ListExchangeDiagnosticQuestions(ctx context.Context, categoryCode string) ([]*model.ExchangeDiagnosticQuestion, error) {
+	return []*model.ExchangeDiagnosticQuestion{
+		{
+			ID: "q1", CategoryCode: "SMARTPHONE", QuestionKey: "powers_on", QuestionText: "Powers on?", DisplayOrder: 1,
+			Options: []*model.ExchangeQuestionOption{
+				{ID: "opt1", QuestionID: "q1", OptionKey: "yes", OptionLabel: "Yes", DeductionAmount: 0, IsFatalDisqualifier: false},
+				{ID: "opt2", QuestionID: "q1", OptionKey: "no", OptionLabel: "No", DeductionAmount: 0, IsFatalDisqualifier: true, RejectionReason: "Device does not power on"},
+			},
+		},
+		{
+			ID: "q2", CategoryCode: "SMARTPHONE", QuestionKey: "screen_cracks", QuestionText: "Cracks?", DisplayOrder: 2,
+			Options: []*model.ExchangeQuestionOption{
+				{ID: "opt3", QuestionID: "q2", OptionKey: "none", OptionLabel: "None", DeductionAmount: 0, IsFatalDisqualifier: false},
+				{ID: "opt4", QuestionID: "q2", OptionKey: "cracked", OptionLabel: "Cracked", DeductionAmount: 4000, IsFatalDisqualifier: false},
+			},
+		},
+	}, nil
+}
+
+func (m *mockReturnRepo) ListExchangeDeviceCatalog(ctx context.Context, categoryCode string) ([]*model.ExchangeDeviceCatalog, error) {
+	return []*model.ExchangeDeviceCatalog{
+		{ID: "d1", CategoryCode: "SMARTPHONE", Brand: "Apple", Model: "iPhone 13", Variant: "128GB", BaseExchangeValue: 26000, IsActive: true},
+	}, nil
+}
+
+func (m *mockReturnRepo) GetExchangeDeviceByModel(ctx context.Context, categoryCode, brand, modelName, variant string) (*model.ExchangeDeviceCatalog, error) {
+	return &model.ExchangeDeviceCatalog{
+		ID: "d1", CategoryCode: "SMARTPHONE", Brand: brand, Model: modelName, Variant: variant, BaseExchangeValue: 26000, IsActive: true,
+	}, nil
+}
+
+func (m *mockReturnRepo) GetExchangeDeviceCatalogByID(ctx context.Context, id string) (*model.ExchangeDeviceCatalog, error) {
+	if id == "d-inactive" {
+		return &model.ExchangeDeviceCatalog{
+			ID: id, CategoryCode: "SMARTPHONE", Brand: "Apple", Model: "iPhone 13", Variant: "128GB", BaseExchangeValue: 26000, IsActive: false,
+		}, nil
+	}
+	if id == "d-laptop" {
+		return &model.ExchangeDeviceCatalog{
+			ID: id, CategoryCode: "LAPTOP", Brand: "Apple", Model: "MacBook Air", Variant: "256GB", BaseExchangeValue: 35000, IsActive: true,
+		}, nil
+	}
+	if id == "d-notfound" || id == "invalid" {
+		return nil, nil
+	}
+	return &model.ExchangeDeviceCatalog{
+		ID: id, CategoryCode: "SMARTPHONE", Brand: "Apple", Model: "iPhone 13", Variant: "128GB", BaseExchangeValue: 26000, IsActive: true,
+	}, nil
+}
+
+func (m *mockReturnRepo) CreateExchangeQuote(ctx context.Context, quote *model.ExchangeQuote, answers []*model.ExchangeQuoteAnswer) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := *quote
+	cp.Answers = answers
+	m.quotes[quote.ID] = &cp
+	return nil
+}
+
+func (m *mockReturnRepo) GetExchangeQuoteByID(ctx context.Context, id string) (*model.ExchangeQuote, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if q, ok := m.quotes[id]; ok {
+		cp := *q
+		return &cp, nil
+	}
+	return &model.ExchangeQuote{
+		ID: id, UserID: "u1", ProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 22000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
+	}, nil
+}
+
+func (m *mockReturnRepo) UpdateExchangeQuoteStatus(ctx context.Context, id string, status model.ExchangeQuoteStatus) error {
+	return nil
+}
+
+func (m *mockReturnRepo) ApplyExchangeQuoteToOrderWithOutbox(ctx context.Context, exc *model.Exchange, quoteID string, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if quoteID != "" {
+		if q, ok := m.quotes[quoteID]; ok {
+			if q.UserID != exc.UserID || (q.Status != model.ExchangeQuoteStatusLocked && q.Status != model.ExchangeQuoteStatusQuoted) || q.ExpiresAt.Before(time.Now()) {
+				return repository.ErrQuoteNotApplicable
+			}
+			q.Status = model.ExchangeQuoteStatusApplied
+		}
+	}
+	cp := *exc
+	m.exchanges[exc.ID] = &cp
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
+}
+
+func (m *mockReturnRepo) UpdateExchangeStatusAndDiscountWithOutbox(ctx context.Context, exchangeID string, status model.ExchangeStatus, finalDiscount, priceDiff float64, outboxEvent *outbox.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if exc, ok := m.exchanges[exchangeID]; ok {
+		exc.Status = status
+		exc.FinalDiscount = finalDiscount
+		exc.PriceDifference = priceDiff
+	}
+	if outboxEvent != nil {
+		m.outboxEvents = append(m.outboxEvents, outboxEvent)
+	}
+	return nil
 }
 
 type mockOrderClient struct {
@@ -1547,22 +1645,18 @@ func TestReturnService_CreateExchange_SuccessAndCalculation(t *testing.T) {
 	repo := newMockReturnRepo()
 	prodClient := &mockProductClient{
 		product: &productpb.Product{
-			Id:    "new-prod-999",
-			Price: 799.0,
+			Id:                 "prod-123",
+			Name:               "Apple iPhone 15",
+			IsExchangeEligible: true,
+			Price:              799.0,
 		},
 	}
 	svc := service.NewReturnService(repo, nil, prodClient, 7)
 
 	req := &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		OrderItemID:       "item-456",
-		UserID:            "user-789",
-		NewProductID:      "new-prod-999",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		OldVariant:        "128GB",
-		SerialOrIMEI:      "354829104829104",
-		BaseExchangeValue: 300.0,
+		ProductID:               "prod-123",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 		Answers: []*dto.ExchangeAnswerDTO{
 			{QuestionKey: "SCREEN_CONDITION", AnswerValue: "MINOR_SCRATCHES", DeductionAmount: 30.0},
 			{QuestionKey: "BATTERY_HEALTH", AnswerValue: "NORMAL", DeductionAmount: 0.0},
@@ -1574,16 +1668,15 @@ func TestReturnService_CreateExchange_SuccessAndCalculation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected create exchange success, got err: %v", err)
 	}
-	if exc.BaseExchangeValue != 300.0 {
-		t.Errorf("expected base value 300, got: %f", exc.BaseExchangeValue)
+	if exc.BaseExchangeValue != 26000.0 {
+		t.Errorf("expected base value 26000, got: %f", exc.BaseExchangeValue)
 	}
-	// 300 - 30 - 20 = 250
-	if exc.EstimatedDiscount != 250.0 {
-		t.Errorf("expected estimated discount 250, got: %f", exc.EstimatedDiscount)
+	// 26000 - 30 - 20 = 25950
+	if exc.EstimatedDiscount != 25950.0 {
+		t.Errorf("expected estimated discount 25950, got: %f", exc.EstimatedDiscount)
 	}
-	// Price difference: 799 - 250 = 549
-	if exc.PriceDifference != 549.0 {
-		t.Errorf("expected price diff 549, got: %f", exc.PriceDifference)
+	if exc.PriceDifference != 0.0 {
+		t.Errorf("expected price diff 0, got: %f", exc.PriceDifference)
 	}
 	if exc.Status != model.ExchangeStatusOfferCreated {
 		t.Errorf("expected OFFER_CREATED, got: %s", exc.Status)
@@ -1591,85 +1684,176 @@ func TestReturnService_CreateExchange_SuccessAndCalculation(t *testing.T) {
 	if len(exc.Answers) != 3 {
 		t.Errorf("expected 3 answers, got: %d", len(exc.Answers))
 	}
+	if exc.ProductID != "prod-123" {
+		t.Errorf("expected product ID prod-123, got: %s", exc.ProductID)
+	}
+	if exc.ExchangeDeviceCatalogID != "d1" {
+		t.Errorf("expected catalog ID d1, got: %s", exc.ExchangeDeviceCatalogID)
+	}
 }
 
 func TestReturnService_CreateExchange_ValidationErrors(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockReturnRepo()
-	svc := service.NewReturnService(repo, nil, nil, 7)
+	smartphoneProduct := &productpb.Product{
+		Id:                 "prod-smart",
+		Name:               "Samsung Galaxy S23",
+		IsExchangeEligible: true,
+	}
+	svc := service.NewReturnService(repo, nil, &mockProductClient{product: smartphoneProduct}, 7)
 
 	// Missing user
 	_, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:      "order-1",
-		NewProductID: "prod-1",
-		OldBrand:     "Brand",
-		OldModel:     "Model",
+		ProductID:               "prod-smart",
+		ExchangeDeviceCatalogID: "d1",
 	})
 	if !errors.Is(err, service.ErrUserIDRequired) {
 		t.Errorf("expected ErrUserIDRequired, got: %v", err)
 	}
 
-	// Missing order
+	// Missing productId
 	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		UserID:       "user-1",
-		NewProductID: "prod-1",
-		OldBrand:     "Brand",
-		OldModel:     "Model",
+		UserID:                  "user-1",
+		ExchangeDeviceCatalogID: "d1",
 	})
-	if !errors.Is(err, service.ErrOrderIDRequired) {
-		t.Errorf("expected ErrOrderIDRequired, got: %v", err)
+	if !errors.Is(err, service.ErrExchangeProductIDRequired) {
+		t.Errorf("expected ErrExchangeProductIDRequired, got: %v", err)
 	}
 
-	// Missing new product
+	// Missing exchangeDeviceCatalogId
 	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		UserID:   "user-1",
-		OrderID:  "order-1",
-		OldBrand: "Brand",
-		OldModel: "Model",
+		UserID:    "user-1",
+		ProductID: "prod-smart",
 	})
-	if !errors.Is(err, service.ErrExchangeNewProductRequired) {
-		t.Errorf("expected ErrExchangeNewProductRequired, got: %v", err)
+	if !errors.Is(err, service.ErrExchangeDeviceCatalogIDRequired) {
+		t.Errorf("expected ErrExchangeDeviceCatalogIDRequired, got: %v", err)
 	}
 
-	// Missing brand/model
+	// Device catalog not found
 	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		UserID:       "user-1",
-		OrderID:      "order-1",
-		NewProductID: "prod-1",
+		UserID:                  "user-1",
+		ProductID:               "prod-smart",
+		ExchangeDeviceCatalogID: "d-notfound",
 	})
-	if !errors.Is(err, service.ErrExchangeBrandModelRequired) {
-		t.Errorf("expected ErrExchangeBrandModelRequired, got: %v", err)
+	if !errors.Is(err, service.ErrExchangeDeviceNotFound) {
+		t.Errorf("expected ErrExchangeDeviceNotFound, got: %v", err)
 	}
 
-	// Order client configured: order not found
-	svcWithOrder := service.NewReturnService(repo, &mockOrderClient{order: nil}, nil, 7)
-	_, err = svcWithOrder.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		UserID:       "user-1",
-		OrderID:      "order-1",
-		NewProductID: "prod-1",
-		OldBrand:     "Brand",
-		OldModel:     "Model",
+	// Inactive device catalog entry
+	_, err = svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-smart",
+		ExchangeDeviceCatalogID: "d-inactive",
 	})
-	if !errors.Is(err, service.ErrOrderNotFound) {
-		t.Errorf("expected ErrOrderNotFound, got: %v", err)
+	if !errors.Is(err, service.ErrExchangeDeviceInactive) {
+		t.Errorf("expected ErrExchangeDeviceInactive, got: %v", err)
 	}
 
-	// Order client configured: order belongs to another customer
-	svcWithOtherUser := service.NewReturnService(repo, &mockOrderClient{
-		order: &orderpb.Order{
-			Id:     "order-1",
-			UserId: "user-different",
+	// Product not found
+	svcNotFound := service.NewReturnService(repo, nil, &mockProductClient{product: nil}, 7)
+	_, err = svcNotFound.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-missing",
+		ExchangeDeviceCatalogID: "d1",
+	})
+	if !errors.Is(err, service.ErrProductNotFound) {
+		t.Errorf("expected ErrProductNotFound, got: %v", err)
+	}
+
+	// Product not eligible for exchange
+	svcIneligible := service.NewReturnService(repo, nil, &mockProductClient{
+		product: &productpb.Product{
+			Id:                 "prod-ineligible",
+			Name:               "iPhone 14",
+			IsExchangeEligible: false,
 		},
-	}, nil, 7)
-	_, err = svcWithOtherUser.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		UserID:       "user-1",
-		OrderID:      "order-1",
-		NewProductID: "prod-1",
-		OldBrand:     "Brand",
-		OldModel:     "Model",
+	}, 7)
+	_, err = svcIneligible.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-ineligible",
+		ExchangeDeviceCatalogID: "d1",
 	})
-	if !errors.Is(err, service.ErrUnauthorizedReturnRequest) {
-		t.Errorf("expected ErrUnauthorizedReturnRequest, got: %v", err)
+	if !errors.Is(err, service.ErrProductNotExchangeEligible) {
+		t.Errorf("expected ErrProductNotExchangeEligible, got: %v", err)
+	}
+
+	// Small electronics restriction: Charger
+	svcCharger := service.NewReturnService(repo, nil, &mockProductClient{
+		product: &productpb.Product{
+			Id:                 "prod-charger",
+			Name:               "20W USB-C Fast Charger",
+			IsExchangeEligible: true,
+		},
+	}, 7)
+	_, err = svcCharger.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-charger",
+		ExchangeDeviceCatalogID: "d1",
+	})
+	if !errors.Is(err, service.ErrSmallProductExchangeRestricted) {
+		t.Errorf("expected ErrSmallProductExchangeRestricted for charger, got: %v", err)
+	}
+
+	// Small electronics restriction: AirPods
+	svcAirPods := service.NewReturnService(repo, nil, &mockProductClient{
+		product: &productpb.Product{
+			Id:                 "prod-airpods",
+			Name:               "Apple AirPods Pro 2",
+			IsExchangeEligible: true,
+		},
+	}, 7)
+	_, err = svcAirPods.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-airpods",
+		ExchangeDeviceCatalogID: "d1",
+	})
+	if !errors.Is(err, service.ErrSmallProductExchangeRestricted) {
+		t.Errorf("expected ErrSmallProductExchangeRestricted for AirPods, got: %v", err)
+	}
+
+	// Small electronics restriction: Watch
+	svcWatch := service.NewReturnService(repo, nil, &mockProductClient{
+		product: &productpb.Product{
+			Id:                 "prod-watch",
+			Name:               "Apple Watch Series 9",
+			IsExchangeEligible: true,
+		},
+	}, 7)
+	_, err = svcWatch.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-watch",
+		ExchangeDeviceCatalogID: "d1",
+	})
+	if !errors.Is(err, service.ErrSmallProductExchangeRestricted) {
+		t.Errorf("expected ErrSmallProductExchangeRestricted for Watch, got: %v", err)
+	}
+
+	// Product category not exchangeable: Laptop
+	svcLaptop := service.NewReturnService(repo, nil, &mockProductClient{
+		product: &productpb.Product{
+			Id:                 "prod-laptop",
+			Name:               "MacBook Pro 14",
+			IsExchangeEligible: true,
+		},
+	}, 7)
+	_, err = svcLaptop.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-laptop",
+		ExchangeDeviceCatalogID: "d1",
+	})
+	if !errors.Is(err, service.ErrProductCategoryNotExchangeable) {
+		t.Errorf("expected ErrProductCategoryNotExchangeable for Laptop, got: %v", err)
+	}
+
+	// Incompatible category: Smartphone exchanging for Laptop device catalog entry
+	svcIncompatible := service.NewReturnService(repo, nil, &mockProductClient{product: smartphoneProduct}, 7)
+	_, err = svcIncompatible.CreateExchange(ctx, &dto.CreateExchangeDTO{
+		UserID:                  "user-1",
+		ProductID:               "prod-smart",
+		ExchangeDeviceCatalogID: "d-laptop",
+	})
+	if !errors.Is(err, service.ErrIncompatibleExchangeCategory) {
+		t.Errorf("expected ErrIncompatibleExchangeCategory, got: %v", err)
 	}
 }
 
@@ -1679,19 +1863,16 @@ func TestReturnService_VerifyExchangeProduct_Success(t *testing.T) {
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Samsung",
-		OldModel:          "Galaxy S21",
-		BaseExchangeValue: 200.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 	if err != nil {
 		t.Fatalf("failed create exchange: %v", err)
 	}
 
 	// Verify product approved
-	adjDiscount := 200.0
+	adjDiscount := 26000.0
 	verifiedExc, v, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
 		ExchangeID:       exc.ID,
 		VerifiedBy:       "delivery-partner-1",
@@ -1725,12 +1906,9 @@ func TestReturnService_VerifyExchangeProduct_ZeroAdjustedDiscountAllowed(t *test
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 500.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 	if err != nil {
 		t.Fatalf("failed create exchange: %v", err)
@@ -1772,12 +1950,9 @@ func TestReturnService_VerifyExchangeProduct_OmittedDiscountUsesEstimated(t *tes
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, err := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Apple",
-		OldModel:          "iPhone 12",
-		BaseExchangeValue: 500.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 	if err != nil {
 		t.Fatalf("failed create exchange: %v", err)
@@ -1815,12 +1990,9 @@ func TestReturnService_VerifyExchangeProduct_Disapproved(t *testing.T) {
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Samsung",
-		OldModel:          "Galaxy S21",
-		BaseExchangeValue: 200.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 
 	// Verify product disapproved
@@ -1854,12 +2026,9 @@ func TestReturnService_VerifyExchangeProduct_NonFunctionalCannotBeApproved(t *te
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Samsung",
-		OldModel:          "Galaxy S21",
-		BaseExchangeValue: 200.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 
 	// Attempting to approve non-functional device
@@ -1882,12 +2051,9 @@ func TestReturnService_VerifyExchangeProduct_InvalidConditionRating(t *testing.T
 	svc := service.NewReturnService(repo, nil, nil, 7)
 
 	exc, _ := svc.CreateExchange(ctx, &dto.CreateExchangeDTO{
-		OrderID:           "order-123",
-		UserID:            "user-789",
-		NewProductID:      "prod-999",
-		OldBrand:          "Samsung",
-		OldModel:          "Galaxy S21",
-		BaseExchangeValue: 200.0,
+		ProductID:               "prod-smart-1",
+		ExchangeDeviceCatalogID: "d1",
+		UserID:                  "user-789",
 	})
 
 	_, _, err := svc.VerifyExchangeProduct(ctx, &dto.VerifyExchangeProductDTO{
