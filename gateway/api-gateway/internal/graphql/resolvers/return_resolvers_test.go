@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql"
-	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
-	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
@@ -1164,38 +1162,6 @@ func TestExchangeQuery_Forbidden_OtherUser(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected forbidden error for other user, got nil")
 	}
-}
-
-type mockOrderClientForReturnTest struct {
-	orderpb.OrderServiceClient
-	order *orderpb.Order
-	err   error
-}
-
-func (m *mockOrderClientForReturnTest) GetOrder(ctx context.Context, in *orderpb.GetOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.GetOrderResponse, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.order != nil && m.order.Id == in.Id {
-		return &orderpb.GetOrderResponse{Order: m.order}, nil
-	}
-	return nil, appErrors.NotFound("order not found")
-}
-
-type mockDeliveryClientForReturnTest struct {
-	deliverypb.DeliveryServiceClient
-	delivery *deliverypb.Delivery
-	err      error
-}
-
-func (m *mockDeliveryClientForReturnTest) GetDeliveryByOrder(ctx context.Context, in *deliverypb.GetDeliveryByOrderRequest, opts ...grpcPkg.CallOption) (*deliverypb.GetDeliveryResponse, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.delivery != nil && m.delivery.OrderId == in.OrderId {
-		return &deliverypb.GetDeliveryResponse{Delivery: m.delivery}, nil
-	}
-	return nil, appErrors.NotFound("delivery not found")
 }
 
 type mockStoreClientForReturnTest struct {
