@@ -39,9 +39,9 @@ type FlagRatingInput struct {
 }
 
 type FlaggedRatingItem struct {
-	Rating *model.Rating `json:"rating"`
-	FlagCount int32 `json:"flag_count"`
-	Flags []*model.RatingFlag `json:"flags"`
+	Rating    *model.Rating       `json:"rating"`
+	FlagCount int32               `json:"flag_count"`
+	Flags     []*model.RatingFlag `json:"flags"`
 }
 
 type GetFlaggedRatingsInput struct {
@@ -52,6 +52,6 @@ type GetFlaggedRatingsInput struct {
 
 type ModerateRatingInput struct {
 	RatingId string `json:"rating_id"`
-	AdminId string `json:"admin_id"`
-	IsHidden bool `json:"is_hidden"`
+	AdminId  string `json:"admin_id"`
+	IsHidden bool   `json:"is_hidden"`
 }

@@ -383,7 +383,7 @@ func (s *ratingService) ModerateRatings(ctx context.Context, input dto.ModerateR
 		return appErrors.Unauthorized("unauthenticated: admin_id is required")
 	}
 
-	err := s.repo.ModerateRatings(ctx,input.IsHidden,input.RatingId)
+	err := s.repo.ModerateRatings(ctx, input.IsHidden, input.RatingId)
 	if err != nil {
 		if errors.Is(err, repository.ErrRatingNotFound) {
 			return appErrors.NotFound("rating not found")
@@ -392,9 +392,9 @@ func (s *ratingService) ModerateRatings(ctx context.Context, input dto.ModerateR
 		return appErrors.Internal(err, "failed to moderate rating")
 	}
 
-	s.log.Info("Rating moderated by admin", 
-    "rating_id", input.RatingId, 
-    "is_hidden", input.IsHidden,
+	s.log.Info("Rating moderated by admin",
+		"rating_id", input.RatingId,
+		"is_hidden", input.IsHidden,
 	)
 
 	return nil

@@ -1,4 +1,4 @@
-package repository
+﻿package repository
 
 import (
 	"context"
@@ -242,12 +242,18 @@ func (r *RatingRepo) DeleteRating(ctx context.Context, id string) error {
 
 func (r *RatingRepo) CreateFlag(ctx context.Context, flagRating *model.RatingFlag) error {
 
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	updateQuery := `
 		UPDATE ratings
 		SET is_flagged = true, updated_at = NOW()
 		WHERE id = $1 AND is_hidden = false AND deleted_at IS NULL`
-	
-	tag, err := r.db.Pool.Exec(ctx, updateQuery, flagRating.RatingID)
+
+	tag, err := tx.Exec(ctx, updateQuery, flagRating.RatingID)
 	if err != nil {
 		return fmt.Errorf("failed to update flag in rating: %w", err)
 	}
@@ -263,7 +269,7 @@ func (r *RatingRepo) CreateFlag(ctx context.Context, flagRating *model.RatingFla
 		)
 		RETURNING id, created_at; `
 
-	err = r.db.Pool.QueryRow(
+	err = tx.QueryRow(
 		ctx,
 		insertQuery,
 		flagRating.RatingID,
@@ -278,6 +284,10 @@ func (r *RatingRepo) CreateFlag(ctx context.Context, flagRating *model.RatingFla
 			return ErrRatingAlreadyExists
 		}
 		return fmt.Errorf("failed to insert rating: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -306,7 +316,7 @@ func (r *RatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset int32)
 			r.created_at, r.updated_at,
 			f.id, f.user_id, f.rating_id, f.category, f.reason, f.created_at
 		FROM ratings r
-		INNER JOIN rating_flags f ON r.id = f.rating_id
+		INNER JOIN rating_flags f ON r.id = f.rating_id AND f.deleted_at IS NULL
 		WHERE r.is_flagged = true AND r.is_hidden = false AND r.deleted_at IS NULL
 		ORDER BY r.created_at DESC, f.created_at DESC
 		LIMIT $1 OFFSET $2
@@ -358,20 +368,40 @@ func (r *RatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset int32)
 
 func (r *RatingRepo) ModerateRatings(ctx context.Context, isHidden bool, ratingID string) error {
 
-	updateQuery := `UPDATE ratings
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	updateRatingQuery := `
+		UPDATE ratings
 		SET is_hidden = $1,
 		    is_flagged = CASE WHEN $1 = false THEN false ELSE is_flagged END,
 		    updated_at = NOW()
 		WHERE id = $2 AND deleted_at IS NULL`
-		
-	
-	tag, err := r.db.Pool.Exec(ctx, updateQuery, isHidden, ratingID)
+
+	tag, err := tx.Exec(ctx, updateRatingQuery, isHidden, ratingID)
 	if err != nil {
 		return fmt.Errorf("failed to update hidden status: %w", err)
 	}
 
 	if tag.RowsAffected() == 0 {
 		return ErrRatingNotFound
+	}
+
+	deleteFlagQuery := `
+		UPDATE rating_flags
+		SET deleted_at = NOW()
+		WHERE rating_id = $1 AND deleted_at IS NULL
+	`
+
+	if _, err := tx.Exec(ctx, deleteFlagQuery, ratingID); err != nil {
+		return fmt.Errorf("failed to soft delete rating flags: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

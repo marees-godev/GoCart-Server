@@ -1,10 +1,14 @@
-CREATE TYPE flag_category AS ENUM (
-    'SPAM',
-    'INAPPROPRIATE_CONTENT',
-    'FAKE_REVIEW',
-    'IRRELEVANT',
-    'OTHER'
-);
+DO $$ BEGIN
+    CREATE TYPE flag_category AS ENUM (
+        'SPAM',
+        'INAPPROPRIATE_CONTENT',
+        'FAKE_REVIEW',
+        'IRRELEVANT',
+        'OTHER'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS rating_flags (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -13,6 +17,7 @@ CREATE TABLE IF NOT EXISTS rating_flags (
     category flag_category NOT NULL DEFAULT 'SPAM',
     reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at TIMESTAMPTZ DEFAULT NULL,
     UNIQUE(rating_id, user_id)
 );
 

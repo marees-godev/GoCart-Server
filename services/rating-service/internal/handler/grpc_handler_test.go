@@ -143,7 +143,7 @@ func (m *mockRatingService) ModerateRatings(ctx context.Context, input dto.Moder
 		return appErrors.Unauthorized("unauthenticated: admin_id is required")
 	}
 
-	r,ok := m.ratings[input.RatingId]
+	r, ok := m.ratings[input.RatingId]
 	if !ok {
 		return appErrors.NotFound("rating not found")
 	}
@@ -265,14 +265,14 @@ func TestRatingGRPCHandler(t *testing.T) {
 
 	t.Run("ModerateRatings RPC", func(t *testing.T) {
 
-		_,err := h.ModerateRatings(ctx, nil)
+		_, err := h.ModerateRatings(ctx, nil)
 		if status.Code(err) != codes.InvalidArgument {
-			t.Errorf("expected InvalidArgument for nil request, got %v",err)
+			t.Errorf("expected InvalidArgument for nil request, got %v", err)
 		}
 
 		_, err = h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
 			RatingId: uuid.New().String(),
-			AdminId: "admin-101",
+			AdminId:  "admin-101",
 			IsHidden: true,
 		})
 		if status.Code(err) != codes.NotFound {
@@ -281,19 +281,19 @@ func TestRatingGRPCHandler(t *testing.T) {
 
 		hideResp, err := h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
 			RatingId: ratingID,
-			AdminId: "admin-101",
+			AdminId:  "admin-101",
 			IsHidden: true,
 		})
 		if err != nil {
-			t.Fatalf("ModerateRatings hide failed: %v",err)
+			t.Fatalf("ModerateRatings hide failed: %v", err)
 		}
 		if !hideResp.GetSuccess() || hideResp.GetMessage() != "Rating hidden successfully" {
-			t.Errorf("unexpected hide response: %+v",hideResp)
+			t.Errorf("unexpected hide response: %+v", hideResp)
 		}
 
 		unhideResp, err := h.ModerateRatings(ctx, &ratingpb.ModerateRatingRequest{
 			RatingId: ratingID,
-			AdminId: "admin-101",
+			AdminId:  "admin-101",
 			IsHidden: false,
 		})
 		if err != nil {

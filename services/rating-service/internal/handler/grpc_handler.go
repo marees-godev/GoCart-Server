@@ -225,9 +225,9 @@ func (h *RatingGRPCHandler) ModerateRatings(ctx context.Context, req *ratingpb.M
 		return nil, status.Error(codes.InvalidArgument, "request must not be nil")
 	}
 
-	err := h.service.ModerateRatings(ctx,dto.ModerateRatingInput{
+	err := h.service.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: req.RatingId,
-		AdminId: req.AdminId,
+		AdminId:  req.AdminId,
 		IsHidden: req.IsHidden,
 	})
 

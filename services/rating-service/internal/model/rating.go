@@ -25,4 +25,5 @@ type RatingFlag struct {
 	Category  string    `json:"category" db:"category"`
 	Reason    string    `json:"reason" db:"reason"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
 }

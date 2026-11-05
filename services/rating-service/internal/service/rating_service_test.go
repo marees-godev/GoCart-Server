@@ -27,7 +27,7 @@ type mockRatingRepo struct {
 func newMockRatingRepo() *mockRatingRepo {
 	return &mockRatingRepo{
 		ratings: make(map[string]*model.Rating),
-		flags: make(map[string]*model.RatingFlag),
+		flags:   make(map[string]*model.RatingFlag),
 	}
 }
 
@@ -688,7 +688,7 @@ func TestRatingService_FlagRating(t *testing.T) {
 func TestRatingService_GetFlaggedRatings(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{},nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
 
 	// 1. Missing admin ID
 	_, _, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
@@ -696,33 +696,33 @@ func TestRatingService_GetFlaggedRatings(t *testing.T) {
 	})
 
 	if err == nil || !strings.Contains(err.Error(), "admin_id is required") {
-		t.Errorf("expected admin_id required error, got: %v",err)
+		t.Errorf("expected admin_id required error, got: %v", err)
 	}
 
 	// 2. Success with flagged rating
 	r, err := repo.CreateRating(ctx, &model.Rating{
-		UserID: uuid.New().String(),
-		ProductID: uuid.New().String(),
-		OrderID: uuid.New().String(),
+		UserID:      uuid.New().String(),
+		ProductID:   uuid.New().String(),
+		OrderID:     uuid.New().String(),
 		OrderItemID: uuid.New().String(),
-		Rating: 5,
-		Review: "Spam product",
+		Rating:      5,
+		Review:      "Spam product",
 	})
 	if err != nil {
-		t.Fatalf("failed to create rating: %v",err)
+		t.Fatalf("failed to create rating: %v", err)
 	}
 
 	_ = repo.CreateFlag(ctx, &model.RatingFlag{
 		RatingID: r.ID,
-		UserID: uuid.New().String(),
+		UserID:   uuid.New().String(),
 		Category: "SPAM",
-		Reason: "Bot link",
+		Reason:   "Bot link",
 	})
 
-	items, total, err := svc.GetFlaggedRatings(ctx , dto.GetFlaggedRatingsInput{
+	items, total, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
 		AdminId: "admin-101",
-		Limit: 10,
-		Offset: 0,
+		Limit:   10,
+		Offset:  0,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error fetching flagged ratings: %v", err)
@@ -740,43 +740,43 @@ func TestRatingService_GetFlaggedRatings(t *testing.T) {
 func TestRatingService_ModerateRatings(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{},nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
 
 	// 1. Missing rating ID
 	err := svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: "",
-		AdminId: "admin-101",
+		AdminId:  "admin-101",
 		IsHidden: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "rating id is required") {
-		t.Fatalf("expected 'rating id is required', got: %v",err)
+		t.Fatalf("expected 'rating id is required', got: %v", err)
 	}
 
 	// 2. Invalid UUID format
 	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: "invalid-uuid",
-		AdminId: "admin-101",
+		AdminId:  "admin-101",
 		IsHidden: true,
 	})
 
 	if err == nil || !strings.Contains(err.Error(), "invalid rating id format") {
-		t.Fatalf("expected 'invalid rating id format', got: %v",err)
+		t.Fatalf("expected 'invalid rating id format', got: %v", err)
 	}
 
 	// 3. Missing Admin ID
 	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: uuid.New().String(),
-		AdminId: "",
+		AdminId:  "",
 		IsHidden: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "admin_id is required") {
-		t.Fatalf("expected 'admin_id is required', got: %v",err)
+		t.Fatalf("expected 'admin_id is required', got: %v", err)
 	}
 
 	// 4. Rating Not Found
 	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: uuid.New().String(),
-		AdminId: "admin-101",
+		AdminId:  "admin-101",
 		IsHidden: true,
 	})
 	if err == nil || !strings.Contains(err.Error(), "rating not found") {
@@ -785,12 +785,12 @@ func TestRatingService_ModerateRatings(t *testing.T) {
 
 	// 5. Success: Hide Rating
 	r, err := repo.CreateRating(ctx, &model.Rating{
-		UserID: uuid.New().String(),
-		ProductID: uuid.New().String(),
-		OrderID: uuid.New().String(),
+		UserID:      uuid.New().String(),
+		ProductID:   uuid.New().String(),
+		OrderID:     uuid.New().String(),
 		OrderItemID: uuid.New().String(),
-		Rating: 4,
-		Review: "Questionable review",
+		Rating:      4,
+		Review:      "Questionable review",
 	})
 	if err != nil {
 		t.Fatalf("failed to create rating: %v", err)
@@ -798,18 +798,18 @@ func TestRatingService_ModerateRatings(t *testing.T) {
 
 	_ = repo.CreateFlag(ctx, &model.RatingFlag{
 		RatingID: r.ID,
-		UserID: uuid.New().String(),
+		UserID:   uuid.New().String(),
 		Category: "INAPPROPRIATE_CONTENT",
-		Reason: "Bad words",
+		Reason:   "Bad words",
 	})
 
-	err  = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
+	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: r.ID,
-		AdminId: "admin-101",
+		AdminId:  "admin-101",
 		IsHidden: true,
 	})
 	if err != nil {
-		t.Fatalf("unexpected error moderating rating: %v",err)
+		t.Fatalf("unexpected error moderating rating: %v", err)
 	}
 
 	flagged, total, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
@@ -819,13 +819,13 @@ func TestRatingService_ModerateRatings(t *testing.T) {
 		t.Fatalf("unexpected error fetching flagged ratings: %v", err)
 	}
 	if total != 0 || len(flagged) != 0 {
-		t.Fatalf("expected 0 flagged rating after hiding, got: %v",err)
+		t.Fatalf("expected 0 flagged rating after hiding, got: %v", err)
 	}
 
 	// 6. Success: Unhide and clear flag
 	err = svc.ModerateRatings(ctx, dto.ModerateRatingInput{
 		RatingId: r.ID,
-		AdminId: "admin-101",
+		AdminId:  "admin-101",
 		IsHidden: false,
 	})
 	if err != nil {
