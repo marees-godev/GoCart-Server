@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -105,7 +106,7 @@ func LoadEnv() *Config {
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
-			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+			MigrationsPath: resolveMigrationsPath(GetEnv("DB_MIGRATIONS_PATH", "./migrations")),
 		},
 		Kafka: KafkaConfig{
 			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
@@ -187,4 +188,25 @@ func GetEnvAsStringSlice(key string, defaultValue []string) []string {
 		}
 	}
 	return res
+}
+
+func resolveMigrationsPath(configuredPath string) string {
+	if entries, err := os.ReadDir(configuredPath); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+				return configuredPath
+			}
+		}
+	}
+
+	serviceMigrations := filepath.Join("services", "return-service", "migrations")
+	if entries, err := os.ReadDir(serviceMigrations); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+				return serviceMigrations
+			}
+		}
+	}
+
+	return configuredPath
 }

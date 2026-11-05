@@ -7,6 +7,7 @@ type ExchangeStatus string
 const (
 	ExchangeStatusOfferCreated       ExchangeStatus = "OFFER_CREATED"
 	ExchangeStatusAppliedAtCheckout ExchangeStatus = "APPLIED_AT_CHECKOUT"
+	ExchangeStatusRequested         ExchangeStatus = "EXCHANGE_REQUESTED"
 	ExchangeStatusPickupScheduled   ExchangeStatus = "PICKUP_SCHEDULED"
 	ExchangeStatusPickedUp          ExchangeStatus = "PICKED_UP"
 	ExchangeStatusVerified          ExchangeStatus = "VERIFIED"
@@ -17,9 +18,9 @@ const (
 
 func (s ExchangeStatus) IsValid() bool {
 	switch s {
-	case ExchangeStatusOfferCreated, ExchangeStatusAppliedAtCheckout, ExchangeStatusPickupScheduled,
-		ExchangeStatusPickedUp, ExchangeStatusVerified, ExchangeStatusRevaluated,
-		ExchangeStatusCompleted, ExchangeStatusCancelled:
+	case ExchangeStatusOfferCreated, ExchangeStatusAppliedAtCheckout, ExchangeStatusRequested,
+		ExchangeStatusPickupScheduled, ExchangeStatusPickedUp, ExchangeStatusVerified,
+		ExchangeStatusRevaluated, ExchangeStatusCompleted, ExchangeStatusCancelled:
 		return true
 	default:
 		return false
@@ -29,15 +30,23 @@ func (s ExchangeStatus) IsValid() bool {
 var AllowedExchangeTransitions = map[ExchangeStatus][]ExchangeStatus{
 	ExchangeStatusOfferCreated: {
 		ExchangeStatusAppliedAtCheckout,
+		ExchangeStatusRequested,
 		ExchangeStatusCancelled,
 	},
 	ExchangeStatusAppliedAtCheckout: {
+		ExchangeStatusRequested,
+		ExchangeStatusPickupScheduled,
+		ExchangeStatusPickedUp,
+		ExchangeStatusCancelled,
+	},
+	ExchangeStatusRequested: {
 		ExchangeStatusPickupScheduled,
 		ExchangeStatusPickedUp,
 		ExchangeStatusCancelled,
 	},
 	ExchangeStatusPickupScheduled: {
 		ExchangeStatusPickedUp,
+		ExchangeStatusVerified,
 		ExchangeStatusCancelled,
 	},
 	ExchangeStatusPickedUp: {
@@ -121,10 +130,7 @@ type ExchangeVerification struct {
 
 type Exchange struct {
 	ID                string                    `json:"id" db:"id"`
-	OrderID           string                    `json:"order_id" db:"order_id"`
-	OrderItemID       string                    `json:"order_item_id" db:"order_item_id"`
 	UserID            string                    `json:"user_id" db:"user_id"`
-	NewProductID      string                    `json:"new_product_id" db:"new_product_id"`
 	OldBrand          string                    `json:"old_brand" db:"old_brand"`
 	OldModel          string                    `json:"old_model" db:"old_model"`
 	OldVariant        string                    `json:"old_variant,omitempty" db:"old_variant"`
@@ -134,6 +140,9 @@ type Exchange struct {
 	FinalDiscount     float64                   `json:"final_discount" db:"final_discount"`
 	PriceDifference   float64                   `json:"price_difference" db:"price_difference"`
 	Status            ExchangeStatus            `json:"status" db:"status"`
+	QuoteID           string                    `json:"quote_id,omitempty" db:"quote_id"`
+	ProductID         string                    `json:"product_id,omitempty" db:"product_id"`
+	ExchangeDeviceCatalogID string              `json:"exchange_device_catalog_id,omitempty" db:"exchange_device_catalog_id"`
 	Answers           []*ExchangeQuestionAnswer `json:"answers,omitempty"`
 	Verification      *ExchangeVerification     `json:"verification,omitempty"`
 	CreatedAt         time.Time                 `json:"created_at" db:"created_at"`

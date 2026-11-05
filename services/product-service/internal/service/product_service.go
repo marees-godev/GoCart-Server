@@ -234,20 +234,22 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 	}
 
 	product := &model.Product{
-		StoreID:     req.StoreID,
-		CategoryID:  req.CategoryID,
-		SKU:         req.SKU,
-		Name:        name,
-		Description: req.Description,
-		Price:       req.Price,
-		MRP:         req.MRP,
-		Tax:         req.Tax,
-		Currency:    "USD",
-		Status:      prodStatus,
-		ImageURL:    imgURL,
-		AvgRating:   0.00,
-		Images:      images,
-		Variants:    variants,
+		StoreID:             req.StoreID,
+		CategoryID:          req.CategoryID,
+		SKU:                 req.SKU,
+		Name:                name,
+		Description:         req.Description,
+		Price:               req.Price,
+		MRP:                 req.MRP,
+		Tax:                 req.Tax,
+		Currency:            "USD",
+		Status:              prodStatus,
+		ImageURL:            imgURL,
+		AvgRating:           0.00,
+		IsExchangeEligible:  req.IsExchangeEligible,
+		MaxExchangeDiscount: req.MaxExchangeDiscount,
+		Images:              images,
+		Variants:            variants,
 	}
 
 	if prodStatus == model.StatusPublished {
@@ -341,6 +343,13 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 		existing.ImageURL = s.processImageDataURL(ctx, *req.ImageURL, "products")
 	}
 
+	if req.IsExchangeEligible != nil {
+		existing.IsExchangeEligible = *req.IsExchangeEligible
+	}
+	if req.MaxExchangeDiscount != nil {
+		existing.MaxExchangeDiscount = *req.MaxExchangeDiscount
+	}
+
 	if len(req.Images) > 0 {
 		newImages := make([]model.ProductImage, 0, len(req.Images))
 		for i, raw := range req.Images {
@@ -412,8 +421,8 @@ func (s *productService) DeleteProduct(ctx context.Context, id string) error {
 			}
 			if stResp.Store.MerchantId != user.UserID {
 				return appErrors.Forbidden("merchant does not own this product's store")
-			} 
-			
+			}
+
 		}
 	}
 
