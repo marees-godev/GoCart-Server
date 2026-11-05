@@ -246,7 +246,7 @@ func (r *RatingRepo) CreateFlag(ctx context.Context, flagRating *model.RatingFla
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	updateQuery := `
 		UPDATE ratings
@@ -372,7 +372,7 @@ func (r *RatingRepo) ModerateRatings(ctx context.Context, isHidden bool, ratingI
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	updateRatingQuery := `
 		UPDATE ratings
