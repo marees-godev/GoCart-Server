@@ -117,10 +117,7 @@ type ExchangeVerification {
 
 type Exchange {
   id: ID!
-  orderId: String
-  orderItemId: String
   userId: String!
-  newProductId: String
   productId: String
   exchangeDeviceCatalogId: String
   oldBrand: String!
@@ -226,7 +223,7 @@ type ExchangeQuoteAnswer {
 type ExchangeQuote {
   id: ID!
   userId: String!
-  newProductId: String!
+  productId: String!
   categoryCode: String!
   oldBrand: String!
   oldModel: String!
@@ -255,7 +252,7 @@ input ExchangeUserAnswerInput {
 }
 
 input CalculateExchangeValuationInput {
-  newProductId: String!
+  productId: String!
   categoryCode: String
   oldBrand: String!
   oldModel: String!
@@ -264,7 +261,7 @@ input CalculateExchangeValuationInput {
 }
 
 input LockExchangeQuoteInput {
-  newProductId: String!
+  productId: String!
   categoryCode: String
   oldBrand: String!
   oldModel: String!
@@ -309,4 +306,3 @@ extend type Mutation {
   applyExchangeToOrder(input: ApplyExchangeToOrderInput!): Exchange! @auth
   resolveExchangeMismatch(input: ResolveExchangeMismatchInput!): Exchange! @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
-

@@ -170,10 +170,9 @@ message ExchangeVerification {
 
 message Exchange {
   string id = 1;
-  string order_id = 2;
-  string order_item_id = 3;
+  reserved 2, 3, 5;
+  reserved "order_id", "order_item_id", "new_product_id";
   string user_id = 4;
-  string new_product_id = 5;
   string old_brand = 6;
   string old_model = 7;
   string old_variant = 8;
@@ -289,7 +288,7 @@ message ExchangeDeductionDetail {
 }
 
 message CalculateExchangeValuationRequest {
-  string new_product_id = 1;
+  string product_id = 1;
   string category_code = 2;
   string old_brand = 3;
   string old_model = 4;
@@ -318,7 +317,7 @@ message ExchangeQuoteAnswer {
 message ExchangeQuote {
   string id = 1;
   string user_id = 2;
-  string new_product_id = 3;
+  string product_id = 3;
   string category_code = 4;
   string old_brand = 5;
   string old_model = 6;
@@ -338,7 +337,7 @@ message ExchangeQuote {
 
 message LockExchangeQuoteRequest {
   string user_id = 1;
-  string new_product_id = 2;
+  string product_id = 2;
   string category_code = 3;
   string old_brand = 4;
   string old_model = 5;
@@ -380,4 +379,3 @@ message ResolveExchangeMismatchRequest {
 message ResolveExchangeMismatchResponse {
   Exchange exchange = 1;
 }
-

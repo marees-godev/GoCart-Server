@@ -8,6 +8,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -28,6 +29,16 @@ type mockReturnClient struct {
 	lastCreateExcReq *returnpb.CreateExchangeRequest
 	lastGetExcReq    *returnpb.GetExchangeRequest
 	lastVerifyExcReq *returnpb.VerifyExchangeProductRequest
+	getExcResp       *returnpb.GetExchangeResponse
+}
+
+type mockProductClientForReturnTest struct {
+	productpb.ProductServiceClient
+	product *productpb.Product
+}
+
+func (m *mockProductClientForReturnTest) GetProduct(ctx context.Context, in *productpb.GetProductRequest, opts ...grpcPkg.CallOption) (*productpb.GetProductResponse, error) {
+	return &productpb.GetProductResponse{Product: m.product}, nil
 }
 
 func (m *mockReturnClient) RequestReturn(ctx context.Context, in *returnpb.RequestReturnRequest, opts ...grpcPkg.CallOption) (*returnpb.RequestReturnResponse, error) {
@@ -179,13 +190,14 @@ func (m *mockReturnClient) CreateExchange(ctx context.Context, in *returnpb.Crea
 
 func (m *mockReturnClient) GetExchange(ctx context.Context, in *returnpb.GetExchangeRequest, opts ...grpcPkg.CallOption) (*returnpb.GetExchangeResponse, error) {
 	m.lastGetExcReq = in
+	if m.getExcResp != nil {
+		return m.getExcResp, nil
+	}
 	return &returnpb.GetExchangeResponse{
 		Exchange: &returnpb.Exchange{
 			Id:                "exc-100",
-			OrderId:           "order-1",
-			OrderItemId:       "item-1",
 			UserId:            "user-123",
-			NewProductId:      "prod-2",
+			ProductId:         "prod-2",
 			OldBrand:          "Apple",
 			OldModel:          "iPhone 13",
 			BaseExchangeValue: 300.0,
@@ -204,10 +216,7 @@ func (m *mockReturnClient) VerifyExchangeProduct(ctx context.Context, in *return
 	return &returnpb.VerifyExchangeProductResponse{
 		Exchange: &returnpb.Exchange{
 			Id:                in.ExchangeId,
-			OrderId:           "order-1",
-			OrderItemId:       "item-1",
 			UserId:            "user-123",
-			NewProductId:      "prod-2",
 			OldBrand:          "Apple",
 			OldModel:          "iPhone 13",
 			BaseExchangeValue: 300.0,
@@ -1226,10 +1235,9 @@ func TestExchangeQuery_Admin_Bypass(t *testing.T) {
 
 func TestExchangeQuery_Merchant_Forbidden_UnauthorizedOrder(t *testing.T) {
 	mockClient := &mockReturnClient{}
-	orderMock := &mockOrderClientForReturnTest{
-		order: &orderpb.Order{
-			Id:      "order-1",
-			UserId:  "customer-1",
+	prodMock := &mockProductClientForReturnTest{
+		product: &productpb.Product{
+			Id:      "prod-2",
 			StoreId: "store-other",
 		},
 	}
@@ -1240,9 +1248,9 @@ func TestExchangeQuery_Merchant_Forbidden_UnauthorizedOrder(t *testing.T) {
 		},
 	}
 	clients := &grpc.Clients{
-		ReturnClient: mockClient,
-		OrderClient:  orderMock,
-		StoreClient:  storeMock,
+		ReturnClient:  mockClient,
+		ProductClient: prodMock,
+		StoreClient:   storeMock,
 	}
 	resolver := NewResolver(clients)
 
@@ -1260,10 +1268,9 @@ func TestExchangeQuery_Merchant_Forbidden_UnauthorizedOrder(t *testing.T) {
 
 func TestExchangeQuery_Merchant_Success_OwnStoreOrder(t *testing.T) {
 	mockClient := &mockReturnClient{}
-	orderMock := &mockOrderClientForReturnTest{
-		order: &orderpb.Order{
-			Id:      "order-1",
-			UserId:  "customer-1",
+	prodMock := &mockProductClientForReturnTest{
+		product: &productpb.Product{
+			Id:      "prod-2",
 			StoreId: "store-100",
 		},
 	}
@@ -1274,9 +1281,9 @@ func TestExchangeQuery_Merchant_Success_OwnStoreOrder(t *testing.T) {
 		},
 	}
 	clients := &grpc.Clients{
-		ReturnClient: mockClient,
-		OrderClient:  orderMock,
-		StoreClient:  storeMock,
+		ReturnClient:  mockClient,
+		ProductClient: prodMock,
+		StoreClient:   storeMock,
 	}
 	resolver := NewResolver(clients)
 
@@ -1297,17 +1304,10 @@ func TestExchangeQuery_Merchant_Success_OwnStoreOrder(t *testing.T) {
 
 func TestExchangeQuery_Merchant_Success_ItemStoreMatch(t *testing.T) {
 	mockClient := &mockReturnClient{}
-	orderMock := &mockOrderClientForReturnTest{
-		order: &orderpb.Order{
-			Id:      "order-1",
-			UserId:  "customer-1",
-			StoreId: "store-other",
-			Items: []*orderpb.OrderItem{
-				{
-					Id:      "item-1",
-					StoreId: "store-100",
-				},
-			},
+	prodMock := &mockProductClientForReturnTest{
+		product: &productpb.Product{
+			Id:      "prod-2",
+			StoreId: "store-100",
 		},
 	}
 	storeMock := &mockStoreClientForReturnTest{
@@ -1317,9 +1317,9 @@ func TestExchangeQuery_Merchant_Success_ItemStoreMatch(t *testing.T) {
 		},
 	}
 	clients := &grpc.Clients{
-		ReturnClient: mockClient,
-		OrderClient:  orderMock,
-		StoreClient:  storeMock,
+		ReturnClient:  mockClient,
+		ProductClient: prodMock,
+		StoreClient:   storeMock,
 	}
 	resolver := NewResolver(clients)
 
@@ -1339,16 +1339,20 @@ func TestExchangeQuery_Merchant_Success_ItemStoreMatch(t *testing.T) {
 }
 
 func TestExchangeQuery_DeliveryPartner_Forbidden_Unassigned(t *testing.T) {
-	mockClient := &mockReturnClient{}
-	delMock := &mockDeliveryClientForReturnTest{
-		delivery: &deliverypb.Delivery{
-			OrderId:         "order-1",
-			DeliveryPartner: "partner-other",
+	mockClient := &mockReturnClient{
+		getExcResp: &returnpb.GetExchangeResponse{
+			Exchange: &returnpb.Exchange{
+				Id:        "exc-100",
+				UserId:    "customer-1",
+				ProductId: "prod-2",
+				Verification: &returnpb.ExchangeVerification{
+					VerifiedBy: "partner-other",
+				},
+			},
 		},
 	}
 	clients := &grpc.Clients{
-		ReturnClient:   mockClient,
-		DeliveryClient: delMock,
+		ReturnClient: mockClient,
 	}
 	resolver := NewResolver(clients)
 
@@ -1365,16 +1369,20 @@ func TestExchangeQuery_DeliveryPartner_Forbidden_Unassigned(t *testing.T) {
 }
 
 func TestExchangeQuery_DeliveryPartner_Success_AssignedDelivery(t *testing.T) {
-	mockClient := &mockReturnClient{}
-	delMock := &mockDeliveryClientForReturnTest{
-		delivery: &deliverypb.Delivery{
-			OrderId:         "order-1",
-			DeliveryPartner: "partner-1",
+	mockClient := &mockReturnClient{
+		getExcResp: &returnpb.GetExchangeResponse{
+			Exchange: &returnpb.Exchange{
+				Id:        "exc-100",
+				UserId:    "customer-1",
+				ProductId: "prod-2",
+				Verification: &returnpb.ExchangeVerification{
+					VerifiedBy: "partner-1",
+				},
+			},
 		},
 	}
 	clients := &grpc.Clients{
-		ReturnClient:   mockClient,
-		DeliveryClient: delMock,
+		ReturnClient: mockClient,
 	}
 	resolver := NewResolver(clients)
 
@@ -1444,5 +1452,4 @@ func (m *mockReturnClientWithVerifiedBy) GetExchange(ctx context.Context, in *re
 	}
 	return resp, nil
 }
-
 

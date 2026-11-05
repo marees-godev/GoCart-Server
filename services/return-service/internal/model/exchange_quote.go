@@ -68,7 +68,7 @@ type ExchangeQuoteAnswer struct {
 type ExchangeQuote struct {
 	ID                     string                 `json:"id" db:"id"`
 	UserID                 string                 `json:"user_id" db:"user_id"`
-	NewProductID           string                 `json:"new_product_id" db:"new_product_id"`
+	ProductID              string                 `json:"product_id" db:"product_id"`
 	CategoryCode           string                 `json:"category_code" db:"category_code"`
 	OldBrand               string                 `json:"old_brand" db:"old_brand"`
 	OldModel               string                 `json:"old_model" db:"old_model"`
@@ -89,4 +89,3 @@ type ExchangeQuote struct {
 func (q *ExchangeQuote) IsExpired(now time.Time) bool {
 	return now.After(q.ExpiresAt)
 }
-

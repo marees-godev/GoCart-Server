@@ -473,7 +473,7 @@ type ExchangeOfferAppliedEvent struct {
 	OrderID           string    `json:"order_id"`
 	OrderItemID       string    `json:"order_item_id"`
 	UserID            string    `json:"user_id"`
-	NewProductID      string    `json:"new_product_id"`
+	ProductID         string    `json:"product_id"`
 	OldBrand          string    `json:"old_brand"`
 	OldModel          string    `json:"old_model"`
 	OldVariant        string    `json:"old_variant,omitempty"`
@@ -509,4 +509,3 @@ type ExchangeCompletedEvent struct {
 	FinalDiscount float64   `json:"final_discount"`
 	CompletedAt   time.Time `json:"completed_at"`
 }
-

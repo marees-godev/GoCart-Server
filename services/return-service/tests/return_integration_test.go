@@ -174,18 +174,6 @@ func (m *inMemReturnRepo) GetExchangeByID(ctx context.Context, id string) (*mode
 	return &cp, nil
 }
 
-func (m *inMemReturnRepo) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, exc := range m.exchanges {
-		if exc.OrderID == orderID {
-			cp := *exc
-			return &cp, nil
-		}
-	}
-	return nil, repository.ErrExchangeNotFound
-}
-
 func (m *inMemReturnRepo) CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -260,7 +248,7 @@ func (m *inMemReturnRepo) CreateExchangeQuote(ctx context.Context, quote *model.
 
 func (m *inMemReturnRepo) GetExchangeQuoteByID(ctx context.Context, id string) (*model.ExchangeQuote, error) {
 	return &model.ExchangeQuote{
-		ID: id, UserID: "u1", NewProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 26000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
+		ID: id, UserID: "u1", ProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 26000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
 	}, nil
 }
 

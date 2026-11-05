@@ -239,18 +239,6 @@ func (m *mockReturnRepo) GetExchangeByID(ctx context.Context, id string) (*model
 	return &cp, nil
 }
 
-func (m *mockReturnRepo) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, exc := range m.exchanges {
-		if exc.OrderID == orderID {
-			cp := *exc
-			return &cp, nil
-		}
-	}
-	return nil, repository.ErrExchangeNotFound
-}
-
 func (m *mockReturnRepo) CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -356,7 +344,7 @@ func (m *mockReturnRepo) GetExchangeQuoteByID(ctx context.Context, id string) (*
 		return &cp, nil
 	}
 	return &model.ExchangeQuote{
-		ID: id, UserID: "u1", NewProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 22000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
+		ID: id, UserID: "u1", ProductID: "p1", CategoryCode: "SMARTPHONE", OldBrand: "Apple", OldModel: "iPhone 13", BaseExchangeValue: 26000, FinalDiscount: 22000, Status: model.ExchangeQuoteStatusLocked, ExpiresAt: time.Now().UTC().Add(30 * time.Minute),
 	}, nil
 }
 
@@ -367,6 +355,14 @@ func (m *mockReturnRepo) UpdateExchangeQuoteStatus(ctx context.Context, id strin
 func (m *mockReturnRepo) ApplyExchangeQuoteToOrderWithOutbox(ctx context.Context, exc *model.Exchange, quoteID string, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if quoteID != "" {
+		if q, ok := m.quotes[quoteID]; ok {
+			if q.UserID != exc.UserID || (q.Status != model.ExchangeQuoteStatusLocked && q.Status != model.ExchangeQuoteStatusQuoted) || q.ExpiresAt.Before(time.Now()) {
+				return repository.ErrQuoteNotApplicable
+			}
+			q.Status = model.ExchangeQuoteStatusApplied
+		}
+	}
 	cp := *exc
 	m.exchanges[exc.ID] = &cp
 	if outboxEvent != nil {

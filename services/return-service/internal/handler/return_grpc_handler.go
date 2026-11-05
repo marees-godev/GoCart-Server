@@ -407,7 +407,7 @@ func (h *ReturnGRPCHandler) CalculateExchangeValuation(ctx context.Context, req 
 	}
 
 	valRes, err := h.svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
-		NewProductID: req.GetNewProductId(),
+		ProductID:    req.GetProductId(),
 		CategoryCode: req.GetCategoryCode(),
 		OldBrand:     req.GetOldBrand(),
 		OldModel:     req.GetOldModel(),
@@ -456,7 +456,7 @@ func (h *ReturnGRPCHandler) LockExchangeQuote(ctx context.Context, req *returns.
 
 	quote, err := h.svc.LockExchangeQuote(ctx, &dto.LockExchangeQuoteDTO{
 		UserID:       req.GetUserId(),
-		NewProductID: req.GetNewProductId(),
+		ProductID:    req.GetProductId(),
 		CategoryCode: req.GetCategoryCode(),
 		OldBrand:     req.GetOldBrand(),
 		OldModel:     req.GetOldModel(),
@@ -597,11 +597,8 @@ func mapExchangeToProto(exc *model.Exchange) *returns.Exchange {
 	}
 
 	res := &returns.Exchange{
-		Id:                exc.ID,
-		OrderId:           exc.OrderID,
-		OrderItemId:       exc.OrderItemID,
-		UserId:            exc.UserID,
-		NewProductId:      exc.NewProductID,
+		Id:                      exc.ID,
+		UserId:                  exc.UserID,
 		OldBrand:          exc.OldBrand,
 		OldModel:          exc.OldModel,
 		OldVariant:        exc.OldVariant,
@@ -646,7 +643,7 @@ func mapExchangeQuoteToProto(q *model.ExchangeQuote) *returns.ExchangeQuote {
 	return &returns.ExchangeQuote{
 		Id:                     q.ID,
 		UserId:                 q.UserID,
-		NewProductId:           q.NewProductID,
+		ProductId:              q.ProductID,
 		CategoryCode:           q.CategoryCode,
 		OldBrand:               q.OldBrand,
 		OldModel:               q.OldModel,
@@ -714,7 +711,11 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrExchangeBrandModelRequired),
 		errors.Is(err, service.ErrExchangeProductIDRequired),
 		errors.Is(err, service.ErrExchangeDeviceCatalogIDRequired),
-		errors.Is(err, service.ErrExchangeNewProductRequired):
+		errors.Is(err, service.ErrExchangeProductRequired),
+		errors.Is(err, service.ErrUnknownExchangeQuestion),
+		errors.Is(err, service.ErrUnknownExchangeOption),
+		errors.Is(err, service.ErrDuplicateExchangeAnswer),
+		errors.Is(err, service.ErrMissingRequiredQuestion):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, service.ErrDuplicateReturnRequest):
 		return status.Error(codes.AlreadyExists, err.Error())
@@ -732,6 +733,7 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrExchangeFunctionalRequired),
 		errors.Is(err, service.ErrExchangeQuoteExpired),
 		errors.Is(err, service.ErrExchangeQuoteNotApplicable),
+		errors.Is(err, repository.ErrQuoteNotApplicable),
 		errors.Is(err, service.ErrExchangeDisqualified):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, service.ErrOrderItemNotFound),
@@ -741,12 +743,15 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrExchangeNotFound),
 		errors.Is(err, repository.ErrExchangeNotFound),
 		errors.Is(err, service.ErrExchangeQuoteNotFound),
+		errors.Is(err, repository.ErrExchangeQuoteNotFound),
 		errors.Is(err, service.ErrExchangeDeviceNotFound),
 		errors.Is(err, service.ErrProductNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, service.ErrUnauthorizedReturnRequest),
 		errors.Is(err, service.ErrCustomerCannotReviewOwnReturn):
 		return status.Error(codes.PermissionDenied, err.Error())
+	case errors.Is(err, service.ErrProductServiceUnavailable):
+		return status.Error(codes.Unavailable, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

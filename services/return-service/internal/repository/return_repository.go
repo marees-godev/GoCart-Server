@@ -16,8 +16,10 @@ import (
 )
 
 var (
-	ErrReturnNotFound   = errors.New("return request not found")
-	ErrExchangeNotFound = errors.New("exchange record not found")
+	ErrReturnNotFound        = errors.New("return request not found")
+	ErrExchangeNotFound      = errors.New("exchange record not found")
+	ErrExchangeQuoteNotFound = errors.New("exchange quote not found")
+	ErrQuoteNotApplicable    = errors.New("exchange quote cannot be applied in its current status or has expired")
 )
 
 type ReturnRepository interface {
@@ -33,7 +35,6 @@ type ReturnRepository interface {
 
 	CreateExchangeWithOutbox(ctx context.Context, exc *model.Exchange, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error
 	GetExchangeByID(ctx context.Context, id string) (*model.Exchange, error)
-	GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error)
 	CreateExchangeVerificationWithOutbox(ctx context.Context, v *model.ExchangeVerification, newStatus model.ExchangeStatus, finalDiscount float64, outboxEvents ...*outbox.Event) error
 	GetExchangeVerification(ctx context.Context, exchangeID string) (*model.ExchangeVerification, error)
 	GetExchangeQuestionAnswers(ctx context.Context, exchangeID string) ([]*model.ExchangeQuestionAnswer, error)
@@ -493,18 +494,6 @@ func (r *returnRepository) CreateExchangeWithOutbox(ctx context.Context, exc *mo
 		if exc.QuoteID != "" {
 			quoteUUID = &exc.QuoteID
 		}
-		var newProdUUID *string
-		if exc.NewProductID != "" {
-			newProdUUID = &exc.NewProductID
-		}
-		var orderUUID *string
-		if exc.OrderID != "" {
-			orderUUID = &exc.OrderID
-		}
-		var orderItemUUID *string
-		if exc.OrderItemID != "" {
-			orderItemUUID = &exc.OrderItemID
-		}
 		var productUUID *string
 		if exc.ProductID != "" {
 			productUUID = &exc.ProductID
@@ -515,19 +504,19 @@ func (r *returnRepository) CreateExchangeWithOutbox(ctx context.Context, exc *mo
 		}
 		query := `
 			INSERT INTO exchanges (
-				id, order_id, order_item_id, user_id, new_product_id,
+				id, user_id,
 				old_brand, old_model, old_variant, serial_or_imei,
 				base_exchange_value, estimated_discount, final_discount, price_difference,
 				status, quote_id, product_id, exchange_device_catalog_id, created_at, updated_at
 			) VALUES (
-				$1, $2, $3, $4, $5,
-				$6, $7, $8, $9,
-				$10, $11, $12, $13,
-				$14, $15, $16, $17, $18, $19
+				$1, $2,
+				$3, $4, $5, $6,
+				$7, $8, $9, $10,
+				$11, $12, $13, $14, $15, $16
 			)
 		`
 		_, err := tx.Exec(ctx, query,
-			exc.ID, orderUUID, orderItemUUID, exc.UserID, newProdUUID,
+			exc.ID, exc.UserID,
 			exc.OldBrand, exc.OldModel, exc.OldVariant, exc.SerialOrIMEI,
 			exc.BaseExchangeValue, exc.EstimatedDiscount, exc.FinalDiscount, exc.PriceDifference,
 			string(exc.Status), quoteUUID, productUUID, devCatUUID, exc.CreatedAt, exc.UpdatedAt,
@@ -568,7 +557,7 @@ func (r *returnRepository) CreateExchangeWithOutbox(ctx context.Context, exc *mo
 
 func (r *returnRepository) GetExchangeByID(ctx context.Context, id string) (*model.Exchange, error) {
 	query := `
-		SELECT id, order_id, order_item_id, user_id, new_product_id,
+		SELECT id, user_id,
 		       old_brand, old_model, COALESCE(old_variant, ''), COALESCE(serial_or_imei, ''),
 		       base_exchange_value, estimated_discount, COALESCE(final_discount, 0.0), COALESCE(price_difference, 0.0),
 		       status, created_at, updated_at, COALESCE(quote_id::text, ''),
@@ -577,32 +566,6 @@ func (r *returnRepository) GetExchangeByID(ctx context.Context, id string) (*mod
 		WHERE id = $1
 	`
 	row := r.db.QueryRow(ctx, query, id)
-	exc, err := scanExchange(row)
-	if err != nil {
-		return nil, err
-	}
-
-	answers, _ := r.GetExchangeQuestionAnswers(ctx, exc.ID)
-	exc.Answers = answers
-	v, _ := r.GetExchangeVerification(ctx, exc.ID)
-	exc.Verification = v
-
-	return exc, nil
-}
-
-func (r *returnRepository) GetExchangeByOrderID(ctx context.Context, orderID string) (*model.Exchange, error) {
-	query := `
-		SELECT id, order_id, order_item_id, user_id, new_product_id,
-		       old_brand, old_model, COALESCE(old_variant, ''), COALESCE(serial_or_imei, ''),
-		       base_exchange_value, estimated_discount, COALESCE(final_discount, 0.0), COALESCE(price_difference, 0.0),
-		       status, created_at, updated_at, COALESCE(quote_id::text, ''),
-		       COALESCE(product_id::text, ''), COALESCE(exchange_device_catalog_id::text, '')
-		FROM exchanges
-		WHERE order_id = $1
-		ORDER BY created_at DESC
-		LIMIT 1
-	`
-	row := r.db.QueryRow(ctx, query, orderID)
 	exc, err := scanExchange(row)
 	if err != nil {
 		return nil, err
@@ -752,17 +715,11 @@ func scanExchange(row pgx.Row) (*model.Exchange, error) {
 	var exc model.Exchange
 	var statusStr string
 	var quoteID *string
-	var newProductID *string
-	var orderID *string
-	var orderItemID *string
 	var productID *string
 	var devCatID *string
 	err := row.Scan(
 		&exc.ID,
-		&orderID,
-		&orderItemID,
 		&exc.UserID,
-		&newProductID,
 		&exc.OldBrand,
 		&exc.OldModel,
 		&exc.OldVariant,
@@ -785,17 +742,8 @@ func scanExchange(row pgx.Row) (*model.Exchange, error) {
 		return nil, fmt.Errorf("failed to scan exchange row: %w", err)
 	}
 	exc.Status = model.ExchangeStatus(statusStr)
-	if orderID != nil {
-		exc.OrderID = *orderID
-	}
-	if orderItemID != nil {
-		exc.OrderItemID = *orderItemID
-	}
 	if quoteID != nil {
 		exc.QuoteID = *quoteID
-	}
-	if newProductID != nil {
-		exc.NewProductID = *newProductID
 	}
 	if productID != nil {
 		exc.ProductID = *productID
@@ -935,7 +883,7 @@ func (r *returnRepository) CreateExchangeQuote(ctx context.Context, quote *model
 	return r.db.WithTransaction(ctx, func(tx pgx.Tx) error {
 		query := `
 			INSERT INTO exchange_quotes (
-				id, user_id, new_product_id, category_code, old_brand, old_model, old_variant,
+				id, user_id, product_id, category_code, old_brand, old_model, old_variant,
 				serial_or_imei, base_exchange_value, total_deductions, final_discount,
 				is_disqualified, disqualification_reason, status, expires_at, created_at, updated_at
 			) VALUES (
@@ -943,7 +891,7 @@ func (r *returnRepository) CreateExchangeQuote(ctx context.Context, quote *model
 			)
 		`
 		_, err := tx.Exec(ctx, query,
-			quote.ID, quote.UserID, quote.NewProductID, quote.CategoryCode, quote.OldBrand, quote.OldModel, quote.OldVariant,
+			quote.ID, quote.UserID, quote.ProductID, quote.CategoryCode, quote.OldBrand, quote.OldModel, quote.OldVariant,
 			quote.SerialOrIMEI, quote.BaseExchangeValue, quote.TotalDeductions, quote.FinalDiscount,
 			quote.IsDisqualified, quote.DisqualificationReason, string(quote.Status), quote.ExpiresAt, quote.CreatedAt, quote.UpdatedAt,
 		)
@@ -974,7 +922,7 @@ func (r *returnRepository) CreateExchangeQuote(ctx context.Context, quote *model
 
 func (r *returnRepository) GetExchangeQuoteByID(ctx context.Context, id string) (*model.ExchangeQuote, error) {
 	query := `
-		SELECT id, user_id, new_product_id, category_code, old_brand, old_model, COALESCE(old_variant, ''),
+		SELECT id, user_id, COALESCE(product_id::text, ''), category_code, old_brand, old_model, COALESCE(old_variant, ''),
 		       COALESCE(serial_or_imei, ''), base_exchange_value, total_deductions, final_discount,
 		       is_disqualified, COALESCE(disqualification_reason, ''), status, expires_at, created_at, updated_at
 		FROM exchange_quotes
@@ -984,13 +932,13 @@ func (r *returnRepository) GetExchangeQuoteByID(ctx context.Context, id string) 
 	var q model.ExchangeQuote
 	var statusStr string
 	err := row.Scan(
-		&q.ID, &q.UserID, &q.NewProductID, &q.CategoryCode, &q.OldBrand, &q.OldModel, &q.OldVariant,
+		&q.ID, &q.UserID, &q.ProductID, &q.CategoryCode, &q.OldBrand, &q.OldModel, &q.OldVariant,
 		&q.SerialOrIMEI, &q.BaseExchangeValue, &q.TotalDeductions, &q.FinalDiscount,
 		&q.IsDisqualified, &q.DisqualificationReason, &statusStr, &q.ExpiresAt, &q.CreatedAt, &q.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("exchange quote not found")
+			return nil, ErrExchangeQuoteNotFound
 		}
 		return nil, err
 	}
@@ -1021,8 +969,14 @@ func (r *returnRepository) UpdateExchangeQuoteStatus(ctx context.Context, id str
 		SET status = $2, updated_at = NOW()
 		WHERE id = $1
 	`
-	_, err := r.db.Exec(ctx, query, id, string(status))
-	return err
+	cmdTag, err := r.db.Exec(ctx, query, id, string(status))
+	if err != nil {
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return ErrExchangeQuoteNotFound
+	}
+	return nil
 }
 
 func (r *returnRepository) ApplyExchangeQuoteToOrderWithOutbox(ctx context.Context, exc *model.Exchange, quoteID string, answers []*model.ExchangeQuestionAnswer, outboxEvent *outbox.Event) error {
@@ -1030,39 +984,56 @@ func (r *returnRepository) ApplyExchangeQuoteToOrderWithOutbox(ctx context.Conte
 		if quoteID != "" {
 			updateQuote := `
 				UPDATE exchange_quotes
-				SET status = 'APPLIED', updated_at = $2
+				SET status = 'APPLIED', updated_at = NOW()
 				WHERE id = $1
+				  AND user_id = $2
+				  AND status IN ('LOCKED', 'QUOTED')
+				  AND expires_at > NOW()
+				RETURNING id;
 			`
-			if _, err := tx.Exec(ctx, updateQuote, quoteID, exc.CreatedAt); err != nil {
+			var updatedID string
+			err := tx.QueryRow(ctx, updateQuote, quoteID, exc.UserID).Scan(&updatedID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return ErrQuoteNotApplicable
+				}
 				return fmt.Errorf("failed to update quote status to APPLIED: %w", err)
 			}
 		}
 
-		query := `
-			INSERT INTO exchanges (
-				id, order_id, order_item_id, user_id, new_product_id,
-				old_brand, old_model, old_variant, serial_or_imei,
-				base_exchange_value, estimated_discount, final_discount, price_difference,
-				status, quote_id, created_at, updated_at
-			) VALUES (
-				$1, $2, $3, $4, $5,
-				$6, $7, $8, $9,
-				$10, $11, $12, $13,
-				$14, $15, $16, $17
-			)
-		`
+		var productUUID *string
+		if exc.ProductID != "" {
+			productUUID = &exc.ProductID
+		}
 		var quoteUUID *string
 		if quoteID != "" {
 			quoteUUID = &quoteID
 		}
 
+		query := `
+			INSERT INTO exchanges (
+				id, user_id, product_id,
+				old_brand, old_model, old_variant, serial_or_imei,
+				base_exchange_value, estimated_discount, final_discount, price_difference,
+				status, quote_id, created_at, updated_at
+			) VALUES (
+				$1, $2, $3,
+				$4, $5, $6, $7,
+				$8, $9, $10, $11,
+				$12, $13, $14, $15
+			)
+		`
+
 		_, err := tx.Exec(ctx, query,
-			exc.ID, exc.OrderID, exc.OrderItemID, exc.UserID, exc.NewProductID,
+			exc.ID, exc.UserID, productUUID,
 			exc.OldBrand, exc.OldModel, exc.OldVariant, exc.SerialOrIMEI,
 			exc.BaseExchangeValue, exc.EstimatedDiscount, exc.FinalDiscount, exc.PriceDifference,
 			string(exc.Status), quoteUUID, exc.CreatedAt, exc.UpdatedAt,
 		)
 		if err != nil {
+			if strings.Contains(err.Error(), "uq_exchanges_quote_id") {
+				return ErrQuoteNotApplicable
+			}
 			return fmt.Errorf("failed to insert exchange record: %w", err)
 		}
 

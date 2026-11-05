@@ -69,7 +69,7 @@ type BankAccountInput struct {
 }
 
 type CalculateExchangeValuationInput struct {
-	NewProductID string                     `json:"newProductId"`
+	ProductID    string                     `json:"productId"`
 	CategoryCode *string                    `json:"categoryCode,omitempty"`
 	OldBrand     string                     `json:"oldBrand"`
 	OldModel     string                     `json:"oldModel"`
@@ -318,10 +318,7 @@ type DeliveryPartnerProfile struct {
 
 type Exchange struct {
 	ID                      string                    `json:"id"`
-	OrderID                 *string                   `json:"orderId,omitempty"`
-	OrderItemID             *string                   `json:"orderItemId,omitempty"`
 	UserID                  string                    `json:"userId"`
-	NewProductID            *string                   `json:"newProductId,omitempty"`
 	ProductID               *string                   `json:"productId,omitempty"`
 	ExchangeDeviceCatalogID *string                   `json:"exchangeDeviceCatalogId,omitempty"`
 	OldBrand                string                    `json:"oldBrand"`
@@ -400,7 +397,7 @@ type ExchangeQuestionsResponse struct {
 type ExchangeQuote struct {
 	ID                     string                 `json:"id"`
 	UserID                 string                 `json:"userId"`
-	NewProductID           string                 `json:"newProductId"`
+	ProductID              string                 `json:"productId"`
 	CategoryCode           string                 `json:"categoryCode"`
 	OldBrand               string                 `json:"oldBrand"`
 	OldModel               string                 `json:"oldModel"`
@@ -489,7 +486,7 @@ type InventoryItem struct {
 }
 
 type LockExchangeQuoteInput struct {
-	NewProductID string                     `json:"newProductId"`
+	ProductID    string                     `json:"productId"`
 	CategoryCode *string                    `json:"categoryCode,omitempty"`
 	OldBrand     string                     `json:"oldBrand"`
 	OldModel     string                     `json:"oldModel"`

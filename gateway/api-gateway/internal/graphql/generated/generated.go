@@ -203,12 +203,9 @@ type ComplexityRoot struct {
 		ExchangeDeviceCatalogID func(childComplexity int) int
 		FinalDiscount           func(childComplexity int) int
 		ID                      func(childComplexity int) int
-		NewProductID            func(childComplexity int) int
 		OldBrand                func(childComplexity int) int
 		OldModel                func(childComplexity int) int
 		OldVariant              func(childComplexity int) int
-		OrderID                 func(childComplexity int) int
-		OrderItemID             func(childComplexity int) int
 		PriceDifference         func(childComplexity int) int
 		ProductID               func(childComplexity int) int
 		QuoteID                 func(childComplexity int) int
@@ -280,10 +277,10 @@ type ComplexityRoot struct {
 		FinalDiscount          func(childComplexity int) int
 		ID                     func(childComplexity int) int
 		IsDisqualified         func(childComplexity int) int
-		NewProductID           func(childComplexity int) int
 		OldBrand               func(childComplexity int) int
 		OldModel               func(childComplexity int) int
 		OldVariant             func(childComplexity int) int
+		ProductID              func(childComplexity int) int
 		SerialOrImei           func(childComplexity int) int
 		Status                 func(childComplexity int) int
 		TotalDeductions        func(childComplexity int) int
@@ -1669,13 +1666,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Exchange.ID(childComplexity), true
 
-	case "Exchange.newProductId":
-		if e.complexity.Exchange.NewProductID == nil {
-			break
-		}
-
-		return e.complexity.Exchange.NewProductID(childComplexity), true
-
 	case "Exchange.oldBrand":
 		if e.complexity.Exchange.OldBrand == nil {
 			break
@@ -1696,20 +1686,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Exchange.OldVariant(childComplexity), true
-
-	case "Exchange.orderId":
-		if e.complexity.Exchange.OrderID == nil {
-			break
-		}
-
-		return e.complexity.Exchange.OrderID(childComplexity), true
-
-	case "Exchange.orderItemId":
-		if e.complexity.Exchange.OrderItemID == nil {
-			break
-		}
-
-		return e.complexity.Exchange.OrderItemID(childComplexity), true
 
 	case "Exchange.priceDifference":
 		if e.complexity.Exchange.PriceDifference == nil {
@@ -2061,13 +2037,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ExchangeQuote.IsDisqualified(childComplexity), true
 
-	case "ExchangeQuote.newProductId":
-		if e.complexity.ExchangeQuote.NewProductID == nil {
-			break
-		}
-
-		return e.complexity.ExchangeQuote.NewProductID(childComplexity), true
-
 	case "ExchangeQuote.oldBrand":
 		if e.complexity.ExchangeQuote.OldBrand == nil {
 			break
@@ -2088,6 +2057,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ExchangeQuote.OldVariant(childComplexity), true
+
+	case "ExchangeQuote.productId":
+		if e.complexity.ExchangeQuote.ProductID == nil {
+			break
+		}
+
+		return e.complexity.ExchangeQuote.ProductID(childComplexity), true
 
 	case "ExchangeQuote.serialOrImei":
 		if e.complexity.ExchangeQuote.SerialOrImei == nil {
@@ -6634,10 +6610,7 @@ type ExchangeVerification {
 
 type Exchange {
   id: ID!
-  orderId: String
-  orderItemId: String
   userId: String!
-  newProductId: String
   productId: String
   exchangeDeviceCatalogId: String
   oldBrand: String!
@@ -6743,7 +6716,7 @@ type ExchangeQuoteAnswer {
 type ExchangeQuote {
   id: ID!
   userId: String!
-  newProductId: String!
+  productId: String!
   categoryCode: String!
   oldBrand: String!
   oldModel: String!
@@ -6772,7 +6745,7 @@ input ExchangeUserAnswerInput {
 }
 
 input CalculateExchangeValuationInput {
-  newProductId: String!
+  productId: String!
   categoryCode: String
   oldBrand: String!
   oldModel: String!
@@ -6781,7 +6754,7 @@ input CalculateExchangeValuationInput {
 }
 
 input LockExchangeQuoteInput {
-  newProductId: String!
+  productId: String!
   categoryCode: String
   oldBrand: String!
   oldModel: String!
@@ -6826,7 +6799,6 @@ extend type Mutation {
   applyExchangeToOrder(input: ApplyExchangeToOrderInput!): Exchange! @auth
   resolveExchangeMismatch(input: ResolveExchangeMismatchInput!): Exchange! @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
-
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/store/store.graphql", Input: `extend type Query {
   store(id: ID!): Store
@@ -13642,88 +13614,6 @@ func (ec *executionContext) fieldContext_Exchange_id(_ context.Context, field gr
 	return fc, nil
 }
 
-func (ec *executionContext) _Exchange_orderId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Exchange_orderId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OrderID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Exchange_orderId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Exchange",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Exchange_orderItemId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Exchange_orderItemId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.OrderItemID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Exchange_orderItemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Exchange",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Exchange_userId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Exchange_userId(ctx, field)
 	if err != nil {
@@ -13756,47 +13646,6 @@ func (ec *executionContext) _Exchange_userId(ctx context.Context, field graphql.
 }
 
 func (ec *executionContext) fieldContext_Exchange_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Exchange",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Exchange_newProductId(ctx context.Context, field graphql.CollectedField, obj *model.Exchange) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Exchange_newProductId(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.NewProductID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Exchange_newProductId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Exchange",
 		Field:      field,
@@ -16103,8 +15952,8 @@ func (ec *executionContext) fieldContext_ExchangeQuote_userId(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _ExchangeQuote_newProductId(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuote) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ExchangeQuote_newProductId(ctx, field)
+func (ec *executionContext) _ExchangeQuote_productId(ctx context.Context, field graphql.CollectedField, obj *model.ExchangeQuote) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ExchangeQuote_productId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -16117,7 +15966,7 @@ func (ec *executionContext) _ExchangeQuote_newProductId(ctx context.Context, fie
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.NewProductID, nil
+		return obj.ProductID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16134,7 +15983,7 @@ func (ec *executionContext) _ExchangeQuote_newProductId(ctx context.Context, fie
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_ExchangeQuote_newProductId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ExchangeQuote_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ExchangeQuote",
 		Field:      field,
@@ -25033,14 +24882,8 @@ func (ec *executionContext) fieldContext_Mutation_createExchange(ctx context.Con
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Exchange_id(ctx, field)
-			case "orderId":
-				return ec.fieldContext_Exchange_orderId(ctx, field)
-			case "orderItemId":
-				return ec.fieldContext_Exchange_orderItemId(ctx, field)
 			case "userId":
 				return ec.fieldContext_Exchange_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_Exchange_newProductId(ctx, field)
 			case "productId":
 				return ec.fieldContext_Exchange_productId(ctx, field)
 			case "exchangeDeviceCatalogId":
@@ -25153,14 +24996,8 @@ func (ec *executionContext) fieldContext_Mutation_verifyExchangeProduct(ctx cont
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Exchange_id(ctx, field)
-			case "orderId":
-				return ec.fieldContext_Exchange_orderId(ctx, field)
-			case "orderItemId":
-				return ec.fieldContext_Exchange_orderItemId(ctx, field)
 			case "userId":
 				return ec.fieldContext_Exchange_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_Exchange_newProductId(ctx, field)
 			case "productId":
 				return ec.fieldContext_Exchange_productId(ctx, field)
 			case "exchangeDeviceCatalogId":
@@ -25343,8 +25180,8 @@ func (ec *executionContext) fieldContext_Mutation_lockExchangeQuote(ctx context.
 				return ec.fieldContext_ExchangeQuote_id(ctx, field)
 			case "userId":
 				return ec.fieldContext_ExchangeQuote_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_ExchangeQuote_newProductId(ctx, field)
+			case "productId":
+				return ec.fieldContext_ExchangeQuote_productId(ctx, field)
 			case "categoryCode":
 				return ec.fieldContext_ExchangeQuote_categoryCode(ctx, field)
 			case "oldBrand":
@@ -25454,14 +25291,8 @@ func (ec *executionContext) fieldContext_Mutation_applyExchangeToOrder(ctx conte
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Exchange_id(ctx, field)
-			case "orderId":
-				return ec.fieldContext_Exchange_orderId(ctx, field)
-			case "orderItemId":
-				return ec.fieldContext_Exchange_orderItemId(ctx, field)
 			case "userId":
 				return ec.fieldContext_Exchange_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_Exchange_newProductId(ctx, field)
 			case "productId":
 				return ec.fieldContext_Exchange_productId(ctx, field)
 			case "exchangeDeviceCatalogId":
@@ -25577,14 +25408,8 @@ func (ec *executionContext) fieldContext_Mutation_resolveExchangeMismatch(ctx co
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Exchange_id(ctx, field)
-			case "orderId":
-				return ec.fieldContext_Exchange_orderId(ctx, field)
-			case "orderItemId":
-				return ec.fieldContext_Exchange_orderItemId(ctx, field)
 			case "userId":
 				return ec.fieldContext_Exchange_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_Exchange_newProductId(ctx, field)
 			case "productId":
 				return ec.fieldContext_Exchange_productId(ctx, field)
 			case "exchangeDeviceCatalogId":
@@ -35295,14 +35120,8 @@ func (ec *executionContext) fieldContext_Query_exchange(ctx context.Context, fie
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_Exchange_id(ctx, field)
-			case "orderId":
-				return ec.fieldContext_Exchange_orderId(ctx, field)
-			case "orderItemId":
-				return ec.fieldContext_Exchange_orderItemId(ctx, field)
 			case "userId":
 				return ec.fieldContext_Exchange_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_Exchange_newProductId(ctx, field)
 			case "productId":
 				return ec.fieldContext_Exchange_productId(ctx, field)
 			case "exchangeDeviceCatalogId":
@@ -35474,8 +35293,8 @@ func (ec *executionContext) fieldContext_Query_exchangeQuote(ctx context.Context
 				return ec.fieldContext_ExchangeQuote_id(ctx, field)
 			case "userId":
 				return ec.fieldContext_ExchangeQuote_userId(ctx, field)
-			case "newProductId":
-				return ec.fieldContext_ExchangeQuote_newProductId(ctx, field)
+			case "productId":
+				return ec.fieldContext_ExchangeQuote_productId(ctx, field)
 			case "categoryCode":
 				return ec.fieldContext_ExchangeQuote_categoryCode(ctx, field)
 			case "oldBrand":
@@ -43116,20 +42935,20 @@ func (ec *executionContext) unmarshalInputCalculateExchangeValuationInput(ctx co
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"newProductId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "answers"}
+	fieldsInOrder := [...]string{"productId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "answers"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "newProductId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newProductId"))
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.NewProductID = data
+			it.ProductID = data
 		case "categoryCode":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryCode"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -44224,20 +44043,20 @@ func (ec *executionContext) unmarshalInputLockExchangeQuoteInput(ctx context.Con
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"newProductId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "serialOrImei", "answers"}
+	fieldsInOrder := [...]string{"productId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "serialOrImei", "answers"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "newProductId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("newProductId"))
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.NewProductID = data
+			it.ProductID = data
 		case "categoryCode":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryCode"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -46770,17 +46589,11 @@ func (ec *executionContext) _Exchange(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "orderId":
-			out.Values[i] = ec._Exchange_orderId(ctx, field, obj)
-		case "orderItemId":
-			out.Values[i] = ec._Exchange_orderItemId(ctx, field, obj)
 		case "userId":
 			out.Values[i] = ec._Exchange_userId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "newProductId":
-			out.Values[i] = ec._Exchange_newProductId(ctx, field, obj)
 		case "productId":
 			out.Values[i] = ec._Exchange_productId(ctx, field, obj)
 		case "exchangeDeviceCatalogId":
@@ -47232,8 +47045,8 @@ func (ec *executionContext) _ExchangeQuote(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "newProductId":
-			out.Values[i] = ec._ExchangeQuote_newProductId(ctx, field, obj)
+		case "productId":
+			out.Values[i] = ec._ExchangeQuote_productId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

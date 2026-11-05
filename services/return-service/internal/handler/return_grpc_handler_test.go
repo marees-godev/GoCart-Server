@@ -132,7 +132,7 @@ func (m *mockReturnService) GetExchangeQuote(ctx context.Context, quoteID string
 }
 
 func (m *mockReturnService) ApplyExchangeToOrder(ctx context.Context, req *dto.ApplyExchangeToOrderDTO) (*model.Exchange, error) {
-	return &model.Exchange{ID: "exc-1", OrderID: req.OrderID, UserID: req.UserID, FinalDiscount: 18000, Status: model.ExchangeStatusRequested}, nil
+	return &model.Exchange{ID: "exc-1", UserID: req.UserID, FinalDiscount: 18000, Status: model.ExchangeStatusRequested}, nil
 }
 
 func (m *mockReturnService) ResolveExchangeMismatch(ctx context.Context, req *dto.ResolveExchangeMismatchDTO) (*model.Exchange, error) {

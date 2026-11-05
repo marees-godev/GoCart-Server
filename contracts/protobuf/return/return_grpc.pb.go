@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v7.36.0
-// source: return.proto
+// source: contracts/protobuf/return/return.proto
 
 package returns
 
@@ -725,5 +725,5 @@ var ReturnService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "return.proto",
+	Metadata: "contracts/protobuf/return/return.proto",
 }

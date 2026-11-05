@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -77,7 +78,7 @@ func (r *mutationResolver) RequestReturn(ctx context.Context, input model.Reques
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // RequestReplacement is the resolver for the requestReplacement field.
@@ -137,7 +138,7 @@ func (r *mutationResolver) RequestReplacement(ctx context.Context, input model.R
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // VerifyProduct is the resolver for the verifyProduct field.
@@ -207,7 +208,7 @@ func (r *mutationResolver) VerifyProduct(ctx context.Context, input model.Verify
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // UpdateReturnStatus is the resolver for the updateReturnStatus field.
@@ -271,7 +272,7 @@ func (r *mutationResolver) UpdateReturnStatus(ctx context.Context, id string, st
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // ApproveReturn is the resolver for the approveReturn field.
@@ -316,7 +317,7 @@ func (r *mutationResolver) ApproveReturn(ctx context.Context, id string) (*model
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // RejectReturn is the resolver for the rejectReturn field.
@@ -367,7 +368,7 @@ func (r *mutationResolver) RejectReturn(ctx context.Context, id string, reason s
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // CreateExchange is the resolver for the createExchange field.
@@ -443,7 +444,7 @@ func (r *mutationResolver) CreateExchange(ctx context.Context, input model.Creat
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelExchange(res.Exchange), nil
+	return maps.MapExchange(res.Exchange), nil
 }
 
 // VerifyExchangeProduct is the resolver for the verifyExchangeProduct field.
@@ -511,7 +512,7 @@ func (r *mutationResolver) VerifyExchangeProduct(ctx context.Context, input mode
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelExchange(res.Exchange), nil
+	return maps.MapExchange(res.Exchange), nil
 }
 
 // CalculateExchangeValuation is the resolver for the calculateExchangeValuation field.
@@ -541,7 +542,7 @@ func (r *mutationResolver) CalculateExchangeValuation(ctx context.Context, input
 	}
 
 	res, err := client.CalculateExchangeValuation(ctx, &returnpb.CalculateExchangeValuationRequest{
-		NewProductId: input.NewProductID,
+		ProductId:    input.ProductID,
 		CategoryCode: cat,
 		OldBrand:     input.OldBrand,
 		OldModel:     input.OldModel,
@@ -619,7 +620,7 @@ func (r *mutationResolver) LockExchangeQuote(ctx context.Context, input model.Lo
 
 	res, err := client.LockExchangeQuote(ctx, &returnpb.LockExchangeQuoteRequest{
 		UserId:       userCtx.UserID,
-		NewProductId: input.NewProductID,
+		ProductId:    input.ProductID,
 		CategoryCode: cat,
 		OldBrand:     input.OldBrand,
 		OldModel:     input.OldModel,
@@ -631,7 +632,7 @@ func (r *mutationResolver) LockExchangeQuote(ctx context.Context, input model.Lo
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelExchangeQuote(res.Quote), nil
+	return maps.MapExchangeQuote(res.Quote), nil
 }
 
 // ApplyExchangeToOrder is the resolver for the applyExchangeToOrder field.
@@ -656,7 +657,7 @@ func (r *mutationResolver) ApplyExchangeToOrder(ctx context.Context, input model
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelExchange(res.Exchange), nil
+	return maps.MapExchange(res.Exchange), nil
 }
 
 // ResolveExchangeMismatch is the resolver for the resolveExchangeMismatch field.
@@ -685,7 +686,7 @@ func (r *mutationResolver) ResolveExchangeMismatch(ctx context.Context, input mo
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelExchange(res.Exchange), nil
+	return maps.MapExchange(res.Exchange), nil
 }
 
 // ReturnOrder is the resolver for the returnOrder field.
@@ -722,7 +723,7 @@ func (r *queryResolver) ReturnOrder(ctx context.Context, id string) (*model.Retu
 		}
 	}
 
-	return toModelReturnOrder(res.ReturnOrder), nil
+	return maps.MapReturnOrder(res.ReturnOrder), nil
 }
 
 // ReturnOrdersByOrder is the resolver for the returnOrdersByOrder field.
@@ -760,7 +761,7 @@ func (r *queryResolver) ReturnOrdersByOrder(ctx context.Context, orderID string)
 		if !isElevated && ret.UserId != userCtx.UserID {
 			continue
 		}
-		result = append(result, toModelReturnOrder(ret))
+		result = append(result, maps.MapReturnOrder(ret))
 	}
 	return result, nil
 }
@@ -797,7 +798,7 @@ func (r *queryResolver) ListReturns(ctx context.Context, limit *int, offset *int
 
 	result := make([]*model.ReturnOrder, 0, len(res.Returns))
 	for _, ret := range res.Returns {
-		result = append(result, toModelReturnOrder(ret))
+		result = append(result, maps.MapReturnOrder(ret))
 	}
 	return result, nil
 }
@@ -849,7 +850,7 @@ func (r *queryResolver) Exchange(ctx context.Context, id string) (*model.Exchang
 		}
 	}
 
-	return toModelExchange(res.Exchange), nil
+	return maps.MapExchange(res.Exchange), nil
 }
 
 // ExchangeQuestions is the resolver for the exchangeQuestions field.
@@ -940,7 +941,7 @@ func (r *queryResolver) ExchangeQuote(ctx context.Context, id string) (*model.Ex
 		return nil, appErrors.Forbidden("you do not have permission to view this exchange quote")
 	}
 
-	return toModelExchangeQuote(res.Quote), nil
+	return maps.MapExchangeQuote(res.Quote), nil
 }
 
 // !!! WARNING !!!
@@ -949,65 +950,6 @@ func (r *queryResolver) ExchangeQuote(ctx context.Context, id string) (*model.Ex
 //   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
 //     it when you're done.
 //   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func toModelExchangeQuote(protoQuote *returnpb.ExchangeQuote) *model.ExchangeQuote {
-	if protoQuote == nil {
-		return nil
-	}
-
-	answers := make([]*model.ExchangeQuoteAnswer, 0, len(protoQuote.Answers))
-	for _, a := range protoQuote.Answers {
-		answers = append(answers, &model.ExchangeQuoteAnswer{
-			ID:              a.Id,
-			QuoteID:         a.QuoteId,
-			QuestionKey:     a.QuestionKey,
-			OptionKey:       a.OptionKey,
-			DeductionAmount: a.DeductionAmount,
-			IsFatal:         a.IsFatal,
-		})
-	}
-
-	var variant *string
-	if protoQuote.OldVariant != "" {
-		variant = &protoQuote.OldVariant
-	}
-	var serial *string
-	if protoQuote.SerialOrImei != "" {
-		serial = &protoQuote.SerialOrImei
-	}
-	var reason *string
-	if protoQuote.DisqualificationReason != "" {
-		reason = &protoQuote.DisqualificationReason
-	}
-	var createdAt *string
-	if protoQuote.CreatedAt != "" {
-		createdAt = &protoQuote.CreatedAt
-	}
-	var updatedAt *string
-	if protoQuote.UpdatedAt != "" {
-		updatedAt = &protoQuote.UpdatedAt
-	}
-
-	return &model.ExchangeQuote{
-		ID:                     protoQuote.Id,
-		UserID:                 protoQuote.UserId,
-		NewProductID:           protoQuote.NewProductId,
-		CategoryCode:           protoQuote.CategoryCode,
-		OldBrand:               protoQuote.OldBrand,
-		OldModel:               protoQuote.OldModel,
-		OldVariant:             variant,
-		SerialOrImei:           serial,
-		BaseExchangeValue:      protoQuote.BaseExchangeValue,
-		TotalDeductions:        protoQuote.TotalDeductions,
-		FinalDiscount:          protoQuote.FinalDiscount,
-		IsDisqualified:         protoQuote.IsDisqualified,
-		DisqualificationReason: reason,
-		Status:                 protoQuote.Status,
-		ExpiresAt:              protoQuote.ExpiresAt,
-		Answers:                answers,
-		CreatedAt:              createdAt,
-		UpdatedAt:              updatedAt,
-	}
-}
 func (r *Resolver) getReturnClient() (returnpb.ReturnServiceClient, error) {
 	if r.Clients != nil && r.Clients.ReturnClient != nil {
 		return r.Clients.ReturnClient, nil
@@ -1016,181 +958,4 @@ func (r *Resolver) getReturnClient() (returnpb.ReturnServiceClient, error) {
 		return r.ClientMgr.ReturnClient, nil
 	}
 	return nil, appErrors.Internal(nil, "return service client unavailable")
-}
-func toModelReturnOrder(protoReturn *returnpb.ReturnOrder) *model.ReturnOrder {
-	if protoReturn == nil {
-		return nil
-	}
-
-	res := &model.ReturnOrder{
-		ID:           protoReturn.Id,
-		OrderID:      protoReturn.OrderId,
-		UserID:       protoReturn.UserId,
-		Reason:       protoReturn.Reason,
-		Status:       protoReturn.Status,
-		Type:         protoReturn.Type,
-		RefundAmount: protoReturn.RefundAmount,
-	}
-
-	if protoReturn.OrderItemId != "" {
-		res.OrderItemID = &protoReturn.OrderItemId
-	}
-	if protoReturn.RequestedAt != "" {
-		res.RequestedAt = &protoReturn.RequestedAt
-	}
-	if protoReturn.ApprovedAt != "" {
-		res.ApprovedAt = &protoReturn.ApprovedAt
-	}
-	if protoReturn.CompletedAt != "" {
-		res.CompletedAt = &protoReturn.CompletedAt
-	}
-	if protoReturn.CreatedAt != "" {
-		res.CreatedAt = &protoReturn.CreatedAt
-	}
-	if protoReturn.UpdatedAt != "" {
-		res.UpdatedAt = &protoReturn.UpdatedAt
-	}
-	if protoReturn.RejectionReason != "" {
-		res.RejectionReason = &protoReturn.RejectionReason
-	}
-
-	if protoReturn.Verification != nil {
-		var notes *string
-		if protoReturn.Verification.Notes != "" {
-			notes = &protoReturn.Verification.Notes
-		}
-		var createdAt *string
-		if protoReturn.Verification.CreatedAt != "" {
-			createdAt = &protoReturn.Verification.CreatedAt
-		}
-		var updatedAt *string
-		if protoReturn.Verification.UpdatedAt != "" {
-			updatedAt = &protoReturn.Verification.UpdatedAt
-		}
-
-		res.Verification = &model.ProductVerification{
-			ID:          protoReturn.Verification.Id,
-			ReturnID:    protoReturn.Verification.ReturnId,
-			VerifiedBy:  protoReturn.Verification.VerifiedBy,
-			Condition:   protoReturn.Verification.Condition,
-			IsApproved:  protoReturn.Verification.IsApproved,
-			ProofImages: protoReturn.Verification.ProofImages,
-			Notes:       notes,
-			VerifiedAt:  protoReturn.Verification.VerifiedAt,
-			CreatedAt:   createdAt,
-			UpdatedAt:   updatedAt,
-		}
-	}
-
-	return res
-}
-func toModelExchange(protoExc *returnpb.Exchange) *model.Exchange {
-	if protoExc == nil {
-		return nil
-	}
-
-	res := &model.Exchange{
-		ID:                protoExc.Id,
-		UserID:            protoExc.UserId,
-		OldBrand:          protoExc.OldBrand,
-		OldModel:          protoExc.OldModel,
-		BaseExchangeValue: protoExc.BaseExchangeValue,
-		EstimatedDiscount: protoExc.EstimatedDiscount,
-		Status:            protoExc.Status,
-	}
-
-	if protoExc.OrderId != "" {
-		res.OrderID = &protoExc.OrderId
-	}
-	if protoExc.OrderItemId != "" {
-		res.OrderItemID = &protoExc.OrderItemId
-	}
-	if protoExc.NewProductId != "" {
-		res.NewProductID = &protoExc.NewProductId
-	}
-	if protoExc.ProductId != "" {
-		res.ProductID = &protoExc.ProductId
-	}
-	if protoExc.ExchangeDeviceCatalogId != "" {
-		res.ExchangeDeviceCatalogID = &protoExc.ExchangeDeviceCatalogId
-	}
-
-	if protoExc.OldVariant != "" {
-		res.OldVariant = &protoExc.OldVariant
-	}
-	if protoExc.QuoteId != "" {
-		res.QuoteID = &protoExc.QuoteId
-	}
-	if protoExc.SerialOrImei != "" {
-		res.SerialOrImei = &protoExc.SerialOrImei
-	}
-	if protoExc.FinalDiscount != 0 || protoExc.Status != "PENDING_ESTIMATION" {
-		fd := protoExc.FinalDiscount
-		res.FinalDiscount = &fd
-	}
-	if protoExc.PriceDifference != 0 {
-		pd := protoExc.PriceDifference
-		res.PriceDifference = &pd
-	}
-	if protoExc.CreatedAt != "" {
-		res.CreatedAt = &protoExc.CreatedAt
-	}
-	if protoExc.UpdatedAt != "" {
-		res.UpdatedAt = &protoExc.UpdatedAt
-	}
-
-	if len(protoExc.Answers) > 0 {
-		res.Answers = make([]*model.ExchangeQuestionAnswer, 0, len(protoExc.Answers))
-		for _, a := range protoExc.Answers {
-			if a == nil {
-				continue
-			}
-			ansModel := &model.ExchangeQuestionAnswer{
-				ID:              a.Id,
-				ExchangeID:      a.ExchangeId,
-				QuestionKey:     a.QuestionKey,
-				AnswerValue:     a.AnswerValue,
-				DeductionAmount: a.DeductionAmount,
-			}
-			if a.CreatedAt != "" {
-				ansModel.CreatedAt = &a.CreatedAt
-			}
-			res.Answers = append(res.Answers, ansModel)
-		}
-	}
-
-	if protoExc.Verification != nil {
-		var notes *string
-		if protoExc.Verification.Notes != "" {
-			notes = &protoExc.Verification.Notes
-		}
-		var createdAt *string
-		if protoExc.Verification.CreatedAt != "" {
-			createdAt = &protoExc.Verification.CreatedAt
-		}
-		var updatedAt *string
-		if protoExc.Verification.UpdatedAt != "" {
-			updatedAt = &protoExc.Verification.UpdatedAt
-		}
-
-		res.Verification = &model.ExchangeVerification{
-			ID:               protoExc.Verification.Id,
-			ExchangeID:       protoExc.Verification.ExchangeId,
-			VerifiedBy:       protoExc.Verification.VerifiedBy,
-			ConditionRating:  protoExc.Verification.ConditionRating,
-			IsApproved:       protoExc.Verification.IsApproved,
-			ScreenIntact:     protoExc.Verification.ScreenIntact,
-			BodyIntact:       protoExc.Verification.BodyIntact,
-			Functional:       protoExc.Verification.Functional,
-			SerialMatches:    protoExc.Verification.SerialMatches,
-			AdjustedDiscount: protoExc.Verification.AdjustedDiscount,
-			ProofImages:      protoExc.Verification.ProofImages,
-			Notes:            notes,
-			VerifiedAt:       protoExc.Verification.VerifiedAt,
-			CreatedAt:        createdAt,
-			UpdatedAt:        updatedAt,
-		}
-	}
-
-	return res
 }

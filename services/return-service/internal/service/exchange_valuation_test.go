@@ -9,6 +9,7 @@ import (
 
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/service"
@@ -76,12 +77,13 @@ func TestExchangeService_CalculateValuation_FatalDisqualifier(t *testing.T) {
 
 	// Answering "no" to powers_on is a fatal disqualifier
 	res, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
-		NewProductID: "p1",
+		ProductID:    "p1",
 		CategoryCode: "SMARTPHONE",
 		OldBrand:     "Apple",
 		OldModel:     "iPhone 13",
 		Answers: []*dto.ExchangeUserAnswerDTO{
 			{QuestionKey: "powers_on", OptionKey: "no"},
+			{QuestionKey: "screen_cracks", OptionKey: "none"},
 		},
 	})
 	if err != nil {
@@ -107,7 +109,7 @@ func TestExchangeService_CalculateValuation_ConditionPenalties(t *testing.T) {
 
 	// Powers on (0 deduction), screen cracked (4000 deduction) -> 26000 - 4000 = 22000
 	res, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
-		NewProductID: "p1",
+		ProductID:    "p1",
 		CategoryCode: "SMARTPHONE",
 		OldBrand:     "Apple",
 		OldModel:     "iPhone 13",
@@ -146,7 +148,7 @@ func TestExchangeService_LockQuote_And_ApplyToOrder(t *testing.T) {
 	// 1. Lock Exchange Quote
 	quote, err := svc.LockExchangeQuote(ctx, &dto.LockExchangeQuoteDTO{
 		UserID:       "user-123",
-		NewProductID: "prod-new",
+		ProductID:    "prod-new",
 		CategoryCode: "SMARTPHONE",
 		OldBrand:     "Apple",
 		OldModel:     "iPhone 13",
@@ -185,9 +187,6 @@ func TestExchangeService_LockQuote_And_ApplyToOrder(t *testing.T) {
 	if exc.ID == "" {
 		t.Fatal("expected non-empty exchange ID")
 	}
-	if exc.OrderID != "ord-1" {
-		t.Fatalf("expected order ID 'ord-1', got %s", exc.OrderID)
-	}
 	if exc.Status != model.ExchangeStatusRequested {
 		t.Fatalf("expected status EXCHANGE_REQUESTED, got %s", exc.Status)
 	}
@@ -200,6 +199,17 @@ func TestExchangeService_LockQuote_And_ApplyToOrder(t *testing.T) {
 	if len(repo.outboxEvents) == 0 {
 		t.Fatal("expected outbox event to be stored")
 	}
+
+	// 3. Second attempt with the same quote should fail (already APPLIED / race prevention)
+	_, err = svc.ApplyExchangeToOrder(ctx, &dto.ApplyExchangeToOrderDTO{
+		QuoteID:     quote.ID,
+		OrderID:     "ord-2",
+		OrderItemID: "item-2",
+		UserID:      "user-123",
+	})
+	if !errors.Is(err, service.ErrExchangeQuoteNotApplicable) {
+		t.Fatalf("expected ErrExchangeQuoteNotApplicable on re-applying quote, got: %v", err)
+	}
 }
 
 func TestExchangeService_ResolveExchangeMismatch(t *testing.T) {
@@ -210,10 +220,8 @@ func TestExchangeService_ResolveExchangeMismatch(t *testing.T) {
 	now := time.Now().UTC()
 	exc := &model.Exchange{
 		ID:                "exc-reval",
-		OrderID:           "ord-1",
-		OrderItemID:       "item-1",
 		UserID:            "user-123",
-		NewProductID:      "prod-1",
+		ProductID:         "prod-1",
 		OldBrand:          "Apple",
 		OldModel:          "iPhone 13",
 		BaseExchangeValue: 26000.0,
@@ -244,6 +252,12 @@ func TestExchangeService_ResolveExchangeMismatch(t *testing.T) {
 	if accepted.PriceDifference != 4000 {
 		t.Fatalf("expected price difference 4000, got %f", accepted.PriceDifference)
 	}
+	if len(repo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event for ACCEPT_REVISED, got %d", len(repo.outboxEvents))
+	}
+	if repo.outboxEvents[0].EventType != events.EventTypeExchangeCompleted {
+		t.Fatalf("expected event type %s, got %s", events.EventTypeExchangeCompleted, repo.outboxEvents[0].EventType)
+	}
 
 	// Case 2: Customer declines revised discount -> exchange cancelled
 	exc.Status = model.ExchangeStatusRevaluated
@@ -263,4 +277,193 @@ func TestExchangeService_ResolveExchangeMismatch(t *testing.T) {
 	if declined.PriceDifference != 22000 {
 		t.Fatalf("expected price difference 22000, got %f", declined.PriceDifference)
 	}
+	if len(repo.outboxEvents) != 2 {
+		t.Fatalf("expected 2 outbox events after DECLINE_AND_CANCEL, got %d", len(repo.outboxEvents))
+	}
+}
+
+func TestExchangeService_CalculateValuation_ValidationErrors(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, &mockOrderClient{}, &mockProductClientForExchange{
+		prod: &productpb.Product{Id: "p1", IsExchangeEligible: true},
+	}, 7)
+
+	t.Run("Empty answers rejected", func(t *testing.T) {
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers:      []*dto.ExchangeUserAnswerDTO{},
+		})
+		if !errors.Is(err, service.ErrMissingRequiredQuestion) {
+			t.Fatalf("expected ErrMissingRequiredQuestion, got: %v", err)
+		}
+	})
+
+	t.Run("Partial answers missing required question rejected", func(t *testing.T) {
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers: []*dto.ExchangeUserAnswerDTO{
+				{QuestionKey: "powers_on", OptionKey: "yes"},
+			},
+		})
+		if !errors.Is(err, service.ErrMissingRequiredQuestion) {
+			t.Fatalf("expected ErrMissingRequiredQuestion, got: %v", err)
+		}
+	})
+
+	t.Run("Unknown question rejected", func(t *testing.T) {
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers: []*dto.ExchangeUserAnswerDTO{
+				{QuestionKey: "battery_health", OptionKey: "good"},
+				{QuestionKey: "powers_on", OptionKey: "yes"},
+				{QuestionKey: "screen_cracks", OptionKey: "none"},
+			},
+		})
+		if !errors.Is(err, service.ErrUnknownExchangeQuestion) {
+			t.Fatalf("expected ErrUnknownExchangeQuestion, got: %v", err)
+		}
+	})
+
+	t.Run("Unknown option rejected", func(t *testing.T) {
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers: []*dto.ExchangeUserAnswerDTO{
+				{QuestionKey: "powers_on", OptionKey: "maybe"},
+				{QuestionKey: "screen_cracks", OptionKey: "none"},
+			},
+		})
+		if !errors.Is(err, service.ErrUnknownExchangeOption) {
+			t.Fatalf("expected ErrUnknownExchangeOption, got: %v", err)
+		}
+	})
+
+	t.Run("Duplicate answer rejected", func(t *testing.T) {
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers: []*dto.ExchangeUserAnswerDTO{
+				{QuestionKey: "powers_on", OptionKey: "yes"},
+				{QuestionKey: "powers_on", OptionKey: "no"},
+				{QuestionKey: "screen_cracks", OptionKey: "none"},
+			},
+		})
+		if !errors.Is(err, service.ErrDuplicateExchangeAnswer) {
+			t.Fatalf("expected ErrDuplicateExchangeAnswer, got: %v", err)
+		}
+	})
+}
+
+func TestExchangeService_LockQuote_Disqualified_Rejection(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+	svc := service.NewReturnService(repo, &mockOrderClient{}, &mockProductClientForExchange{
+		prod: &productpb.Product{Id: "p1", IsExchangeEligible: true},
+	}, 7)
+
+	_, err := svc.LockExchangeQuote(ctx, &dto.LockExchangeQuoteDTO{
+		UserID:       "user-123",
+		ProductID:    "p1",
+		CategoryCode: "SMARTPHONE",
+		OldBrand:     "Apple",
+		OldModel:     "iPhone 13",
+		Answers: []*dto.ExchangeUserAnswerDTO{
+			{QuestionKey: "powers_on", OptionKey: "no"},
+			{QuestionKey: "screen_cracks", OptionKey: "none"},
+		},
+	})
+	if !errors.Is(err, service.ErrExchangeDisqualified) {
+		t.Fatalf("expected ErrExchangeDisqualified when locking quote for ineligible device, got: %v", err)
+	}
+}
+
+func TestExchangeService_CalculateValuation_ProductServiceErrors(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockReturnRepo()
+
+	validAnswers := []*dto.ExchangeUserAnswerDTO{
+		{QuestionKey: "powers_on", OptionKey: "yes"},
+		{QuestionKey: "screen_cracks", OptionKey: "none"},
+	}
+
+	t.Run("Propagate product service lookup error", func(t *testing.T) {
+		expectedErr := errors.New("product service rpc failed")
+		svc := service.NewReturnService(repo, &mockOrderClient{}, &mockProductClientForExchange{
+			err: expectedErr,
+		}, 7)
+
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers:      validAnswers,
+		})
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("expected error %v, got: %v", expectedErr, err)
+		}
+	})
+
+	t.Run("Product client is nil returns ErrProductServiceUnavailable", func(t *testing.T) {
+		svc := service.NewReturnService(repo, &mockOrderClient{}, nil, 7)
+
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers:      validAnswers,
+		})
+		if !errors.Is(err, service.ErrProductServiceUnavailable) {
+			t.Fatalf("expected ErrProductServiceUnavailable, got: %v", err)
+		}
+	})
+
+	t.Run("Product not found returns ErrProductNotFound", func(t *testing.T) {
+		svc := service.NewReturnService(repo, &mockOrderClient{}, &mockProductClientForExchange{
+			prod: nil,
+		}, 7)
+
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers:      validAnswers,
+		})
+		if !errors.Is(err, service.ErrProductNotFound) {
+			t.Fatalf("expected ErrProductNotFound, got: %v", err)
+		}
+	})
+
+	t.Run("Ineligible product returns ErrProductNotExchangeEligible", func(t *testing.T) {
+		svc := service.NewReturnService(repo, &mockOrderClient{}, &mockProductClientForExchange{
+			prod: &productpb.Product{Id: "p1", IsExchangeEligible: false},
+		}, 7)
+
+		_, err := svc.CalculateExchangeValuation(ctx, &dto.CalculateExchangeValuationDTO{
+			ProductID:    "p1",
+			CategoryCode: "SMARTPHONE",
+			OldBrand:     "Apple",
+			OldModel:     "iPhone 13",
+			Answers:      validAnswers,
+		})
+		if !errors.Is(err, service.ErrProductNotExchangeEligible) {
+			t.Fatalf("expected ErrProductNotExchangeEligible, got: %v", err)
+		}
+	})
 }

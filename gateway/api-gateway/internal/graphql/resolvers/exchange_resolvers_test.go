@@ -85,7 +85,7 @@ func (m *mockExchangeReturnClient) LockExchangeQuote(ctx context.Context, in *re
 		Quote: &returnpb.ExchangeQuote{
 			Id:                "quote-123",
 			UserId:            in.UserId,
-			NewProductId:      in.NewProductId,
+			ProductId:         in.ProductId,
 			CategoryCode:      in.CategoryCode,
 			OldBrand:          in.OldBrand,
 			OldModel:          in.OldModel,
@@ -105,7 +105,7 @@ func (m *mockExchangeReturnClient) GetExchangeQuote(ctx context.Context, in *ret
 		Quote: &returnpb.ExchangeQuote{
 			Id:                in.Id,
 			UserId:            "user-test-1",
-			NewProductId:      "prod-1",
+			ProductId:         "prod-1",
 			CategoryCode:      "SMARTPHONE",
 			OldBrand:          "Apple",
 			OldModel:          "iPhone 13",
@@ -122,8 +122,6 @@ func (m *mockExchangeReturnClient) ApplyExchangeToOrder(ctx context.Context, in 
 		Exchange: &returnpb.Exchange{
 			Id:                "exc-999",
 			QuoteId:           in.QuoteId,
-			OrderId:           in.OrderId,
-			OrderItemId:       in.OrderItemId,
 			UserId:            in.UserId,
 			Status:            "EXCHANGE_REQUESTED",
 			EstimatedDiscount: 15000,
@@ -172,7 +170,7 @@ func TestExchangeResolvers(t *testing.T) {
 	t.Run("CalculateExchangeValuation - Eligible", func(t *testing.T) {
 		cat := "SMARTPHONE"
 		resp, err := resolver.Mutation().CalculateExchangeValuation(ctx, model.CalculateExchangeValuationInput{
-			NewProductID: "prod-1",
+			ProductID:    "prod-1",
 			CategoryCode: &cat,
 			OldBrand:     "Apple",
 			OldModel:     "iPhone 13",
@@ -190,9 +188,9 @@ func TestExchangeResolvers(t *testing.T) {
 
 	t.Run("CalculateExchangeValuation - Disqualified", func(t *testing.T) {
 		resp, err := resolver.Mutation().CalculateExchangeValuation(ctx, model.CalculateExchangeValuationInput{
-			NewProductID: "prod-1",
-			OldBrand:     "Apple",
-			OldModel:     "iPhone 13",
+			ProductID: "prod-1",
+			OldBrand:  "Apple",
+			OldModel:  "iPhone 13",
 			Answers: []*model.ExchangeUserAnswerInput{
 				{QuestionKey: "POWER_ON", OptionKey: "NO"},
 			},
@@ -207,9 +205,9 @@ func TestExchangeResolvers(t *testing.T) {
 
 	t.Run("LockExchangeQuote - Success", func(t *testing.T) {
 		quote, err := resolver.Mutation().LockExchangeQuote(ctx, model.LockExchangeQuoteInput{
-			NewProductID: "prod-1",
-			OldBrand:     "Apple",
-			OldModel:     "iPhone 13",
+			ProductID: "prod-1",
+			OldBrand:  "Apple",
+			OldModel:  "iPhone 13",
 			Answers: []*model.ExchangeUserAnswerInput{
 				{QuestionKey: "POWER_ON", OptionKey: "YES"},
 			},
@@ -224,9 +222,9 @@ func TestExchangeResolvers(t *testing.T) {
 
 	t.Run("LockExchangeQuote - Unauthenticated", func(t *testing.T) {
 		_, err := resolver.Mutation().LockExchangeQuote(context.Background(), model.LockExchangeQuoteInput{
-			NewProductID: "prod-1",
-			OldBrand:     "Apple",
-			OldModel:     "iPhone 13",
+			ProductID: "prod-1",
+			OldBrand:  "Apple",
+			OldModel:  "iPhone 13",
 		})
 		if err == nil {
 			t.Fatal("expected unauthorized error")

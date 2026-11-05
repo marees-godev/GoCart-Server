@@ -130,10 +130,7 @@ type ExchangeVerification struct {
 
 type Exchange struct {
 	ID                string                    `json:"id" db:"id"`
-	OrderID           string                    `json:"order_id" db:"order_id"`
-	OrderItemID       string                    `json:"order_item_id" db:"order_item_id"`
 	UserID            string                    `json:"user_id" db:"user_id"`
-	NewProductID      string                    `json:"new_product_id" db:"new_product_id"`
 	OldBrand          string                    `json:"old_brand" db:"old_brand"`
 	OldModel          string                    `json:"old_model" db:"old_model"`
 	OldVariant        string                    `json:"old_variant,omitempty" db:"old_variant"`

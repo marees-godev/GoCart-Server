@@ -90,7 +90,7 @@ type ExchangeDeductionDetailDTO struct {
 }
 
 type CalculateExchangeValuationDTO struct {
-	NewProductID string                   `json:"new_product_id"`
+	ProductID    string                   `json:"product_id"`
 	CategoryCode string                   `json:"category_code"`
 	OldBrand     string                   `json:"old_brand"`
 	OldModel     string                   `json:"old_model"`
@@ -109,7 +109,7 @@ type ExchangeValuationResultDTO struct {
 
 type LockExchangeQuoteDTO struct {
 	UserID       string                   `json:"user_id"`
-	NewProductID string                   `json:"new_product_id"`
+	ProductID    string                   `json:"product_id"`
 	CategoryCode string                   `json:"category_code"`
 	OldBrand     string                   `json:"old_brand"`
 	OldModel     string                   `json:"old_model"`
