@@ -10,6 +10,7 @@ import (
 	ratingpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -107,6 +108,74 @@ func (r *mutationResolver) DeleteRating(ctx context.Context, id string) (*model.
 	}, nil
 }
 
+// FlagRating is the resolver for the flagRating field.
+func (r *mutationResolver) FlagRating(ctx context.Context, input model.FlagRatingInput) (*model.FlagRatingResponse, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	var reasonStr string
+	if input.Reason != nil {
+		reasonStr = *input.Reason
+	}
+
+	catVal, ok := ratingpb.FlagCategory_value[string(input.Category)]
+	if !ok {
+		return nil, appErrors.BadRequest("invalid flag category")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.FlagRatingRequest{
+		UserId:   userID,
+		RatingId: input.RatingID,
+		Category: ratingpb.FlagCategory(catVal),
+		Reason:   reasonStr,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.FlagRating(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.FlagRatingResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
+}
+
+// ModerateRating is the resolver for the moderateRating field.
+func (r *mutationResolver) ModerateRating(ctx context.Context, input model.ModerateRatingInput) (*model.ModerateRatingResponse, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil || userCtx.UserID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: admin credentials required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.ModerateRatingRequest{
+		RatingId: input.RatingID,
+		AdminId:  userCtx.UserID,
+		IsHidden: input.IsHidden,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.ModerateRatings(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ModerateRatingResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
+}
+
 // ProductRatings is the resolver for the productRatings field.
 func (r *queryResolver) ProductRatings(ctx context.Context, productID string, limit *int, offset *int) (*model.ProductRatings, error) {
 	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
@@ -163,4 +232,72 @@ func (r *queryResolver) GetRating(ctx context.Context, id string) (*model.Rating
 	}
 
 	return maps.MapRating(resp.GetRating()), nil
+}
+
+// GetFlaggedRating is the resolver for the getFlaggedRating field.
+func (r *queryResolver) GetFlaggedRating(ctx context.Context, limit *int, offset *int) (*model.FlaggedRatingsResponse, error) {
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil || userCtx.UserID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: admin credentials required")
+	}
+
+	var lim int32 = 10
+	if limit != nil && *limit > 0 {
+		lim = int32(*limit)
+	}
+
+	var off int32 = 0
+	if offset != nil && *offset >= 0 {
+		off = int32(*offset)
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.GetFlaggedRatingsRequest{
+		Limit:   lim,
+		Offset:  off,
+		AdminId: userCtx.UserID,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.GetFlaggedRatings(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	var items []*model.FlaggedRatingItem
+	for _, it := range resp.GetItems() {
+		if it == nil || it.GetRating() == nil {
+			continue
+		}
+		var flags []*model.RatingFlagInfo
+		for _, f := range it.GetFlags() {
+			if f == nil {
+				continue
+			}
+
+			var reasonPtr *string
+			if f.Reason != "" {
+				reasonPtr = &f.Reason
+			}
+
+			flags = append(flags, &model.RatingFlagInfo{
+				ID:        f.GetId(),
+				UserID:    f.GetUserId(),
+				Category:  model.FlagCategory(f.GetCategory().String()),
+				Reason:    reasonPtr,
+				CreatedAt: f.GetCreatedAt(),
+			})
+		}
+		items = append(items, &model.FlaggedRatingItem{
+			Rating:    maps.MapRating(it.GetRating()),
+			FlagCount: int(it.GetFlagCount()),
+			Flags:     flags,
+		})
+	}
+	return &model.FlaggedRatingsResponse{
+		Items: items,
+		Total: int(resp.GetTotal()),
+	}, nil
 }

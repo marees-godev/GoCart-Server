@@ -21,6 +21,64 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type FlagCategory int32
+
+const (
+	FlagCategory_UNSPECIFIED           FlagCategory = 0
+	FlagCategory_SPAM                  FlagCategory = 1
+	FlagCategory_INAPPROPRIATE_CONTENT FlagCategory = 2
+	FlagCategory_FAKE_REVIEW           FlagCategory = 3
+	FlagCategory_IRRELEVANT            FlagCategory = 4
+	FlagCategory_OTHER                 FlagCategory = 5
+)
+
+// Enum value maps for FlagCategory.
+var (
+	FlagCategory_name = map[int32]string{
+		0: "UNSPECIFIED",
+		1: "SPAM",
+		2: "INAPPROPRIATE_CONTENT",
+		3: "FAKE_REVIEW",
+		4: "IRRELEVANT",
+		5: "OTHER",
+	}
+	FlagCategory_value = map[string]int32{
+		"UNSPECIFIED":           0,
+		"SPAM":                  1,
+		"INAPPROPRIATE_CONTENT": 2,
+		"FAKE_REVIEW":           3,
+		"IRRELEVANT":            4,
+		"OTHER":                 5,
+	}
+)
+
+func (x FlagCategory) Enum() *FlagCategory {
+	p := new(FlagCategory)
+	*p = x
+	return p
+}
+
+func (x FlagCategory) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FlagCategory) Descriptor() protoreflect.EnumDescriptor {
+	return file_contracts_protobuf_rating_rating_proto_enumTypes[0].Descriptor()
+}
+
+func (FlagCategory) Type() protoreflect.EnumType {
+	return &file_contracts_protobuf_rating_rating_proto_enumTypes[0]
+}
+
+func (x FlagCategory) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FlagCategory.Descriptor instead.
+func (FlagCategory) EnumDescriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{0}
+}
+
 type Rating struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -781,6 +839,486 @@ func (x *DeleteRatingResponse) GetMessage() string {
 	return ""
 }
 
+type FlagRatingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RatingId      string                 `protobuf:"bytes,1,opt,name=rating_id,json=ratingId,proto3" json:"rating_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Category      FlagCategory           `protobuf:"varint,3,opt,name=category,proto3,enum=gocart.rating.v1.FlagCategory" json:"category,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlagRatingRequest) Reset() {
+	*x = FlagRatingRequest{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlagRatingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlagRatingRequest) ProtoMessage() {}
+
+func (x *FlagRatingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlagRatingRequest.ProtoReflect.Descriptor instead.
+func (*FlagRatingRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FlagRatingRequest) GetRatingId() string {
+	if x != nil {
+		return x.RatingId
+	}
+	return ""
+}
+
+func (x *FlagRatingRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *FlagRatingRequest) GetCategory() FlagCategory {
+	if x != nil {
+		return x.Category
+	}
+	return FlagCategory_UNSPECIFIED
+}
+
+func (x *FlagRatingRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type FlagRatingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlagRatingResponse) Reset() {
+	*x = FlagRatingResponse{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlagRatingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlagRatingResponse) ProtoMessage() {}
+
+func (x *FlagRatingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlagRatingResponse.ProtoReflect.Descriptor instead.
+func (*FlagRatingResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *FlagRatingResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *FlagRatingResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type RatingFlag struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Category      FlagCategory           `protobuf:"varint,3,opt,name=category,proto3,enum=gocart.rating.v1.FlagCategory" json:"category,omitempty"`
+	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RatingFlag) Reset() {
+	*x = RatingFlag{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RatingFlag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RatingFlag) ProtoMessage() {}
+
+func (x *RatingFlag) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RatingFlag.ProtoReflect.Descriptor instead.
+func (*RatingFlag) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RatingFlag) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RatingFlag) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RatingFlag) GetCategory() FlagCategory {
+	if x != nil {
+		return x.Category
+	}
+	return FlagCategory_UNSPECIFIED
+}
+
+func (x *RatingFlag) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RatingFlag) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type FlaggedRatingItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rating        *Rating                `protobuf:"bytes,1,opt,name=rating,proto3" json:"rating,omitempty"`
+	FlagCount     int32                  `protobuf:"varint,2,opt,name=flag_count,json=flagCount,proto3" json:"flag_count,omitempty"`
+	Flags         []*RatingFlag          `protobuf:"bytes,3,rep,name=flags,proto3" json:"flags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FlaggedRatingItem) Reset() {
+	*x = FlaggedRatingItem{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FlaggedRatingItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FlaggedRatingItem) ProtoMessage() {}
+
+func (x *FlaggedRatingItem) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FlaggedRatingItem.ProtoReflect.Descriptor instead.
+func (*FlaggedRatingItem) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FlaggedRatingItem) GetRating() *Rating {
+	if x != nil {
+		return x.Rating
+	}
+	return nil
+}
+
+func (x *FlaggedRatingItem) GetFlagCount() int32 {
+	if x != nil {
+		return x.FlagCount
+	}
+	return 0
+}
+
+func (x *FlaggedRatingItem) GetFlags() []*RatingFlag {
+	if x != nil {
+		return x.Flags
+	}
+	return nil
+}
+
+type GetFlaggedRatingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	AdminId       string                 `protobuf:"bytes,3,opt,name=admin_id,json=adminId,proto3" json:"admin_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFlaggedRatingsRequest) Reset() {
+	*x = GetFlaggedRatingsRequest{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFlaggedRatingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFlaggedRatingsRequest) ProtoMessage() {}
+
+func (x *GetFlaggedRatingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFlaggedRatingsRequest.ProtoReflect.Descriptor instead.
+func (*GetFlaggedRatingsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetFlaggedRatingsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetFlaggedRatingsRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *GetFlaggedRatingsRequest) GetAdminId() string {
+	if x != nil {
+		return x.AdminId
+	}
+	return ""
+}
+
+type GetFlaggedRatingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*FlaggedRatingItem   `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFlaggedRatingsResponse) Reset() {
+	*x = GetFlaggedRatingsResponse{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFlaggedRatingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFlaggedRatingsResponse) ProtoMessage() {}
+
+func (x *GetFlaggedRatingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFlaggedRatingsResponse.ProtoReflect.Descriptor instead.
+func (*GetFlaggedRatingsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetFlaggedRatingsResponse) GetItems() []*FlaggedRatingItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *GetFlaggedRatingsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type ModerateRatingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RatingId      string                 `protobuf:"bytes,1,opt,name=rating_id,json=ratingId,proto3" json:"rating_id,omitempty"`
+	AdminId       string                 `protobuf:"bytes,2,opt,name=admin_id,json=adminId,proto3" json:"admin_id,omitempty"`
+	IsHidden      bool                   `protobuf:"varint,3,opt,name=is_hidden,json=isHidden,proto3" json:"is_hidden,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModerateRatingRequest) Reset() {
+	*x = ModerateRatingRequest{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModerateRatingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModerateRatingRequest) ProtoMessage() {}
+
+func (x *ModerateRatingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModerateRatingRequest.ProtoReflect.Descriptor instead.
+func (*ModerateRatingRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ModerateRatingRequest) GetRatingId() string {
+	if x != nil {
+		return x.RatingId
+	}
+	return ""
+}
+
+func (x *ModerateRatingRequest) GetAdminId() string {
+	if x != nil {
+		return x.AdminId
+	}
+	return ""
+}
+
+func (x *ModerateRatingRequest) GetIsHidden() bool {
+	if x != nil {
+		return x.IsHidden
+	}
+	return false
+}
+
+type ModerateRatingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModerateRatingResponse) Reset() {
+	*x = ModerateRatingResponse{}
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModerateRatingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModerateRatingResponse) ProtoMessage() {}
+
+func (x *ModerateRatingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_rating_rating_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModerateRatingResponse.ProtoReflect.Descriptor instead.
+func (*ModerateRatingResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_rating_rating_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ModerateRatingResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ModerateRatingResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_contracts_protobuf_rating_rating_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_rating_rating_proto_rawDesc = "" +
@@ -847,13 +1385,60 @@ const file_contracts_protobuf_rating_rating_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\"J\n" +
 	"\x14DeleteRatingResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xf0\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x9d\x01\n" +
+	"\x11FlagRatingRequest\x12\x1b\n" +
+	"\trating_id\x18\x01 \x01(\tR\bratingId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12:\n" +
+	"\bcategory\x18\x03 \x01(\x0e2\x1e.gocart.rating.v1.FlagCategoryR\bcategory\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"H\n" +
+	"\x12FlagRatingResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa8\x01\n" +
+	"\n" +
+	"RatingFlag\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12:\n" +
+	"\bcategory\x18\x03 \x01(\x0e2\x1e.gocart.rating.v1.FlagCategoryR\bcategory\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\tR\tcreatedAt\"\x98\x01\n" +
+	"\x11FlaggedRatingItem\x120\n" +
+	"\x06rating\x18\x01 \x01(\v2\x18.gocart.rating.v1.RatingR\x06rating\x12\x1d\n" +
+	"\n" +
+	"flag_count\x18\x02 \x01(\x05R\tflagCount\x122\n" +
+	"\x05flags\x18\x03 \x03(\v2\x1c.gocart.rating.v1.RatingFlagR\x05flags\"c\n" +
+	"\x18GetFlaggedRatingsRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x19\n" +
+	"\badmin_id\x18\x03 \x01(\tR\aadminId\"l\n" +
+	"\x19GetFlaggedRatingsResponse\x129\n" +
+	"\x05items\x18\x01 \x03(\v2#.gocart.rating.v1.FlaggedRatingItemR\x05items\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"l\n" +
+	"\x15ModerateRatingRequest\x12\x1b\n" +
+	"\trating_id\x18\x01 \x01(\tR\bratingId\x12\x19\n" +
+	"\badmin_id\x18\x02 \x01(\tR\aadminId\x12\x1b\n" +
+	"\tis_hidden\x18\x03 \x01(\bR\bisHidden\"L\n" +
+	"\x16ModerateRatingResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage*p\n" +
+	"\fFlagCategory\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\b\n" +
+	"\x04SPAM\x10\x01\x12\x19\n" +
+	"\x15INAPPROPRIATE_CONTENT\x10\x02\x12\x0f\n" +
+	"\vFAKE_REVIEW\x10\x03\x12\x0e\n" +
+	"\n" +
+	"IRRELEVANT\x10\x04\x12\t\n" +
+	"\x05OTHER\x10\x052\x9d\x06\n" +
 	"\rRatingService\x12]\n" +
 	"\fCreateRating\x12%.gocart.rating.v1.CreateRatingRequest\x1a&.gocart.rating.v1.CreateRatingResponse\x12T\n" +
 	"\tGetRating\x12\".gocart.rating.v1.GetRatingRequest\x1a#.gocart.rating.v1.GetRatingResponse\x12l\n" +
 	"\x11GetProductRatings\x12*.gocart.rating.v1.GetProductRatingsRequest\x1a+.gocart.rating.v1.GetProductRatingsResponse\x12]\n" +
 	"\fUpdateRating\x12%.gocart.rating.v1.UpdateRatingRequest\x1a&.gocart.rating.v1.UpdateRatingResponse\x12]\n" +
-	"\fDeleteRating\x12%.gocart.rating.v1.DeleteRatingRequest\x1a&.gocart.rating.v1.DeleteRatingResponseBHZFgithub.com/marees-godev/GoCart-Server/contracts/protobuf/rating;ratingb\x06proto3"
+	"\fDeleteRating\x12%.gocart.rating.v1.DeleteRatingRequest\x1a&.gocart.rating.v1.DeleteRatingResponse\x12W\n" +
+	"\n" +
+	"FlagRating\x12#.gocart.rating.v1.FlagRatingRequest\x1a$.gocart.rating.v1.FlagRatingResponse\x12l\n" +
+	"\x11GetFlaggedRatings\x12*.gocart.rating.v1.GetFlaggedRatingsRequest\x1a+.gocart.rating.v1.GetFlaggedRatingsResponse\x12d\n" +
+	"\x0fModerateRatings\x12'.gocart.rating.v1.ModerateRatingRequest\x1a(.gocart.rating.v1.ModerateRatingResponseBHZFgithub.com/marees-godev/GoCart-Server/contracts/protobuf/rating;ratingb\x06proto3"
 
 var (
 	file_contracts_protobuf_rating_rating_proto_rawDescOnce sync.Once
@@ -867,42 +1452,63 @@ func file_contracts_protobuf_rating_rating_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_rating_rating_proto_rawDescData
 }
 
-var file_contracts_protobuf_rating_rating_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_contracts_protobuf_rating_rating_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_contracts_protobuf_rating_rating_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_contracts_protobuf_rating_rating_proto_goTypes = []any{
-	(*Rating)(nil),                    // 0: gocart.rating.v1.Rating
-	(*CreateRatingRequest)(nil),       // 1: gocart.rating.v1.CreateRatingRequest
-	(*CreateRatingResponse)(nil),      // 2: gocart.rating.v1.CreateRatingResponse
-	(*GetRatingRequest)(nil),          // 3: gocart.rating.v1.GetRatingRequest
-	(*GetRatingResponse)(nil),         // 4: gocart.rating.v1.GetRatingResponse
-	(*StarRating)(nil),                // 5: gocart.rating.v1.StarRating
-	(*GetProductRatingsRequest)(nil),  // 6: gocart.rating.v1.GetProductRatingsRequest
-	(*GetProductRatingsResponse)(nil), // 7: gocart.rating.v1.GetProductRatingsResponse
-	(*UpdateRatingRequest)(nil),       // 8: gocart.rating.v1.UpdateRatingRequest
-	(*UpdateRatingResponse)(nil),      // 9: gocart.rating.v1.UpdateRatingResponse
-	(*DeleteRatingRequest)(nil),       // 10: gocart.rating.v1.DeleteRatingRequest
-	(*DeleteRatingResponse)(nil),      // 11: gocart.rating.v1.DeleteRatingResponse
+	(FlagCategory)(0),                 // 0: gocart.rating.v1.FlagCategory
+	(*Rating)(nil),                    // 1: gocart.rating.v1.Rating
+	(*CreateRatingRequest)(nil),       // 2: gocart.rating.v1.CreateRatingRequest
+	(*CreateRatingResponse)(nil),      // 3: gocart.rating.v1.CreateRatingResponse
+	(*GetRatingRequest)(nil),          // 4: gocart.rating.v1.GetRatingRequest
+	(*GetRatingResponse)(nil),         // 5: gocart.rating.v1.GetRatingResponse
+	(*StarRating)(nil),                // 6: gocart.rating.v1.StarRating
+	(*GetProductRatingsRequest)(nil),  // 7: gocart.rating.v1.GetProductRatingsRequest
+	(*GetProductRatingsResponse)(nil), // 8: gocart.rating.v1.GetProductRatingsResponse
+	(*UpdateRatingRequest)(nil),       // 9: gocart.rating.v1.UpdateRatingRequest
+	(*UpdateRatingResponse)(nil),      // 10: gocart.rating.v1.UpdateRatingResponse
+	(*DeleteRatingRequest)(nil),       // 11: gocart.rating.v1.DeleteRatingRequest
+	(*DeleteRatingResponse)(nil),      // 12: gocart.rating.v1.DeleteRatingResponse
+	(*FlagRatingRequest)(nil),         // 13: gocart.rating.v1.FlagRatingRequest
+	(*FlagRatingResponse)(nil),        // 14: gocart.rating.v1.FlagRatingResponse
+	(*RatingFlag)(nil),                // 15: gocart.rating.v1.RatingFlag
+	(*FlaggedRatingItem)(nil),         // 16: gocart.rating.v1.FlaggedRatingItem
+	(*GetFlaggedRatingsRequest)(nil),  // 17: gocart.rating.v1.GetFlaggedRatingsRequest
+	(*GetFlaggedRatingsResponse)(nil), // 18: gocart.rating.v1.GetFlaggedRatingsResponse
+	(*ModerateRatingRequest)(nil),     // 19: gocart.rating.v1.ModerateRatingRequest
+	(*ModerateRatingResponse)(nil),    // 20: gocart.rating.v1.ModerateRatingResponse
 }
 var file_contracts_protobuf_rating_rating_proto_depIdxs = []int32{
-	0,  // 0: gocart.rating.v1.CreateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
-	0,  // 1: gocart.rating.v1.GetRatingResponse.rating:type_name -> gocart.rating.v1.Rating
-	0,  // 2: gocart.rating.v1.GetProductRatingsResponse.ratings:type_name -> gocart.rating.v1.Rating
-	5,  // 3: gocart.rating.v1.GetProductRatingsResponse.stars:type_name -> gocart.rating.v1.StarRating
-	0,  // 4: gocart.rating.v1.UpdateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
-	1,  // 5: gocart.rating.v1.RatingService.CreateRating:input_type -> gocart.rating.v1.CreateRatingRequest
-	3,  // 6: gocart.rating.v1.RatingService.GetRating:input_type -> gocart.rating.v1.GetRatingRequest
-	6,  // 7: gocart.rating.v1.RatingService.GetProductRatings:input_type -> gocart.rating.v1.GetProductRatingsRequest
-	8,  // 8: gocart.rating.v1.RatingService.UpdateRating:input_type -> gocart.rating.v1.UpdateRatingRequest
-	10, // 9: gocart.rating.v1.RatingService.DeleteRating:input_type -> gocart.rating.v1.DeleteRatingRequest
-	2,  // 10: gocart.rating.v1.RatingService.CreateRating:output_type -> gocart.rating.v1.CreateRatingResponse
-	4,  // 11: gocart.rating.v1.RatingService.GetRating:output_type -> gocart.rating.v1.GetRatingResponse
-	7,  // 12: gocart.rating.v1.RatingService.GetProductRatings:output_type -> gocart.rating.v1.GetProductRatingsResponse
-	9,  // 13: gocart.rating.v1.RatingService.UpdateRating:output_type -> gocart.rating.v1.UpdateRatingResponse
-	11, // 14: gocart.rating.v1.RatingService.DeleteRating:output_type -> gocart.rating.v1.DeleteRatingResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	1,  // 0: gocart.rating.v1.CreateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
+	1,  // 1: gocart.rating.v1.GetRatingResponse.rating:type_name -> gocart.rating.v1.Rating
+	1,  // 2: gocart.rating.v1.GetProductRatingsResponse.ratings:type_name -> gocart.rating.v1.Rating
+	6,  // 3: gocart.rating.v1.GetProductRatingsResponse.stars:type_name -> gocart.rating.v1.StarRating
+	1,  // 4: gocart.rating.v1.UpdateRatingResponse.rating:type_name -> gocart.rating.v1.Rating
+	0,  // 5: gocart.rating.v1.FlagRatingRequest.category:type_name -> gocart.rating.v1.FlagCategory
+	0,  // 6: gocart.rating.v1.RatingFlag.category:type_name -> gocart.rating.v1.FlagCategory
+	1,  // 7: gocart.rating.v1.FlaggedRatingItem.rating:type_name -> gocart.rating.v1.Rating
+	15, // 8: gocart.rating.v1.FlaggedRatingItem.flags:type_name -> gocart.rating.v1.RatingFlag
+	16, // 9: gocart.rating.v1.GetFlaggedRatingsResponse.items:type_name -> gocart.rating.v1.FlaggedRatingItem
+	2,  // 10: gocart.rating.v1.RatingService.CreateRating:input_type -> gocart.rating.v1.CreateRatingRequest
+	4,  // 11: gocart.rating.v1.RatingService.GetRating:input_type -> gocart.rating.v1.GetRatingRequest
+	7,  // 12: gocart.rating.v1.RatingService.GetProductRatings:input_type -> gocart.rating.v1.GetProductRatingsRequest
+	9,  // 13: gocart.rating.v1.RatingService.UpdateRating:input_type -> gocart.rating.v1.UpdateRatingRequest
+	11, // 14: gocart.rating.v1.RatingService.DeleteRating:input_type -> gocart.rating.v1.DeleteRatingRequest
+	13, // 15: gocart.rating.v1.RatingService.FlagRating:input_type -> gocart.rating.v1.FlagRatingRequest
+	17, // 16: gocart.rating.v1.RatingService.GetFlaggedRatings:input_type -> gocart.rating.v1.GetFlaggedRatingsRequest
+	19, // 17: gocart.rating.v1.RatingService.ModerateRatings:input_type -> gocart.rating.v1.ModerateRatingRequest
+	3,  // 18: gocart.rating.v1.RatingService.CreateRating:output_type -> gocart.rating.v1.CreateRatingResponse
+	5,  // 19: gocart.rating.v1.RatingService.GetRating:output_type -> gocart.rating.v1.GetRatingResponse
+	8,  // 20: gocart.rating.v1.RatingService.GetProductRatings:output_type -> gocart.rating.v1.GetProductRatingsResponse
+	10, // 21: gocart.rating.v1.RatingService.UpdateRating:output_type -> gocart.rating.v1.UpdateRatingResponse
+	12, // 22: gocart.rating.v1.RatingService.DeleteRating:output_type -> gocart.rating.v1.DeleteRatingResponse
+	14, // 23: gocart.rating.v1.RatingService.FlagRating:output_type -> gocart.rating.v1.FlagRatingResponse
+	18, // 24: gocart.rating.v1.RatingService.GetFlaggedRatings:output_type -> gocart.rating.v1.GetFlaggedRatingsResponse
+	20, // 25: gocart.rating.v1.RatingService.ModerateRatings:output_type -> gocart.rating.v1.ModerateRatingResponse
+	18, // [18:26] is the sub-list for method output_type
+	10, // [10:18] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_rating_rating_proto_init() }
@@ -915,13 +1521,14 @@ func file_contracts_protobuf_rating_rating_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_rating_rating_proto_rawDesc), len(file_contracts_protobuf_rating_rating_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   12,
+			NumEnums:      1,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_contracts_protobuf_rating_rating_proto_goTypes,
 		DependencyIndexes: file_contracts_protobuf_rating_rating_proto_depIdxs,
+		EnumInfos:         file_contracts_protobuf_rating_rating_proto_enumTypes,
 		MessageInfos:      file_contracts_protobuf_rating_rating_proto_msgTypes,
 	}.Build()
 	File_contracts_protobuf_rating_rating_proto = out.File
