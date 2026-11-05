@@ -84,8 +84,7 @@ input VerifyProductInput {
   returnId: ID!
   condition: String!
   isApproved: Boolean!
-  proofImages: [String!]
-  imagesUpload: [Upload!]
+  proofImages: [Upload]
   notes: String
 }
 
@@ -118,10 +117,9 @@ type ExchangeVerification {
 
 type Exchange {
   id: ID!
-  orderId: String!
-  orderItemId: String!
   userId: String!
-  newProductId: String!
+  productId: String
+  exchangeDeviceCatalogId: String
   oldBrand: String!
   oldModel: String!
   oldVariant: String
@@ -131,6 +129,7 @@ type Exchange {
   finalDiscount: Float
   priceDifference: Float
   status: String!
+  quoteId: String
   answers: [ExchangeQuestionAnswer!]
   verification: ExchangeVerification
   createdAt: String
@@ -144,15 +143,13 @@ input ExchangeQuestionAnswerInput {
 }
 
 input CreateExchangeInput {
-  orderId: String!
+  productId: String!
+  exchangeDeviceCatalogId: String!
   userId: String
-  orderItemId: String!
-  newProductId: String!
-  oldBrand: String!
-  oldModel: String!
+  oldBrand: String
+  oldModel: String
   oldVariant: String
   serialOrImei: String
-  baseExchangeValue: Float!
   answers: [ExchangeQuestionAnswerInput!]
 }
 
@@ -168,11 +165,131 @@ input VerifyExchangeProductInput {
   notes: String
 }
 
+type ExchangeQuestionOption {
+  id: ID!
+  questionId: ID!
+  optionKey: String!
+  optionLabel: String!
+  deductionAmount: Float!
+  isFatalDisqualifier: Boolean!
+  rejectionReason: String
+  displayOrder: Int!
+}
+
+type ExchangeDiagnosticQuestion {
+  id: ID!
+  categoryCode: String!
+  questionKey: String!
+  questionText: String!
+  displayOrder: Int!
+  options: [ExchangeQuestionOption!]!
+}
+
+type ExchangeDeviceOption {
+  id: ID!
+  categoryCode: String!
+  brand: String!
+  model: String!
+  variant: String!
+  baseExchangeValue: Float!
+}
+
+type ExchangeDeductionDetail {
+  questionKey: String!
+  optionKey: String!
+  deductionAmount: Float!
+  isFatal: Boolean!
+  rejectionReason: String
+}
+
+type ExchangeValuationResult {
+  isEligible: Boolean!
+  rejectionReason: String
+  baseExchangeValue: Float!
+  totalDeductions: Float!
+  finalDiscount: Float!
+  deductions: [ExchangeDeductionDetail!]
+}
+
+type ExchangeQuoteAnswer {
+  id: ID!
+  quoteId: ID!
+  questionKey: String!
+  optionKey: String!
+  deductionAmount: Float!
+  isFatal: Boolean!
+}
+
+type ExchangeQuote {
+  id: ID!
+  userId: String!
+  productId: String!
+  categoryCode: String!
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  baseExchangeValue: Float!
+  totalDeductions: Float!
+  finalDiscount: Float!
+  isDisqualified: Boolean!
+  disqualificationReason: String
+  status: String!
+  expiresAt: String!
+  answers: [ExchangeQuoteAnswer!]
+  createdAt: String
+  updatedAt: String
+}
+
+type ExchangeQuestionsResponse {
+  questions: [ExchangeDiagnosticQuestion!]!
+  devices: [ExchangeDeviceOption!]!
+}
+
+input ExchangeUserAnswerInput {
+  questionKey: String!
+  optionKey: String!
+}
+
+input CalculateExchangeValuationInput {
+  productId: String!
+  categoryCode: String
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  answers: [ExchangeUserAnswerInput!]!
+}
+
+input LockExchangeQuoteInput {
+  productId: String!
+  categoryCode: String
+  oldBrand: String!
+  oldModel: String!
+  oldVariant: String
+  serialOrImei: String
+  answers: [ExchangeUserAnswerInput!]!
+}
+
+input ApplyExchangeToOrderInput {
+  quoteId: ID!
+  orderId: String!
+  orderItemId: String!
+}
+
+input ResolveExchangeMismatchInput {
+  exchangeId: ID!
+  action: String!
+  paymentMethod: String
+  notes: String
+}
+
 extend type Query {
   returnOrder(id: ID!): ReturnOrder @auth
   returnOrdersByOrder(orderId: String!): [ReturnOrder!]! @auth
   listReturns(limit: Int, offset: Int, status: String): [ReturnOrder!]! @auth(requires: [ADMIN, MERCHANT, DELIVERY_PARTNER])
   exchange(id: ID!): Exchange @auth
+  exchangeQuestions(categoryCode: String, productId: String): ExchangeQuestionsResponse!
+  exchangeQuote(id: ID!): ExchangeQuote @auth
 }
 
 extend type Mutation {
@@ -184,5 +301,8 @@ extend type Mutation {
   rejectReturn(id: ID!, reason: String!): ReturnOrder @auth(requires: [ADMIN])
   createExchange(input: CreateExchangeInput!): Exchange @auth
   verifyExchangeProduct(input: VerifyExchangeProductInput!): Exchange @auth(requires: [DELIVERY_PARTNER, ADMIN])
+  calculateExchangeValuation(input: CalculateExchangeValuationInput!): ExchangeValuationResult!
+  lockExchangeQuote(input: LockExchangeQuoteInput!): ExchangeQuote! @auth
+  applyExchangeToOrder(input: ApplyExchangeToOrderInput!): Exchange! @auth
+  resolveExchangeMismatch(input: ResolveExchangeMismatchInput!): Exchange! @auth(requires: [DELIVERY_PARTNER, ADMIN])
 }
-

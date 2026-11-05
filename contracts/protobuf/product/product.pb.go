@@ -238,28 +238,30 @@ func (x *ProductImage) GetDisplayOrder() int32 {
 }
 
 type Product struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	StoreId       string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	CategoryId    string                 `protobuf:"bytes,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Sku           string                 `protobuf:"bytes,4,opt,name=sku,proto3" json:"sku,omitempty"`
-	Name          string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
-	Price         float64                `protobuf:"fixed64,7,opt,name=price,proto3" json:"price,omitempty"`
-	Mrp           float64                `protobuf:"fixed64,8,opt,name=mrp,proto3" json:"mrp,omitempty"`
-	Tax           float64                `protobuf:"fixed64,9,opt,name=tax,proto3" json:"tax,omitempty"`
-	Status        string                 `protobuf:"bytes,10,opt,name=status,proto3" json:"status,omitempty"`
-	Images        []string               `protobuf:"bytes,11,rep,name=images,proto3" json:"images,omitempty"`
-	Variants      []*ProductVariant      `protobuf:"bytes,12,rep,name=variants,proto3" json:"variants,omitempty"`
-	AvgRating     float64                `protobuf:"fixed64,13,opt,name=avg_rating,json=avgRating,proto3" json:"avg_rating,omitempty"`
-	CreatedAt     string                 `protobuf:"bytes,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     string                 `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Productname   string                 `protobuf:"bytes,16,opt,name=productname,proto3" json:"productname,omitempty"`
-	DeletedAt     string                 `protobuf:"bytes,17,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
-	ImageUrl      string                 `protobuf:"bytes,18,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	IsReturnable  bool                   `protobuf:"varint,19,opt,name=is_returnable,json=isReturnable,proto3" json:"is_returnable,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	StoreId             string                 `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	CategoryId          string                 `protobuf:"bytes,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Sku                 string                 `protobuf:"bytes,4,opt,name=sku,proto3" json:"sku,omitempty"`
+	Name                string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	Description         string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Price               float64                `protobuf:"fixed64,7,opt,name=price,proto3" json:"price,omitempty"`
+	Mrp                 float64                `protobuf:"fixed64,8,opt,name=mrp,proto3" json:"mrp,omitempty"`
+	Tax                 float64                `protobuf:"fixed64,9,opt,name=tax,proto3" json:"tax,omitempty"`
+	Status              string                 `protobuf:"bytes,10,opt,name=status,proto3" json:"status,omitempty"`
+	Images              []string               `protobuf:"bytes,11,rep,name=images,proto3" json:"images,omitempty"`
+	Variants            []*ProductVariant      `protobuf:"bytes,12,rep,name=variants,proto3" json:"variants,omitempty"`
+	AvgRating           float64                `protobuf:"fixed64,13,opt,name=avg_rating,json=avgRating,proto3" json:"avg_rating,omitempty"`
+	CreatedAt           string                 `protobuf:"bytes,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt           string                 `protobuf:"bytes,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Productname         string                 `protobuf:"bytes,16,opt,name=productname,proto3" json:"productname,omitempty"`
+	DeletedAt           string                 `protobuf:"bytes,17,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+	ImageUrl            string                 `protobuf:"bytes,18,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	IsReturnable        bool                   `protobuf:"varint,19,opt,name=is_returnable,json=isReturnable,proto3" json:"is_returnable,omitempty"`
+	IsExchangeEligible  bool                   `protobuf:"varint,20,opt,name=is_exchange_eligible,json=isExchangeEligible,proto3" json:"is_exchange_eligible,omitempty"`
+	MaxExchangeDiscount float64                `protobuf:"fixed64,21,opt,name=max_exchange_discount,json=maxExchangeDiscount,proto3" json:"max_exchange_discount,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Product) Reset() {
@@ -423,6 +425,20 @@ func (x *Product) GetIsReturnable() bool {
 		return x.IsReturnable
 	}
 	return false
+}
+
+func (x *Product) GetIsExchangeEligible() bool {
+	if x != nil {
+		return x.IsExchangeEligible
+	}
+	return false
+}
+
+func (x *Product) GetMaxExchangeDiscount() float64 {
+	if x != nil {
+		return x.MaxExchangeDiscount
+	}
+	return 0
 }
 
 type GetProductRequest struct {
@@ -726,22 +742,24 @@ func (x *CreateProductVariantInput) GetAttributesJson() string {
 }
 
 type CreateProductRequest struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	StoreId       string                       `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	CategoryId    string                       `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Sku           string                       `protobuf:"bytes,3,opt,name=sku,proto3" json:"sku,omitempty"`
-	Name          string                       `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                       `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Price         float64                      `protobuf:"fixed64,6,opt,name=price,proto3" json:"price,omitempty"`
-	Mrp           float64                      `protobuf:"fixed64,7,opt,name=mrp,proto3" json:"mrp,omitempty"`
-	Tax           float64                      `protobuf:"fixed64,8,opt,name=tax,proto3" json:"tax,omitempty"`
-	Status        string                       `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
-	Images        []string                     `protobuf:"bytes,10,rep,name=images,proto3" json:"images,omitempty"`
-	Variants      []*CreateProductVariantInput `protobuf:"bytes,11,rep,name=variants,proto3" json:"variants,omitempty"`
-	Productname   string                       `protobuf:"bytes,12,opt,name=productname,proto3" json:"productname,omitempty"`
-	ImageUrl      string                       `protobuf:"bytes,13,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState       `protogen:"open.v1"`
+	StoreId             string                       `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	CategoryId          string                       `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Sku                 string                       `protobuf:"bytes,3,opt,name=sku,proto3" json:"sku,omitempty"`
+	Name                string                       `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Description         string                       `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Price               float64                      `protobuf:"fixed64,6,opt,name=price,proto3" json:"price,omitempty"`
+	Mrp                 float64                      `protobuf:"fixed64,7,opt,name=mrp,proto3" json:"mrp,omitempty"`
+	Tax                 float64                      `protobuf:"fixed64,8,opt,name=tax,proto3" json:"tax,omitempty"`
+	Status              string                       `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	Images              []string                     `protobuf:"bytes,10,rep,name=images,proto3" json:"images,omitempty"`
+	Variants            []*CreateProductVariantInput `protobuf:"bytes,11,rep,name=variants,proto3" json:"variants,omitempty"`
+	Productname         string                       `protobuf:"bytes,12,opt,name=productname,proto3" json:"productname,omitempty"`
+	ImageUrl            string                       `protobuf:"bytes,13,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	IsExchangeEligible  bool                         `protobuf:"varint,14,opt,name=is_exchange_eligible,json=isExchangeEligible,proto3" json:"is_exchange_eligible,omitempty"`
+	MaxExchangeDiscount float64                      `protobuf:"fixed64,15,opt,name=max_exchange_discount,json=maxExchangeDiscount,proto3" json:"max_exchange_discount,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateProductRequest) Reset() {
@@ -863,6 +881,20 @@ func (x *CreateProductRequest) GetImageUrl() string {
 		return x.ImageUrl
 	}
 	return ""
+}
+
+func (x *CreateProductRequest) GetIsExchangeEligible() bool {
+	if x != nil {
+		return x.IsExchangeEligible
+	}
+	return false
+}
+
+func (x *CreateProductRequest) GetMaxExchangeDiscount() float64 {
+	if x != nil {
+		return x.MaxExchangeDiscount
+	}
+	return 0
 }
 
 type CreateProductResponse struct {
@@ -1010,21 +1042,23 @@ func (x *UpdateProductVariantInput) GetStatus() string {
 }
 
 type UpdateProductRequest struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	Id            string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          *string                      `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Description   *string                      `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	Price         *float64                     `protobuf:"fixed64,4,opt,name=price,proto3,oneof" json:"price,omitempty"`
-	Mrp           *float64                     `protobuf:"fixed64,5,opt,name=mrp,proto3,oneof" json:"mrp,omitempty"`
-	Tax           *float64                     `protobuf:"fixed64,6,opt,name=tax,proto3,oneof" json:"tax,omitempty"`
-	Status        *string                      `protobuf:"bytes,7,opt,name=status,proto3,oneof" json:"status,omitempty"`
-	CategoryId    *string                      `protobuf:"bytes,8,opt,name=category_id,json=categoryId,proto3,oneof" json:"category_id,omitempty"`
-	Images        []string                     `protobuf:"bytes,9,rep,name=images,proto3" json:"images,omitempty"`
-	Variants      []*UpdateProductVariantInput `protobuf:"bytes,10,rep,name=variants,proto3" json:"variants,omitempty"`
-	Productname   *string                      `protobuf:"bytes,11,opt,name=productname,proto3,oneof" json:"productname,omitempty"`
-	ImageUrl      *string                      `protobuf:"bytes,12,opt,name=image_url,json=imageUrl,proto3,oneof" json:"image_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState       `protogen:"open.v1"`
+	Id                  string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                *string                      `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Description         *string                      `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	Price               *float64                     `protobuf:"fixed64,4,opt,name=price,proto3,oneof" json:"price,omitempty"`
+	Mrp                 *float64                     `protobuf:"fixed64,5,opt,name=mrp,proto3,oneof" json:"mrp,omitempty"`
+	Tax                 *float64                     `protobuf:"fixed64,6,opt,name=tax,proto3,oneof" json:"tax,omitempty"`
+	Status              *string                      `protobuf:"bytes,7,opt,name=status,proto3,oneof" json:"status,omitempty"`
+	CategoryId          *string                      `protobuf:"bytes,8,opt,name=category_id,json=categoryId,proto3,oneof" json:"category_id,omitempty"`
+	Images              []string                     `protobuf:"bytes,9,rep,name=images,proto3" json:"images,omitempty"`
+	Variants            []*UpdateProductVariantInput `protobuf:"bytes,10,rep,name=variants,proto3" json:"variants,omitempty"`
+	Productname         *string                      `protobuf:"bytes,11,opt,name=productname,proto3,oneof" json:"productname,omitempty"`
+	ImageUrl            *string                      `protobuf:"bytes,12,opt,name=image_url,json=imageUrl,proto3,oneof" json:"image_url,omitempty"`
+	IsExchangeEligible  *bool                        `protobuf:"varint,13,opt,name=is_exchange_eligible,json=isExchangeEligible,proto3,oneof" json:"is_exchange_eligible,omitempty"`
+	MaxExchangeDiscount *float64                     `protobuf:"fixed64,14,opt,name=max_exchange_discount,json=maxExchangeDiscount,proto3,oneof" json:"max_exchange_discount,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *UpdateProductRequest) Reset() {
@@ -1139,6 +1173,20 @@ func (x *UpdateProductRequest) GetImageUrl() string {
 		return *x.ImageUrl
 	}
 	return ""
+}
+
+func (x *UpdateProductRequest) GetIsExchangeEligible() bool {
+	if x != nil && x.IsExchangeEligible != nil {
+		return *x.IsExchangeEligible
+	}
+	return false
+}
+
+func (x *UpdateProductRequest) GetMaxExchangeDiscount() float64 {
+	if x != nil && x.MaxExchangeDiscount != nil {
+		return *x.MaxExchangeDiscount
+	}
+	return 0
 }
 
 type UpdateProductResponse struct {
@@ -1416,7 +1464,7 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\balt_text\x18\x04 \x01(\tR\aaltText\x12\x1d\n" +
 	"\n" +
 	"is_primary\x18\x05 \x01(\bR\tisPrimary\x12#\n" +
-	"\rdisplay_order\x18\x06 \x01(\x05R\fdisplayOrder\"\xa6\x04\n" +
+	"\rdisplay_order\x18\x06 \x01(\x05R\fdisplayOrder\"\x8c\x05\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1f\n" +
@@ -1442,7 +1490,9 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\n" +
 	"deleted_at\x18\x11 \x01(\tR\tdeletedAt\x12\x1b\n" +
 	"\timage_url\x18\x12 \x01(\tR\bimageUrl\x12#\n" +
-	"\ris_returnable\x18\x13 \x01(\bR\fisReturnable\"#\n" +
+	"\ris_returnable\x18\x13 \x01(\bR\fisReturnable\x120\n" +
+	"\x14is_exchange_eligible\x18\x14 \x01(\bR\x12isExchangeEligible\x122\n" +
+	"\x15max_exchange_discount\x18\x15 \x01(\x01R\x13maxExchangeDiscount\"#\n" +
 	"\x11GetProductRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"J\n" +
 	"\x12GetProductResponse\x124\n" +
@@ -1463,7 +1513,7 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\x05price\x18\x03 \x01(\x01R\x05price\x12\x10\n" +
 	"\x03mrp\x18\x04 \x01(\x01R\x03mrp\x12\x14\n" +
 	"\x05stock\x18\x05 \x01(\x05R\x05stock\x12'\n" +
-	"\x0fattributes_json\x18\x06 \x01(\tR\x0eattributesJson\"\x8d\x03\n" +
+	"\x0fattributes_json\x18\x06 \x01(\tR\x0eattributesJson\"\xf3\x03\n" +
 	"\x14CreateProductRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\tR\n" +
@@ -1479,7 +1529,9 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	" \x03(\tR\x06images\x12H\n" +
 	"\bvariants\x18\v \x03(\v2,.gocart.product.v1.CreateProductVariantInputR\bvariants\x12 \n" +
 	"\vproductname\x18\f \x01(\tR\vproductname\x12\x1b\n" +
-	"\timage_url\x18\r \x01(\tR\bimageUrl\"M\n" +
+	"\timage_url\x18\r \x01(\tR\bimageUrl\x120\n" +
+	"\x14is_exchange_eligible\x18\x0e \x01(\bR\x12isExchangeEligible\x122\n" +
+	"\x15max_exchange_discount\x18\x0f \x01(\x01R\x13maxExchangeDiscount\"M\n" +
 	"\x15CreateProductResponse\x124\n" +
 	"\aproduct\x18\x01 \x01(\v2\x1a.gocart.product.v1.ProductR\aproduct\"\xd0\x01\n" +
 	"\x19UpdateProductVariantInput\x12\x0e\n" +
@@ -1490,7 +1542,7 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\x03mrp\x18\x05 \x01(\x01R\x03mrp\x12\x14\n" +
 	"\x05stock\x18\x06 \x01(\x05R\x05stock\x12'\n" +
 	"\x0fattributes_json\x18\a \x01(\tR\x0eattributesJson\x12\x16\n" +
-	"\x06status\x18\b \x01(\tR\x06status\"\x89\x04\n" +
+	"\x06status\x18\b \x01(\tR\x06status\"\xac\x05\n" +
 	"\x14UpdateProductRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12%\n" +
@@ -1505,7 +1557,10 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\bvariants\x18\n" +
 	" \x03(\v2,.gocart.product.v1.UpdateProductVariantInputR\bvariants\x12%\n" +
 	"\vproductname\x18\v \x01(\tH\aR\vproductname\x88\x01\x01\x12 \n" +
-	"\timage_url\x18\f \x01(\tH\bR\bimageUrl\x88\x01\x01B\a\n" +
+	"\timage_url\x18\f \x01(\tH\bR\bimageUrl\x88\x01\x01\x125\n" +
+	"\x14is_exchange_eligible\x18\r \x01(\bH\tR\x12isExchangeEligible\x88\x01\x01\x127\n" +
+	"\x15max_exchange_discount\x18\x0e \x01(\x01H\n" +
+	"R\x13maxExchangeDiscount\x88\x01\x01B\a\n" +
 	"\x05_nameB\x0e\n" +
 	"\f_descriptionB\b\n" +
 	"\x06_priceB\x06\n" +
@@ -1515,7 +1570,9 @@ const file_contracts_protobuf_product_product_proto_rawDesc = "" +
 	"\f_category_idB\x0e\n" +
 	"\f_productnameB\f\n" +
 	"\n" +
-	"_image_url\"M\n" +
+	"_image_urlB\x17\n" +
+	"\x15_is_exchange_eligibleB\x18\n" +
+	"\x16_max_exchange_discount\"M\n" +
 	"\x15UpdateProductResponse\x124\n" +
 	"\aproduct\x18\x01 \x01(\v2\x1a.gocart.product.v1.ProductR\aproduct\"&\n" +
 	"\x14DeleteProductRequest\x12\x0e\n" +

@@ -31,8 +31,10 @@ type CreateProductRequest struct {
 	MRP         float64                `json:"mrp"`
 	Tax         float64                `json:"tax"`
 	Status      string                 `json:"status"`
-	ImageURL    string                 `json:"image_url,omitempty"`
-	Images      []string               `json:"images"`
+	ImageURL            string                 `json:"image_url,omitempty"`
+	IsExchangeEligible  bool                   `json:"is_exchange_eligible"`
+	MaxExchangeDiscount float64                `json:"max_exchange_discount"`
+	Images              []string               `json:"images"`
 	Variants    []CreateVariantRequest `json:"variants"`
 }
 
@@ -140,8 +142,10 @@ type UpdateProductRequest struct {
 	Tax         *float64               `json:"tax,omitempty"`
 	Status      *string                `json:"status,omitempty"`
 	CategoryID  *string                `json:"category_id,omitempty"`
-	ImageURL    *string                `json:"image_url,omitempty"`
-	Images      []string               `json:"images,omitempty"`
+	ImageURL            *string                `json:"image_url,omitempty"`
+	IsExchangeEligible  *bool                  `json:"is_exchange_eligible,omitempty"`
+	MaxExchangeDiscount *float64               `json:"max_exchange_discount,omitempty"`
+	Images              []string               `json:"images,omitempty"`
 	Variants    []UpdateVariantRequest `json:"variants,omitempty"`
 }
 
@@ -280,8 +284,10 @@ func ToProductPB(p *model.Product) *productpb.Product {
 		AvgRating:    p.AvgRating,
 		CreatedAt:    p.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:    p.UpdatedAt.Format(time.RFC3339),
-		DeletedAt:    deletedAtStr,
-		IsReturnable: true,
+		DeletedAt:           deletedAtStr,
+		IsReturnable:        true,
+		IsExchangeEligible:  p.IsExchangeEligible,
+		MaxExchangeDiscount: p.MaxExchangeDiscount,
 	}
 }
 
