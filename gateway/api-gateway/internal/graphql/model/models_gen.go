@@ -456,6 +456,28 @@ type ExchangeVerification struct {
 	UpdatedAt        *string  `json:"updatedAt,omitempty"`
 }
 
+type FlagRatingInput struct {
+	RatingID string       `json:"ratingId"`
+	Category FlagCategory `json:"category"`
+	Reason   *string      `json:"reason,omitempty"`
+}
+
+type FlagRatingResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type FlaggedRatingItem struct {
+	Rating    *Rating           `json:"rating"`
+	FlagCount int               `json:"flagCount"`
+	Flags     []*RatingFlagInfo `json:"flags"`
+}
+
+type FlaggedRatingsResponse struct {
+	Items []*FlaggedRatingItem `json:"items"`
+	Total int                  `json:"total"`
+}
+
 type ForgotPasswordInput struct {
 	Email string   `json:"email"`
 	Role  AuthRole `json:"role"`
@@ -535,6 +557,16 @@ type MerchantAppeal struct {
 type MerchantList struct {
 	Merchants []*Merchant `json:"merchants"`
 	Total     int         `json:"total"`
+}
+
+type ModerateRatingInput struct {
+	RatingID string `json:"ratingId"`
+	IsHidden bool   `json:"isHidden"`
+}
+
+type ModerateRatingResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 type Mutation struct {
@@ -697,6 +729,14 @@ type Rating struct {
 	IsHidden    bool    `json:"isHidden"`
 	CreatedAt   *string `json:"createdAt,omitempty"`
 	UpdatedAt   *string `json:"updatedAt,omitempty"`
+}
+
+type RatingFlagInfo struct {
+	ID        string       `json:"id"`
+	UserID    string       `json:"userId"`
+	Category  FlagCategory `json:"category"`
+	Reason    *string      `json:"reason,omitempty"`
+	CreatedAt string       `json:"createdAt"`
 }
 
 type RefreshTokenInput struct {
@@ -1133,6 +1173,53 @@ func (e *DeliveryStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e DeliveryStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FlagCategory string
+
+const (
+	FlagCategorySpam                 FlagCategory = "SPAM"
+	FlagCategoryInappropriateContent FlagCategory = "INAPPROPRIATE_CONTENT"
+	FlagCategoryFakeReview           FlagCategory = "FAKE_REVIEW"
+	FlagCategoryIrrelevant           FlagCategory = "IRRELEVANT"
+	FlagCategoryOther                FlagCategory = "OTHER"
+)
+
+var AllFlagCategory = []FlagCategory{
+	FlagCategorySpam,
+	FlagCategoryInappropriateContent,
+	FlagCategoryFakeReview,
+	FlagCategoryIrrelevant,
+	FlagCategoryOther,
+}
+
+func (e FlagCategory) IsValid() bool {
+	switch e {
+	case FlagCategorySpam, FlagCategoryInappropriateContent, FlagCategoryFakeReview, FlagCategoryIrrelevant, FlagCategoryOther:
+		return true
+	}
+	return false
+}
+
+func (e FlagCategory) String() string {
+	return string(e)
+}
+
+func (e *FlagCategory) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FlagCategory(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FlagCategory", str)
+	}
+	return nil
+}
+
+func (e FlagCategory) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
