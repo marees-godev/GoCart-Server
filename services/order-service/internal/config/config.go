@@ -25,6 +25,7 @@ type GRPCConfig struct {
 	CartServiceAddr      string
 	ProductServiceAddr   string
 	InventoryServiceAddr string
+	DeliveryServiceAddr  string
 	TimeoutSeconds       int
 }
 
@@ -113,6 +114,7 @@ func LoadEnv() *Config {
 			CartServiceAddr:      GetEnv("CART_SERVICE_GRPC_ADDR", "localhost:50057"),
 			ProductServiceAddr:   GetEnv("PRODUCT_SERVICE_GRPC_ADDR", "localhost:50053"),
 			InventoryServiceAddr: GetEnv("INVENTORY_SERVICE_GRPC_ADDR", "localhost:50058"),
+			DeliveryServiceAddr:  GetEnv("DELIVERY_SERVICE_GRPC_ADDR", "localhost:50062"),
 			TimeoutSeconds:       GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 5),
 		},
 	}

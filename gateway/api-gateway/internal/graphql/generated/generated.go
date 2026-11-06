@@ -408,6 +408,7 @@ type ComplexityRoot struct {
 		ApproveDeliveryPartner         func(childComplexity int, partnerID string) int
 		ApproveReturn                  func(childComplexity int, id string) int
 		ApproveStore                   func(childComplexity int, id string) int
+		CancelDelivery                 func(childComplexity int, id string, reason *string) int
 		CalculateExchangeValuation     func(childComplexity int, input model.CalculateExchangeValuationInput) int
 		CancelOrder                    func(childComplexity int, id string, reason *string) int
 		CancelPayment                  func(childComplexity int, paymentID *string, orderID *string, reason *string) int
@@ -583,6 +584,7 @@ type ComplexityRoot struct {
 		Tax                 func(childComplexity int) int
 		UpdatedAt           func(childComplexity int) int
 		Variants            func(childComplexity int) int
+		Weight      func(childComplexity int) int
 	}
 
 	ProductList struct {
@@ -627,6 +629,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		AppealDeliveryPartners        func(childComplexity int) int
+		CalculateShippingFee          func(childComplexity int, input model.CalculateShippingFeeInput) int
 		Cart                          func(childComplexity int, userID *string) int
 		Categories                    func(childComplexity int, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) int
 		Category                      func(childComplexity int, id string) int
@@ -735,6 +738,15 @@ type ComplexityRoot struct {
 		UpdatedAt       func(childComplexity int) int
 		UserID          func(childComplexity int) int
 		Verification    func(childComplexity int) int
+	}
+
+	ShippingFeeCalculation struct {
+		BreakdownDetails func(childComplexity int) int
+		CalculationModel func(childComplexity int) int
+		Currency         func(childComplexity int) int
+		ShippingFee      func(childComplexity int) int
+		TotalWeightGrams func(childComplexity int) int
+		Zone             func(childComplexity int) int
 	}
 
 	StarRating struct {
@@ -855,6 +867,7 @@ type MutationResolver interface {
 	DeleteCategory(ctx context.Context, id string) (*model.DeleteCategoryResponse, error)
 	CreateDelivery(ctx context.Context, input model.CreateDeliveryInput) (*model.Delivery, error)
 	UpdateDeliveryStatus(ctx context.Context, id string, status model.DeliveryStatus, location *string) (*model.Delivery, error)
+	CancelDelivery(ctx context.Context, id string, reason *string) (*model.Delivery, error)
 	UpdateDeliveryPartnerProfile(ctx context.Context, input model.UpdateDeliveryPartnerProfileInput) (*model.DeliveryPartnerProfile, error)
 	VerifyDeliveryPartnerGstin(ctx context.Context, partnerID string) (*model.DeliveryPartnerProfile, error)
 	ActivateDeliveryPartner(ctx context.Context) (*model.DeliveryPartnerActionResponse, error)
@@ -938,6 +951,7 @@ type QueryResolver interface {
 	Delivery(ctx context.Context, id string) (*model.Delivery, error)
 	DeliveryByTracking(ctx context.Context, trackingNumber string) (*model.Delivery, error)
 	DeliveryByOrder(ctx context.Context, orderID string) (*model.Delivery, error)
+	CalculateShippingFee(ctx context.Context, input model.CalculateShippingFeeInput) (*model.ShippingFeeCalculation, error)
 	DeliveryPartnerProfile(ctx context.Context, partnerID *string) (*model.DeliveryPartnerProfile, error)
 	AppealDeliveryPartners(ctx context.Context) ([]*model.DeliveryPartnerProfile, error)
 	Stock(ctx context.Context, productID string) (*model.StockItem, error)
@@ -2730,6 +2744,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ApproveStore(childComplexity, args["id"].(string)), true
 
+	case "Mutation.cancelDelivery":
+		if e.complexity.Mutation.CancelDelivery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_cancelDelivery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CancelDelivery(childComplexity, args["id"].(string), args["reason"].(*string)), true
+
 	case "Mutation.calculateExchangeValuation":
 		if e.complexity.Mutation.CalculateExchangeValuation == nil {
 			break
@@ -4193,6 +4219,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Product.Variants(childComplexity), true
 
+	case "Product.weight":
+		if e.complexity.Product.Weight == nil {
+			break
+		}
+
+		return e.complexity.Product.Weight(childComplexity), true
+
 	case "ProductList.products":
 		if e.complexity.ProductList.Products == nil {
 			break
@@ -4395,6 +4428,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.AppealDeliveryPartners(childComplexity), true
+
+	case "Query.calculateShippingFee":
+		if e.complexity.Query.CalculateShippingFee == nil {
+			break
+		}
+
+		args, err := ec.field_Query_calculateShippingFee_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CalculateShippingFee(childComplexity, args["input"].(model.CalculateShippingFeeInput)), true
 
 	case "Query.cart":
 		if e.complexity.Query.Cart == nil {
@@ -5205,6 +5250,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ReturnOrder.Verification(childComplexity), true
 
+	case "ShippingFeeCalculation.breakdownDetails":
+		if e.complexity.ShippingFeeCalculation.BreakdownDetails == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.BreakdownDetails(childComplexity), true
+
+	case "ShippingFeeCalculation.calculationModel":
+		if e.complexity.ShippingFeeCalculation.CalculationModel == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.CalculationModel(childComplexity), true
+
+	case "ShippingFeeCalculation.currency":
+		if e.complexity.ShippingFeeCalculation.Currency == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.Currency(childComplexity), true
+
+	case "ShippingFeeCalculation.shippingFee":
+		if e.complexity.ShippingFeeCalculation.ShippingFee == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.ShippingFee(childComplexity), true
+
+	case "ShippingFeeCalculation.totalWeightGrams":
+		if e.complexity.ShippingFeeCalculation.TotalWeightGrams == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.TotalWeightGrams(childComplexity), true
+
+	case "ShippingFeeCalculation.zone":
+		if e.complexity.ShippingFeeCalculation.Zone == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.Zone(childComplexity), true
+
 	case "StarRating.fiveStar":
 		if e.complexity.StarRating.FiveStar == nil {
 			break
@@ -5713,6 +5800,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputAddToCartInput,
 		ec.unmarshalInputApplyExchangeToOrderInput,
 		ec.unmarshalInputBankAccountInput,
+		ec.unmarshalInputCalculateShippingFeeInput,
 		ec.unmarshalInputCalculateExchangeValuationInput,
 		ec.unmarshalInputChangePasswordInput,
 		ec.unmarshalInputCreateAddressInput,
@@ -5746,6 +5834,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputResolveExchangeMismatchInput,
 		ec.unmarshalInputRestockInventoryInput,
 		ec.unmarshalInputSendNotificationInput,
+		ec.unmarshalInputShippingItemInput,
 		ec.unmarshalInputSubmitKYCInput,
 		ec.unmarshalInputUpdateAddressInput,
 		ec.unmarshalInputUpdateCategoryInput,
@@ -6079,6 +6168,37 @@ type Delivery {
   updatedAt: String
 }
 
+input ShippingItemInput {
+  productId: ID!
+  quantity: Int!
+  weightGrams: Float!
+}
+
+input CalculateShippingFeeInput {
+  deliveryPartnerId: ID!
+  weightGrams: Float
+  zone: String
+  originCity: String
+  originState: String
+  destinationCity: String
+  destinationState: String
+  destinationPostalCode: String
+  shippingAddress: String
+  shippingAddressId: ID
+  orderId: ID
+  items: [ShippingItemInput!]
+  model: String
+}
+
+type ShippingFeeCalculation {
+  shippingFee: Float!
+  currency: String!
+  zone: String!
+  totalWeightGrams: Float!
+  calculationModel: String!
+  breakdownDetails: String
+}
+
 input CreateDeliveryInput {
   orderId: String!
   deliveryPartnerId: ID!
@@ -6131,6 +6251,7 @@ extend type Query {
   delivery(id: ID!): Delivery @auth
   deliveryByTracking(trackingNumber: String!): Delivery @auth
   deliveryByOrder(orderId: String!): Delivery @auth
+  calculateShippingFee(input: CalculateShippingFeeInput!): ShippingFeeCalculation! @auth
   deliveryPartnerProfile(partnerId: ID): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
   appealDeliveryPartners: [DeliveryPartnerProfile!]! @auth(requires: [ADMIN])
 }
@@ -6138,6 +6259,7 @@ extend type Query {
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [DELIVERY_PARTNER])
+  cancelDelivery(id: ID!, reason: String): Delivery! @auth
   updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
   verifyDeliveryPartnerGSTIN(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
   activateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])
@@ -6402,6 +6524,7 @@ type OrderList {
 }
 
 input CreateOrderInput {
+  deliveryPartnerId: String!
   userId: String
   cartId: String
   shippingAddress: String
@@ -6409,7 +6532,6 @@ input CreateOrderInput {
   billingAddressId: String
   currency: String
   idempotencyKey: String
-  shippingFee: Float
   discountAmount: Float
 }
 
@@ -6510,6 +6632,7 @@ type Product {
   price: Float!
   mrp: Float!
   tax: Float!
+  weight: Float!
   status: ProductStatus!
   imageUrl: String
   isExchangeEligible: Boolean
@@ -6555,6 +6678,7 @@ input CreateProductInput {
   price: Float!
   mrp: Float!
   tax: Float
+  weight: Float!
   status: ProductStatus
   imageUrl: String
   isExchangeEligible: Boolean
@@ -6581,6 +6705,7 @@ input UpdateProductInput {
   price: Float
   mrp: Float
   tax: Float
+  weight: Float
   status: ProductStatus
   imageUrl: String
   isExchangeEligible: Boolean
@@ -7394,6 +7519,30 @@ func (ec *executionContext) field_Mutation_approveStore_args(ctx context.Context
 		}
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_cancelDelivery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["reason"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reason"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["reason"] = arg1
 	return args, nil
 }
 
@@ -8888,6 +9037,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_calculateShippingFee_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CalculateShippingFeeInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNCalculateShippingFeeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateShippingFeeInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -21416,6 +21580,107 @@ func (ec *executionContext) fieldContext_Mutation_updateDeliveryStatus(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_cancelDelivery(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_cancelDelivery(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().CancelDelivery(rctx, fc.Args["id"].(string), fc.Args["reason"].(*string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.Delivery); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.Delivery`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Delivery)
+	fc.Result = res
+	return ec.marshalNDelivery2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_cancelDelivery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Delivery_id(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Delivery_orderId(ctx, field)
+			case "trackingNumber":
+				return ec.fieldContext_Delivery_trackingNumber(ctx, field)
+			case "status":
+				return ec.fieldContext_Delivery_status(ctx, field)
+			case "estimatedDeliveryAt":
+				return ec.fieldContext_Delivery_estimatedDeliveryAt(ctx, field)
+			case "deliveredAt":
+				return ec.fieldContext_Delivery_deliveredAt(ctx, field)
+			case "deliveryPartner":
+				return ec.fieldContext_Delivery_deliveryPartner(ctx, field)
+			case "shippingAddress":
+				return ec.fieldContext_Delivery_shippingAddress(ctx, field)
+			case "shippingAddressId":
+				return ec.fieldContext_Delivery_shippingAddressId(ctx, field)
+			case "contactNumber":
+				return ec.fieldContext_Delivery_contactNumber(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Delivery_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Delivery_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Delivery", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_cancelDelivery_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_updateDeliveryPartnerProfile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_updateDeliveryPartnerProfile(ctx, field)
 	if err != nil {
@@ -24306,6 +24571,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_mrp(ctx, field)
 			case "tax":
 				return ec.fieldContext_Product_tax(ctx, field)
+			case "weight":
+				return ec.fieldContext_Product_weight(ctx, field)
 			case "status":
 				return ec.fieldContext_Product_status(ctx, field)
 			case "imageUrl":
@@ -24422,6 +24689,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_mrp(ctx, field)
 			case "tax":
 				return ec.fieldContext_Product_tax(ctx, field)
+			case "weight":
+				return ec.fieldContext_Product_weight(ctx, field)
 			case "status":
 				return ec.fieldContext_Product_status(ctx, field)
 			case "imageUrl":
@@ -31324,6 +31593,50 @@ func (ec *executionContext) fieldContext_Product_tax(_ context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _Product_weight(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_weight(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Weight, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_weight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_status(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Product_status(ctx, field)
 	if err != nil {
@@ -31823,6 +32136,8 @@ func (ec *executionContext) fieldContext_ProductList_products(_ context.Context,
 				return ec.fieldContext_Product_mrp(ctx, field)
 			case "tax":
 				return ec.fieldContext_Product_tax(ctx, field)
+			case "weight":
+				return ec.fieldContext_Product_weight(ctx, field)
 			case "status":
 				return ec.fieldContext_Product_status(ctx, field)
 			case "imageUrl":
@@ -33769,6 +34084,95 @@ func (ec *executionContext) fieldContext_Query_deliveryByOrder(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_calculateShippingFee(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_calculateShippingFee(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().CalculateShippingFee(rctx, fc.Args["input"].(model.CalculateShippingFeeInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.ShippingFeeCalculation); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.ShippingFeeCalculation`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ShippingFeeCalculation)
+	fc.Result = res
+	return ec.marshalNShippingFeeCalculation2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingFeeCalculation(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_calculateShippingFee(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "shippingFee":
+				return ec.fieldContext_ShippingFeeCalculation_shippingFee(ctx, field)
+			case "currency":
+				return ec.fieldContext_ShippingFeeCalculation_currency(ctx, field)
+			case "zone":
+				return ec.fieldContext_ShippingFeeCalculation_zone(ctx, field)
+			case "totalWeightGrams":
+				return ec.fieldContext_ShippingFeeCalculation_totalWeightGrams(ctx, field)
+			case "calculationModel":
+				return ec.fieldContext_ShippingFeeCalculation_calculationModel(ctx, field)
+			case "breakdownDetails":
+				return ec.fieldContext_ShippingFeeCalculation_breakdownDetails(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ShippingFeeCalculation", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_calculateShippingFee_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_deliveryPartnerProfile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_deliveryPartnerProfile(ctx, field)
 	if err != nil {
@@ -35359,6 +35763,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_mrp(ctx, field)
 			case "tax":
 				return ec.fieldContext_Product_tax(ctx, field)
+			case "weight":
+				return ec.fieldContext_Product_weight(ctx, field)
 			case "status":
 				return ec.fieldContext_Product_status(ctx, field)
 			case "imageUrl":
@@ -39085,6 +39491,267 @@ func (ec *executionContext) _ReturnOrder_updatedAt(ctx context.Context, field gr
 func (ec *executionContext) fieldContext_ReturnOrder_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ReturnOrder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_shippingFee(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_shippingFee(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ShippingFee, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_shippingFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_currency(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_currency(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Currency, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_currency(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_zone(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_zone(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Zone, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_zone(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_totalWeightGrams(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_totalWeightGrams(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalWeightGrams, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_totalWeightGrams(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_calculationModel(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_calculationModel(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CalculationModel, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_calculationModel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_breakdownDetails(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_breakdownDetails(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BreakdownDetails, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_breakdownDetails(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -44109,6 +44776,117 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCalculateShippingFeeInput(ctx context.Context, obj interface{}) (model.CalculateShippingFeeInput, error) {
+	var it model.CalculateShippingFeeInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"deliveryPartnerId", "weightGrams", "zone", "originCity", "originState", "destinationCity", "destinationState", "destinationPostalCode", "shippingAddress", "shippingAddressId", "orderId", "items", "model"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "deliveryPartnerId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deliveryPartnerId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeliveryPartnerID = data
+		case "weightGrams":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("weightGrams"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WeightGrams = data
+		case "zone":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("zone"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Zone = data
+		case "originCity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("originCity"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OriginCity = data
+		case "originState":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("originState"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OriginState = data
+		case "destinationCity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("destinationCity"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DestinationCity = data
+		case "destinationState":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("destinationState"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DestinationState = data
+		case "destinationPostalCode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("destinationPostalCode"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DestinationPostalCode = data
+		case "shippingAddress":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shippingAddress"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShippingAddress = data
+		case "shippingAddressId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shippingAddressId"))
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShippingAddressID = data
+		case "orderId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderId"))
+			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OrderID = data
+		case "items":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("items"))
+			data, err := ec.unmarshalOShippingItemInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingItemInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Items = data
+		case "model":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("model"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Model = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCalculateExchangeValuationInput(ctx context.Context, obj interface{}) (model.CalculateExchangeValuationInput, error) {
 	var it model.CalculateExchangeValuationInput
 	asMap := map[string]interface{}{}
@@ -44536,13 +45314,20 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userId", "cartId", "shippingAddress", "shippingAddressId", "billingAddressId", "currency", "idempotencyKey", "shippingFee", "discountAmount"}
+	fieldsInOrder := [...]string{"deliveryPartnerId", "userId", "cartId", "shippingAddress", "shippingAddressId", "billingAddressId", "currency", "idempotencyKey", "discountAmount"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "deliveryPartnerId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deliveryPartnerId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeliveryPartnerID = data
 		case "userId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -44592,13 +45377,6 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.IdempotencyKey = data
-		case "shippingFee":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shippingFee"))
-			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ShippingFee = data
 		case "discountAmount":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("discountAmount"))
 			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
@@ -44619,7 +45397,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"storeId", "categoryId", "sku", "name", "description", "price", "mrp", "tax", "status", "imageUrl", "isExchangeEligible", "maxExchangeDiscount", "images", "imagesUpload", "variants"}
+	fieldsInOrder := [...]string{"storeId", "categoryId", "sku", "name", "description", "price", "mrp", "tax", "weight", "status", "imageUrl", "isExchangeEligible", "maxExchangeDiscount", "images", "imagesUpload", "variants"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -44682,6 +45460,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Tax = data
+		case "weight":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("weight"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Weight = data
 		case "status":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
 			data, err := ec.unmarshalOProductStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐProductStatus(ctx, v)
@@ -45910,6 +46695,47 @@ func (ec *executionContext) unmarshalInputSendNotificationInput(ctx context.Cont
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputShippingItemInput(ctx context.Context, obj interface{}) (model.ShippingItemInput, error) {
+	var it model.ShippingItemInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "quantity", "weightGrams"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		case "weightGrams":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("weightGrams"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.WeightGrams = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, obj interface{}) (model.SubmitKYCInput, error) {
 	var it model.SubmitKYCInput
 	asMap := map[string]interface{}{}
@@ -46227,7 +47053,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "description", "price", "mrp", "tax", "status", "imageUrl", "isExchangeEligible", "maxExchangeDiscount", "categoryId", "images", "imagesUpload", "variants"}
+	fieldsInOrder := [...]string{"name", "description", "price", "mrp", "tax", "weight", "status", "imageUrl", "isExchangeEligible", "maxExchangeDiscount", "categoryId", "images", "imagesUpload", "variants"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -46269,6 +47095,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Tax = data
+		case "weight":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("weight"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Weight = data
 		case "status":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
 			data, err := ec.unmarshalOProductStatus2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐProductStatus(ctx, v)
@@ -49249,6 +50082,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateDeliveryStatus(ctx, field)
 			})
+		case "cancelDelivery":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_cancelDelivery(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "updateDeliveryPartnerProfile":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateDeliveryPartnerProfile(ctx, field)
@@ -50107,6 +50947,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "weight":
+			out.Values[i] = ec._Product_weight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "status":
 			out.Values[i] = ec._Product_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -50623,6 +51468,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_deliveryByOrder(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "calculateShippingFee":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_calculateShippingFee(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -51787,6 +52654,67 @@ func (ec *executionContext) _ReturnOrder(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var shippingFeeCalculationImplementors = []string{"ShippingFeeCalculation"}
+
+func (ec *executionContext) _ShippingFeeCalculation(ctx context.Context, sel ast.SelectionSet, obj *model.ShippingFeeCalculation) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, shippingFeeCalculationImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ShippingFeeCalculation")
+		case "shippingFee":
+			out.Values[i] = ec._ShippingFeeCalculation_shippingFee(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "currency":
+			out.Values[i] = ec._ShippingFeeCalculation_currency(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "zone":
+			out.Values[i] = ec._ShippingFeeCalculation_zone(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalWeightGrams":
+			out.Values[i] = ec._ShippingFeeCalculation_totalWeightGrams(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "calculationModel":
+			out.Values[i] = ec._ShippingFeeCalculation_calculationModel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "breakdownDetails":
+			out.Values[i] = ec._ShippingFeeCalculation_breakdownDetails(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var starRatingImplementors = []string{"StarRating"}
 
 func (ec *executionContext) _StarRating(ctx context.Context, sel ast.SelectionSet, obj *model.StarRating) graphql.Marshaler {
@@ -52810,6 +53738,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNCalculateShippingFeeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateShippingFeeInput(ctx context.Context, v interface{}) (model.CalculateShippingFeeInput, error) {
+	res, err := ec.unmarshalInputCalculateShippingFeeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCalculateExchangeValuationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateExchangeValuationInput(ctx context.Context, v interface{}) (model.CalculateExchangeValuationInput, error) {
 	res, err := ec.unmarshalInputCalculateExchangeValuationInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -53051,6 +53984,20 @@ func (ec *executionContext) marshalNDeleteProductVariantResponse2ᚖgithubᚗcom
 		return graphql.Null
 	}
 	return ec._DeleteProductVariantResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDelivery2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx context.Context, sel ast.SelectionSet, v model.Delivery) graphql.Marshaler {
+	return ec._Delivery(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDelivery2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx context.Context, sel ast.SelectionSet, v *model.Delivery) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Delivery(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNDeliveryPartnerActionResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeliveryPartnerActionResponse(ctx context.Context, sel ast.SelectionSet, v model.DeliveryPartnerActionResponse) graphql.Marshaler {
@@ -54306,6 +55253,25 @@ func (ec *executionContext) unmarshalNSendNotificationInput2githubᚗcomᚋmaree
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNShippingFeeCalculation2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingFeeCalculation(ctx context.Context, sel ast.SelectionSet, v model.ShippingFeeCalculation) graphql.Marshaler {
+	return ec._ShippingFeeCalculation(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNShippingFeeCalculation2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingFeeCalculation(ctx context.Context, sel ast.SelectionSet, v *model.ShippingFeeCalculation) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ShippingFeeCalculation(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNShippingItemInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingItemInput(ctx context.Context, v interface{}) (*model.ShippingItemInput, error) {
+	res, err := ec.unmarshalInputShippingItemInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNStarRating2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStarRating(ctx context.Context, sel ast.SelectionSet, v *model.StarRating) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -55530,6 +56496,26 @@ func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCa
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) unmarshalOShippingItemInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingItemInputᚄ(ctx context.Context, v interface{}) ([]*model.ShippingItemInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]*model.ShippingItemInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNShippingItemInput2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐShippingItemInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func (ec *executionContext) marshalOStockItem2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐStockItem(ctx context.Context, sel ast.SelectionSet, v *model.StockItem) graphql.Marshaler {

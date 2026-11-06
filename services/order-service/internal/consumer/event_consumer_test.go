@@ -97,7 +97,7 @@ func (m *mockConsumerRepo) CreateOrderWithOutbox(ctx context.Context, orderID st
 
 func setupConsumerTest() (*consumer.OrderEventConsumer, *mockConsumerRepo, service.OrderService) {
 	repo := newMockConsumerRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 	c := consumer.NewOrderEventConsumer(svc)
 	return c, repo, svc
 }
@@ -260,5 +260,77 @@ func TestOrderEventConsumer_UnknownEvent_IgnoredCleanly(t *testing.T) {
 	err := c.HandleEvent(context.Background(), env)
 	if err != nil {
 		t.Errorf("expected unknown event to be ignored cleanly, got error: %v", err)
+	}
+}
+
+func TestOrderEventConsumer_DeliveryStatusChanged_Cancelled(t *testing.T) {
+	c, repo, _ := setupConsumerTest()
+	orderID := uuid.New().String()
+	repo.orders[orderID] = &model.Order{
+		ID:            orderID,
+		UserID:        uuid.New().String(),
+		Status:        model.OrderStatusCreated,
+		PaymentStatus: model.PaymentStatusPaid,
+		TotalAmount:   100.00,
+	}
+
+	payload := events.DeliveryStatusChangedEvent{
+		DeliveryID: uuid.New().String(),
+		OrderID:    orderID,
+		NewStatus:  "CANCELLED",
+	}
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeDeliveryStatusChanged, "delivery-service", payload.DeliveryID, payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(context.Background(), env); err != nil {
+		t.Fatalf("HandleEvent failed: %v", err)
+	}
+
+	if repo.orders[orderID].Status != model.OrderStatusCancelled {
+		t.Errorf("expected order status CANCELLED, got %s", repo.orders[orderID].Status)
+	}
+}
+
+func TestOrderEventConsumer_DeliveryStatusChanged_Progression(t *testing.T) {
+	c, repo, _ := setupConsumerTest()
+	orderID := uuid.New().String()
+	repo.orders[orderID] = &model.Order{
+		ID:            orderID,
+		UserID:        uuid.New().String(),
+		Status:        model.OrderStatusCreated,
+		PaymentStatus: model.PaymentStatusPaid,
+		TotalAmount:   100.00,
+	}
+
+	// 1. PICKED_UP -> SHIPPED
+	p1 := events.DeliveryStatusChangedEvent{DeliveryID: "del-1", OrderID: orderID, NewStatus: "PICKED_UP"}
+	env1, _ := events.NewEventEnvelopeWithAggregate(events.EventTypeDeliveryStatusChanged, "delivery-service", "del-1", p1)
+	if err := c.HandleEvent(context.Background(), env1); err != nil {
+		t.Fatalf("HandleEvent PICKED_UP failed: %v", err)
+	}
+	if repo.orders[orderID].Status != model.OrderStatusShipped {
+		t.Errorf("expected SHIPPED, got %s", repo.orders[orderID].Status)
+	}
+
+	// 2. OUT_FOR_DELIVERY -> OUT_FOR_DELIVERY
+	p2 := events.DeliveryStatusChangedEvent{DeliveryID: "del-1", OrderID: orderID, NewStatus: "OUT_FOR_DELIVERY"}
+	env2, _ := events.NewEventEnvelopeWithAggregate(events.EventTypeDeliveryStatusChanged, "delivery-service", "del-1", p2)
+	if err := c.HandleEvent(context.Background(), env2); err != nil {
+		t.Fatalf("HandleEvent OUT_FOR_DELIVERY failed: %v", err)
+	}
+	if repo.orders[orderID].Status != model.OrderStatusOutForDelivery {
+		t.Errorf("expected OUT_FOR_DELIVERY, got %s", repo.orders[orderID].Status)
+	}
+
+	// 3. DELIVERED -> DELIVERED
+	p3 := events.DeliveryStatusChangedEvent{DeliveryID: "del-1", OrderID: orderID, NewStatus: "DELIVERED"}
+	env3, _ := events.NewEventEnvelopeWithAggregate(events.EventTypeDeliveryStatusChanged, "delivery-service", "del-1", p3)
+	if err := c.HandleEvent(context.Background(), env3); err != nil {
+		t.Fatalf("HandleEvent DELIVERED failed: %v", err)
+	}
+	if repo.orders[orderID].Status != model.OrderStatusDelivered {
+		t.Errorf("expected DELIVERED, got %s", repo.orders[orderID].Status)
 	}
 }

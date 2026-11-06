@@ -11,7 +11,9 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/model"
@@ -372,7 +374,7 @@ func TestOrderService_CreateOrder_SingleStore_Success(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, nil, 5, nil)
 
 	shippingAddr := "123 Main St, New York, NY 10001"
 	shipAddrID := uuid.New().String()
@@ -515,7 +517,7 @@ func TestOrderService_CreateOrder_MultiStoreSplit(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, nil, 5, nil)
 
 	result, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
@@ -628,7 +630,7 @@ func TestOrderService_CreateOrder_AuthoritativePriceEnforced(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
 
 	result, err := svc.CreateOrder(ctx, input)
 	if err != nil {
@@ -655,7 +657,7 @@ func TestOrderService_CreateOrder_EmptyCartRejected(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, cartClient, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, cartClient, nil, nil, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
@@ -675,7 +677,7 @@ func TestOrderService_CreateOrder_EmptyCartRejected(t *testing.T) {
 func TestOrderService_CreateOrder_InvalidUserRejected(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	// Missing user_id
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
@@ -701,7 +703,7 @@ func TestOrderService_CreateOrder_InvalidUserRejected(t *testing.T) {
 func TestOrderService_CreateOrder_MissingAddressRejected(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:         uuid.New().String(),
@@ -732,7 +734,7 @@ func TestOrderService_CreateOrder_InsufficientStockRejected(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
@@ -771,7 +773,7 @@ func TestOrderService_CreateOrder_InactiveProductRejected(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          userID,
@@ -790,7 +792,7 @@ func TestOrderService_CreateOrder_InactiveProductRejected(t *testing.T) {
 func TestOrderService_GetOrder_And_UpdateStatus(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	orderID := uuid.New().String()
 	repo.orders[orderID] = &model.Order{
@@ -837,7 +839,7 @@ func TestOrderService_GetOrder_And_UpdateStatus(t *testing.T) {
 func TestOrderService_GetOrder_Authorization(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	ownerID := uuid.New().String()
 	otherUserID := uuid.New().String()
@@ -874,7 +876,7 @@ func TestOrderService_GetOrder_Authorization(t *testing.T) {
 func TestOrderService_CancelOrder(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	ownerID := uuid.New().String()
 	otherUserID := uuid.New().String()
@@ -925,15 +927,34 @@ func TestOrderService_CancelOrder(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected cancelling shipped order to fail")
 	}
+
+	// 5. Admin cannot cancel order (not even admin has right to cancel)
+	adminOrderID := uuid.New().String()
+	repo.orders[adminOrderID] = &model.Order{
+		ID:          adminOrderID,
+		UserID:      ownerID,
+		Status:      model.OrderStatusCreated,
+		TotalAmount: 50.00,
+	}
+	adminCtx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "admin-123", Role: "ADMIN"})
+	_, err = svc.CancelOrder(adminCtx, adminOrderID, "admin-123", "Admin cancel")
+	if err == nil {
+		t.Fatalf("expected admin cancellation to fail with forbidden")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeForbidden {
+		t.Errorf("expected FORBIDDEN error code for admin cancel, got %v", err)
+	}
 }
 
 func TestOrderService_CreateOrder_MissingIdempotencyKey(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
 		UserID:          uuid.New().String(),
+		IdempotencyKey:  uuid.New().String(),
 		ShippingAddress: "123 Main St",
 		// IdempotencyKey omitted
 	})
@@ -967,7 +988,7 @@ func TestOrderService_CreateOrder_Idempotency_DuplicateRequest(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
 
 	input := dto.CreateOrderInput{
 		UserID:          userID,
@@ -1026,7 +1047,7 @@ func TestOrderService_CreateOrder_Idempotency_DuplicateRequest(t *testing.T) {
 func TestOrderService_OrderStateMachine_Transitions(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	orderID := uuid.New().String()
 	repo.orders[orderID] = &model.Order{
@@ -1159,7 +1180,7 @@ func TestOrderService_OrderStateMachine_Transitions(t *testing.T) {
 func TestOrderService_Cancellation_BeforeAndAfterShipment(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	userID := uuid.New().String()
 
@@ -1224,7 +1245,7 @@ func TestOrderService_Cancellation_BeforeAndAfterShipment(t *testing.T) {
 func TestOrderService_OrderStatusHistory_Traceable(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockOrderRepo()
-	svc := service.NewOrderService(repo, nil, nil, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
 
 	userID := uuid.New().String()
 	orderID := uuid.New().String()
@@ -1308,3 +1329,77 @@ func ptr[T any](v T) *T {
 }
 
 
+
+type mockDeliveryClient struct {
+	calculateShippingFeeFunc func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error)
+}
+
+func (m *mockDeliveryClient) CalculateShippingFee(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+	if m.calculateShippingFeeFunc != nil {
+		return m.calculateShippingFeeFunc(ctx, req)
+	}
+	return &deliverypb.CalculateShippingFeeResponse{ShippingFee: 0}, nil
+}
+
+func TestOrderService_CreateOrder_CalculatesShippingFeeViaDeliveryClient(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+
+	prodID := uuid.New().String()
+	storeID := uuid.New().String()
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			prodID: {
+				Id:      prodID,
+				Name:    "Heavy Package",
+				Price:   200.0,
+				Status:  "ACTIVE",
+				StoreId: storeID,
+				Weight:  1.5,
+			},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			prodID: {ProductId: prodID, AvailableQuantity: 10},
+		},
+	}
+
+	var calledWithItems []*deliverypb.ShippingItem
+	delClient := &mockDeliveryClient{
+		calculateShippingFeeFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+			calledWithItems = req.Items
+			return &deliverypb.CalculateShippingFeeResponse{
+				ShippingFee:      65.0,
+				Currency:         "INR",
+				Zone:             "INTRA_CITY",
+				TotalWeightGrams: 1500,
+			}, nil
+		},
+	}
+
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, delClient, 5, nil)
+
+	res, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+		UserID:          uuid.New().String(),
+		IdempotencyKey:  uuid.New().String(),
+		ShippingAddress: `{"city":"Chennai","state":"Tamil Nadu","postal_code":"600001"}`,
+		Items: []dto.CreateOrderItemInput{
+			{ProductID: prodID, Quantity: 1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateOrder failed: %v", err)
+	}
+
+	if len(calledWithItems) != 1 {
+		t.Fatalf("expected delivery client to be called with 1 item, got %d", len(calledWithItems))
+	}
+	if calledWithItems[0].WeightGrams != 1500 {
+		t.Errorf("expected weight_grams 1500, got %v", calledWithItems[0].WeightGrams)
+	}
+
+	if res.PrimaryOrder.ShippingFee != 65.0 {
+		t.Errorf("expected primary order shipping fee 65.0, got %v", res.PrimaryOrder.ShippingFee)
+	}
+}
