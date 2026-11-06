@@ -14,6 +14,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service/shipping_fee"
 )
 
 type DeliveryGRPCServer struct {
@@ -165,6 +166,77 @@ func (s *DeliveryGRPCServer) UpdateDeliveryStatus(ctx context.Context, req *deli
 
 	return &deliverypb.UpdateDeliveryStatusResponse{
 		Delivery: toProtoDelivery(delivery),
+	}, nil
+}
+
+func (s *DeliveryGRPCServer) CancelDelivery(ctx context.Context, req *deliverypb.CancelDeliveryRequest) (*deliverypb.CancelDeliveryResponse, error) {
+	if req == nil {
+		s.logger.Warn("CancelDelivery: request is nil")
+		return nil, appErrors.BadRequest("request is required").ToGRPC()
+	}
+
+	deliveryID := strings.TrimSpace(req.DeliveryId)
+	orderID := strings.TrimSpace(req.OrderId)
+	if deliveryID == "" && orderID == "" {
+		s.logger.Warn("CancelDelivery: missing delivery_id or order_id")
+		return nil, appErrors.BadRequest("delivery_id or order_id is required").ToGRPC()
+	}
+
+	s.logger.Info("CancelDelivery: processing delivery cancellation", slog.String("delivery_id", deliveryID), slog.String("order_id", orderID), slog.String("reason", req.Reason))
+	delivery, err := s.deliveryService.CancelDelivery(ctx, deliveryID, orderID, req.Reason)
+	if err != nil {
+		s.logger.Warn("CancelDelivery rejected or failed", slog.String("delivery_id", deliveryID), slog.String("order_id", orderID), slog.Any("error", err))
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &deliverypb.CancelDeliveryResponse{
+		Delivery: toProtoDelivery(delivery),
+		Success:  true,
+		Message:  "delivery cancelled successfully",
+	}, nil
+}
+
+func (s *DeliveryGRPCServer) CalculateShippingFee(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+	if req == nil {
+		return nil, appErrors.BadRequest("request is required").ToGRPC()
+	}
+
+	calcItems := make([]shipping_fee.CalculationItem, 0, len(req.Items))
+	for _, it := range req.Items {
+		calcItems = append(calcItems, shipping_fee.CalculationItem{
+			ProductID:   it.ProductId,
+			Quantity:    int(it.Quantity),
+			WeightGrams: it.WeightGrams,
+		})
+	}
+
+	calcReq := &shipping_fee.CalculationRequest{
+		WeightGrams:           req.WeightGrams,
+		Zone:                  req.Zone,
+		OriginCity:            req.OriginCity,
+		OriginState:           req.OriginState,
+		DestinationCity:       req.DestinationCity,
+		DestinationState:      req.DestinationState,
+		DestinationPostalCode: req.DestinationPostalCode,
+		ShippingAddress:       req.ShippingAddress,
+		Items:                 calcItems,
+		Model:                 req.Model,
+		PartnerID:             req.PartnerId,
+	}
+
+	res, err := s.deliveryService.CalculateShippingFee(ctx, calcReq)
+	if err != nil {
+		s.logger.Error("CalculateShippingFee failed", slog.Any("error", err))
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &deliverypb.CalculateShippingFeeResponse{
+		ShippingFee:      res.ShippingFee,
+		Currency:         res.Currency,
+		Zone:             res.Zone,
+		TotalWeightGrams: res.TotalWeightGrams,
+		CalculationModel: res.CalculationModel,
+		BreakdownDetails: res.BreakdownDetails,
 	}, nil
 }
 
@@ -498,6 +570,15 @@ func toProtoDelivery(d *model.Delivery) *deliverypb.Delivery {
 	}
 	if d.ActualDelivery != nil {
 		res.DeliveredAt = d.ActualDelivery.Format(time.RFC3339)
+	}
+	for _, u := range d.TrackingUpdates {
+		res.TrackingUpdates = append(res.TrackingUpdates, &deliverypb.DeliveryTrackingUpdate{
+			Id:        u.ID,
+			Status:    string(u.Status),
+			Location:  u.Location,
+			Notes:     u.Notes,
+			CreatedAt: u.CreatedAt.Format(time.RFC3339),
+		})
 	}
 	return res
 }

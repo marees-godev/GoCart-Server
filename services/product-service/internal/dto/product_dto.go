@@ -30,6 +30,7 @@ type CreateProductRequest struct {
 	Price       float64                `json:"price"`
 	MRP         float64                `json:"mrp"`
 	Tax         float64                `json:"tax"`
+	Weight      float64                `json:"weight"`
 	Status      string                 `json:"status"`
 	ImageURL            string                 `json:"image_url,omitempty"`
 	IsExchangeEligible  bool                   `json:"is_exchange_eligible"`
@@ -140,6 +141,7 @@ type UpdateProductRequest struct {
 	Price       *float64               `json:"price,omitempty"`
 	MRP         *float64               `json:"mrp,omitempty"`
 	Tax         *float64               `json:"tax,omitempty"`
+	Weight      *float64               `json:"weight,omitempty"`
 	Status      *string                `json:"status,omitempty"`
 	CategoryID  *string                `json:"category_id,omitempty"`
 	ImageURL            *string                `json:"image_url,omitempty"`
@@ -286,6 +288,7 @@ func ToProductPB(p *model.Product) *productpb.Product {
 		UpdatedAt:    p.UpdatedAt.Format(time.RFC3339),
 		DeletedAt:           deletedAtStr,
 		IsReturnable:        true,
+		Weight:       p.Weight,
 		IsExchangeEligible:  p.IsExchangeEligible,
 		MaxExchangeDiscount: p.MaxExchangeDiscount,
 	}

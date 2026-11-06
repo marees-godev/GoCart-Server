@@ -62,7 +62,7 @@ func (r *queryResolver) merchantHasAccessToExchange(ctx context.Context, userCtx
 	return false
 }
 
-func (r *queryResolver) deliveryPartnerHasAccessToExchange(ctx context.Context, userCtx *auth.UserContext, exc *returnpb.Exchange) bool {
+func (r *queryResolver) deliveryPartnerHasAccessToExchange(_ context.Context, userCtx *auth.UserContext, exc *returnpb.Exchange) bool {
 	if exc == nil || userCtx == nil {
 		return false
 	}

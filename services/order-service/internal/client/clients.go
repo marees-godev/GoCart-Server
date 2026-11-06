@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 )
@@ -19,6 +20,10 @@ type ProductClient interface {
 
 type InventoryClient interface {
 	GetStock(ctx context.Context, productID string) (*inventorypb.StockItem, error)
+}
+
+type DeliveryClient interface {
+	CalculateShippingFee(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error)
 }
 
 type cartClient struct {
@@ -72,4 +77,16 @@ func (i *inventoryClient) GetStock(ctx context.Context, productID string) (*inve
 		return nil, err
 	}
 	return resp.GetStock(), nil
+}
+
+type deliveryClient struct {
+	client deliverypb.DeliveryServiceClient
+}
+
+func NewDeliveryClient(c deliverypb.DeliveryServiceClient) DeliveryClient {
+	return &deliveryClient{client: c}
+}
+
+func (d *deliveryClient) CalculateShippingFee(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+	return d.client.CalculateShippingFee(ctx, req)
 }

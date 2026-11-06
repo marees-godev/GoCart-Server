@@ -238,6 +238,7 @@ func (r *pgDeliveryRepository) GetByID(ctx context.Context, id string) (*model.D
 		r.logger.Error("Repository: failed to query delivery by id", slog.String("delivery_id", cleanID), slog.Any("error", err))
 		return nil, appErrors.Internal(err, "failed to query delivery by id")
 	}
+	r.loadTrackingUpdates(ctx, delivery)
 	return delivery, nil
 }
 
@@ -260,6 +261,7 @@ func (r *pgDeliveryRepository) GetByOrderID(ctx context.Context, orderID string)
 		r.logger.Error("Repository: failed to query delivery by order_id", slog.String("order_id", orderID), slog.Any("error", err))
 		return nil, appErrors.Internal(err, "failed to query delivery by order_id")
 	}
+	r.loadTrackingUpdates(ctx, delivery)
 	return delivery, nil
 }
 
@@ -282,6 +284,7 @@ func (r *pgDeliveryRepository) GetByTrackingNumber(ctx context.Context, tracking
 		r.logger.Error("Repository: failed to query delivery by tracking_number", slog.String("tracking_number", trackingNumber), slog.Any("error", err))
 		return nil, appErrors.Internal(err, "failed to query delivery by tracking_number")
 	}
+	r.loadTrackingUpdates(ctx, delivery)
 	return delivery, nil
 }
 
@@ -554,6 +557,75 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 		}
 	}
 
+	// Publish OrderShipped when advancing to PICKED_UP or IN_TRANSIT
+	if cleanStatus == model.StatusPickedUp || cleanStatus == model.StatusInTransit {
+		shippedEvt := events.OrderShippedEvent{
+			OrderID:         updatedDelivery.OrderID,
+			DeliveryID:      updatedDelivery.ID,
+			TrackingNumber:  updatedDelivery.TrackingNumber,
+			DeliveryPartner: updatedDelivery.DeliveryPartner,
+			Carrier:         updatedDelivery.DeliveryPartner,
+			ShippedAt:       time.Now().UTC(),
+		}
+		if shEnv, shErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderShipped, "delivery-service", updatedDelivery.ID, shippedEvt); shErr == nil {
+			if shBytes, mErr := shEnv.Marshal(); mErr == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "order",
+					AggregateID:   updatedDelivery.OrderID,
+					EventType:     events.EventTypeOrderShipped,
+					Payload:       shBytes,
+					Topic:         events.TopicOrderShipped,
+				})
+			}
+		}
+	}
+
+	// Publish OrderDelivered when reaching DELIVERED
+	if cleanStatus == model.StatusDelivered {
+		deliveredEvt := events.OrderDeliveredEvent{
+			OrderID:         updatedDelivery.OrderID,
+			DeliveryID:      updatedDelivery.ID,
+			TrackingNumber:  updatedDelivery.TrackingNumber,
+			DeliveryPartner: updatedDelivery.DeliveryPartner,
+			DeliveredAt:     time.Now().UTC(),
+		}
+		if delEnv, delErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderDelivered, "delivery-service", updatedDelivery.ID, deliveredEvt); delErr == nil {
+			if delBytes, mErr := delEnv.Marshal(); mErr == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "order",
+					AggregateID:   updatedDelivery.OrderID,
+					EventType:     events.EventTypeOrderDelivered,
+					Payload:       delBytes,
+					Topic:         events.TopicOrderDelivered,
+				})
+			}
+		}
+	}
+
+	// Publish OrderCancelled when transitioning to CANCELLED
+	if cleanStatus == model.StatusCancelled {
+		cancelReason := notes
+		if strings.TrimSpace(cancelReason) == "" {
+			cancelReason = "Delivery cancelled"
+		}
+		cancelledEvt := events.OrderCancelledEvent{
+			OrderID:     updatedDelivery.OrderID,
+			Reason:      cancelReason,
+			CancelledAt: time.Now().UTC(),
+		}
+		if canEnv, canErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderCancelled, "delivery-service", updatedDelivery.ID, cancelledEvt); canErr == nil {
+			if canBytes, mErr := canEnv.Marshal(); mErr == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "order",
+					AggregateID:   updatedDelivery.OrderID,
+					EventType:     events.EventTypeOrderCancelled,
+					Payload:       canBytes,
+					Topic:         events.TopicOrderCancelled,
+				})
+			}
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		r.logger.Error("Repository: failed to commit update delivery status transaction", slog.Any("error", err))
 		return nil, appErrors.Internal(err, "failed to commit transaction")
@@ -561,6 +633,29 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 
 	r.logger.Info("Repository: delivery status updated successfully", slog.String("delivery_id", existing.ID), slog.String("new_status", string(cleanStatus)))
 	return updatedDelivery, nil
+}
+
+func (r *pgDeliveryRepository) loadTrackingUpdates(ctx context.Context, delivery *model.Delivery) {
+	if delivery == nil || delivery.ID == "" {
+		return
+	}
+	rows, err := r.db.Pool.Query(ctx, `
+		SELECT id, delivery_id, status, COALESCE(location, ''), COALESCE(notes, ''), created_at
+		FROM delivery_tracking_updates
+		WHERE delivery_id = $1
+		ORDER BY created_at ASC
+	`, delivery.ID)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var u model.TrackingUpdate
+		if err := rows.Scan(&u.ID, &u.DeliveryID, &u.Status, &u.Location, &u.Notes, &u.CreatedAt); err == nil {
+			delivery.TrackingUpdates = append(delivery.TrackingUpdates, u)
+		}
+	}
 }
 
 func (r *pgDeliveryRepository) scanOne(row pgx.Row) (*model.Delivery, error) {

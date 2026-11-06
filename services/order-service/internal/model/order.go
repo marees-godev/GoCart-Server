@@ -48,6 +48,10 @@ var ValidStateTransitions = map[OrderStatus][]OrderStatus{
 		OrderStatusPendingPayment,
 		OrderStatusPaid,
 		OrderStatusConfirmed,
+		OrderStatusProcessing,
+		OrderStatusShipped,
+		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
 		OrderStatusPaymentFailed,
 		OrderStatusCancelled,
 	},
@@ -60,21 +64,32 @@ var ValidStateTransitions = map[OrderStatus][]OrderStatus{
 	OrderStatusPaid: {
 		OrderStatusConfirmed,
 		OrderStatusProcessing,
+		OrderStatusShipped,
+		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
 		OrderStatusCancelled,
 	},
 	OrderStatusConfirmed: {
 		OrderStatusProcessing,
+		OrderStatusShipped,
+		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
 		OrderStatusCancelled,
 	},
 	OrderStatusProcessing: {
 		OrderStatusShipped,
+		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
 		OrderStatusCancelled,
 	},
 	OrderStatusShipped: {
 		OrderStatusOutForDelivery,
+		OrderStatusDelivered,
+		OrderStatusCancelled,
 	},
 	OrderStatusOutForDelivery: {
 		OrderStatusDelivered,
+		OrderStatusCancelled,
 	},
 	OrderStatusDelivered: {
 		OrderStatusReturnRequested,

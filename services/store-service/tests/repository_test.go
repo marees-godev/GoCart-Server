@@ -54,6 +54,12 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 		if evt.AggregateID != "store-uuid-1" {
 			t.Errorf("expected aggregate_id store-uuid-1, got %s", evt.AggregateID)
 		}
+		if evt.EventType != events.EventTypeStoreCreated {
+			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreCreated, evt.EventType)
+		}
+		if evt.AggregateType != "store" {
+			t.Errorf("expected aggregate_type store, got %s", evt.AggregateType)
+		}
 
 		// Verify unmarshal
 		unmarshaledEnv, err := events.UnmarshalEnvelope(evt.Payload)
@@ -95,6 +101,27 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 		if evt.Topic != "gocart.store.store-submitted" {
 			t.Errorf("expected topic gocart.store.store-submitted, got %s", evt.Topic)
 		}
+		if evt.EventType != events.EventTypeStoreSubmitted {
+			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreSubmitted, evt.EventType)
+		}
+		if evt.AggregateID != payload.StoreID {
+			t.Errorf("expected aggregate_id %s, got %s", payload.StoreID, evt.AggregateID)
+		}
+		if evt.AggregateType != "store" {
+			t.Errorf("expected aggregate_type store, got %s", evt.AggregateType)
+		}
+
+		unmarshaledEnv, err := events.UnmarshalEnvelope(evt.Payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal envelope from payload: %v", err)
+		}
+		var restored events.StoreSubmittedEvent
+		if err := unmarshaledEnv.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed to unmarshal data: %v", err)
+		}
+		if restored.StoreID != payload.StoreID || restored.MerchantID != payload.MerchantID {
+			t.Errorf("restored event payload mismatch: %+v", restored)
+		}
 	})
 
 	t.Run("StoreApproved Outbox Event", func(t *testing.T) {
@@ -123,6 +150,27 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 
 		if evt.Topic != "gocart.store.store-approved" {
 			t.Errorf("expected topic gocart.store.store-approved, got %s", evt.Topic)
+		}
+		if evt.EventType != events.EventTypeStoreApproved {
+			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreApproved, evt.EventType)
+		}
+		if evt.AggregateID != payload.StoreID {
+			t.Errorf("expected aggregate_id %s, got %s", payload.StoreID, evt.AggregateID)
+		}
+		if evt.AggregateType != "store" {
+			t.Errorf("expected aggregate_type store, got %s", evt.AggregateType)
+		}
+
+		unmarshaledEnv, err := events.UnmarshalEnvelope(evt.Payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal envelope from payload: %v", err)
+		}
+		var restored events.StoreApprovedEvent
+		if err := unmarshaledEnv.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed to unmarshal data: %v", err)
+		}
+		if restored.StoreID != payload.StoreID || restored.AdminID != payload.AdminID {
+			t.Errorf("restored event payload mismatch: %+v", restored)
 		}
 	})
 
@@ -154,6 +202,27 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 		if evt.Topic != "gocart.store.store-rejected" {
 			t.Errorf("expected topic gocart.store.store-rejected, got %s", evt.Topic)
 		}
+		if evt.EventType != events.EventTypeStoreRejected {
+			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreRejected, evt.EventType)
+		}
+		if evt.AggregateID != payload.StoreID {
+			t.Errorf("expected aggregate_id %s, got %s", payload.StoreID, evt.AggregateID)
+		}
+		if evt.AggregateType != "store" {
+			t.Errorf("expected aggregate_type store, got %s", evt.AggregateType)
+		}
+
+		unmarshaledEnv, err := events.UnmarshalEnvelope(evt.Payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal envelope from payload: %v", err)
+		}
+		var restored events.StoreRejectedEvent
+		if err := unmarshaledEnv.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed to unmarshal data: %v", err)
+		}
+		if restored.StoreID != payload.StoreID || restored.Reason != payload.Reason {
+			t.Errorf("restored event payload mismatch: %+v", restored)
+		}
 	})
 
 	t.Run("StoreSuspended Outbox Event", func(t *testing.T) {
@@ -183,6 +252,27 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 
 		if evt.Topic != "gocart.store.store-suspended" {
 			t.Errorf("expected topic gocart.store.store-suspended, got %s", evt.Topic)
+		}
+		if evt.EventType != events.EventTypeStoreSuspended {
+			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreSuspended, evt.EventType)
+		}
+		if evt.AggregateID != payload.StoreID {
+			t.Errorf("expected aggregate_id %s, got %s", payload.StoreID, evt.AggregateID)
+		}
+		if evt.AggregateType != "store" {
+			t.Errorf("expected aggregate_type store, got %s", evt.AggregateType)
+		}
+
+		unmarshaledEnv, err := events.UnmarshalEnvelope(evt.Payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal envelope from payload: %v", err)
+		}
+		var restored events.StoreSuspendedEvent
+		if err := unmarshaledEnv.UnmarshalData(&restored); err != nil {
+			t.Fatalf("failed to unmarshal data: %v", err)
+		}
+		if restored.StoreID != payload.StoreID || restored.Reason != payload.Reason {
+			t.Errorf("restored event payload mismatch: %+v", restored)
 		}
 	})
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service/shipping_fee"
 )
 
 type DeliveryService interface {
@@ -30,6 +31,8 @@ type DeliveryService interface {
 	ListDeliveries(ctx context.Context, limit, offset int, status string) ([]*model.Delivery, int, error)
 	UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error)
 	ProcessStatusUpdate(ctx context.Context, req *dto.DeliveryStatusUpdateRequest) (*model.Delivery, error)
+	CancelDelivery(ctx context.Context, deliveryID, orderID, reason string) (*model.Delivery, error)
+	CalculateShippingFee(ctx context.Context, req *shipping_fee.CalculationRequest) (*shipping_fee.CalculationResult, error)
 
 	// Estimated delivery using order_service and transit rules
 	EstimateDelivery(ctx context.Context, orderID string, partnerID ...string) (*dto.EstimatedDeliveryResponse, error)
@@ -55,6 +58,7 @@ type deliveryService struct {
 	orderClient     client.OrderClient
 	inventoryClient client.InventoryClient
 	gstinClient     gstinClientPkg.GSTINClient
+	shippingEngine  *shipping_fee.Engine
 	logger          *slog.Logger
 }
 
@@ -62,6 +66,11 @@ func NewDeliveryService(repo repository.DeliveryRepository, args ...any) Deliver
 	s := &deliveryService{
 		repo:   repo,
 		logger: slog.Default(),
+		shippingEngine: shipping_fee.NewEngine(shipping_fee.EngineConfig{
+			DefaultModel: shipping_fee.ModelWeightBased,
+			BaseFlatRate: 50.0,
+			Currency:     shipping_fee.DefaultCurrency,
+		}),
 	}
 	for _, arg := range args {
 		switch v := arg.(type) {
@@ -71,6 +80,10 @@ func NewDeliveryService(repo repository.DeliveryRepository, args ...any) Deliver
 			s.inventoryClient = v
 		case gstinClientPkg.GSTINClient:
 			s.gstinClient = v
+		case *shipping_fee.Engine:
+			if v != nil {
+				s.shippingEngine = v
+			}
 		case *slog.Logger:
 			if v != nil {
 				s.logger = v
@@ -430,6 +443,69 @@ func (s *deliveryService) ProcessStatusUpdate(ctx context.Context, req *dto.Deli
 
 	s.logger.Info("Processing delivery status update", slog.String("delivery_id", delivery.ID), slog.String("current", string(delivery.Status)), slog.String("target", string(cleanStatus)))
 	return s.repo.UpdateStatusWithDetails(ctx, delivery.ID, cleanStatus, req.EstimatedDelivery, actDelivery, req.Location, req.Notes)
+}
+
+func (s *deliveryService) CancelDelivery(ctx context.Context, deliveryID, orderID, reason string) (*model.Delivery, error) {
+	cleanDeliveryID := strings.TrimSpace(deliveryID)
+	cleanOrderID := strings.TrimSpace(orderID)
+
+	if cleanDeliveryID == "" && cleanOrderID == "" {
+		s.logger.Warn("CancelDelivery failed: missing delivery or order id")
+		return nil, appErrors.BadRequest("delivery_id or order_id is required for cancellation")
+	}
+
+	var delivery *model.Delivery
+	var err error
+
+	if cleanDeliveryID != "" {
+		delivery, err = s.repo.GetByID(ctx, cleanDeliveryID)
+	}
+	if (err != nil || delivery == nil) && cleanOrderID != "" {
+		delivery, err = s.repo.GetByOrderID(ctx, cleanOrderID)
+	}
+
+	if err != nil || delivery == nil {
+		s.logger.Warn("CancelDelivery failed: delivery not found", slog.String("delivery_id", cleanDeliveryID), slog.String("order_id", cleanOrderID))
+		return nil, appErrors.NotFound("delivery not found for cancellation")
+	}
+
+	// Idempotency: if already cancelled, succeed idempotently
+	if delivery.Status == model.StatusCancelled {
+		s.logger.Info("Delivery is already cancelled (idempotent)", slog.String("delivery_id", delivery.ID))
+		return delivery, nil
+	}
+
+	// Enforce transition rules: allow cancellation only when current status is CREATED;
+	// reject transitions from PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, or terminal states.
+	if delivery.Status != model.StatusCreated {
+		s.logger.Warn("CancelDelivery rejected: parcel has already transitioned beyond CREATED status",
+			slog.String("delivery_id", delivery.ID),
+			slog.String("current_status", string(delivery.Status)))
+		return nil, appErrors.New(
+			appErrors.CodeUnprocessableEntity,
+			fmt.Sprintf("cannot cancel delivery: cancellation is only permitted while shipment is in CREATED state prior to pickup (current status: %s)", delivery.Status),
+			http.StatusUnprocessableEntity,
+		)
+	}
+
+	cleanReason := strings.TrimSpace(reason)
+	if cleanReason == "" {
+		cleanReason = "Cancelled prior to carrier pickup"
+	}
+
+	s.logger.Info("Cancelling delivery prior to pickup", slog.String("delivery_id", delivery.ID), slog.String("reason", cleanReason))
+	return s.repo.UpdateStatusWithDetails(ctx, delivery.ID, model.StatusCancelled, nil, nil, "", cleanReason)
+}
+
+func (s *deliveryService) CalculateShippingFee(ctx context.Context, req *shipping_fee.CalculationRequest) (*shipping_fee.CalculationResult, error) {
+	if s.shippingEngine == nil {
+		s.shippingEngine = shipping_fee.NewEngine(shipping_fee.EngineConfig{
+			DefaultModel: shipping_fee.ModelWeightBased,
+			BaseFlatRate: 50.0,
+			Currency:     shipping_fee.DefaultCurrency,
+		})
+	}
+	return s.shippingEngine.Calculate(ctx, req)
 }
 
 func (s *deliveryService) generateTrackingNumber(partner string) (string, error) {

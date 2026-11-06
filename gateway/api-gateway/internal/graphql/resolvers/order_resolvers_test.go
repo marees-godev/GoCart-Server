@@ -2,9 +2,12 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -13,6 +16,32 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+type mockDeliveryForOrderTest struct {
+	deliverypb.DeliveryServiceClient
+	feeResp *deliverypb.CalculateShippingFeeResponse
+	lastReq *deliverypb.CalculateShippingFeeRequest
+}
+
+func (m *mockDeliveryForOrderTest) CalculateShippingFee(ctx context.Context, in *deliverypb.CalculateShippingFeeRequest, opts ...grpcPkg.CallOption) (*deliverypb.CalculateShippingFeeResponse, error) {
+	m.lastReq = in
+	if m.feeResp != nil {
+		return m.feeResp, nil
+	}
+	return &deliverypb.CalculateShippingFeeResponse{ShippingFee: 55.0}, nil
+}
+
+type mockUserForOrderTest struct {
+	userpb.UserServiceClient
+	addr *userpb.Address
+}
+
+func (m *mockUserForOrderTest) GetUserAddress(ctx context.Context, in *userpb.GetUserAddressRequest, opts ...grpcPkg.CallOption) (*userpb.GetUserAddressResponse, error) {
+	if m.addr != nil {
+		return &userpb.GetUserAddressResponse{Address: m.addr}, nil
+	}
+	return nil, appErrors.NotFound("address not found")
+}
 
 type mockOrderServiceClient struct {
 	orderpb.OrderServiceClient
@@ -88,7 +117,6 @@ func TestOrderResolvers_CreateOrder_And_Checkout(t *testing.T) {
 
 	cartID := "cart-999"
 	addr := "123 Market St, San Francisco, CA"
-	fee := 10.0
 	disc := 5.0
 
 	mockClient := &mockOrderServiceClient{
@@ -117,10 +145,10 @@ func TestOrderResolvers_CreateOrder_And_Checkout(t *testing.T) {
 	mutResolver := &mutationResolver{r}
 
 	input := model.CreateOrderInput{
-		CartID:          &cartID,
-		ShippingAddress: &addr,
-		ShippingFee:     &fee,
-		DiscountAmount:  &disc,
+		DeliveryPartnerID: "del-partner-default",
+		CartID:            &cartID,
+		ShippingAddress:   &addr,
+		DiscountAmount:    &disc,
 	}
 
 	// 1. Test createOrder mutation
@@ -142,6 +170,101 @@ func TestOrderResolvers_CreateOrder_And_Checkout(t *testing.T) {
 	}
 	if ord2.ID != "ord-001" {
 		t.Errorf("expected checkout to return created order, got %+v", ord2)
+	}
+}
+
+func TestOrderResolvers_CreateOrder_CalculatesShippingFeeWithAddressAndPartner(t *testing.T) {
+	userID := "usr-123"
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: userID,
+		Role:   auth.RoleCustomer,
+	})
+
+	mockOrder := &mockOrderServiceClient{
+		createResp: &orderpb.CreateOrderResponse{
+			Order: &orderpb.Order{
+				Id:          "ord-fee-calc",
+				UserId:      userID,
+				Status:      "CREATED",
+				ShippingFee: 55.0,
+				TotalAmount: 155.0,
+			},
+		},
+	}
+	mockDelivery := &mockDeliveryForOrderTest{}
+	mockUser := &mockUserForOrderTest{
+		addr: &userpb.Address{
+			AddressLine: "77 South Cross Road",
+			City:        "Madurai",
+			State:       "Tamil Nadu",
+			PostalCode:  "625001",
+		},
+	}
+
+	clients := &grpc.Clients{
+		OrderClient:    mockOrder,
+		DeliveryClient: mockDelivery,
+		UserClient:     mockUser,
+	}
+	r := NewResolver(clients, "1.0.0")
+	mutResolver := &mutationResolver{r}
+
+	addrID := "addr-mdu"
+	partnerID := "del-partner-1"
+	// Client submits WITHOUT shippingFee in input
+	input := model.CreateOrderInput{
+		DeliveryPartnerID: partnerID,
+		ShippingAddressID: &addrID,
+	}
+
+	ord, err := mutResolver.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("CreateOrder failed: %v", err)
+	}
+	if ord == nil {
+		t.Fatal("expected non-nil order")
+	}
+
+	// Verify DeliveryClient was called with resolved address and partner
+	if mockDelivery.lastReq == nil {
+		t.Fatal("expected deliveryClient.CalculateShippingFee to have been called")
+	}
+	if mockDelivery.lastReq.PartnerId != "del-partner-1" {
+		t.Errorf("expected partner id del-partner-1, got %s", mockDelivery.lastReq.PartnerId)
+	}
+	if mockDelivery.lastReq.DestinationCity != "Madurai" {
+		t.Errorf("expected destination city Madurai, got %s", mockDelivery.lastReq.DestinationCity)
+	}
+
+	// Verify calculated shipping fee was passed to orderClient.CreateOrder
+	if mockOrder.lastCreateReq == nil {
+		t.Fatal("expected orderClient.CreateOrder to have been called")
+	}
+	if mockOrder.lastCreateReq.ShippingFee != 55.0 {
+		t.Errorf("expected CreateOrder to be called with shippingFee 55.0, got %f", mockOrder.lastCreateReq.ShippingFee)
+	}
+}
+
+func TestOrderResolvers_CreateOrder_MissingDeliveryPartnerID_Fails(t *testing.T) {
+	userID := "usr-123"
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: userID,
+		Role:   auth.RoleCustomer,
+	})
+	mockClient := &mockOrderServiceClient{}
+	r := setupTestOrderResolver(mockClient)
+	mutResolver := &mutationResolver{r}
+
+	input := model.CreateOrderInput{
+		DeliveryPartnerID: "   ",
+	}
+
+	_, err := mutResolver.CreateOrder(ctx, input)
+	if err == nil {
+		t.Fatal("expected error when deliveryPartnerId is empty, got nil")
+	}
+	if !strings.Contains(err.Error(), "deliveryPartnerId is required") {
+		t.Errorf("expected 'deliveryPartnerId is required' error, got %v", err)
 	}
 }
 

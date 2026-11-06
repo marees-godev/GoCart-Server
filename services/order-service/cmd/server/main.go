@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
@@ -147,9 +148,18 @@ func main() {
 		log.Warn("Failed to dial Inventory Service", "error", invErr)
 	}
 
+	var deliveryClient client.DeliveryClient
+	deliveryConn, delErr := grpc.NewClient(cfg.GRPC.DeliveryServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if delErr == nil {
+		deliveryClient = client.NewDeliveryClient(deliverypb.NewDeliveryServiceClient(deliveryConn))
+		defer deliveryConn.Close()
+	} else {
+		log.Warn("Failed to dial Delivery Service", "error", delErr)
+	}
+
 	// 8. Initialize business layers
 	orderRepo := repository.NewOrderRepo(db, outboxStore)
-	orderService := service.NewOrderService(orderRepo, cartClient, prodClient, invClient, cfg.GRPC.TimeoutSeconds, log)
+	orderService := service.NewOrderService(orderRepo, cartClient, prodClient, invClient, deliveryClient, cfg.GRPC.TimeoutSeconds, log)
 	orderGRPCHandler := handler.NewOrderGRPCHandler(orderService, log)
 
 	// 8b. Start Kafka event consumer for order lifecycle events (PaymentSuccessful, PaymentFailed)
@@ -159,6 +169,11 @@ func main() {
 			Topics: []string{
 				events.TopicPaymentSuccessful,
 				events.TopicPaymentFailed,
+				events.TopicOrderShipped,
+				events.TopicOrderDelivered,
+				events.TopicDeliveryStatusChanged,
+				events.TopicDeliveryStatusUpdated,
+				events.TopicOrderCancelled,
 			},
 		}
 		orderKafkaConsumer := kafka.NewConsumer(kafka.Config{
