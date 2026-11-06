@@ -1,0 +1,69 @@
+[
+  {
+    "event_type": "UserRegistered",
+    "channel": "EMAIL",
+    "subject_template": "Welcome to GoCart, {{.Email}}!",
+    "body_template": "Hello {{.Email}}, your account has been registered successfully on GoCart. Welcome aboard!"
+  },
+  {
+    "event_type": "StoreApproved",
+    "channel": "EMAIL",
+    "subject_template": "Store Approved: Store #{{.StoreID}}",
+    "body_template": "Congratulations! Your store application for Store #{{.StoreID}} has been approved. You may now start listing products."
+  },
+  {
+    "event_type": "StoreRejected",
+    "channel": "EMAIL",
+    "subject_template": "Store Application Update: Store #{{.StoreID}}",
+    "body_template": "Your store application for Store #{{.StoreID}} was rejected. Reason: {{.Reason}}. Please contact support if you have questions."
+  },
+  {
+    "event_type": "OrderCreated",
+    "channel": "EMAIL",
+    "subject_template": "Order Confirmation - Order #{{.OrderID}}",
+    "body_template": "Thank you for your order! Your order #{{.OrderID}} has been placed with total amount {{.TotalAmount}} {{.Currency}}."
+  },
+  {
+    "event_type": "PaymentSuccessful",
+    "channel": "EMAIL",
+    "subject_template": "Payment Receipt - Order #{{.OrderID}}",
+    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} was successful. Reference Payment ID: {{.PaymentID}}."
+  },
+  {
+    "event_type": "PaymentFailed",
+    "channel": "EMAIL",
+    "subject_template": "Payment Failed - Order #{{.OrderID}}",
+    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} failed. Reason: {{.Reason}}. Please update your payment method."
+  },
+  {
+    "event_type": "OrderShipped",
+    "channel": "EMAIL",
+    "subject_template": "Your Order #{{.OrderID}} has Shipped!",
+    "body_template": "Great news! Your order #{{.OrderID}} has been shipped via {{.DeliveryPartner}} with tracking number: {{.TrackingNumber}}."
+  },
+  {
+    "event_type": "OrderDelivered",
+    "channel": "EMAIL",
+    "subject_template": "Order #{{.OrderID}} Delivered",
+    "body_template": "Your order #{{.OrderID}} has been delivered successfully. Thank you for shopping with GoCart!"
+  },
+  {
+    "event_type": "ReturnApproved",
+    "channel": "EMAIL",
+    "subject_template": "Return Request Approved - Return #{{.ReturnID}}",
+    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been approved. Refund amount: {{.RefundAmount}}."
+  },
+  {
+    "event_type": "ReturnRejected",
+    "channel": "EMAIL",
+    "subject_template": "Return Request Rejected - Return #{{.ReturnID}}",
+    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been rejected. Reason: {{.RejectionReason}}."
+  },
+  {
+    "event_type": "RefundCompleted",
+    "channel": "EMAIL",
+    "subject_template": "Refund Completed - Order #{{.OrderID}}",
+    "body_template": "Your refund of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} (Refund ID: {{.RefundID}}) has been processed successfully."
+  }
+]
+
