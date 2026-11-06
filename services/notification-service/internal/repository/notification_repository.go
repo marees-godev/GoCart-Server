@@ -14,16 +14,24 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/model"
 )
 
-type PostgresRepository struct {
+type notificationRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{pool: pool}
+func NewNotificationRepository(pool *pgxpool.Pool) NotificationRepository {
+	return &notificationRepository{pool: pool}
+}
+
+// PostgresRepository is an alias for NotificationRepository for backward compatibility
+type PostgresRepository = NotificationRepository
+
+// NewPostgresRepository is a wrapper for NewNotificationRepository for backward compatibility
+func NewPostgresRepository(pool *pgxpool.Pool) NotificationRepository {
+	return NewNotificationRepository(pool)
 }
 
 // ChannelRepository implementation
-func (r *PostgresRepository) GetByCode(ctx context.Context, code string) (*model.Channel, error) {
+func (r *notificationRepository) GetByCode(ctx context.Context, code string) (*model.Channel, error) {
 	query := `
 		SELECT id, code::text, name, is_active, created_at
 		FROM notification_channels
@@ -41,7 +49,7 @@ func (r *PostgresRepository) GetByCode(ctx context.Context, code string) (*model
 	return &c, nil
 }
 
-func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*model.Channel, error) {
+func (r *notificationRepository) GetByID(ctx context.Context, id string) (*model.Channel, error) {
 	query := `
 		SELECT id, code::text, name, is_active, created_at
 		FROM notification_channels
@@ -60,7 +68,7 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*model.Cha
 }
 
 // TemplateRepository implementation
-func (r *PostgresRepository) GetByEventType(ctx context.Context, eventType string) (*model.Template, error) {
+func (r *notificationRepository) GetByEventType(ctx context.Context, eventType string) (*model.Template, error) {
 	query := `
 		SELECT id, event_type, channel_id, subject_template, body_template, is_active, created_at, updated_at
 		FROM notification_templates
@@ -80,7 +88,7 @@ func (r *PostgresRepository) GetByEventType(ctx context.Context, eventType strin
 	return &t, nil
 }
 
-func (r *PostgresRepository) GetByEventTypeAndChannel(ctx context.Context, eventType string, channelID string) (*model.Template, error) {
+func (r *notificationRepository) GetByEventTypeAndChannel(ctx context.Context, eventType string, channelID string) (*model.Template, error) {
 	query := `
 		SELECT id, event_type, channel_id, subject_template, body_template, is_active, created_at, updated_at
 		FROM notification_templates
@@ -101,7 +109,7 @@ func (r *PostgresRepository) GetByEventTypeAndChannel(ctx context.Context, event
 }
 
 // PreferenceRepository implementation
-func (r *PostgresRepository) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *notificationRepository) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
 	query := `
 		SELECT id, user_id, channel_id, event_type, is_enabled, created_at, updated_at
 		FROM user_notification_preferences
@@ -121,7 +129,7 @@ func (r *PostgresRepository) GetPreference(ctx context.Context, userID, channelI
 	return &p, nil
 }
 
-func (r *PostgresRepository) UpsertPreference(ctx context.Context, pref *model.Preference) error {
+func (r *notificationRepository) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	query := `
 		INSERT INTO user_notification_preferences (user_id, channel_id, event_type, is_enabled, updated_at)
 		VALUES ($1::uuid, $2::uuid, $3, $4, NOW())
@@ -136,7 +144,7 @@ func (r *PostgresRepository) UpsertPreference(ctx context.Context, pref *model.P
 }
 
 // JobRepository implementation
-func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.NotificationJob) error {
+func (r *notificationRepository) CreateJob(ctx context.Context, job *model.NotificationJob) error {
 	query := `
 		INSERT INTO notification_jobs (
 			id, event_id, user_id, channel_id, template_id, event_type, recipient,
@@ -145,7 +153,7 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.Notificat
 		)
 		VALUES (
 			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()),
-			$2, NULLIF($3, '')::uuid, $4::uuid, $5::uuid, $6, $7,
+			$2, NULLIF($3, '')::uuid, $4::uuid, NULLIF($5, '')::uuid, $6, $7,
 			$8, $9, $10::notification_job_status, $11, $12, $13, $14,
 			NOW(), NOW()
 		)
@@ -159,9 +167,17 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.Notificat
 		}
 	}
 
+	var templateIDVal *string
+	if job.TemplateID != "" {
+		trimmed := strings.TrimSpace(job.TemplateID)
+		if _, err := uuid.Parse(trimmed); err == nil {
+			templateIDVal = &trimmed
+		}
+	}
+
 	err := r.pool.QueryRow(
 		ctx, query,
-		job.ID, job.EventID, userIDVal, job.ChannelID, job.TemplateID, job.EventType, job.Recipient,
+		job.ID, job.EventID, userIDVal, job.ChannelID, templateIDVal, job.EventType, job.Recipient,
 		job.Subject, job.Content, string(job.Status), job.RetryCount, job.MaxRetries, job.CorrelationID, job.ErrorMessage,
 	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt)
 	if err != nil {
@@ -174,7 +190,7 @@ func (r *PostgresRepository) CreateJob(ctx context.Context, job *model.Notificat
 	return nil
 }
 
-func (r *PostgresRepository) GetJobByEventID(ctx context.Context, eventID string) (*model.NotificationJob, error) {
+func (r *notificationRepository) GetJobByEventID(ctx context.Context, eventID string) (*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
 		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
@@ -212,7 +228,7 @@ func (r *PostgresRepository) GetJobByEventID(ctx context.Context, eventID string
 	return &j, nil
 }
 
-func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*model.NotificationJob, error) {
+func (r *notificationRepository) GetJobByID(ctx context.Context, id string) (*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
 		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
@@ -250,7 +266,7 @@ func (r *PostgresRepository) GetJobByID(ctx context.Context, id string) (*model.
 	return &j, nil
 }
 
-func (r *PostgresRepository) UpdateJobStatus(ctx context.Context, id string, status model.JobStatus, errMsg *string) error {
+func (r *notificationRepository) UpdateJobStatus(ctx context.Context, id string, status model.JobStatus, errMsg *string) error {
 	query := `
 		UPDATE notification_jobs
 		SET status = $2::notification_job_status, error_message = $3, updated_at = NOW(),
@@ -264,7 +280,7 @@ func (r *PostgresRepository) UpdateJobStatus(ctx context.Context, id string, sta
 	return nil
 }
 
-func (r *PostgresRepository) IncrementRetry(ctx context.Context, id string, errMsg string) error {
+func (r *notificationRepository) IncrementRetry(ctx context.Context, id string, errMsg string) error {
 	query := `
 		UPDATE notification_jobs
 		SET retry_count = retry_count + 1,
@@ -280,7 +296,7 @@ func (r *PostgresRepository) IncrementRetry(ctx context.Context, id string, errM
 	return nil
 }
 
-func (r *PostgresRepository) ListPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
+func (r *notificationRepository) ListPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
 		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
@@ -325,7 +341,7 @@ func (r *PostgresRepository) ListPendingJobs(ctx context.Context, limit int) ([]
 }
 
 // ClaimPendingJobs atomically claims pending jobs to PROCESSING using SKIP LOCKED to prevent duplicate processing across replicas
-func (r *PostgresRepository) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
+func (r *notificationRepository) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
 		WITH claimable AS (
 			SELECT id
@@ -378,7 +394,7 @@ func (r *PostgresRepository) ClaimPendingJobs(ctx context.Context, limit int) ([
 }
 
 // IdempotencyRepository implementation
-func (r *PostgresRepository) IsEventProcessed(ctx context.Context, eventID string) (bool, error) {
+func (r *notificationRepository) IsEventProcessed(ctx context.Context, eventID string) (bool, error) {
 	query := `
 		SELECT EXISTS(SELECT 1 FROM processed_events WHERE event_id = $1)
 	`
@@ -390,7 +406,7 @@ func (r *PostgresRepository) IsEventProcessed(ctx context.Context, eventID strin
 	return exists, nil
 }
 
-func (r *PostgresRepository) RecordProcessedEvent(ctx context.Context, event *model.ProcessedEvent) error {
+func (r *notificationRepository) RecordProcessedEvent(ctx context.Context, event *model.ProcessedEvent) error {
 	query := `
 		INSERT INTO processed_events (event_id, event_type, source, processed_at)
 		VALUES ($1, $2, $3, NOW())

@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS notification_jobs (
     event_id VARCHAR(255) NOT NULL UNIQUE,
     user_id UUID,
     channel_id UUID NOT NULL REFERENCES notification_channels(id) ON DELETE RESTRICT,
-    template_id UUID NOT NULL REFERENCES notification_templates(id) ON DELETE RESTRICT,
+    template_id UUID REFERENCES notification_templates(id) ON DELETE SET NULL,
     event_type VARCHAR(100) NOT NULL,
     recipient VARCHAR(255) NOT NULL,
     subject VARCHAR(255) NOT NULL,
@@ -84,31 +84,3 @@ INSERT INTO notification_channels (code, name, is_active) VALUES
     ('PUSH', 'Push Notifications', TRUE)
 ON CONFLICT (code) DO NOTHING;
 
--- Seed Templates for the 11 domain events explicitly defined by the SRS
-INSERT INTO notification_templates (event_type, channel_id, subject_template, body_template, is_active)
-SELECT 
-    t.event_type,
-    c.id,
-    t.subject_template,
-    t.body_template,
-    TRUE
-FROM (
-    VALUES
-        ('UserRegistered', 'Welcome to GoCart, {{.Email}}!', 'Hello {{.Email}}, your account has been registered successfully on GoCart. Welcome aboard!'),
-        ('StoreApproved', 'Store Approved: Store #{{.StoreID}}', 'Congratulations! Your store application for Store #{{.StoreID}} has been approved. You may now start listing products.'),
-        ('StoreRejected', 'Store Application Update: Store #{{.StoreID}}', 'Your store application for Store #{{.StoreID}} was rejected. Reason: {{.Reason}}. Please contact support if you have questions.'),
-        ('OrderCreated', 'Order Confirmation - Order #{{.OrderID}}', 'Thank you for your order! Your order #{{.OrderID}} has been placed with total amount {{.TotalAmount}} {{.Currency}}.'),
-        ('PaymentSuccessful', 'Payment Receipt - Order #{{.OrderID}}', 'Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} was successful. Reference Payment ID: {{.PaymentID}}.'),
-        ('PaymentFailed', 'Payment Failed - Order #{{.OrderID}}', 'Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} failed. Reason: {{.Reason}}. Please update your payment method.'),
-        ('OrderShipped', 'Your Order #{{.OrderID}} has Shipped!', 'Great news! Your order #{{.OrderID}} has been shipped via {{.DeliveryPartner}} with tracking number: {{.TrackingNumber}}.'),
-        ('OrderDelivered', 'Order #{{.OrderID}} Delivered', 'Your order #{{.OrderID}} has been delivered successfully. Thank you for shopping with GoCart!'),
-        ('ReturnApproved', 'Return Request Approved - Return #{{.ReturnID}}', 'Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been approved. Refund amount: {{.RefundAmount}}.'),
-        ('ReturnRejected', 'Return Request Rejected - Return #{{.ReturnID}}', 'Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been rejected. Reason: {{.RejectionReason}}.'),
-        ('RefundCompleted', 'Refund Completed - Order #{{.OrderID}}', 'Your refund of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} (Refund ID: {{.RefundID}}) has been processed successfully.')
-) AS t(event_type, subject_template, body_template)
-CROSS JOIN (
-    SELECT id FROM notification_channels WHERE code = 'EMAIL' LIMIT 1
-) AS c
-ON CONFLICT (event_type, channel_id) DO UPDATE SET
-    subject_template = EXCLUDED.subject_template,
-    body_template = EXCLUDED.body_template;

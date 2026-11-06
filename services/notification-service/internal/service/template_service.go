@@ -9,6 +9,7 @@ import (
 
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/templates"
 )
 
 type TemplateService interface {
@@ -27,16 +28,30 @@ type templateService struct {
 	cache        map[string]*compiledTemplate
 }
 
-func NewTemplateService(templateRepo repository.TemplateRepository) TemplateService {
+func NewTemplateService(templateRepo ...repository.TemplateRepository) TemplateService {
+	var repo repository.TemplateRepository
+	if len(templateRepo) > 0 {
+		repo = templateRepo[0]
+	}
 	return &templateService{
-		templateRepo: templateRepo,
+		templateRepo: repo,
 		cache:        make(map[string]*compiledTemplate),
 	}
 }
 
 func (s *templateService) ResolveTemplate(ctx context.Context, eventType, channelID string) (*model.Template, error) {
-	if channelID != "" {
-		tmpl, err := s.templateRepo.GetByEventTypeAndChannel(ctx, eventType, channelID)
+	if s.templateRepo != nil {
+		if channelID != "" {
+			tmpl, err := s.templateRepo.GetByEventTypeAndChannel(ctx, eventType, channelID)
+			if err != nil {
+				return nil, err
+			}
+			if tmpl != nil {
+				return tmpl, nil
+			}
+		}
+
+		tmpl, err := s.templateRepo.GetByEventType(ctx, eventType)
 		if err != nil {
 			return nil, err
 		}
@@ -45,14 +60,11 @@ func (s *templateService) ResolveTemplate(ctx context.Context, eventType, channe
 		}
 	}
 
-	tmpl, err := s.templateRepo.GetByEventType(ctx, eventType)
-	if err != nil {
-		return nil, err
+	if fileTmpl, ok := templates.GetTemplate(eventType); ok {
+		return fileTmpl, nil
 	}
-	if tmpl == nil {
-		return nil, fmt.Errorf("no active template found for event_type: %s", eventType)
-	}
-	return tmpl, nil
+
+	return nil, fmt.Errorf("no active template found for event_type: %s", eventType)
 }
 
 func (s *templateService) getOrCompile(tmpl *model.Template) (*compiledTemplate, error) {

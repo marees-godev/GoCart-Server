@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// 5. Initialize Repositories and Services
-	repo := repository.NewPostgresRepository(db.Pool)
+	repo := repository.NewNotificationRepository(db.Pool)
 	tmplSvc := service.NewTemplateService(repo)
 	prefSvc := service.NewPreferenceService(repo, repo)
 	pipelineSvc := service.NewNotificationPipelineService(tmplSvc, prefSvc, repo, repo, log)

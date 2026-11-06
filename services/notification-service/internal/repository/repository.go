@@ -35,3 +35,11 @@ type IdempotencyRepository interface {
 	IsEventProcessed(ctx context.Context, eventID string) (bool, error)
 	RecordProcessedEvent(ctx context.Context, event *model.ProcessedEvent) error
 }
+
+type NotificationRepository interface {
+	ChannelRepository
+	TemplateRepository
+	PreferenceRepository
+	JobRepository
+	IdempotencyRepository
+}
