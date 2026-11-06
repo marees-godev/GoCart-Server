@@ -106,6 +106,7 @@ type RefundCompletedEvent struct {
 	RefundID        string    `json:"refund_id"`
 	PaymentID       string    `json:"payment_id"`
 	OrderID         string    `json:"order_id"`
+	UserID          string    `json:"user_id,omitempty"`
 	Amount          float64   `json:"amount"`
 	Currency        string    `json:"currency,omitempty"`
 	GatewayRefundID string    `json:"gateway_refund_id,omitempty"`
@@ -283,6 +284,22 @@ type OrderPaymentFailedEvent struct {
 	PaymentID string    `json:"payment_id,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
 	FailedAt  time.Time `json:"failed_at"`
+}
+
+// OrderShippedEvent represents the payload for OrderShipped domain event.
+type OrderShippedEvent struct {
+	OrderID         string    `json:"order_id"`
+	UserID          string    `json:"user_id"`
+	TrackingNumber  string    `json:"tracking_number,omitempty"`
+	DeliveryPartner string    `json:"delivery_partner,omitempty"`
+	ShippedAt       time.Time `json:"shipped_at"`
+}
+
+// OrderDeliveredEvent represents the payload for OrderDelivered domain event.
+type OrderDeliveredEvent struct {
+	OrderID     string    `json:"order_id"`
+	UserID      string    `json:"user_id"`
+	DeliveredAt time.Time `json:"delivered_at"`
 }
 
 // DeliveryCreatedEvent represents the payload for DeliveryCreated domain event.

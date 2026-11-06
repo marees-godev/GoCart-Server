@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,13 +11,18 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/config"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/consumer"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/repository"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/service"
 )
 
 func main() {
@@ -78,7 +84,62 @@ func main() {
 		}
 	}
 
-	// 5. Setup Fiber HTTP server with observability middleware
+	// 5. Initialize Repositories and Services
+	repo := repository.NewNotificationRepository(db.Pool)
+	tmplSvc := service.NewTemplateService(repo)
+	prefSvc := service.NewPreferenceService(repo, repo)
+	pipelineSvc := service.NewNotificationPipelineService(tmplSvc, prefSvc, repo, repo, log)
+	eventConsumer := consumer.NewNotificationEventConsumer(pipelineSvc, log)
+
+	// 6. Start Asynchronous Notification Job Worker
+	jobWorker := service.NewJobWorker(repo, log, 5*time.Second)
+	go jobWorker.Start(ctx)
+
+	// 7. Initialize Kafka Consumer
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		producer := kafka.NewProducer(kafka.Config{
+			Brokers:  cfg.Kafka.Brokers,
+			ClientID: cfg.Kafka.ClientID,
+		})
+		defer producer.Close()
+
+		topics := []string{
+			events.TopicUserRegistered,
+			events.TopicStoreApproved,
+			events.TopicStoreRejected,
+			events.TopicOrderCreated,
+			events.TopicPaymentSuccessful,
+			events.TopicPaymentFailed,
+			events.TopicOrderShipped,
+			events.TopicOrderDelivered,
+			events.TopicReturnApproved,
+			events.TopicReturnRejected,
+			events.TopicRefundCompleted,
+		}
+
+		kafkaConsumer := kafka.NewConsumer(
+			kafka.Config{
+				Brokers:        cfg.Kafka.Brokers,
+				ClientID:       cfg.Kafka.ClientID,
+				ConnectTimeout: 10 * time.Second,
+			},
+			kafka.ConsumerConfig{
+				GroupID: cfg.Kafka.GroupID,
+				Topics:  topics,
+			},
+			producer,
+		)
+		defer kafkaConsumer.Close()
+
+		go func() {
+			log.Info("Starting Notification Kafka Event Consumer...", "topics", topics, "group", cfg.Kafka.GroupID)
+			if err := kafkaConsumer.Start(ctx, eventConsumer.HandleEvent); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("Kafka event consumer failed", "error", err)
+			}
+		}()
+	}
+
+	// 8. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 	})
@@ -89,7 +150,7 @@ func main() {
 	app.Use(adaptor.HTTPMiddleware(middleware.Metrics(cfg.App.Name)))
 	app.Use(adaptor.HTTPMiddleware(middleware.Logger))
 
-	// Metrics, Health and Readiness endpoints
+	// Observability endpoints
 	healthHandler := health.NewHandler(cfg.App.Name, health.FromPinger(db))
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))

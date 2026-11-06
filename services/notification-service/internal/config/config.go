@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -13,6 +14,7 @@ type Config struct {
 	Database DatabaseConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
+	Kafka    KafkaConfig
 }
 
 type AppConfig struct {
@@ -42,6 +44,13 @@ type TracingConfig struct {
 	Enabled      bool
 	Exporter     string
 	OTLPEndpoint string
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+	GroupID  string
+	Enabled  bool
 }
 
 func LoadEnv() *Config {
@@ -75,6 +84,12 @@ func LoadEnv() *Config {
 			Exporter:     GetEnv("TRACING_EXPORTER", "stdout"),
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "notification-service"),
+			GroupID:  GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
+			Enabled:  GetEnvAsBool("KAFKA_ENABLED", true),
+		},
 	}
 }
 
@@ -107,4 +122,20 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	res := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	return res
 }

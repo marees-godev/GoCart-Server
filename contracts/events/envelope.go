@@ -14,6 +14,8 @@ const (
 	EventTypeOrderCancelled             = "OrderCancelled"
 	EventTypeOrderConfirmed             = "OrderConfirmed"
 	EventTypeOrderPaymentFailed         = "OrderPaymentFailed"
+	EventTypeOrderShipped               = "OrderShipped"
+	EventTypeOrderDelivered             = "OrderDelivered"
 	EventTypePaymentSuccessful          = "PaymentSuccessful"
 	EventTypePaymentFailed              = "PaymentFailed"
 	EventTypePaymentInitiated           = "PaymentInitiated"
@@ -31,7 +33,7 @@ const (
 	EventTypeInventoryReservationFailed = "InventoryReservationFailed"
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
- 	EventTypePartnerRegistered          = "PartnerRegistered"
+	EventTypePartnerRegistered          = "PartnerRegistered"
 
 	// Store Service Events
 	EventTypeStoreCreated     = "StoreCreated"
@@ -80,6 +82,8 @@ const (
 	TopicOrderCancelled     = "gocart.order.order-cancelled"
 	TopicOrderConfirmed     = "gocart.order.order-confirmed"
 	TopicOrderPaymentFailed = "gocart.order.order-payment-failed"
+	TopicOrderShipped       = "gocart.order.order-shipped"
+	TopicOrderDelivered     = "gocart.order.order-delivered"
 	TopicPaymentSuccessful  = "gocart.payment.payment-successful"
 	TopicPaymentFailed      = "gocart.payment.payment-failed"
 	TopicPaymentInitiated   = "gocart.payment.payment-initiated"
