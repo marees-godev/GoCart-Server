@@ -68,6 +68,15 @@ type BankAccountInput struct {
 	Gstin             *string `json:"gstin,omitempty"`
 }
 
+type CalculateExchangeValuationInput struct {
+	ProductID    string                     `json:"productId"`
+	CategoryCode *string                    `json:"categoryCode,omitempty"`
+	OldBrand     string                     `json:"oldBrand"`
+	OldModel     string                     `json:"oldModel"`
+	OldVariant   *string                    `json:"oldVariant,omitempty"`
+	Answers      []*ExchangeUserAnswerInput `json:"answers"`
+}
+
 type CalculateShippingFeeInput struct {
 	DeliveryPartnerID     string               `json:"deliveryPartnerId"`
 	WeightGrams           *float64             `json:"weightGrams,omitempty"`
@@ -82,15 +91,6 @@ type CalculateShippingFeeInput struct {
 	OrderID               *string              `json:"orderId,omitempty"`
 	Items                 []*ShippingItemInput `json:"items,omitempty"`
 	Model                 *string              `json:"model,omitempty"`
-}
-
-type CalculateExchangeValuationInput struct {
-	ProductID    string                     `json:"productId"`
-	CategoryCode *string                    `json:"categoryCode,omitempty"`
-	OldBrand     string                     `json:"oldBrand"`
-	OldModel     string                     `json:"oldModel"`
-	OldVariant   *string                    `json:"oldVariant,omitempty"`
-	Answers      []*ExchangeUserAnswerInput `json:"answers"`
 }
 
 type Cart struct {
@@ -202,7 +202,7 @@ type CreateProductInput struct {
 	Price               float64                      `json:"price"`
 	Mrp                 float64                      `json:"mrp"`
 	Tax                 *float64                     `json:"tax,omitempty"`
-	Weight       float64                      `json:"weight"`
+	Weight              float64                      `json:"weight"`
 	Status              *ProductStatus               `json:"status,omitempty"`
 	ImageURL            *string                      `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`
@@ -679,7 +679,7 @@ type Product struct {
 	Price               float64           `json:"price"`
 	Mrp                 float64           `json:"mrp"`
 	Tax                 float64           `json:"tax"`
-	Weight      float64           `json:"weight"`
+	Weight              float64           `json:"weight"`
 	Status              ProductStatus     `json:"status"`
 	ImageURL            *string           `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool             `json:"isExchangeEligible,omitempty"`
@@ -991,7 +991,7 @@ type UpdateProductInput struct {
 	Price               *float64                     `json:"price,omitempty"`
 	Mrp                 *float64                     `json:"mrp,omitempty"`
 	Tax                 *float64                     `json:"tax,omitempty"`
-	Weight       *float64                     `json:"weight,omitempty"`
+	Weight              *float64                     `json:"weight,omitempty"`
 	Status              *ProductStatus               `json:"status,omitempty"`
 	ImageURL            *string                      `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`

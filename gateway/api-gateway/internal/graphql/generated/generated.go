@@ -408,8 +408,8 @@ type ComplexityRoot struct {
 		ApproveDeliveryPartner         func(childComplexity int, partnerID string) int
 		ApproveReturn                  func(childComplexity int, id string) int
 		ApproveStore                   func(childComplexity int, id string) int
-		CancelDelivery                 func(childComplexity int, id string, reason *string) int
 		CalculateExchangeValuation     func(childComplexity int, input model.CalculateExchangeValuationInput) int
+		CancelDelivery                 func(childComplexity int, id string, reason *string) int
 		CancelOrder                    func(childComplexity int, id string, reason *string) int
 		CancelPayment                  func(childComplexity int, paymentID *string, orderID *string, reason *string) int
 		ChangePassword                 func(childComplexity int, input model.ChangePasswordInput) int
@@ -584,7 +584,7 @@ type ComplexityRoot struct {
 		Tax                 func(childComplexity int) int
 		UpdatedAt           func(childComplexity int) int
 		Variants            func(childComplexity int) int
-		Weight      func(childComplexity int) int
+		Weight              func(childComplexity int) int
 	}
 
 	ProductList struct {
@@ -2744,18 +2744,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ApproveStore(childComplexity, args["id"].(string)), true
 
-	case "Mutation.cancelDelivery":
-		if e.complexity.Mutation.CancelDelivery == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_cancelDelivery_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.CancelDelivery(childComplexity, args["id"].(string), args["reason"].(*string)), true
-
 	case "Mutation.calculateExchangeValuation":
 		if e.complexity.Mutation.CalculateExchangeValuation == nil {
 			break
@@ -2767,6 +2755,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CalculateExchangeValuation(childComplexity, args["input"].(model.CalculateExchangeValuationInput)), true
+
+	case "Mutation.cancelDelivery":
+		if e.complexity.Mutation.CancelDelivery == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_cancelDelivery_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CancelDelivery(childComplexity, args["id"].(string), args["reason"].(*string)), true
 
 	case "Mutation.cancelOrder":
 		if e.complexity.Mutation.CancelOrder == nil {
@@ -5800,8 +5800,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputAddToCartInput,
 		ec.unmarshalInputApplyExchangeToOrderInput,
 		ec.unmarshalInputBankAccountInput,
-		ec.unmarshalInputCalculateShippingFeeInput,
 		ec.unmarshalInputCalculateExchangeValuationInput,
+		ec.unmarshalInputCalculateShippingFeeInput,
 		ec.unmarshalInputChangePasswordInput,
 		ec.unmarshalInputCreateAddressInput,
 		ec.unmarshalInputCreateCategoryInput,
@@ -7522,6 +7522,21 @@ func (ec *executionContext) field_Mutation_approveStore_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_calculateExchangeValuation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.CalculateExchangeValuationInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNCalculateExchangeValuationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateExchangeValuationInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_cancelDelivery_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -7543,21 +7558,6 @@ func (ec *executionContext) field_Mutation_cancelDelivery_args(ctx context.Conte
 		}
 	}
 	args["reason"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_calculateExchangeValuation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.CalculateExchangeValuationInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNCalculateExchangeValuationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateExchangeValuationInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
 	return args, nil
 }
 
@@ -44776,6 +44776,68 @@ func (ec *executionContext) unmarshalInputBankAccountInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCalculateExchangeValuationInput(ctx context.Context, obj interface{}) (model.CalculateExchangeValuationInput, error) {
+	var it model.CalculateExchangeValuationInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "answers"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "categoryCode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryCode"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CategoryCode = data
+		case "oldBrand":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldBrand"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldBrand = data
+		case "oldModel":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldModel"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldModel = data
+		case "oldVariant":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldVariant"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OldVariant = data
+		case "answers":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("answers"))
+			data, err := ec.unmarshalNExchangeUserAnswerInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeUserAnswerInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Answers = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCalculateShippingFeeInput(ctx context.Context, obj interface{}) (model.CalculateShippingFeeInput, error) {
 	var it model.CalculateShippingFeeInput
 	asMap := map[string]interface{}{}
@@ -44881,68 +44943,6 @@ func (ec *executionContext) unmarshalInputCalculateShippingFeeInput(ctx context.
 				return it, err
 			}
 			it.Model = data
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputCalculateExchangeValuationInput(ctx context.Context, obj interface{}) (model.CalculateExchangeValuationInput, error) {
-	var it model.CalculateExchangeValuationInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"productId", "categoryCode", "oldBrand", "oldModel", "oldVariant", "answers"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "productId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ProductID = data
-		case "categoryCode":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryCode"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.CategoryCode = data
-		case "oldBrand":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldBrand"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.OldBrand = data
-		case "oldModel":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldModel"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.OldModel = data
-		case "oldVariant":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oldVariant"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.OldVariant = data
-		case "answers":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("answers"))
-			data, err := ec.unmarshalNExchangeUserAnswerInput2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐExchangeUserAnswerInputᚄ(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Answers = data
 		}
 	}
 
@@ -53738,13 +53738,13 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNCalculateShippingFeeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateShippingFeeInput(ctx context.Context, v interface{}) (model.CalculateShippingFeeInput, error) {
-	res, err := ec.unmarshalInputCalculateShippingFeeInput(ctx, v)
+func (ec *executionContext) unmarshalNCalculateExchangeValuationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateExchangeValuationInput(ctx context.Context, v interface{}) (model.CalculateExchangeValuationInput, error) {
+	res, err := ec.unmarshalInputCalculateExchangeValuationInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNCalculateExchangeValuationInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateExchangeValuationInput(ctx context.Context, v interface{}) (model.CalculateExchangeValuationInput, error) {
-	res, err := ec.unmarshalInputCalculateExchangeValuationInput(ctx, v)
+func (ec *executionContext) unmarshalNCalculateShippingFeeInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCalculateShippingFeeInput(ctx context.Context, v interface{}) (model.CalculateShippingFeeInput, error) {
+	res, err := ec.unmarshalInputCalculateShippingFeeInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
