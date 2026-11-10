@@ -129,6 +129,15 @@ func (a *ShippingAddress) Scan(value any) error {
 	}
 }
 
+type TrackingUpdate struct {
+	ID         string         `json:"id"`
+	DeliveryID string         `json:"delivery_id"`
+	Status     DeliveryStatus `json:"status"`
+	Location   string         `json:"location,omitempty"`
+	Notes      string         `json:"notes,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+}
+
 type Delivery struct {
 	ID                string          `json:"id"`
 	OrderID           string          `json:"order_id"`
@@ -139,6 +148,7 @@ type Delivery struct {
 	Status            DeliveryStatus  `json:"status"`
 	EstimatedDelivery *time.Time      `json:"estimated_delivery,omitempty"`
 	ActualDelivery    *time.Time      `json:"actual_delivery,omitempty"`
+	TrackingUpdates   []TrackingUpdate `json:"tracking_updates,omitempty"`
 	CreatedAt         time.Time       `json:"created_at"`
 	UpdatedAt         time.Time       `json:"updated_at"`
 }

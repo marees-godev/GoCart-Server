@@ -13,6 +13,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	deliveryGRPC "github.com/marees-godev/GoCart-Server/services/delivery-service/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service/shipping_fee"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -403,6 +404,32 @@ func (m *mockDeliveryService) ProcessExpiredDeactivations(ctx context.Context, r
 }
 
 
+func (m *mockDeliveryService) CancelDelivery(ctx context.Context, deliveryID, orderID, reason string) (*model.Delivery, error) {
+	var target *model.Delivery
+	for _, d := range m.deliveries {
+		if (deliveryID != "" && d.ID == deliveryID) || (orderID != "" && d.OrderID == orderID) {
+			target = d
+			break
+		}
+	}
+	if target == nil {
+		return nil, appErrors.NotFound("delivery not found")
+	}
+	if target.Status == model.StatusCancelled {
+		return target, nil
+	}
+	if target.Status != model.StatusCreated {
+		return nil, appErrors.New(appErrors.CodeUnprocessableEntity, "cannot cancel: not in CREATED status", 422)
+	}
+	target.Status = model.StatusCancelled
+	return target, nil
+}
+
+func (m *mockDeliveryService) CalculateShippingFee(ctx context.Context, req *shipping_fee.CalculationRequest) (*shipping_fee.CalculationResult, error) {
+	engine := shipping_fee.NewEngine(shipping_fee.EngineConfig{})
+	return engine.Calculate(ctx, req)
+}
+
 func setupTestGRPCServer(t *testing.T, svc *mockDeliveryService) (deliverypb.DeliveryServiceClient, func()) {
 	lis := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
@@ -682,3 +709,101 @@ func TestGRPC_PartnerProfile(t *testing.T) {
 
 
 
+
+func TestGRPC_CancelDelivery(t *testing.T) {
+	svc := newMockDeliveryService()
+	client, cleanup := setupTestGRPCServer(t, svc)
+	defer cleanup()
+	ctx := context.Background()
+
+	// Delivery in CREATED status
+	delID := uuid.New().String()
+	orderID := uuid.New().String()
+	svc.deliveries[delID] = &model.Delivery{
+		ID:      delID,
+		OrderID: orderID,
+		Status:  model.StatusCreated,
+	}
+
+	// 1. Successful cancellation while in CREATED state
+	cancelResp, err := client.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+		DeliveryId: delID,
+		Reason:     "Customer cancelled order prior to pickup",
+	})
+	if err != nil {
+		t.Fatalf("expected CancelDelivery to succeed: %v", err)
+	}
+	if !cancelResp.Success || cancelResp.Delivery.Status != "CANCELLED" {
+		t.Fatalf("expected CANCELLED status, got %s", cancelResp.Delivery.Status)
+	}
+
+	// 2. Idempotent re-cancellation
+	cancelResp2, err := client.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+		DeliveryId: delID,
+	})
+	if err != nil || cancelResp2.Delivery.Status != "CANCELLED" {
+		t.Fatalf("expected idempotent cancellation to succeed, got %v", err)
+	}
+
+	// 3. Rejection when parcel transitioned to PICKED_UP
+	pickedUpID := uuid.New().String()
+	svc.deliveries[pickedUpID] = &model.Delivery{
+		ID:      pickedUpID,
+		OrderID: uuid.New().String(),
+		Status:  model.StatusPickedUp,
+	}
+	_, err = client.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+		DeliveryId: pickedUpID,
+	})
+	if err == nil {
+		t.Fatalf("expected cancellation of PICKED_UP shipment to be rejected")
+	}
+
+	// 4. Rejection when parcel is IN_TRANSIT
+	inTransitID := uuid.New().String()
+	svc.deliveries[inTransitID] = &model.Delivery{
+		ID:      inTransitID,
+		OrderID: uuid.New().String(),
+		Status:  model.StatusInTransit,
+	}
+	_, err = client.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+		DeliveryId: inTransitID,
+	})
+	if err == nil {
+		t.Fatalf("expected cancellation of IN_TRANSIT shipment to be rejected")
+	}
+}
+
+func TestGRPC_CalculateShippingFee(t *testing.T) {
+	svc := newMockDeliveryService()
+	client, cleanup := setupTestGRPCServer(t, svc)
+	defer cleanup()
+	ctx := context.Background()
+
+	// Intra-city 0-500g: ₹40
+	resp, err := client.CalculateShippingFee(ctx, &deliverypb.CalculateShippingFeeRequest{
+		WeightGrams: 350,
+		Zone:        "INTRA_CITY",
+	})
+	if err != nil {
+		t.Fatalf("CalculateShippingFee failed: %v", err)
+	}
+	if resp.ShippingFee != 40.0 {
+		t.Fatalf("expected fee 40.0, got %f", resp.ShippingFee)
+	}
+	if resp.Currency != "INR" {
+		t.Fatalf("expected currency INR, got %s", resp.Currency)
+	}
+
+	// Regional 5500g: 3-5kg base (₹230) + 1 add kg (₹50) = ₹280
+	resp2, err := client.CalculateShippingFee(ctx, &deliverypb.CalculateShippingFeeRequest{
+		WeightGrams: 5500,
+		Zone:        "REGIONAL",
+	})
+	if err != nil {
+		t.Fatalf("CalculateShippingFee failed: %v", err)
+	}
+	if resp2.ShippingFee != 280.0 {
+		t.Fatalf("expected fee 280.0, got %f", resp2.ShippingFee)
+	}
+}

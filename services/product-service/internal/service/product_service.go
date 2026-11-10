@@ -246,6 +246,7 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 		Status:              prodStatus,
 		ImageURL:            imgURL,
 		AvgRating:           0.00,
+		Weight:      req.Weight,
 		IsExchangeEligible:  req.IsExchangeEligible,
 		MaxExchangeDiscount: req.MaxExchangeDiscount,
 		Images:              images,
@@ -326,6 +327,9 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 	}
 	if req.Tax != nil {
 		existing.Tax = *req.Tax
+	}
+	if req.Weight != nil {
+		existing.Weight = *req.Weight
 	}
 
 	if req.Status != nil {

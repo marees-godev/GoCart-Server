@@ -316,7 +316,7 @@ func setupInProcessGRPC(
 	const bufSize = 1024 * 1024
 	lis := bufconn.Listen(bufSize)
 
-	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, nil, 5, nil)
 	grpcHandler := handler.NewOrderGRPCHandler(svc, nil)
 
 	s := grpc.NewServer()

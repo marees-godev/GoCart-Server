@@ -59,6 +59,7 @@ message Product {
   bool is_returnable = 19;
   bool is_exchange_eligible = 20;
   double max_exchange_discount = 21;
+  double weight = 22;
 }
 
 message GetProductRequest {
@@ -107,6 +108,7 @@ message CreateProductRequest {
   string image_url = 13;
   bool is_exchange_eligible = 14;
   double max_exchange_discount = 15;
+  optional double weight = 16;
 }
 
 message CreateProductResponse {
@@ -139,6 +141,7 @@ message UpdateProductRequest {
   optional string image_url = 12;
   optional bool is_exchange_eligible = 13;
   optional double max_exchange_discount = 14;
+  optional double weight = 15;
 }
 
 message UpdateProductResponse {

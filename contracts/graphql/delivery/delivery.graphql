@@ -30,6 +30,37 @@ type Delivery {
   updatedAt: String
 }
 
+input ShippingItemInput {
+  productId: ID!
+  quantity: Int!
+  weightGrams: Float!
+}
+
+input CalculateShippingFeeInput {
+  deliveryPartnerId: ID!
+  weightGrams: Float
+  zone: String
+  originCity: String
+  originState: String
+  destinationCity: String
+  destinationState: String
+  destinationPostalCode: String
+  shippingAddress: String
+  shippingAddressId: ID
+  orderId: ID
+  items: [ShippingItemInput!]
+  model: String
+}
+
+type ShippingFeeCalculation {
+  shippingFee: Float!
+  currency: String!
+  zone: String!
+  totalWeightGrams: Float!
+  calculationModel: String!
+  breakdownDetails: String
+}
+
 input CreateDeliveryInput {
   orderId: String!
   deliveryPartnerId: ID!
@@ -82,6 +113,7 @@ extend type Query {
   delivery(id: ID!): Delivery @auth
   deliveryByTracking(trackingNumber: String!): Delivery @auth
   deliveryByOrder(orderId: String!): Delivery @auth
+  calculateShippingFee(input: CalculateShippingFeeInput!): ShippingFeeCalculation! @auth
   deliveryPartnerProfile(partnerId: ID): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
   appealDeliveryPartners: [DeliveryPartnerProfile!]! @auth(requires: [ADMIN])
 }
@@ -89,6 +121,7 @@ extend type Query {
 extend type Mutation {
   createDelivery(input: CreateDeliveryInput!): Delivery @auth(requires: [DELIVERY_PARTNER])
   updateDeliveryStatus(id: ID!, status: DeliveryStatus!, location: String): Delivery @auth(requires: [DELIVERY_PARTNER])
+  cancelDelivery(id: ID!, reason: String): Delivery! @auth
   updateDeliveryPartnerProfile(input: UpdateDeliveryPartnerProfileInput!): DeliveryPartnerProfile @auth(requires: [DELIVERY_PARTNER, ADMIN])
   verifyDeliveryPartnerGSTIN(partnerId: ID!): DeliveryPartnerProfile! @auth(requires: [ADMIN])
   activateDeliveryPartner: DeliveryPartnerActionResponse! @auth(requires: [DELIVERY_PARTNER])

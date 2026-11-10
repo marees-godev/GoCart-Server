@@ -60,6 +60,7 @@ func (h *ProductGRPCHandler) CreateProduct(ctx context.Context, req *productpb.C
 		Price:               req.Price,
 		MRP:                 req.Mrp,
 		Tax:                 req.Tax,
+		Weight:      req.GetWeight(),
 		Status:              req.Status,
 		ImageURL:            req.ImageUrl,
 		IsExchangeEligible:  req.IsExchangeEligible,
@@ -158,6 +159,9 @@ func (h *ProductGRPCHandler) UpdateProduct(ctx context.Context, req *productpb.U
 	}
 	if req.Tax != nil {
 		updateReq.Tax = req.Tax
+	}
+	if req.Weight != nil {
+		updateReq.Weight = req.Weight
 	}
 	if req.Status != nil {
 		updateReq.Status = req.Status

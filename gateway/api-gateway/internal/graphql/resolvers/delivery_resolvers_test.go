@@ -23,6 +23,7 @@ type mockDeliveryClient struct {
 	lastGetTrackingReq  *deliverypb.GetDeliveryByTrackingRequest
 	lastGetOrderReq     *deliverypb.GetDeliveryByOrderRequest
 	lastCreatePartnerReq *deliverypb.CreatePartnerProfileRequest
+	lastCalcReq         *deliverypb.CalculateShippingFeeRequest
 }
 
 func (m *mockDeliveryClient) GetPartnerProfile(ctx context.Context, in *deliverypb.GetPartnerProfileRequest, opts ...grpcPkg.CallOption) (*deliverypb.PartnerProfileResponse, error) {
@@ -82,10 +83,18 @@ func (m *mockDeliveryClient) UpdateDeliveryStatus(ctx context.Context, in *deliv
 
 func (m *mockDeliveryClient) GetDelivery(ctx context.Context, in *deliverypb.GetDeliveryRequest, opts ...grpcPkg.CallOption) (*deliverypb.GetDeliveryResponse, error) {
 	m.lastGetReq = in
+	if in.Id == "not-found" {
+		return nil, appErrors.NotFound("delivery not found")
+	}
+	orderID := "ord-123"
+	if in.Id == "del-no-order" {
+		orderID = ""
+	}
 	return &deliverypb.GetDeliveryResponse{
 		Delivery: &deliverypb.Delivery{
-			Id:     in.Id,
-			Status: "CREATED",
+			Id:      in.Id,
+			OrderId: orderID,
+			Status:  "CREATED",
 		},
 	}, nil
 }
@@ -109,6 +118,29 @@ func (m *mockDeliveryClient) GetDeliveryByOrder(ctx context.Context, in *deliver
 			OrderId: in.OrderId,
 			Status:  "DELIVERED",
 		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) CancelDelivery(ctx context.Context, in *deliverypb.CancelDeliveryRequest, opts ...grpcPkg.CallOption) (*deliverypb.CancelDeliveryResponse, error) {
+	if in.DeliveryId == "fail-id" {
+		return nil, appErrors.UnprocessableEntity("delivery cannot be cancelled: parcel is already picked up")
+	}
+	return &deliverypb.CancelDeliveryResponse{
+		Delivery: &deliverypb.Delivery{
+			Id:     in.DeliveryId,
+			Status: "CANCELLED",
+		},
+	}, nil
+}
+
+func (m *mockDeliveryClient) CalculateShippingFee(ctx context.Context, in *deliverypb.CalculateShippingFeeRequest, opts ...grpcPkg.CallOption) (*deliverypb.CalculateShippingFeeResponse, error) {
+	m.lastCalcReq = in
+	return &deliverypb.CalculateShippingFeeResponse{
+		ShippingFee:      55.0,
+		Currency:         "INR",
+		Zone:             "TAMIL_NADU",
+		TotalWeightGrams: in.WeightGrams,
+		CalculationModel: "WEIGHT_BASED",
 	}, nil
 }
 
@@ -246,6 +278,16 @@ func (m *mockOrderClientForDeliveryTest) GetOrder(ctx context.Context, in *order
 		return &orderpb.GetOrderResponse{Order: m.order}, nil
 	}
 	return nil, appErrors.NotFound("order not found")
+}
+
+func (m *mockOrderClientForDeliveryTest) CancelOrder(ctx context.Context, in *orderpb.CancelOrderRequest, opts ...grpcPkg.CallOption) (*orderpb.CancelOrderResponse, error) {
+	if m.err != nil { return nil, m.err }
+	return &orderpb.CancelOrderResponse{Order: m.order}, nil
+}
+
+func (m *mockOrderClientForDeliveryTest) UpdateOrderStatus(ctx context.Context, in *orderpb.UpdateOrderStatusRequest, opts ...grpcPkg.CallOption) (*orderpb.UpdateOrderStatusResponse, error) {
+	if m.err != nil { return nil, m.err }
+	return &orderpb.UpdateOrderStatusResponse{Order: m.order}, nil
 }
 
 type mockUserClientForDeliveryTest struct {
@@ -951,5 +993,317 @@ func TestCreateDelivery_OrderPaymentStatusEmpty_Fails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "payment_status must be PAID") {
 		t.Errorf("expected 'payment_status must be PAID' error, got %v", err)
+	}
+}
+
+
+func TestCancelDelivery_Success(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-1"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	reason := "Changed mind"
+	res, err := r.CancelDelivery(ctx, "del-123", &reason)
+	if err != nil {
+		t.Fatalf("CancelDelivery failed: %v", err)
+	}
+	if res.Status != model.DeliveryStatusCancelled {
+		t.Errorf("expected CANCELLED status, got %v", res.Status)
+	}
+}
+
+func TestCancelDelivery_ForbiddenForDifferentUser(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-buyer"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	// Authenticated as a different user
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-intruder", Role: "CUSTOMER"})
+
+	_, err := r.CancelDelivery(ctx, "del-123", nil)
+	if err == nil {
+		t.Fatal("expected forbidden error for different user, got nil")
+	}
+	if !strings.Contains(err.Error(), "only the user who placed the order can cancel this delivery") {
+		t.Errorf("expected access denied error, got %v", err)
+	}
+}
+
+func TestCancelDelivery_ForbiddenForAdmin(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-admin"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-admin", Role: "ADMIN"})
+
+	_, err := r.CancelDelivery(ctx, "del-123", nil)
+	if err == nil {
+		t.Fatal("expected forbidden error for admin, got nil")
+	}
+	if !strings.Contains(err.Error(), "admins do not have permission") {
+		t.Errorf("expected admin forbidden error, got %v", err)
+	}
+}
+
+func TestCancelDelivery_Unauthenticated(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-buyer"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := context.Background()
+
+	_, err := r.CancelDelivery(ctx, "del-123", nil)
+	if err == nil {
+		t.Fatal("expected unauthorized error, got nil")
+	}
+	if !strings.Contains(err.Error(), "authentication required") {
+		t.Errorf("expected authentication required error, got %v", err)
+	}
+}
+
+func TestCancelDelivery_DeliveryNotFound(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-1"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	_, err := r.CancelDelivery(ctx, "not-found", nil)
+	if err == nil {
+		t.Fatal("expected not found error, got nil")
+	}
+	if !strings.Contains(err.Error(), "delivery not found") {
+		t.Errorf("expected delivery not found error, got %v", err)
+	}
+}
+
+func TestCancelDelivery_OrderNotFound(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		err: appErrors.NotFound("associated order not found"),
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	_, err := r.CancelDelivery(ctx, "del-123", nil)
+	if err == nil {
+		t.Fatal("expected order not found error, got nil")
+	}
+	if !strings.Contains(err.Error(), "associated order not found") {
+		t.Errorf("expected order not found error, got %v", err)
+	}
+}
+
+func TestCancelDelivery_FailedPrecondition(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{Id: "ord-123", UserId: "usr-1"},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	_, err := r.CancelDelivery(ctx, "fail-id", nil)
+	if err == nil {
+		t.Fatal("expected error cancelling picked up delivery, got nil")
+	}
+	if !strings.Contains(err.Error(), "already picked up") {
+		t.Errorf("expected 'already picked up' in error, got %v", err)
+	}
+}
+
+func TestCalculateShippingFee_Success(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	clients := &grpc.Clients{DeliveryClient: deliveryMock}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	weight := 450.0
+	res, err := r.CalculateShippingFee(ctx, model.CalculateShippingFeeInput{
+		DeliveryPartnerID: "partner-default",
+		WeightGrams:       &weight,
+	})
+	if err != nil {
+		t.Fatalf("CalculateShippingFee failed: %v", err)
+	}
+	if res.ShippingFee != 55.0 {
+		t.Errorf("expected fee 55.0, got %v", res.ShippingFee)
+	}
+	if res.Zone != "TAMIL_NADU" {
+		t.Errorf("expected zone TAMIL_NADU, got %v", res.Zone)
+	}
+}
+
+func TestCalculateShippingFee_MissingDeliveryPartnerID_Fails(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	clients := &grpc.Clients{DeliveryClient: deliveryMock}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	weight := 450.0
+	_, err := r.CalculateShippingFee(ctx, model.CalculateShippingFeeInput{
+		DeliveryPartnerID: "   ",
+		WeightGrams:       &weight,
+	})
+	if err == nil {
+		t.Fatal("expected error when deliveryPartnerId is empty, got nil")
+	}
+	if !strings.Contains(err.Error(), "deliveryPartnerId is required") {
+		t.Errorf("expected 'deliveryPartnerId is required' error, got %v", err)
+	}
+}
+
+func TestCalculateShippingFee_WithUserAddressAndDeliveryPartner(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	userMock := &mockUserClientForDeliveryTest{
+		address: &userpb.Address{
+			AddressLine: "123 Main St",
+			City:        "Chennai",
+			State:       "Tamil Nadu",
+			PostalCode:  "600001",
+			Country:     "India",
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		UserClient:     userMock,
+	}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	addrID := "addr-chennai-1"
+	partnerID := "partner-dhl"
+	weight := 600.0
+	res, err := r.CalculateShippingFee(ctx, model.CalculateShippingFeeInput{
+		DeliveryPartnerID: partnerID,
+		WeightGrams:       &weight,
+		ShippingAddressID: &addrID,
+	})
+	if err != nil {
+		t.Fatalf("CalculateShippingFee failed: %v", err)
+	}
+	if res == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if deliveryMock.lastCalcReq == nil {
+		t.Fatal("expected deliveryMock.lastCalcReq to be populated")
+	}
+	if deliveryMock.lastCalcReq.DestinationCity != "Chennai" {
+		t.Errorf("expected destination city Chennai, got %s", deliveryMock.lastCalcReq.DestinationCity)
+	}
+	if deliveryMock.lastCalcReq.DestinationState != "Tamil Nadu" {
+		t.Errorf("expected destination state Tamil Nadu, got %s", deliveryMock.lastCalcReq.DestinationState)
+	}
+	if deliveryMock.lastCalcReq.PartnerId != "partner-dhl" {
+		t.Errorf("expected partner id partner-dhl, got %s", deliveryMock.lastCalcReq.PartnerId)
+	}
+}
+
+func TestCalculateShippingFee_WithOrder(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	orderMock := &mockOrderClientForDeliveryTest{
+		order: &orderpb.Order{
+			Id:              "ord-fee-1",
+			UserId:          "usr-1",
+			ShippingAddress: "{\"city\":\"Coimbatore\",\"state\":\"Tamil Nadu\",\"postal_code\":\"641001\"}",
+			Items: []*orderpb.OrderItem{
+				{ProductId: "prod-1", Quantity: 2},
+			},
+		},
+	}
+	clients := &grpc.Clients{
+		DeliveryClient: deliveryMock,
+		OrderClient:    orderMock,
+	}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	orderID := "ord-fee-1"
+	partner := "express-courier"
+	res, err := r.CalculateShippingFee(ctx, model.CalculateShippingFeeInput{
+		DeliveryPartnerID: partner,
+		OrderID:           &orderID,
+	})
+	if err != nil {
+		t.Fatalf("CalculateShippingFee failed: %v", err)
+	}
+	if res == nil {
+		t.Fatal("expected non-nil response")
+	}
+	if deliveryMock.lastCalcReq == nil {
+		t.Fatal("expected deliveryMock.lastCalcReq to be populated")
+	}
+	if deliveryMock.lastCalcReq.DestinationCity != "Coimbatore" {
+		t.Errorf("expected destination city Coimbatore, got %s", deliveryMock.lastCalcReq.DestinationCity)
+	}
+	if deliveryMock.lastCalcReq.PartnerId != "express-courier" {
+		t.Errorf("expected partner express-courier, got %s", deliveryMock.lastCalcReq.PartnerId)
+	}
+	if len(deliveryMock.lastCalcReq.Items) != 1 {
+		t.Errorf("expected 1 item from order, got %d", len(deliveryMock.lastCalcReq.Items))
+	}
+}
+
+func TestDeliveryByTracking_Success(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	clients := &grpc.Clients{DeliveryClient: deliveryMock}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	res, err := r.DeliveryByTracking(ctx, "TRK-12345")
+	if err != nil {
+		t.Fatalf("DeliveryByTracking failed: %v", err)
+	}
+	if res == nil || res.ID != "del-123" {
+		t.Errorf("expected del-123, got %v", res)
+	}
+}
+
+func TestDeliveryByOrder_Success(t *testing.T) {
+	deliveryMock := &mockDeliveryClient{}
+	clients := &grpc.Clients{DeliveryClient: deliveryMock}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "usr-1", Role: "CUSTOMER"})
+
+	res, err := r.DeliveryByOrder(ctx, "ord-12345")
+	if err != nil {
+		t.Fatalf("DeliveryByOrder failed: %v", err)
+	}
+	if res == nil || res.ID != "del-123" {
+		t.Errorf("expected del-123, got %v", res)
 	}
 }

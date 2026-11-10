@@ -57,7 +57,7 @@ func setupCheckoutIntegration(t *testing.T) (orderpb.OrderServiceClient, *consum
 		},
 	}
 
-	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, 5, nil)
+	svc := service.NewOrderService(repo, cartClient, prodClient, invClient, nil, 5, nil)
 	orderConsumer := consumer.NewOrderEventConsumer(svc)
 
 	grpcClient, cleanup := setupInProcessGRPC(t, repo, cartClient, prodClient, invClient)

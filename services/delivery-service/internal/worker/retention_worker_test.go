@@ -8,6 +8,7 @@ import (
 
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/model"
+	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/service/shipping_fee"
 	"github.com/marees-godev/GoCart-Server/services/delivery-service/internal/worker"
 )
 
@@ -31,6 +32,12 @@ func (m *mockDeliveryServiceForWorker) ListDeliveries(ctx context.Context, limit
 	return nil, 0, nil
 }
 func (m *mockDeliveryServiceForWorker) UpdateStatus(ctx context.Context, id string, targetStatus model.DeliveryStatus) (*model.Delivery, error) {
+	return nil, nil
+}
+func (m *mockDeliveryServiceForWorker) CancelDelivery(ctx context.Context, deliveryID, orderID, reason string) (*model.Delivery, error) {
+	return nil, nil
+}
+func (m *mockDeliveryServiceForWorker) CalculateShippingFee(ctx context.Context, req *shipping_fee.CalculationRequest) (*shipping_fee.CalculationResult, error) {
 	return nil, nil
 }
 func (m *mockDeliveryServiceForWorker) ProcessStatusUpdate(ctx context.Context, req *dto.DeliveryStatusUpdateRequest) (*model.Delivery, error) {

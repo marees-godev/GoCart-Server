@@ -32,6 +32,7 @@ type pgProductRepository struct {
 	pool        *pgxpool.Pool
 	outboxStore *outbox.Store
 	logger      *slog.Logger
+	beginTx     func(ctx context.Context) (pgx.Tx, error)
 }
 
 func NewProductRepository(pool *pgxpool.Pool, log ...*slog.Logger) ProductRepository {
@@ -53,8 +54,15 @@ func NewProductRepositoryWithOutbox(pool *pgxpool.Pool, outboxStore *outbox.Stor
 	}
 }
 
+func (r *pgProductRepository) startTx(ctx context.Context) (pgx.Tx, error) {
+	if r.beginTx != nil {
+		return r.beginTx(ctx)
+	}
+	return r.pool.Begin(ctx)
+}
+
 func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Product) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.startTx(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
@@ -62,9 +70,9 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 	query := `
 		INSERT INTO products (
-			store_id, category_id, sku, name, description, price, mrp, tax, currency, status, image_url, avg_rating, is_exchange_eligible, max_exchange_discount
+			store_id, category_id, sku, name, description, price, mrp, tax, currency, status, image_url, avg_rating, weight, is_exchange_eligible, max_exchange_discount
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -75,7 +83,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 	err = tx.QueryRow(ctx, query,
 		p.StoreID, p.CategoryID, p.SKU, p.Name, p.Description,
-		p.Price, p.MRP, p.Tax, currency, p.Status, p.ImageURL, p.AvgRating,
+		p.Price, p.MRP, p.Tax, currency, p.Status, p.ImageURL, p.AvgRating, p.Weight,
 		p.IsExchangeEligible, p.MaxExchangeDiscount,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 
@@ -168,7 +176,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 
 func (r *pgProductRepository) GetProductByID(ctx context.Context, id string) (*model.Product, error) {
 	query := `
-		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
+		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, weight, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
 		FROM products
 		WHERE id = $1 AND deleted_at IS NULL
 	`
@@ -176,7 +184,7 @@ func (r *pgProductRepository) GetProductByID(ctx context.Context, id string) (*m
 	var p model.Product
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&p.ID, &p.StoreID, &p.CategoryID, &p.SKU, &p.Name, &p.Description,
-		&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.Weight, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 		&p.IsExchangeEligible, &p.MaxExchangeDiscount,
 	)
 	if err != nil {
@@ -227,7 +235,7 @@ func (r *pgProductRepository) GetProductByID(ctx context.Context, id string) (*m
 
 func (r *pgProductRepository) GetProductBySKU(ctx context.Context, storeID, sku string) (*model.Product, error) {
 	query := `
-		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at
+		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, weight, created_at, updated_at, deleted_at
 		FROM products
 		WHERE store_id = $1 AND sku = $2 AND deleted_at IS NULL
 	`
@@ -235,7 +243,7 @@ func (r *pgProductRepository) GetProductBySKU(ctx context.Context, storeID, sku 
 	var p model.Product
 	err := r.pool.QueryRow(ctx, query, storeID, sku).Scan(
 		&p.ID, &p.StoreID, &p.CategoryID, &p.SKU, &p.Name, &p.Description,
-		&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.Weight, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -289,7 +297,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 	}
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
+		SELECT id, store_id, category_id, sku, name, description, price, mrp, tax, currency, status, COALESCE(image_url, ''), avg_rating, weight, created_at, updated_at, deleted_at, COALESCE(is_exchange_eligible, FALSE), COALESCE(max_exchange_discount, 0.00)
 		FROM products
 		WHERE %s
 		ORDER BY created_at DESC
@@ -309,7 +317,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 		var p model.Product
 		err := rows.Scan(
 			&p.ID, &p.StoreID, &p.CategoryID, &p.SKU, &p.Name, &p.Description,
-			&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.Price, &p.MRP, &p.Tax, &p.Currency, &p.Status, &p.ImageURL, &p.AvgRating, &p.Weight, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 			&p.IsExchangeEligible, &p.MaxExchangeDiscount,
 		)
 		if err != nil {
@@ -358,7 +366,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 }
 
 func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Product) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.startTx(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
@@ -381,13 +389,13 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 
 	query := `
 		UPDATE products
-		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, is_exchange_eligible = $9, max_exchange_discount = $10, updated_at = NOW()
-		WHERE id = $11 AND deleted_at IS NULL
+		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, weight = $9, is_exchange_eligible = $10, max_exchange_discount = $11, updated_at = NOW()
+		WHERE id = $12 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 
 	err = tx.QueryRow(ctx, query,
-		p.CategoryID, p.Name, p.Description, p.Price, p.MRP, p.Tax, p.Status, p.ImageURL, p.IsExchangeEligible, p.MaxExchangeDiscount, p.ID,
+		p.CategoryID, p.Name, p.Description, p.Price, p.MRP, p.Tax, p.Status, p.ImageURL, p.Weight, p.IsExchangeEligible, p.MaxExchangeDiscount, p.ID,
 	).Scan(&p.UpdatedAt)
 
 	if err != nil {
