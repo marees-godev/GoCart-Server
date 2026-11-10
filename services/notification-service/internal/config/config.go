@@ -4,17 +4,20 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/provider"
 )
 
 type Config struct {
-	App      AppConfig
-	HTTP     HTTPConfig
-	Database DatabaseConfig
-	Logger   LoggerConfig
-	Tracing  TracingConfig
-	Kafka    KafkaConfig
+	App       AppConfig
+	HTTP      HTTPConfig
+	Database  DatabaseConfig
+	Logger    LoggerConfig
+	Tracing   TracingConfig
+	Kafka     KafkaConfig
+	Providers provider.ProviderConfig
 }
 
 type AppConfig struct {
@@ -90,7 +93,43 @@ func LoadEnv() *Config {
 			GroupID:  GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
 			Enabled:  GetEnvAsBool("KAFKA_ENABLED", true),
 		},
+		Providers: provider.ProviderConfig{
+			Email: provider.EmailProviderConfig{
+				Provider: GetEnv("EMAIL_PROVIDER", "mock"),
+				Host:     GetEnv("SMTP_HOST", "localhost"),
+				Port:     GetEnvAsInt("SMTP_PORT", 587),
+				Username: GetEnv("SMTP_USERNAME", ""),
+				Password: GetEnv("SMTP_PASSWORD", ""),
+				From:     GetEnv("SMTP_FROM", "no-reply@gocart.local"),
+				UseTLS:   GetEnvAsBool("SMTP_USE_TLS", false),
+				Timeout:  GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
+			},
+			SMS: provider.SMSConfig{
+				Provider:   GetEnv("SMS_PROVIDER", "mock"),
+				AccountSID: GetEnv("SMS_ACCOUNT_SID", ""),
+				AuthToken:  GetEnv("SMS_AUTH_TOKEN", ""),
+				FromNumber: GetEnv("SMS_FROM_NUMBER", ""),
+				Timeout:    GetEnvAsDuration("SMS_TIMEOUT", 5*time.Second),
+			},
+			Push: provider.PushConfig{
+				Provider:  GetEnv("PUSH_PROVIDER", "mock"),
+				ServerKey: GetEnv("PUSH_SERVER_KEY", ""),
+				Timeout:   GetEnvAsDuration("PUSH_TIMEOUT", 5*time.Second),
+			},
+		},
 	}
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
 }
 
 func GetEnv(key, defaultValue string) string {
