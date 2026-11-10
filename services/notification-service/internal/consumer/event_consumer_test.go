@@ -656,7 +656,7 @@ func TestJobWorker_ProcessBatchAndRetry(t *testing.T) {
 	}
 	_ = repo.CreateJob(ctx, job)
 
-	worker := service.NewJobWorker(repo, logger, 50*time.Millisecond)
+	worker := service.NewJobWorker(repo, nil, logger, 50*time.Millisecond)
 
 	// Run single batch processing
 	workerCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
