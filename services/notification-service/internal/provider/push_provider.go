@@ -135,6 +135,13 @@ func (p *FCMPushProvider) Send(ctx context.Context, notification Notification) e
 	default:
 	}
 
+	// Simulated / stubbed HTTP API call
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://fcm.googleapis.com/fcm/send", nil)
+	if err != nil {
+		return p.sanitizeError(err)
+	}
+	_ = req
+
 	return nil
 }
 
