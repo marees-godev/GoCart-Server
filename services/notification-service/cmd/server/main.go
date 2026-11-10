@@ -21,6 +21,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/consumer"
+	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/provider"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/service"
 )
@@ -91,8 +92,9 @@ func main() {
 	pipelineSvc := service.NewNotificationPipelineService(tmplSvc, prefSvc, repo, repo, log)
 	eventConsumer := consumer.NewNotificationEventConsumer(pipelineSvc, log)
 
-	// 6. Start Asynchronous Notification Job Worker
-	jobWorker := service.NewJobWorker(repo, log, 5*time.Second)
+	// 6. Start Asynchronous Notification Job Worker with Provider Registry
+	providerRegistry := provider.NewRegistryFromConfig(cfg.Providers, log)
+	jobWorker := service.NewJobWorker(repo, providerRegistry, log, 5*time.Second)
 	go jobWorker.Start(ctx)
 
 	// 7. Initialize Kafka Consumer
