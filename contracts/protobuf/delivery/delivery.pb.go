@@ -21,27 +21,104 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type DeliveryTrackingUpdate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Location      string                 `protobuf:"bytes,3,opt,name=location,proto3" json:"location,omitempty"`
+	Notes         string                 `protobuf:"bytes,4,opt,name=notes,proto3" json:"notes,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeliveryTrackingUpdate) Reset() {
+	*x = DeliveryTrackingUpdate{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeliveryTrackingUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeliveryTrackingUpdate) ProtoMessage() {}
+
+func (x *DeliveryTrackingUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeliveryTrackingUpdate.ProtoReflect.Descriptor instead.
+func (*DeliveryTrackingUpdate) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeliveryTrackingUpdate) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DeliveryTrackingUpdate) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *DeliveryTrackingUpdate) GetLocation() string {
+	if x != nil {
+		return x.Location
+	}
+	return ""
+}
+
+func (x *DeliveryTrackingUpdate) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
+}
+
+func (x *DeliveryTrackingUpdate) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
 type Delivery struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OrderId             string                 `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
-	TrackingNumber      string                 `protobuf:"bytes,3,opt,name=tracking_number,json=trackingNumber,proto3" json:"tracking_number,omitempty"`
-	Status              string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	EstimatedDeliveryAt string                 `protobuf:"bytes,5,opt,name=estimated_delivery_at,json=estimatedDeliveryAt,proto3" json:"estimated_delivery_at,omitempty"`
-	DeliveredAt         string                 `protobuf:"bytes,6,opt,name=delivered_at,json=deliveredAt,proto3" json:"delivered_at,omitempty"`
-	DeliveryPartner     string                 `protobuf:"bytes,7,opt,name=delivery_partner,json=deliveryPartner,proto3" json:"delivery_partner,omitempty"`
-	ShippingAddress     string                 `protobuf:"bytes,8,opt,name=shipping_address,json=shippingAddress,proto3" json:"shipping_address,omitempty"`
-	UpdatedAt           string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	CreatedAt           string                 `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	ContactNumber       string                 `protobuf:"bytes,11,opt,name=contact_number,json=contactNumber,proto3" json:"contact_number,omitempty"`
-	ShippingAddressId   string                 `protobuf:"bytes,12,opt,name=shipping_address_id,json=shippingAddressId,proto3" json:"shipping_address_id,omitempty"`
+	state               protoimpl.MessageState    `protogen:"open.v1"`
+	Id                  string                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrderId             string                    `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	TrackingNumber      string                    `protobuf:"bytes,3,opt,name=tracking_number,json=trackingNumber,proto3" json:"tracking_number,omitempty"`
+	Status              string                    `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	EstimatedDeliveryAt string                    `protobuf:"bytes,5,opt,name=estimated_delivery_at,json=estimatedDeliveryAt,proto3" json:"estimated_delivery_at,omitempty"`
+	DeliveredAt         string                    `protobuf:"bytes,6,opt,name=delivered_at,json=deliveredAt,proto3" json:"delivered_at,omitempty"`
+	DeliveryPartner     string                    `protobuf:"bytes,7,opt,name=delivery_partner,json=deliveryPartner,proto3" json:"delivery_partner,omitempty"`
+	ShippingAddress     string                    `protobuf:"bytes,8,opt,name=shipping_address,json=shippingAddress,proto3" json:"shipping_address,omitempty"`
+	UpdatedAt           string                    `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt           string                    `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ContactNumber       string                    `protobuf:"bytes,11,opt,name=contact_number,json=contactNumber,proto3" json:"contact_number,omitempty"`
+	ShippingAddressId   string                    `protobuf:"bytes,12,opt,name=shipping_address_id,json=shippingAddressId,proto3" json:"shipping_address_id,omitempty"`
+	TrackingUpdates     []*DeliveryTrackingUpdate `protobuf:"bytes,13,rep,name=tracking_updates,json=trackingUpdates,proto3" json:"tracking_updates,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Delivery) Reset() {
 	*x = Delivery{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[0]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +130,7 @@ func (x *Delivery) String() string {
 func (*Delivery) ProtoMessage() {}
 
 func (x *Delivery) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[0]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +143,7 @@ func (x *Delivery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Delivery.ProtoReflect.Descriptor instead.
 func (*Delivery) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{0}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Delivery) GetId() string {
@@ -153,6 +230,13 @@ func (x *Delivery) GetShippingAddressId() string {
 	return ""
 }
 
+func (x *Delivery) GetTrackingUpdates() []*DeliveryTrackingUpdate {
+	if x != nil {
+		return x.TrackingUpdates
+	}
+	return nil
+}
+
 type CreateDeliveryRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	OrderId           string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
@@ -166,7 +250,7 @@ type CreateDeliveryRequest struct {
 
 func (x *CreateDeliveryRequest) Reset() {
 	*x = CreateDeliveryRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[1]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -178,7 +262,7 @@ func (x *CreateDeliveryRequest) String() string {
 func (*CreateDeliveryRequest) ProtoMessage() {}
 
 func (x *CreateDeliveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[1]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -191,7 +275,7 @@ func (x *CreateDeliveryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeliveryRequest.ProtoReflect.Descriptor instead.
 func (*CreateDeliveryRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{1}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateDeliveryRequest) GetOrderId() string {
@@ -238,7 +322,7 @@ type CreateDeliveryResponse struct {
 
 func (x *CreateDeliveryResponse) Reset() {
 	*x = CreateDeliveryResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[2]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +334,7 @@ func (x *CreateDeliveryResponse) String() string {
 func (*CreateDeliveryResponse) ProtoMessage() {}
 
 func (x *CreateDeliveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[2]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +347,7 @@ func (x *CreateDeliveryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDeliveryResponse.ProtoReflect.Descriptor instead.
 func (*CreateDeliveryResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{2}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateDeliveryResponse) GetDelivery() *Delivery {
@@ -282,7 +366,7 @@ type GetDeliveryRequest struct {
 
 func (x *GetDeliveryRequest) Reset() {
 	*x = GetDeliveryRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[3]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +378,7 @@ func (x *GetDeliveryRequest) String() string {
 func (*GetDeliveryRequest) ProtoMessage() {}
 
 func (x *GetDeliveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[3]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +391,7 @@ func (x *GetDeliveryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeliveryRequest.ProtoReflect.Descriptor instead.
 func (*GetDeliveryRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{3}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetDeliveryRequest) GetId() string {
@@ -326,7 +410,7 @@ type GetDeliveryByTrackingRequest struct {
 
 func (x *GetDeliveryByTrackingRequest) Reset() {
 	*x = GetDeliveryByTrackingRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[4]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +422,7 @@ func (x *GetDeliveryByTrackingRequest) String() string {
 func (*GetDeliveryByTrackingRequest) ProtoMessage() {}
 
 func (x *GetDeliveryByTrackingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[4]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +435,7 @@ func (x *GetDeliveryByTrackingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeliveryByTrackingRequest.ProtoReflect.Descriptor instead.
 func (*GetDeliveryByTrackingRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{4}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetDeliveryByTrackingRequest) GetTrackingNumber() string {
@@ -370,7 +454,7 @@ type GetDeliveryByOrderRequest struct {
 
 func (x *GetDeliveryByOrderRequest) Reset() {
 	*x = GetDeliveryByOrderRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -382,7 +466,7 @@ func (x *GetDeliveryByOrderRequest) String() string {
 func (*GetDeliveryByOrderRequest) ProtoMessage() {}
 
 func (x *GetDeliveryByOrderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -395,7 +479,7 @@ func (x *GetDeliveryByOrderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeliveryByOrderRequest.ProtoReflect.Descriptor instead.
 func (*GetDeliveryByOrderRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{5}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetDeliveryByOrderRequest) GetOrderId() string {
@@ -414,7 +498,7 @@ type GetDeliveryResponse struct {
 
 func (x *GetDeliveryResponse) Reset() {
 	*x = GetDeliveryResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +510,7 @@ func (x *GetDeliveryResponse) String() string {
 func (*GetDeliveryResponse) ProtoMessage() {}
 
 func (x *GetDeliveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +523,7 @@ func (x *GetDeliveryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeliveryResponse.ProtoReflect.Descriptor instead.
 func (*GetDeliveryResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{6}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetDeliveryResponse) GetDelivery() *Delivery {
@@ -460,7 +544,7 @@ type UpdateDeliveryStatusRequest struct {
 
 func (x *UpdateDeliveryStatusRequest) Reset() {
 	*x = UpdateDeliveryStatusRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -472,7 +556,7 @@ func (x *UpdateDeliveryStatusRequest) String() string {
 func (*UpdateDeliveryStatusRequest) ProtoMessage() {}
 
 func (x *UpdateDeliveryStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -485,7 +569,7 @@ func (x *UpdateDeliveryStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDeliveryStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDeliveryStatusRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{7}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateDeliveryStatusRequest) GetId() string {
@@ -518,7 +602,7 @@ type UpdateDeliveryStatusResponse struct {
 
 func (x *UpdateDeliveryStatusResponse) Reset() {
 	*x = UpdateDeliveryStatusResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +614,7 @@ func (x *UpdateDeliveryStatusResponse) String() string {
 func (*UpdateDeliveryStatusResponse) ProtoMessage() {}
 
 func (x *UpdateDeliveryStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,7 +627,7 @@ func (x *UpdateDeliveryStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDeliveryStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateDeliveryStatusResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{8}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateDeliveryStatusResponse) GetDelivery() *Delivery {
@@ -551,6 +635,394 @@ func (x *UpdateDeliveryStatusResponse) GetDelivery() *Delivery {
 		return x.Delivery
 	}
 	return nil
+}
+
+type CancelDeliveryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeliveryId    string                 `protobuf:"bytes,1,opt,name=delivery_id,json=deliveryId,proto3" json:"delivery_id,omitempty"`
+	OrderId       string                 `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelDeliveryRequest) Reset() {
+	*x = CancelDeliveryRequest{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelDeliveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelDeliveryRequest) ProtoMessage() {}
+
+func (x *CancelDeliveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelDeliveryRequest.ProtoReflect.Descriptor instead.
+func (*CancelDeliveryRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CancelDeliveryRequest) GetDeliveryId() string {
+	if x != nil {
+		return x.DeliveryId
+	}
+	return ""
+}
+
+func (x *CancelDeliveryRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *CancelDeliveryRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type CancelDeliveryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Delivery      *Delivery              `protobuf:"bytes,1,opt,name=delivery,proto3" json:"delivery,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelDeliveryResponse) Reset() {
+	*x = CancelDeliveryResponse{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelDeliveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelDeliveryResponse) ProtoMessage() {}
+
+func (x *CancelDeliveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelDeliveryResponse.ProtoReflect.Descriptor instead.
+func (*CancelDeliveryResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CancelDeliveryResponse) GetDelivery() *Delivery {
+	if x != nil {
+		return x.Delivery
+	}
+	return nil
+}
+
+func (x *CancelDeliveryResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CancelDeliveryResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ShippingItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Quantity      int32                  `protobuf:"varint,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	WeightGrams   float64                `protobuf:"fixed64,3,opt,name=weight_grams,json=weightGrams,proto3" json:"weight_grams,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShippingItem) Reset() {
+	*x = ShippingItem{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShippingItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShippingItem) ProtoMessage() {}
+
+func (x *ShippingItem) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShippingItem.ProtoReflect.Descriptor instead.
+func (*ShippingItem) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ShippingItem) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *ShippingItem) GetQuantity() int32 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
+}
+
+func (x *ShippingItem) GetWeightGrams() float64 {
+	if x != nil {
+		return x.WeightGrams
+	}
+	return 0
+}
+
+type CalculateShippingFeeRequest struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	WeightGrams           float64                `protobuf:"fixed64,1,opt,name=weight_grams,json=weightGrams,proto3" json:"weight_grams,omitempty"`
+	Zone                  string                 `protobuf:"bytes,2,opt,name=zone,proto3" json:"zone,omitempty"`
+	OriginCity            string                 `protobuf:"bytes,3,opt,name=origin_city,json=originCity,proto3" json:"origin_city,omitempty"`
+	OriginState           string                 `protobuf:"bytes,4,opt,name=origin_state,json=originState,proto3" json:"origin_state,omitempty"`
+	DestinationCity       string                 `protobuf:"bytes,5,opt,name=destination_city,json=destinationCity,proto3" json:"destination_city,omitempty"`
+	DestinationState      string                 `protobuf:"bytes,6,opt,name=destination_state,json=destinationState,proto3" json:"destination_state,omitempty"`
+	DestinationPostalCode string                 `protobuf:"bytes,7,opt,name=destination_postal_code,json=destinationPostalCode,proto3" json:"destination_postal_code,omitempty"`
+	ShippingAddress       string                 `protobuf:"bytes,8,opt,name=shipping_address,json=shippingAddress,proto3" json:"shipping_address,omitempty"`
+	Items                 []*ShippingItem        `protobuf:"bytes,9,rep,name=items,proto3" json:"items,omitempty"`
+	Model                 string                 `protobuf:"bytes,10,opt,name=model,proto3" json:"model,omitempty"`
+	PartnerId             string                 `protobuf:"bytes,11,opt,name=partner_id,json=partnerId,proto3" json:"partner_id,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CalculateShippingFeeRequest) Reset() {
+	*x = CalculateShippingFeeRequest{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateShippingFeeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateShippingFeeRequest) ProtoMessage() {}
+
+func (x *CalculateShippingFeeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateShippingFeeRequest.ProtoReflect.Descriptor instead.
+func (*CalculateShippingFeeRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CalculateShippingFeeRequest) GetWeightGrams() float64 {
+	if x != nil {
+		return x.WeightGrams
+	}
+	return 0
+}
+
+func (x *CalculateShippingFeeRequest) GetZone() string {
+	if x != nil {
+		return x.Zone
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetOriginCity() string {
+	if x != nil {
+		return x.OriginCity
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetOriginState() string {
+	if x != nil {
+		return x.OriginState
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetDestinationCity() string {
+	if x != nil {
+		return x.DestinationCity
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetDestinationState() string {
+	if x != nil {
+		return x.DestinationState
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetDestinationPostalCode() string {
+	if x != nil {
+		return x.DestinationPostalCode
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetShippingAddress() string {
+	if x != nil {
+		return x.ShippingAddress
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetItems() []*ShippingItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *CalculateShippingFeeRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeRequest) GetPartnerId() string {
+	if x != nil {
+		return x.PartnerId
+	}
+	return ""
+}
+
+type CalculateShippingFeeResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ShippingFee      float64                `protobuf:"fixed64,1,opt,name=shipping_fee,json=shippingFee,proto3" json:"shipping_fee,omitempty"`
+	Currency         string                 `protobuf:"bytes,2,opt,name=currency,proto3" json:"currency,omitempty"`
+	Zone             string                 `protobuf:"bytes,3,opt,name=zone,proto3" json:"zone,omitempty"`
+	TotalWeightGrams float64                `protobuf:"fixed64,4,opt,name=total_weight_grams,json=totalWeightGrams,proto3" json:"total_weight_grams,omitempty"`
+	CalculationModel string                 `protobuf:"bytes,5,opt,name=calculation_model,json=calculationModel,proto3" json:"calculation_model,omitempty"`
+	BreakdownDetails string                 `protobuf:"bytes,6,opt,name=breakdown_details,json=breakdownDetails,proto3" json:"breakdown_details,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CalculateShippingFeeResponse) Reset() {
+	*x = CalculateShippingFeeResponse{}
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalculateShippingFeeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalculateShippingFeeResponse) ProtoMessage() {}
+
+func (x *CalculateShippingFeeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalculateShippingFeeResponse.ProtoReflect.Descriptor instead.
+func (*CalculateShippingFeeResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *CalculateShippingFeeResponse) GetShippingFee() float64 {
+	if x != nil {
+		return x.ShippingFee
+	}
+	return 0
+}
+
+func (x *CalculateShippingFeeResponse) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeResponse) GetZone() string {
+	if x != nil {
+		return x.Zone
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeResponse) GetTotalWeightGrams() float64 {
+	if x != nil {
+		return x.TotalWeightGrams
+	}
+	return 0
+}
+
+func (x *CalculateShippingFeeResponse) GetCalculationModel() string {
+	if x != nil {
+		return x.CalculationModel
+	}
+	return ""
+}
+
+func (x *CalculateShippingFeeResponse) GetBreakdownDetails() string {
+	if x != nil {
+		return x.BreakdownDetails
+	}
+	return ""
 }
 
 type DeliveryPartnerProfile struct {
@@ -579,7 +1051,7 @@ type DeliveryPartnerProfile struct {
 
 func (x *DeliveryPartnerProfile) Reset() {
 	*x = DeliveryPartnerProfile{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +1063,7 @@ func (x *DeliveryPartnerProfile) String() string {
 func (*DeliveryPartnerProfile) ProtoMessage() {}
 
 func (x *DeliveryPartnerProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +1076,7 @@ func (x *DeliveryPartnerProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeliveryPartnerProfile.ProtoReflect.Descriptor instead.
 func (*DeliveryPartnerProfile) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{9}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *DeliveryPartnerProfile) GetId() string {
@@ -746,7 +1218,7 @@ type CreatePartnerProfileRequest struct {
 
 func (x *CreatePartnerProfileRequest) Reset() {
 	*x = CreatePartnerProfileRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +1230,7 @@ func (x *CreatePartnerProfileRequest) String() string {
 func (*CreatePartnerProfileRequest) ProtoMessage() {}
 
 func (x *CreatePartnerProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +1243,7 @@ func (x *CreatePartnerProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePartnerProfileRequest.ProtoReflect.Descriptor instead.
 func (*CreatePartnerProfileRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{10}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CreatePartnerProfileRequest) GetPartnerId() string {
@@ -818,7 +1290,7 @@ type GetPartnerProfileRequest struct {
 
 func (x *GetPartnerProfileRequest) Reset() {
 	*x = GetPartnerProfileRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -830,7 +1302,7 @@ func (x *GetPartnerProfileRequest) String() string {
 func (*GetPartnerProfileRequest) ProtoMessage() {}
 
 func (x *GetPartnerProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +1315,7 @@ func (x *GetPartnerProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPartnerProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetPartnerProfileRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{11}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetPartnerProfileRequest) GetPartnerId() string {
@@ -867,7 +1339,7 @@ type UpdatePartnerProfileRequest struct {
 
 func (x *UpdatePartnerProfileRequest) Reset() {
 	*x = UpdatePartnerProfileRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[12]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -879,7 +1351,7 @@ func (x *UpdatePartnerProfileRequest) String() string {
 func (*UpdatePartnerProfileRequest) ProtoMessage() {}
 
 func (x *UpdatePartnerProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[12]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,7 +1364,7 @@ func (x *UpdatePartnerProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePartnerProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePartnerProfileRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{12}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UpdatePartnerProfileRequest) GetPartnerId() string {
@@ -948,7 +1420,7 @@ type VerifyPartnerGSTINRequest struct {
 
 func (x *VerifyPartnerGSTINRequest) Reset() {
 	*x = VerifyPartnerGSTINRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[13]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -960,7 +1432,7 @@ func (x *VerifyPartnerGSTINRequest) String() string {
 func (*VerifyPartnerGSTINRequest) ProtoMessage() {}
 
 func (x *VerifyPartnerGSTINRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[13]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -973,7 +1445,7 @@ func (x *VerifyPartnerGSTINRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyPartnerGSTINRequest.ProtoReflect.Descriptor instead.
 func (*VerifyPartnerGSTINRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{13}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *VerifyPartnerGSTINRequest) GetPartnerId() string {
@@ -1006,7 +1478,7 @@ type PartnerProfileResponse struct {
 
 func (x *PartnerProfileResponse) Reset() {
 	*x = PartnerProfileResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1490,7 @@ func (x *PartnerProfileResponse) String() string {
 func (*PartnerProfileResponse) ProtoMessage() {}
 
 func (x *PartnerProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1503,7 @@ func (x *PartnerProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PartnerProfileResponse.ProtoReflect.Descriptor instead.
 func (*PartnerProfileResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{14}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PartnerProfileResponse) GetProfile() *DeliveryPartnerProfile {
@@ -1051,7 +1523,7 @@ type ActivatePartnerRequest struct {
 
 func (x *ActivatePartnerRequest) Reset() {
 	*x = ActivatePartnerRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1063,7 +1535,7 @@ func (x *ActivatePartnerRequest) String() string {
 func (*ActivatePartnerRequest) ProtoMessage() {}
 
 func (x *ActivatePartnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1076,7 +1548,7 @@ func (x *ActivatePartnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivatePartnerRequest.ProtoReflect.Descriptor instead.
 func (*ActivatePartnerRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{15}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ActivatePartnerRequest) GetPartnerId() string {
@@ -1104,7 +1576,7 @@ type DeactivatePartnerRequest struct {
 
 func (x *DeactivatePartnerRequest) Reset() {
 	*x = DeactivatePartnerRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[16]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +1588,7 @@ func (x *DeactivatePartnerRequest) String() string {
 func (*DeactivatePartnerRequest) ProtoMessage() {}
 
 func (x *DeactivatePartnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[16]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +1601,7 @@ func (x *DeactivatePartnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeactivatePartnerRequest.ProtoReflect.Descriptor instead.
 func (*DeactivatePartnerRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{16}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeactivatePartnerRequest) GetPartnerId() string {
@@ -1164,7 +1636,7 @@ type DeletePartnerProfileRequest struct {
 
 func (x *DeletePartnerProfileRequest) Reset() {
 	*x = DeletePartnerProfileRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[17]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1176,7 +1648,7 @@ func (x *DeletePartnerProfileRequest) String() string {
 func (*DeletePartnerProfileRequest) ProtoMessage() {}
 
 func (x *DeletePartnerProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[17]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1189,7 +1661,7 @@ func (x *DeletePartnerProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePartnerProfileRequest.ProtoReflect.Descriptor instead.
 func (*DeletePartnerProfileRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{17}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DeletePartnerProfileRequest) GetPartnerId() string {
@@ -1224,7 +1696,7 @@ type DeletePartnerProfileResponse struct {
 
 func (x *DeletePartnerProfileResponse) Reset() {
 	*x = DeletePartnerProfileResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[18]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1236,7 +1708,7 @@ func (x *DeletePartnerProfileResponse) String() string {
 func (*DeletePartnerProfileResponse) ProtoMessage() {}
 
 func (x *DeletePartnerProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[18]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1249,7 +1721,7 @@ func (x *DeletePartnerProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePartnerProfileResponse.ProtoReflect.Descriptor instead.
 func (*DeletePartnerProfileResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{18}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DeletePartnerProfileResponse) GetSuccess() bool {
@@ -1282,7 +1754,7 @@ type ApprovePartnerRequest struct {
 
 func (x *ApprovePartnerRequest) Reset() {
 	*x = ApprovePartnerRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[19]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1294,7 +1766,7 @@ func (x *ApprovePartnerRequest) String() string {
 func (*ApprovePartnerRequest) ProtoMessage() {}
 
 func (x *ApprovePartnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[19]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1307,7 +1779,7 @@ func (x *ApprovePartnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApprovePartnerRequest.ProtoReflect.Descriptor instead.
 func (*ApprovePartnerRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{19}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ApprovePartnerRequest) GetPartnerId() string {
@@ -1327,7 +1799,7 @@ type RejectPartnerRequest struct {
 
 func (x *RejectPartnerRequest) Reset() {
 	*x = RejectPartnerRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[20]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1339,7 +1811,7 @@ func (x *RejectPartnerRequest) String() string {
 func (*RejectPartnerRequest) ProtoMessage() {}
 
 func (x *RejectPartnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[20]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1352,7 +1824,7 @@ func (x *RejectPartnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectPartnerRequest.ProtoReflect.Descriptor instead.
 func (*RejectPartnerRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{20}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RejectPartnerRequest) GetPartnerId() string {
@@ -1380,7 +1852,7 @@ type AppealRejectionRequest struct {
 
 func (x *AppealRejectionRequest) Reset() {
 	*x = AppealRejectionRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[21]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1392,7 +1864,7 @@ func (x *AppealRejectionRequest) String() string {
 func (*AppealRejectionRequest) ProtoMessage() {}
 
 func (x *AppealRejectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[21]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1405,7 +1877,7 @@ func (x *AppealRejectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppealRejectionRequest.ProtoReflect.Descriptor instead.
 func (*AppealRejectionRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{21}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AppealRejectionRequest) GetPartnerId() string {
@@ -1439,7 +1911,7 @@ type ListAppealedPartnersRequest struct {
 
 func (x *ListAppealedPartnersRequest) Reset() {
 	*x = ListAppealedPartnersRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[22]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1451,7 +1923,7 @@ func (x *ListAppealedPartnersRequest) String() string {
 func (*ListAppealedPartnersRequest) ProtoMessage() {}
 
 func (x *ListAppealedPartnersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[22]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1464,7 +1936,7 @@ func (x *ListAppealedPartnersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAppealedPartnersRequest.ProtoReflect.Descriptor instead.
 func (*ListAppealedPartnersRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{22}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListAppealedPartnersRequest) GetLimit() int32 {
@@ -1491,7 +1963,7 @@ type ListAppealedPartnersResponse struct {
 
 func (x *ListAppealedPartnersResponse) Reset() {
 	*x = ListAppealedPartnersResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[23]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1503,7 +1975,7 @@ func (x *ListAppealedPartnersResponse) String() string {
 func (*ListAppealedPartnersResponse) ProtoMessage() {}
 
 func (x *ListAppealedPartnersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[23]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1516,7 +1988,7 @@ func (x *ListAppealedPartnersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAppealedPartnersResponse.ProtoReflect.Descriptor instead.
 func (*ListAppealedPartnersResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{23}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListAppealedPartnersResponse) GetProfiles() []*DeliveryPartnerProfile {
@@ -1543,7 +2015,7 @@ type ListApprovedPartnersRequest struct {
 
 func (x *ListApprovedPartnersRequest) Reset() {
 	*x = ListApprovedPartnersRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[24]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1555,7 +2027,7 @@ func (x *ListApprovedPartnersRequest) String() string {
 func (*ListApprovedPartnersRequest) ProtoMessage() {}
 
 func (x *ListApprovedPartnersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[24]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1568,7 +2040,7 @@ func (x *ListApprovedPartnersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovedPartnersRequest.ProtoReflect.Descriptor instead.
 func (*ListApprovedPartnersRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{24}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListApprovedPartnersRequest) GetLimit() int32 {
@@ -1595,7 +2067,7 @@ type ListApprovedPartnersResponse struct {
 
 func (x *ListApprovedPartnersResponse) Reset() {
 	*x = ListApprovedPartnersResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[25]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1607,7 +2079,7 @@ func (x *ListApprovedPartnersResponse) String() string {
 func (*ListApprovedPartnersResponse) ProtoMessage() {}
 
 func (x *ListApprovedPartnersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[25]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1620,7 +2092,7 @@ func (x *ListApprovedPartnersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApprovedPartnersResponse.ProtoReflect.Descriptor instead.
 func (*ListApprovedPartnersResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{25}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListApprovedPartnersResponse) GetProfiles() []*DeliveryPartnerProfile {
@@ -1646,7 +2118,7 @@ type ProcessExpiredDeactivationsRequest struct {
 
 func (x *ProcessExpiredDeactivationsRequest) Reset() {
 	*x = ProcessExpiredDeactivationsRequest{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[26]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1658,7 +2130,7 @@ func (x *ProcessExpiredDeactivationsRequest) String() string {
 func (*ProcessExpiredDeactivationsRequest) ProtoMessage() {}
 
 func (x *ProcessExpiredDeactivationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[26]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1671,7 +2143,7 @@ func (x *ProcessExpiredDeactivationsRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ProcessExpiredDeactivationsRequest.ProtoReflect.Descriptor instead.
 func (*ProcessExpiredDeactivationsRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{26}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ProcessExpiredDeactivationsRequest) GetRetentionMinutes() int32 {
@@ -1691,7 +2163,7 @@ type ProcessExpiredDeactivationsResponse struct {
 
 func (x *ProcessExpiredDeactivationsResponse) Reset() {
 	*x = ProcessExpiredDeactivationsResponse{}
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[27]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1703,7 +2175,7 @@ func (x *ProcessExpiredDeactivationsResponse) String() string {
 func (*ProcessExpiredDeactivationsResponse) ProtoMessage() {}
 
 func (x *ProcessExpiredDeactivationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[27]
+	mi := &file_contracts_protobuf_delivery_delivery_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1716,7 +2188,7 @@ func (x *ProcessExpiredDeactivationsResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ProcessExpiredDeactivationsResponse.ProtoReflect.Descriptor instead.
 func (*ProcessExpiredDeactivationsResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{27}
+	return file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ProcessExpiredDeactivationsResponse) GetProcessedCount() int32 {
@@ -1737,7 +2209,14 @@ var File_contracts_protobuf_delivery_delivery_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_delivery_delivery_proto_rawDesc = "" +
 	"\n" +
-	"*contracts/protobuf/delivery/delivery.proto\x12\x12gocart.delivery.v1\"\xb8\x03\n" +
+	"*contracts/protobuf/delivery/delivery.proto\x12\x12gocart.delivery.v1\"\x91\x01\n" +
+	"\x16DeliveryTrackingUpdate\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1a\n" +
+	"\blocation\x18\x03 \x01(\tR\blocation\x12\x14\n" +
+	"\x05notes\x18\x04 \x01(\tR\x05notes\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\tR\tcreatedAt\"\x8f\x04\n" +
 	"\bDelivery\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\x12'\n" +
@@ -1753,7 +2232,8 @@ const file_contracts_protobuf_delivery_delivery_proto_rawDesc = "" +
 	"created_at\x18\n" +
 	" \x01(\tR\tcreatedAt\x12%\n" +
 	"\x0econtact_number\x18\v \x01(\tR\rcontactNumber\x12.\n" +
-	"\x13shipping_address_id\x18\f \x01(\tR\x11shippingAddressId\"\xdf\x01\n" +
+	"\x13shipping_address_id\x18\f \x01(\tR\x11shippingAddressId\x12U\n" +
+	"\x10tracking_updates\x18\r \x03(\v2*.gocart.delivery.v1.DeliveryTrackingUpdateR\x0ftrackingUpdates\"\xdf\x01\n" +
 	"\x15CreateDeliveryRequest\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x12)\n" +
 	"\x10delivery_partner\x18\x02 \x01(\tR\x0fdeliveryPartner\x12)\n" +
@@ -1775,7 +2255,43 @@ const file_contracts_protobuf_delivery_delivery_proto_rawDesc = "" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1a\n" +
 	"\blocation\x18\x03 \x01(\tR\blocation\"X\n" +
 	"\x1cUpdateDeliveryStatusResponse\x128\n" +
-	"\bdelivery\x18\x01 \x01(\v2\x1c.gocart.delivery.v1.DeliveryR\bdelivery\"\x97\x05\n" +
+	"\bdelivery\x18\x01 \x01(\v2\x1c.gocart.delivery.v1.DeliveryR\bdelivery\"k\n" +
+	"\x15CancelDeliveryRequest\x12\x1f\n" +
+	"\vdelivery_id\x18\x01 \x01(\tR\n" +
+	"deliveryId\x12\x19\n" +
+	"\border_id\x18\x02 \x01(\tR\aorderId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x86\x01\n" +
+	"\x16CancelDeliveryResponse\x128\n" +
+	"\bdelivery\x18\x01 \x01(\v2\x1c.gocart.delivery.v1.DeliveryR\bdelivery\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"l\n" +
+	"\fShippingItem\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tR\tproductId\x12\x1a\n" +
+	"\bquantity\x18\x02 \x01(\x05R\bquantity\x12!\n" +
+	"\fweight_grams\x18\x03 \x01(\x01R\vweightGrams\"\xc0\x03\n" +
+	"\x1bCalculateShippingFeeRequest\x12!\n" +
+	"\fweight_grams\x18\x01 \x01(\x01R\vweightGrams\x12\x12\n" +
+	"\x04zone\x18\x02 \x01(\tR\x04zone\x12\x1f\n" +
+	"\vorigin_city\x18\x03 \x01(\tR\n" +
+	"originCity\x12!\n" +
+	"\forigin_state\x18\x04 \x01(\tR\voriginState\x12)\n" +
+	"\x10destination_city\x18\x05 \x01(\tR\x0fdestinationCity\x12+\n" +
+	"\x11destination_state\x18\x06 \x01(\tR\x10destinationState\x126\n" +
+	"\x17destination_postal_code\x18\a \x01(\tR\x15destinationPostalCode\x12)\n" +
+	"\x10shipping_address\x18\b \x01(\tR\x0fshippingAddress\x126\n" +
+	"\x05items\x18\t \x03(\v2 .gocart.delivery.v1.ShippingItemR\x05items\x12\x14\n" +
+	"\x05model\x18\n" +
+	" \x01(\tR\x05model\x12\x1d\n" +
+	"\n" +
+	"partner_id\x18\v \x01(\tR\tpartnerId\"\xf9\x01\n" +
+	"\x1cCalculateShippingFeeResponse\x12!\n" +
+	"\fshipping_fee\x18\x01 \x01(\x01R\vshippingFee\x12\x1a\n" +
+	"\bcurrency\x18\x02 \x01(\tR\bcurrency\x12\x12\n" +
+	"\x04zone\x18\x03 \x01(\tR\x04zone\x12,\n" +
+	"\x12total_weight_grams\x18\x04 \x01(\x01R\x10totalWeightGrams\x12+\n" +
+	"\x11calculation_model\x18\x05 \x01(\tR\x10calculationModel\x12+\n" +
+	"\x11breakdown_details\x18\x06 \x01(\tR\x10breakdownDetails\"\x97\x05\n" +
 	"\x16DeliveryPartnerProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1879,13 +2395,15 @@ const file_contracts_protobuf_delivery_delivery_proto_rawDesc = "" +
 	"\x11retention_minutes\x18\x01 \x01(\x05R\x10retentionMinutes\"h\n" +
 	"#ProcessExpiredDeactivationsResponse\x12'\n" +
 	"\x0fprocessed_count\x18\x01 \x01(\x05R\x0eprocessedCount\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\x91\x10\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xf5\x11\n" +
 	"\x0fDeliveryService\x12g\n" +
 	"\x0eCreateDelivery\x12).gocart.delivery.v1.CreateDeliveryRequest\x1a*.gocart.delivery.v1.CreateDeliveryResponse\x12^\n" +
 	"\vGetDelivery\x12&.gocart.delivery.v1.GetDeliveryRequest\x1a'.gocart.delivery.v1.GetDeliveryResponse\x12r\n" +
 	"\x15GetDeliveryByTracking\x120.gocart.delivery.v1.GetDeliveryByTrackingRequest\x1a'.gocart.delivery.v1.GetDeliveryResponse\x12l\n" +
 	"\x12GetDeliveryByOrder\x12-.gocart.delivery.v1.GetDeliveryByOrderRequest\x1a'.gocart.delivery.v1.GetDeliveryResponse\x12y\n" +
-	"\x14UpdateDeliveryStatus\x12/.gocart.delivery.v1.UpdateDeliveryStatusRequest\x1a0.gocart.delivery.v1.UpdateDeliveryStatusResponse\x12s\n" +
+	"\x14UpdateDeliveryStatus\x12/.gocart.delivery.v1.UpdateDeliveryStatusRequest\x1a0.gocart.delivery.v1.UpdateDeliveryStatusResponse\x12g\n" +
+	"\x0eCancelDelivery\x12).gocart.delivery.v1.CancelDeliveryRequest\x1a*.gocart.delivery.v1.CancelDeliveryResponse\x12y\n" +
+	"\x14CalculateShippingFee\x12/.gocart.delivery.v1.CalculateShippingFeeRequest\x1a0.gocart.delivery.v1.CalculateShippingFeeResponse\x12s\n" +
 	"\x14CreatePartnerProfile\x12/.gocart.delivery.v1.CreatePartnerProfileRequest\x1a*.gocart.delivery.v1.PartnerProfileResponse\x12m\n" +
 	"\x11GetPartnerProfile\x12,.gocart.delivery.v1.GetPartnerProfileRequest\x1a*.gocart.delivery.v1.PartnerProfileResponse\x12s\n" +
 	"\x14UpdatePartnerProfile\x12/.gocart.delivery.v1.UpdatePartnerProfileRequest\x1a*.gocart.delivery.v1.PartnerProfileResponse\x12h\n" +
@@ -1912,85 +2430,98 @@ func file_contracts_protobuf_delivery_delivery_proto_rawDescGZIP() []byte {
 	return file_contracts_protobuf_delivery_delivery_proto_rawDescData
 }
 
-var file_contracts_protobuf_delivery_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_contracts_protobuf_delivery_delivery_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_contracts_protobuf_delivery_delivery_proto_goTypes = []any{
-	(*Delivery)(nil),                            // 0: gocart.delivery.v1.Delivery
-	(*CreateDeliveryRequest)(nil),               // 1: gocart.delivery.v1.CreateDeliveryRequest
-	(*CreateDeliveryResponse)(nil),              // 2: gocart.delivery.v1.CreateDeliveryResponse
-	(*GetDeliveryRequest)(nil),                  // 3: gocart.delivery.v1.GetDeliveryRequest
-	(*GetDeliveryByTrackingRequest)(nil),        // 4: gocart.delivery.v1.GetDeliveryByTrackingRequest
-	(*GetDeliveryByOrderRequest)(nil),           // 5: gocart.delivery.v1.GetDeliveryByOrderRequest
-	(*GetDeliveryResponse)(nil),                 // 6: gocart.delivery.v1.GetDeliveryResponse
-	(*UpdateDeliveryStatusRequest)(nil),         // 7: gocart.delivery.v1.UpdateDeliveryStatusRequest
-	(*UpdateDeliveryStatusResponse)(nil),        // 8: gocart.delivery.v1.UpdateDeliveryStatusResponse
-	(*DeliveryPartnerProfile)(nil),              // 9: gocart.delivery.v1.DeliveryPartnerProfile
-	(*CreatePartnerProfileRequest)(nil),         // 10: gocart.delivery.v1.CreatePartnerProfileRequest
-	(*GetPartnerProfileRequest)(nil),            // 11: gocart.delivery.v1.GetPartnerProfileRequest
-	(*UpdatePartnerProfileRequest)(nil),         // 12: gocart.delivery.v1.UpdatePartnerProfileRequest
-	(*VerifyPartnerGSTINRequest)(nil),           // 13: gocart.delivery.v1.VerifyPartnerGSTINRequest
-	(*PartnerProfileResponse)(nil),              // 14: gocart.delivery.v1.PartnerProfileResponse
-	(*ActivatePartnerRequest)(nil),              // 15: gocart.delivery.v1.ActivatePartnerRequest
-	(*DeactivatePartnerRequest)(nil),            // 16: gocart.delivery.v1.DeactivatePartnerRequest
-	(*DeletePartnerProfileRequest)(nil),         // 17: gocart.delivery.v1.DeletePartnerProfileRequest
-	(*DeletePartnerProfileResponse)(nil),        // 18: gocart.delivery.v1.DeletePartnerProfileResponse
-	(*ApprovePartnerRequest)(nil),               // 19: gocart.delivery.v1.ApprovePartnerRequest
-	(*RejectPartnerRequest)(nil),                // 20: gocart.delivery.v1.RejectPartnerRequest
-	(*AppealRejectionRequest)(nil),              // 21: gocart.delivery.v1.AppealRejectionRequest
-	(*ListAppealedPartnersRequest)(nil),         // 22: gocart.delivery.v1.ListAppealedPartnersRequest
-	(*ListAppealedPartnersResponse)(nil),        // 23: gocart.delivery.v1.ListAppealedPartnersResponse
-	(*ListApprovedPartnersRequest)(nil),         // 24: gocart.delivery.v1.ListApprovedPartnersRequest
-	(*ListApprovedPartnersResponse)(nil),        // 25: gocart.delivery.v1.ListApprovedPartnersResponse
-	(*ProcessExpiredDeactivationsRequest)(nil),  // 26: gocart.delivery.v1.ProcessExpiredDeactivationsRequest
-	(*ProcessExpiredDeactivationsResponse)(nil), // 27: gocart.delivery.v1.ProcessExpiredDeactivationsResponse
+	(*DeliveryTrackingUpdate)(nil),              // 0: gocart.delivery.v1.DeliveryTrackingUpdate
+	(*Delivery)(nil),                            // 1: gocart.delivery.v1.Delivery
+	(*CreateDeliveryRequest)(nil),               // 2: gocart.delivery.v1.CreateDeliveryRequest
+	(*CreateDeliveryResponse)(nil),              // 3: gocart.delivery.v1.CreateDeliveryResponse
+	(*GetDeliveryRequest)(nil),                  // 4: gocart.delivery.v1.GetDeliveryRequest
+	(*GetDeliveryByTrackingRequest)(nil),        // 5: gocart.delivery.v1.GetDeliveryByTrackingRequest
+	(*GetDeliveryByOrderRequest)(nil),           // 6: gocart.delivery.v1.GetDeliveryByOrderRequest
+	(*GetDeliveryResponse)(nil),                 // 7: gocart.delivery.v1.GetDeliveryResponse
+	(*UpdateDeliveryStatusRequest)(nil),         // 8: gocart.delivery.v1.UpdateDeliveryStatusRequest
+	(*UpdateDeliveryStatusResponse)(nil),        // 9: gocart.delivery.v1.UpdateDeliveryStatusResponse
+	(*CancelDeliveryRequest)(nil),               // 10: gocart.delivery.v1.CancelDeliveryRequest
+	(*CancelDeliveryResponse)(nil),              // 11: gocart.delivery.v1.CancelDeliveryResponse
+	(*ShippingItem)(nil),                        // 12: gocart.delivery.v1.ShippingItem
+	(*CalculateShippingFeeRequest)(nil),         // 13: gocart.delivery.v1.CalculateShippingFeeRequest
+	(*CalculateShippingFeeResponse)(nil),        // 14: gocart.delivery.v1.CalculateShippingFeeResponse
+	(*DeliveryPartnerProfile)(nil),              // 15: gocart.delivery.v1.DeliveryPartnerProfile
+	(*CreatePartnerProfileRequest)(nil),         // 16: gocart.delivery.v1.CreatePartnerProfileRequest
+	(*GetPartnerProfileRequest)(nil),            // 17: gocart.delivery.v1.GetPartnerProfileRequest
+	(*UpdatePartnerProfileRequest)(nil),         // 18: gocart.delivery.v1.UpdatePartnerProfileRequest
+	(*VerifyPartnerGSTINRequest)(nil),           // 19: gocart.delivery.v1.VerifyPartnerGSTINRequest
+	(*PartnerProfileResponse)(nil),              // 20: gocart.delivery.v1.PartnerProfileResponse
+	(*ActivatePartnerRequest)(nil),              // 21: gocart.delivery.v1.ActivatePartnerRequest
+	(*DeactivatePartnerRequest)(nil),            // 22: gocart.delivery.v1.DeactivatePartnerRequest
+	(*DeletePartnerProfileRequest)(nil),         // 23: gocart.delivery.v1.DeletePartnerProfileRequest
+	(*DeletePartnerProfileResponse)(nil),        // 24: gocart.delivery.v1.DeletePartnerProfileResponse
+	(*ApprovePartnerRequest)(nil),               // 25: gocart.delivery.v1.ApprovePartnerRequest
+	(*RejectPartnerRequest)(nil),                // 26: gocart.delivery.v1.RejectPartnerRequest
+	(*AppealRejectionRequest)(nil),              // 27: gocart.delivery.v1.AppealRejectionRequest
+	(*ListAppealedPartnersRequest)(nil),         // 28: gocart.delivery.v1.ListAppealedPartnersRequest
+	(*ListAppealedPartnersResponse)(nil),        // 29: gocart.delivery.v1.ListAppealedPartnersResponse
+	(*ListApprovedPartnersRequest)(nil),         // 30: gocart.delivery.v1.ListApprovedPartnersRequest
+	(*ListApprovedPartnersResponse)(nil),        // 31: gocart.delivery.v1.ListApprovedPartnersResponse
+	(*ProcessExpiredDeactivationsRequest)(nil),  // 32: gocart.delivery.v1.ProcessExpiredDeactivationsRequest
+	(*ProcessExpiredDeactivationsResponse)(nil), // 33: gocart.delivery.v1.ProcessExpiredDeactivationsResponse
 }
 var file_contracts_protobuf_delivery_delivery_proto_depIdxs = []int32{
-	0,  // 0: gocart.delivery.v1.CreateDeliveryResponse.delivery:type_name -> gocart.delivery.v1.Delivery
-	0,  // 1: gocart.delivery.v1.GetDeliveryResponse.delivery:type_name -> gocart.delivery.v1.Delivery
-	0,  // 2: gocart.delivery.v1.UpdateDeliveryStatusResponse.delivery:type_name -> gocart.delivery.v1.Delivery
-	9,  // 3: gocart.delivery.v1.PartnerProfileResponse.profile:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
-	9,  // 4: gocart.delivery.v1.ListAppealedPartnersResponse.profiles:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
-	9,  // 5: gocart.delivery.v1.ListApprovedPartnersResponse.profiles:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
-	1,  // 6: gocart.delivery.v1.DeliveryService.CreateDelivery:input_type -> gocart.delivery.v1.CreateDeliveryRequest
-	3,  // 7: gocart.delivery.v1.DeliveryService.GetDelivery:input_type -> gocart.delivery.v1.GetDeliveryRequest
-	4,  // 8: gocart.delivery.v1.DeliveryService.GetDeliveryByTracking:input_type -> gocart.delivery.v1.GetDeliveryByTrackingRequest
-	5,  // 9: gocart.delivery.v1.DeliveryService.GetDeliveryByOrder:input_type -> gocart.delivery.v1.GetDeliveryByOrderRequest
-	7,  // 10: gocart.delivery.v1.DeliveryService.UpdateDeliveryStatus:input_type -> gocart.delivery.v1.UpdateDeliveryStatusRequest
-	10, // 11: gocart.delivery.v1.DeliveryService.CreatePartnerProfile:input_type -> gocart.delivery.v1.CreatePartnerProfileRequest
-	11, // 12: gocart.delivery.v1.DeliveryService.GetPartnerProfile:input_type -> gocart.delivery.v1.GetPartnerProfileRequest
-	12, // 13: gocart.delivery.v1.DeliveryService.UpdatePartnerProfile:input_type -> gocart.delivery.v1.UpdatePartnerProfileRequest
-	13, // 14: gocart.delivery.v1.DeliveryService.VerifyGSTIN:input_type -> gocart.delivery.v1.VerifyPartnerGSTINRequest
-	15, // 15: gocart.delivery.v1.DeliveryService.ActivatePartner:input_type -> gocart.delivery.v1.ActivatePartnerRequest
-	16, // 16: gocart.delivery.v1.DeliveryService.DeactivatePartner:input_type -> gocart.delivery.v1.DeactivatePartnerRequest
-	17, // 17: gocart.delivery.v1.DeliveryService.DeletePartnerProfile:input_type -> gocart.delivery.v1.DeletePartnerProfileRequest
-	19, // 18: gocart.delivery.v1.DeliveryService.ApprovePartner:input_type -> gocart.delivery.v1.ApprovePartnerRequest
-	20, // 19: gocart.delivery.v1.DeliveryService.RejectPartner:input_type -> gocart.delivery.v1.RejectPartnerRequest
-	21, // 20: gocart.delivery.v1.DeliveryService.AppealRejection:input_type -> gocart.delivery.v1.AppealRejectionRequest
-	22, // 21: gocart.delivery.v1.DeliveryService.ListAppealedPartners:input_type -> gocart.delivery.v1.ListAppealedPartnersRequest
-	24, // 22: gocart.delivery.v1.DeliveryService.ListApprovedPartners:input_type -> gocart.delivery.v1.ListApprovedPartnersRequest
-	26, // 23: gocart.delivery.v1.DeliveryService.ProcessExpiredDeactivations:input_type -> gocart.delivery.v1.ProcessExpiredDeactivationsRequest
-	2,  // 24: gocart.delivery.v1.DeliveryService.CreateDelivery:output_type -> gocart.delivery.v1.CreateDeliveryResponse
-	6,  // 25: gocart.delivery.v1.DeliveryService.GetDelivery:output_type -> gocart.delivery.v1.GetDeliveryResponse
-	6,  // 26: gocart.delivery.v1.DeliveryService.GetDeliveryByTracking:output_type -> gocart.delivery.v1.GetDeliveryResponse
-	6,  // 27: gocart.delivery.v1.DeliveryService.GetDeliveryByOrder:output_type -> gocart.delivery.v1.GetDeliveryResponse
-	8,  // 28: gocart.delivery.v1.DeliveryService.UpdateDeliveryStatus:output_type -> gocart.delivery.v1.UpdateDeliveryStatusResponse
-	14, // 29: gocart.delivery.v1.DeliveryService.CreatePartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 30: gocart.delivery.v1.DeliveryService.GetPartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 31: gocart.delivery.v1.DeliveryService.UpdatePartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 32: gocart.delivery.v1.DeliveryService.VerifyGSTIN:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 33: gocart.delivery.v1.DeliveryService.ActivatePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 34: gocart.delivery.v1.DeliveryService.DeactivatePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	18, // 35: gocart.delivery.v1.DeliveryService.DeletePartnerProfile:output_type -> gocart.delivery.v1.DeletePartnerProfileResponse
-	14, // 36: gocart.delivery.v1.DeliveryService.ApprovePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 37: gocart.delivery.v1.DeliveryService.RejectPartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	14, // 38: gocart.delivery.v1.DeliveryService.AppealRejection:output_type -> gocart.delivery.v1.PartnerProfileResponse
-	23, // 39: gocart.delivery.v1.DeliveryService.ListAppealedPartners:output_type -> gocart.delivery.v1.ListAppealedPartnersResponse
-	25, // 40: gocart.delivery.v1.DeliveryService.ListApprovedPartners:output_type -> gocart.delivery.v1.ListApprovedPartnersResponse
-	27, // 41: gocart.delivery.v1.DeliveryService.ProcessExpiredDeactivations:output_type -> gocart.delivery.v1.ProcessExpiredDeactivationsResponse
-	24, // [24:42] is the sub-list for method output_type
-	6,  // [6:24] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0,  // 0: gocart.delivery.v1.Delivery.tracking_updates:type_name -> gocart.delivery.v1.DeliveryTrackingUpdate
+	1,  // 1: gocart.delivery.v1.CreateDeliveryResponse.delivery:type_name -> gocart.delivery.v1.Delivery
+	1,  // 2: gocart.delivery.v1.GetDeliveryResponse.delivery:type_name -> gocart.delivery.v1.Delivery
+	1,  // 3: gocart.delivery.v1.UpdateDeliveryStatusResponse.delivery:type_name -> gocart.delivery.v1.Delivery
+	1,  // 4: gocart.delivery.v1.CancelDeliveryResponse.delivery:type_name -> gocart.delivery.v1.Delivery
+	12, // 5: gocart.delivery.v1.CalculateShippingFeeRequest.items:type_name -> gocart.delivery.v1.ShippingItem
+	15, // 6: gocart.delivery.v1.PartnerProfileResponse.profile:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
+	15, // 7: gocart.delivery.v1.ListAppealedPartnersResponse.profiles:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
+	15, // 8: gocart.delivery.v1.ListApprovedPartnersResponse.profiles:type_name -> gocart.delivery.v1.DeliveryPartnerProfile
+	2,  // 9: gocart.delivery.v1.DeliveryService.CreateDelivery:input_type -> gocart.delivery.v1.CreateDeliveryRequest
+	4,  // 10: gocart.delivery.v1.DeliveryService.GetDelivery:input_type -> gocart.delivery.v1.GetDeliveryRequest
+	5,  // 11: gocart.delivery.v1.DeliveryService.GetDeliveryByTracking:input_type -> gocart.delivery.v1.GetDeliveryByTrackingRequest
+	6,  // 12: gocart.delivery.v1.DeliveryService.GetDeliveryByOrder:input_type -> gocart.delivery.v1.GetDeliveryByOrderRequest
+	8,  // 13: gocart.delivery.v1.DeliveryService.UpdateDeliveryStatus:input_type -> gocart.delivery.v1.UpdateDeliveryStatusRequest
+	10, // 14: gocart.delivery.v1.DeliveryService.CancelDelivery:input_type -> gocart.delivery.v1.CancelDeliveryRequest
+	13, // 15: gocart.delivery.v1.DeliveryService.CalculateShippingFee:input_type -> gocart.delivery.v1.CalculateShippingFeeRequest
+	16, // 16: gocart.delivery.v1.DeliveryService.CreatePartnerProfile:input_type -> gocart.delivery.v1.CreatePartnerProfileRequest
+	17, // 17: gocart.delivery.v1.DeliveryService.GetPartnerProfile:input_type -> gocart.delivery.v1.GetPartnerProfileRequest
+	18, // 18: gocart.delivery.v1.DeliveryService.UpdatePartnerProfile:input_type -> gocart.delivery.v1.UpdatePartnerProfileRequest
+	19, // 19: gocart.delivery.v1.DeliveryService.VerifyGSTIN:input_type -> gocart.delivery.v1.VerifyPartnerGSTINRequest
+	21, // 20: gocart.delivery.v1.DeliveryService.ActivatePartner:input_type -> gocart.delivery.v1.ActivatePartnerRequest
+	22, // 21: gocart.delivery.v1.DeliveryService.DeactivatePartner:input_type -> gocart.delivery.v1.DeactivatePartnerRequest
+	23, // 22: gocart.delivery.v1.DeliveryService.DeletePartnerProfile:input_type -> gocart.delivery.v1.DeletePartnerProfileRequest
+	25, // 23: gocart.delivery.v1.DeliveryService.ApprovePartner:input_type -> gocart.delivery.v1.ApprovePartnerRequest
+	26, // 24: gocart.delivery.v1.DeliveryService.RejectPartner:input_type -> gocart.delivery.v1.RejectPartnerRequest
+	27, // 25: gocart.delivery.v1.DeliveryService.AppealRejection:input_type -> gocart.delivery.v1.AppealRejectionRequest
+	28, // 26: gocart.delivery.v1.DeliveryService.ListAppealedPartners:input_type -> gocart.delivery.v1.ListAppealedPartnersRequest
+	30, // 27: gocart.delivery.v1.DeliveryService.ListApprovedPartners:input_type -> gocart.delivery.v1.ListApprovedPartnersRequest
+	32, // 28: gocart.delivery.v1.DeliveryService.ProcessExpiredDeactivations:input_type -> gocart.delivery.v1.ProcessExpiredDeactivationsRequest
+	3,  // 29: gocart.delivery.v1.DeliveryService.CreateDelivery:output_type -> gocart.delivery.v1.CreateDeliveryResponse
+	7,  // 30: gocart.delivery.v1.DeliveryService.GetDelivery:output_type -> gocart.delivery.v1.GetDeliveryResponse
+	7,  // 31: gocart.delivery.v1.DeliveryService.GetDeliveryByTracking:output_type -> gocart.delivery.v1.GetDeliveryResponse
+	7,  // 32: gocart.delivery.v1.DeliveryService.GetDeliveryByOrder:output_type -> gocart.delivery.v1.GetDeliveryResponse
+	9,  // 33: gocart.delivery.v1.DeliveryService.UpdateDeliveryStatus:output_type -> gocart.delivery.v1.UpdateDeliveryStatusResponse
+	11, // 34: gocart.delivery.v1.DeliveryService.CancelDelivery:output_type -> gocart.delivery.v1.CancelDeliveryResponse
+	14, // 35: gocart.delivery.v1.DeliveryService.CalculateShippingFee:output_type -> gocart.delivery.v1.CalculateShippingFeeResponse
+	20, // 36: gocart.delivery.v1.DeliveryService.CreatePartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 37: gocart.delivery.v1.DeliveryService.GetPartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 38: gocart.delivery.v1.DeliveryService.UpdatePartnerProfile:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 39: gocart.delivery.v1.DeliveryService.VerifyGSTIN:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 40: gocart.delivery.v1.DeliveryService.ActivatePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 41: gocart.delivery.v1.DeliveryService.DeactivatePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	24, // 42: gocart.delivery.v1.DeliveryService.DeletePartnerProfile:output_type -> gocart.delivery.v1.DeletePartnerProfileResponse
+	20, // 43: gocart.delivery.v1.DeliveryService.ApprovePartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 44: gocart.delivery.v1.DeliveryService.RejectPartner:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	20, // 45: gocart.delivery.v1.DeliveryService.AppealRejection:output_type -> gocart.delivery.v1.PartnerProfileResponse
+	29, // 46: gocart.delivery.v1.DeliveryService.ListAppealedPartners:output_type -> gocart.delivery.v1.ListAppealedPartnersResponse
+	31, // 47: gocart.delivery.v1.DeliveryService.ListApprovedPartners:output_type -> gocart.delivery.v1.ListApprovedPartnersResponse
+	33, // 48: gocart.delivery.v1.DeliveryService.ProcessExpiredDeactivations:output_type -> gocart.delivery.v1.ProcessExpiredDeactivationsResponse
+	29, // [29:49] is the sub-list for method output_type
+	9,  // [9:29] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_delivery_delivery_proto_init() }
@@ -1998,17 +2529,17 @@ func file_contracts_protobuf_delivery_delivery_proto_init() {
 	if File_contracts_protobuf_delivery_delivery_proto != nil {
 		return
 	}
-	file_contracts_protobuf_delivery_delivery_proto_msgTypes[9].OneofWrappers = []any{}
-	file_contracts_protobuf_delivery_delivery_proto_msgTypes[10].OneofWrappers = []any{}
-	file_contracts_protobuf_delivery_delivery_proto_msgTypes[12].OneofWrappers = []any{}
-	file_contracts_protobuf_delivery_delivery_proto_msgTypes[17].OneofWrappers = []any{}
+	file_contracts_protobuf_delivery_delivery_proto_msgTypes[15].OneofWrappers = []any{}
+	file_contracts_protobuf_delivery_delivery_proto_msgTypes[16].OneofWrappers = []any{}
+	file_contracts_protobuf_delivery_delivery_proto_msgTypes[18].OneofWrappers = []any{}
+	file_contracts_protobuf_delivery_delivery_proto_msgTypes[23].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_delivery_delivery_proto_rawDesc), len(file_contracts_protobuf_delivery_delivery_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

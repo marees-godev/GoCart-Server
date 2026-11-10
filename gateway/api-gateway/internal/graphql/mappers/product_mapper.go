@@ -107,6 +107,7 @@ func MapProduct(p *productpb.Product) *model.Product {
 		Price:               p.Price,
 		Mrp:                 p.Mrp,
 		Tax:                 p.Tax,
+		Weight:              p.Weight,
 		Status:              model.ProductStatus(p.Status),
 		ImageURL:            imgURL,
 		Images:              p.Images,

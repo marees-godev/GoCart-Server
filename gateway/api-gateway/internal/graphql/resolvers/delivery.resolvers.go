@@ -11,6 +11,7 @@ import (
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -187,6 +188,130 @@ func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, 
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	// As delivery proceeds, synchronously synchronize order status with order-service
+	if res != nil && res.Delivery != nil && strings.TrimSpace(res.Delivery.OrderId) != "" {
+		if orderClient, oErr := r.getOrderClient(); oErr == nil && orderClient != nil {
+			delivOrderID := strings.TrimSpace(res.Delivery.OrderId)
+			var targetOrderStatus string
+			switch strings.ToUpper(strings.TrimSpace(string(status))) {
+			case "PICKED_UP", "IN_TRANSIT":
+				targetOrderStatus = "SHIPPED"
+			case "OUT_FOR_DELIVERY":
+				targetOrderStatus = "OUT_FOR_DELIVERY"
+			case "DELIVERED":
+				targetOrderStatus = "DELIVERED"
+			case "CANCELLED":
+				targetOrderStatus = "CANCELLED"
+			}
+			if targetOrderStatus != "" {
+				_, _ = orderClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+					Id:     delivOrderID,
+					Status: targetOrderStatus,
+				})
+			}
+		}
+	}
+
+	return toModelDelivery(res.Delivery), nil
+}
+
+// CancelDelivery is the resolver for the cancelDelivery field.
+func (r *mutationResolver) CancelDelivery(ctx context.Context, id string, reason *string) (*model.Delivery, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	cleanID := strings.TrimSpace(id)
+	if cleanID == "" {
+		return nil, appErrors.BadRequest("id is required")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		if userCtx := getAuthUser(ctx); userCtx != nil {
+			authID = userCtx.UserID
+		}
+	}
+	if strings.TrimSpace(authID) == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	// Not even admin has right to cancel the order
+	userCtx := getAuthUser(ctx)
+	callerRole := ""
+	if userCtx != nil {
+		callerRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
+	}
+	if callerRole == "ADMIN" || callerRole == auth.RoleAdmin {
+		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders or deliveries; only the user who placed the order can cancel")
+	}
+
+	delivResp, err := r.Clients.DeliveryClient.GetDelivery(ctx, &deliverypb.GetDeliveryRequest{
+		Id: cleanID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if delivResp == nil || delivResp.Delivery == nil || strings.TrimSpace(delivResp.Delivery.Id) == "" {
+		return nil, appErrors.NotFound("delivery not found")
+	}
+
+	orderID := strings.TrimSpace(delivResp.Delivery.OrderId)
+	if orderID == "" {
+		return nil, appErrors.BadRequest("associated order not found for delivery")
+	}
+
+	orderClient, oErr := r.getOrderClient()
+	if oErr != nil {
+		return nil, grpcclient.TranslateGRPCError(oErr)
+	}
+	if orderClient == nil {
+		return nil, appErrors.Internal(nil, "order service unavailable")
+	}
+
+	orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{
+		Id: orderID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if orderResp == nil || orderResp.Order == nil || strings.TrimSpace(orderResp.Order.Id) == "" {
+		return nil, appErrors.NotFound("associated order not found")
+	}
+
+	orderUserID := strings.TrimSpace(orderResp.Order.UserId)
+	if orderUserID == "" || orderUserID != strings.TrimSpace(authID) {
+		return nil, appErrors.Forbidden("access denied: only the user who placed the order can cancel this delivery")
+	}
+
+	var cancelReason string
+	if reason != nil {
+		cancelReason = strings.TrimSpace(*reason)
+	}
+
+	res, err := r.Clients.DeliveryClient.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+		DeliveryId: cleanID,
+		OrderId:    orderID,
+		Reason:     cancelReason,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	// Synchronously update order status in order-service so orders table immediately reflects CANCELLED
+	if orderClient != nil {
+		if _, cErr := orderClient.CancelOrder(ctx, &orderpb.CancelOrderRequest{
+			Id:     orderID,
+			UserId: authID,
+			Reason: cancelReason,
+		}); cErr != nil {
+			_, _ = orderClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+				Id:     orderID,
+				Status: "CANCELLED",
+			})
+		}
 	}
 
 	return toModelDelivery(res.Delivery), nil
@@ -560,6 +685,182 @@ func (r *queryResolver) DeliveryByOrder(ctx context.Context, orderID string) (*m
 	}
 
 	return toModelDelivery(res.Delivery), nil
+}
+
+// CalculateShippingFee is the resolver for the calculateShippingFee field.
+func (r *queryResolver) CalculateShippingFee(ctx context.Context, input model.CalculateShippingFeeInput) (*model.ShippingFeeCalculation, error) {
+	if r.Clients == nil || r.Clients.DeliveryClient == nil {
+		return nil, appErrors.Internal(nil, "delivery service client unavailable")
+	}
+
+	req := &deliverypb.CalculateShippingFeeRequest{}
+	if input.WeightGrams != nil {
+		req.WeightGrams = *input.WeightGrams
+	}
+	if input.Zone != nil {
+		req.Zone = *input.Zone
+	}
+	if input.OriginCity != nil {
+		req.OriginCity = *input.OriginCity
+	}
+	if input.OriginState != nil {
+		req.OriginState = *input.OriginState
+	}
+	if input.DestinationCity != nil {
+		req.DestinationCity = *input.DestinationCity
+	}
+	if input.DestinationState != nil {
+		req.DestinationState = *input.DestinationState
+	}
+	if input.DestinationPostalCode != nil {
+		req.DestinationPostalCode = *input.DestinationPostalCode
+	}
+	if input.ShippingAddress != nil {
+		req.ShippingAddress = *input.ShippingAddress
+	}
+	if input.Model != nil {
+		req.Model = *input.Model
+	}
+
+	// Validate mandatory deliveryPartnerId
+	partnerID := strings.TrimSpace(input.DeliveryPartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("deliveryPartnerId is required")
+	}
+	req.PartnerId = partnerID
+
+	customerID := getAuthUserIDFromCtx(ctx)
+
+	// If orderId is provided, get the order and step the shipping fee for that order
+	var associatedOrder *orderpb.Order
+	if input.OrderID != nil && strings.TrimSpace(*input.OrderID) != "" {
+		cleanOrderID := strings.TrimSpace(*input.OrderID)
+		orderClient, oErr := r.getOrderClient()
+		if oErr == nil && orderClient != nil {
+			oResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: cleanOrderID})
+			if err == nil && oResp != nil && oResp.Order != nil {
+				associatedOrder = oResp.Order
+				if customerID == "" && associatedOrder.UserId != "" {
+					customerID = associatedOrder.UserId
+				}
+				if req.ShippingAddress == "" && strings.TrimSpace(associatedOrder.ShippingAddress) != "" {
+					req.ShippingAddress = strings.TrimSpace(associatedOrder.ShippingAddress)
+				}
+			}
+		}
+	}
+
+	// Resolve user address
+	var shippingAddressID string
+	if input.ShippingAddressID != nil && strings.TrimSpace(*input.ShippingAddressID) != "" {
+		shippingAddressID = strings.TrimSpace(*input.ShippingAddressID)
+	} else if associatedOrder != nil && strings.TrimSpace(associatedOrder.ShippingAddressId) != "" {
+		shippingAddressID = strings.TrimSpace(associatedOrder.ShippingAddressId)
+	}
+
+	userClient := r.getUserClient()
+	if userClient != nil && shippingAddressID != "" && (req.DestinationCity == "" || req.DestinationState == "" || req.ShippingAddress == "") {
+		addrResp, addrErr := userClient.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+			UserId:    customerID,
+			AddressId: shippingAddressID,
+		})
+		if addrErr == nil && addrResp != nil && addrResp.Address != nil {
+			ua := addrResp.Address
+			if req.DestinationCity == "" && ua.City != "" {
+				req.DestinationCity = ua.City
+			}
+			if req.DestinationState == "" && ua.State != "" {
+				req.DestinationState = ua.State
+			}
+			if req.DestinationPostalCode == "" && ua.PostalCode != "" {
+				req.DestinationPostalCode = ua.PostalCode
+			}
+			if req.ShippingAddress == "" {
+				addrMap := map[string]string{
+					"street":      ua.AddressLine,
+					"city":        ua.City,
+					"state":       ua.State,
+					"postal_code": ua.PostalCode,
+					"country":     ua.Country,
+				}
+				if bytes, mErr := json.Marshal(addrMap); mErr == nil {
+					req.ShippingAddress = string(bytes)
+				} else {
+					req.ShippingAddress = strings.TrimSpace(ua.AddressLine)
+				}
+			}
+		}
+	}
+
+	// Parse city and state from shipping address JSON if present
+	if req.ShippingAddress != "" && (req.DestinationCity == "" || req.DestinationState == "") {
+		var addrMap map[string]interface{}
+		if err := json.Unmarshal([]byte(req.ShippingAddress), &addrMap); err == nil {
+			if v, ok := addrMap["city"].(string); ok && v != "" && req.DestinationCity == "" {
+				req.DestinationCity = v
+			}
+			if v, ok := addrMap["state"].(string); ok && v != "" && req.DestinationState == "" {
+				req.DestinationState = v
+			}
+			if v, ok := addrMap["postal_code"].(string); ok && v != "" && req.DestinationPostalCode == "" {
+				req.DestinationPostalCode = v
+			}
+		}
+	}
+
+	if len(input.Items) > 0 {
+		req.Items = make([]*deliverypb.ShippingItem, 0, len(input.Items))
+		for _, it := range input.Items {
+			if it == nil {
+				continue
+			}
+			req.Items = append(req.Items, &deliverypb.ShippingItem{
+				ProductId:   it.ProductID,
+				Quantity:    int32(it.Quantity),
+				WeightGrams: it.WeightGrams,
+			})
+		}
+	} else if associatedOrder != nil && len(associatedOrder.Items) > 0 {
+		catalogClient, _ := r.getProductClient()
+		for _, it := range associatedOrder.Items {
+			if it == nil {
+				continue
+			}
+			var w float64
+			if catalogClient != nil {
+				pResp, pErr := catalogClient.GetProduct(ctx, &productpb.GetProductRequest{Id: it.ProductId})
+				if pErr == nil && pResp != nil && pResp.Product != nil {
+					w = pResp.Product.Weight
+					if w > 0 && w <= 50 {
+						w = w * 1000.0
+					}
+				}
+			}
+			req.Items = append(req.Items, &deliverypb.ShippingItem{
+				ProductId:   it.ProductId,
+				Quantity:    it.Quantity,
+				WeightGrams: w,
+			})
+		}
+	}
+
+	res, err := r.Clients.DeliveryClient.CalculateShippingFee(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := &model.ShippingFeeCalculation{
+		ShippingFee:      res.ShippingFee,
+		Currency:         res.Currency,
+		Zone:             res.Zone,
+		TotalWeightGrams: res.TotalWeightGrams,
+		CalculationModel: res.CalculationModel,
+	}
+	if res.BreakdownDetails != "" {
+		result.BreakdownDetails = &res.BreakdownDetails
+	}
+
+	return result, nil
 }
 
 // DeliveryPartnerProfile is the resolver for the deliveryPartnerProfile field.

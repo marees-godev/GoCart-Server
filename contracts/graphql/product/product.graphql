@@ -37,6 +37,7 @@ type Product {
   price: Float!
   mrp: Float!
   tax: Float!
+  weight: Float!
   status: ProductStatus!
   imageUrl: String
   isExchangeEligible: Boolean
@@ -82,6 +83,7 @@ input CreateProductInput {
   price: Float!
   mrp: Float!
   tax: Float
+  weight: Float!
   status: ProductStatus
   imageUrl: String
   isExchangeEligible: Boolean
@@ -108,6 +110,7 @@ input UpdateProductInput {
   price: Float
   mrp: Float
   tax: Float
+  weight: Float
   status: ProductStatus
   imageUrl: String
   isExchangeEligible: Boolean

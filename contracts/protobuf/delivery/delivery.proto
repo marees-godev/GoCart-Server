@@ -10,6 +10,8 @@ service DeliveryService {
   rpc GetDeliveryByTracking (GetDeliveryByTrackingRequest) returns (GetDeliveryResponse);
   rpc GetDeliveryByOrder (GetDeliveryByOrderRequest) returns (GetDeliveryResponse);
   rpc UpdateDeliveryStatus (UpdateDeliveryStatusRequest) returns (UpdateDeliveryStatusResponse);
+  rpc CancelDelivery (CancelDeliveryRequest) returns (CancelDeliveryResponse);
+  rpc CalculateShippingFee (CalculateShippingFeeRequest) returns (CalculateShippingFeeResponse);
 
   rpc CreatePartnerProfile (CreatePartnerProfileRequest) returns (PartnerProfileResponse);
   rpc GetPartnerProfile (GetPartnerProfileRequest) returns (PartnerProfileResponse);
@@ -27,6 +29,14 @@ service DeliveryService {
   rpc ProcessExpiredDeactivations (ProcessExpiredDeactivationsRequest) returns (ProcessExpiredDeactivationsResponse);
 }
 
+message DeliveryTrackingUpdate {
+  string id = 1;
+  string status = 2;
+  string location = 3;
+  string notes = 4;
+  string created_at = 5;
+}
+
 message Delivery {
   string id = 1;
   string order_id = 2;
@@ -40,6 +50,7 @@ message Delivery {
   string created_at = 10;
   string contact_number = 11;
   string shipping_address_id = 12;
+  repeated DeliveryTrackingUpdate tracking_updates = 13;
 }
 
 message CreateDeliveryRequest {
@@ -78,6 +89,47 @@ message UpdateDeliveryStatusRequest {
 
 message UpdateDeliveryStatusResponse {
   Delivery delivery = 1;
+}
+
+message CancelDeliveryRequest {
+  string delivery_id = 1;
+  string order_id = 2;
+  string reason = 3;
+}
+
+message CancelDeliveryResponse {
+  Delivery delivery = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+message ShippingItem {
+  string product_id = 1;
+  int32 quantity = 2;
+  double weight_grams = 3;
+}
+
+message CalculateShippingFeeRequest {
+  double weight_grams = 1;
+  string zone = 2;
+  string origin_city = 3;
+  string origin_state = 4;
+  string destination_city = 5;
+  string destination_state = 6;
+  string destination_postal_code = 7;
+  string shipping_address = 8;
+  repeated ShippingItem items = 9;
+  string model = 10;
+  string partner_id = 11;
+}
+
+message CalculateShippingFeeResponse {
+  double shipping_fee = 1;
+  string currency = 2;
+  string zone = 3;
+  double total_weight_grams = 4;
+  string calculation_model = 5;
+  string breakdown_details = 6;
 }
 
 message DeliveryPartnerProfile {

@@ -50,6 +50,7 @@ type UpdateStatusRequest struct {
 	Notes             string               `json:"notes,omitempty"`
 }
 
+
 type DeliveryStatusUpdateRequest struct {
 	TrackingNumber    string               `json:"tracking_number,omitempty"`
 	DeliveryID        string               `json:"delivery_id,omitempty"`
@@ -59,6 +60,12 @@ type DeliveryStatusUpdateRequest struct {
 	ActualDelivery    *time.Time           `json:"actual_delivery,omitempty"`
 	Location          string               `json:"location,omitempty"`
 	Notes             string               `json:"notes,omitempty"`
+}
+
+type CancelDeliveryRequest struct {
+	DeliveryID string `json:"delivery_id,omitempty"`
+	OrderID    string `json:"order_id,omitempty"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 type OrderConfirmedPayload struct {

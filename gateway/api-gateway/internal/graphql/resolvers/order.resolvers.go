@@ -6,8 +6,14 @@ package resolvers
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 
+	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -35,11 +41,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	}
 	shippingAddr := ""
 	if input.ShippingAddress != nil {
-		shippingAddr = *input.ShippingAddress
+		shippingAddr = strings.TrimSpace(*input.ShippingAddress)
 	}
 	shippingAddrID := ""
 	if input.ShippingAddressID != nil {
-		shippingAddrID = *input.ShippingAddressID
+		shippingAddrID = strings.TrimSpace(*input.ShippingAddressID)
 	}
 	billingAddrID := ""
 	if input.BillingAddressID != nil {
@@ -53,13 +59,91 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if input.IdempotencyKey != nil {
 		idempKey = *input.IdempotencyKey
 	}
-	var shipFee float64
-	if input.ShippingFee != nil {
-		shipFee = *input.ShippingFee
-	}
 	var discAmt float64
 	if input.DiscountAmount != nil {
 		discAmt = *input.DiscountAmount
+	}
+
+	// Resolve user address if shippingAddress is empty and shippingAddressID is provided
+	userClient := r.getUserClient()
+	if userClient != nil && shippingAddrID != "" && shippingAddr == "" {
+		addrResp, addrErr := userClient.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+			UserId:    userID,
+			AddressId: shippingAddrID,
+		})
+		if addrErr == nil && addrResp != nil && addrResp.Address != nil {
+			ua := addrResp.Address
+			if ua.City != "" || ua.State != "" {
+				addrMap := map[string]string{
+					"street":      ua.AddressLine,
+					"city":        ua.City,
+					"state":       ua.State,
+					"postal_code": ua.PostalCode,
+					"country":     ua.Country,
+				}
+				if bytes, mErr := json.Marshal(addrMap); mErr == nil {
+					shippingAddr = string(bytes)
+				}
+			} else {
+				shippingAddr = strings.TrimSpace(ua.AddressLine)
+			}
+		}
+	}
+
+	// Validate mandatory deliveryPartnerId and calculate stepped shipping fee
+	partnerID := strings.TrimSpace(input.DeliveryPartnerID)
+	if partnerID == "" {
+		return nil, appErrors.BadRequest("deliveryPartnerId is required")
+	}
+
+	var shipFee float64
+	deliveryClient, dErr := r.getDeliveryClient()
+	if dErr == nil && deliveryClient != nil {
+		feeReq := &deliverypb.CalculateShippingFeeRequest{
+			ShippingAddress: shippingAddr,
+			PartnerId:       partnerID,
+		}
+		if shippingAddr != "" {
+			var addrMap map[string]string
+			if jErr := json.Unmarshal([]byte(shippingAddr), &addrMap); jErr == nil {
+				feeReq.DestinationCity = addrMap["city"]
+				feeReq.DestinationState = addrMap["state"]
+				feeReq.DestinationPostalCode = addrMap["postal_code"]
+			}
+		}
+
+		cartClient, cErr := r.getCartClient()
+		catalogClient, pErr := r.getProductClient()
+		if cErr == nil && cartClient != nil && cartID != "" {
+			cResp, errCart := cartClient.GetCart(ctx, &cartpb.GetCartRequest{UserId: userID})
+			if errCart == nil && cResp != nil && cResp.Cart != nil {
+				for _, item := range cResp.Cart.Items {
+					if item == nil {
+						continue
+					}
+					var w float64
+					if pErr == nil && catalogClient != nil {
+						pResp, prodErr := catalogClient.GetProduct(ctx, &productpb.GetProductRequest{Id: item.ProductId})
+						if prodErr == nil && pResp != nil && pResp.Product != nil {
+							w = pResp.Product.Weight
+							if w > 0 && w <= 50 {
+								w = w * 1000.0
+							}
+						}
+					}
+					feeReq.Items = append(feeReq.Items, &deliverypb.ShippingItem{
+						ProductId:   item.ProductId,
+						Quantity:    item.Quantity,
+						WeightGrams: w,
+					})
+				}
+			}
+		}
+
+		feeResp, feeErr := deliveryClient.CalculateShippingFee(ctx, feeReq)
+		if feeErr == nil && feeResp != nil {
+			shipFee = feeResp.ShippingFee
+		}
 	}
 
 	resp, err := client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
@@ -97,6 +181,11 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
 	}
 
+	userCtx := getAuthUser(ctx)
+	if userCtx != nil && (strings.EqualFold(userCtx.Role, "ADMIN") || userCtx.Role == auth.RoleAdmin) {
+		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the user who placed the order can cancel")
+	}
+
 	var reasonStr string
 	if reason != nil {
 		reasonStr = *reason
@@ -109,6 +198,13 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if r.Clients != nil && r.Clients.DeliveryClient != nil {
+		_, _ = r.Clients.DeliveryClient.CancelDelivery(ctx, &deliverypb.CancelDeliveryRequest{
+			OrderId: id,
+			Reason:  reasonStr,
+		})
 	}
 
 	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
