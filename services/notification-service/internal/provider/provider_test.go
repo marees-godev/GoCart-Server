@@ -362,35 +362,12 @@ func TestProviderRegistry_SwappableImplementations(t *testing.T) {
 	}
 }
 
-func TestSMSAndPushProviders(t *testing.T) {
+func TestPushProviders(t *testing.T) {
 	ctx := context.Background()
-
-	// SMS Mock Provider
-	smsProv := NewMockSMSProvider(2 * time.Second)
-	err := smsProv.Send(ctx, Notification{
-		Recipient: "+1234567890",
-		Content:   "Your OTP is 1234",
-		Channel:   "SMS",
-	})
-	if err != nil {
-		t.Fatalf("expected SMS send success, got: %v", err)
-	}
-	if len(smsProv.SentNotifications()) != 1 {
-		t.Fatalf("expected 1 sent SMS, got %d", len(smsProv.SentNotifications()))
-	}
-
-	// SMS Invalid Recipient
-	err = smsProv.Send(ctx, Notification{
-		Recipient: "12",
-		Content:   "OTP",
-	})
-	if !errors.Is(err, ErrInvalidRecipient) {
-		t.Fatalf("expected ErrInvalidRecipient for short phone, got: %v", err)
-	}
 
 	// Push Mock Provider
 	pushProv := NewMockPushProvider(2 * time.Second)
-	err = pushProv.Send(ctx, Notification{
+	err := pushProv.Send(ctx, Notification{
 		Recipient: "device-token-abc-123",
 		Subject:   "Order Update",
 		Content:   "Your order has shipped",
@@ -454,10 +431,6 @@ func TestNewRegistryFromConfig(t *testing.T) {
 			Provider: "mock",
 			Timeout:  1 * time.Second,
 		},
-		SMS: SMSConfig{
-			Provider: "mock",
-			Timeout:  1 * time.Second,
-		},
 		Push: PushConfig{
 			Provider: "mock",
 			Timeout:  1 * time.Second,
@@ -471,9 +444,10 @@ func TestNewRegistryFromConfig(t *testing.T) {
 		t.Fatalf("expected EMAIL provider in registry, got: %v", err)
 	}
 
-	smsP, err := reg.Get("SMS")
-	if err != nil || smsP.Channel() != "SMS" {
-		t.Fatalf("expected SMS provider in registry, got: %v", err)
+	// SMS should not be supported
+	_, err = reg.Get("SMS")
+	if !errors.Is(err, ErrChannelNotSupported) {
+		t.Fatalf("expected ErrChannelNotSupported for SMS, got: %v", err)
 	}
 
 	pushP, err := reg.Get("PUSH")
