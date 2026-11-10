@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -265,7 +264,7 @@ func TestUpdateProduct_SQLPlaceholdersAndWeightMapping(t *testing.T) {
 	if got, ok := updateQuery.args[10].(float64); !ok || got != 7.50 {
 		t.Fatalf("expected $11 (max_exchange_discount) = 7.50, got %#v", updateQuery.args[10])
 	}
-	if got, ok := updateQuery.args[11].(string); !ok || got != fmt.Sprint("prod-123") {
+	if got, ok := updateQuery.args[11].(string); !ok || got != "prod-123" {
 		t.Fatalf("expected $12 (id) = prod-123, got %#v", updateQuery.args[11])
 	}
 }
