@@ -54,7 +54,6 @@ func (r *providerRegistry) GetAll() map[string]NotificationProvider {
 func NewDefaultRegistry() Registry {
 	reg := NewRegistry()
 	reg.Register("EMAIL", NewMockEmailProvider(0))
-	reg.Register("SMS", NewMockSMSProvider(0))
 	reg.Register("PUSH", NewMockPushProvider(0))
 	reg.Register("IN_APP", NewInAppProvider())
 	return reg

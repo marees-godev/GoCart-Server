@@ -104,13 +104,6 @@ func LoadEnv() *Config {
 				UseTLS:   GetEnvAsBool("SMTP_USE_TLS", false),
 				Timeout:  GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
 			},
-			SMS: provider.SMSConfig{
-				Provider:   GetEnv("SMS_PROVIDER", "mock"),
-				AccountSID: GetEnv("SMS_ACCOUNT_SID", ""),
-				AuthToken:  GetEnv("SMS_AUTH_TOKEN", ""),
-				FromNumber: GetEnv("SMS_FROM_NUMBER", ""),
-				Timeout:    GetEnvAsDuration("SMS_TIMEOUT", 5*time.Second),
-			},
 			Push: provider.PushConfig{
 				Provider:  GetEnv("PUSH_PROVIDER", "mock"),
 				ServerKey: GetEnv("PUSH_SERVER_KEY", ""),
