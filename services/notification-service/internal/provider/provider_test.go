@@ -408,6 +408,44 @@ func TestSMSAndPushProviders(t *testing.T) {
 	if !errors.Is(err, ErrInvalidRecipient) {
 		t.Fatalf("expected ErrInvalidRecipient for empty push recipient, got: %v", err)
 	}
+
+	// FCM Push Provider
+	fcmProv := NewFCMPushProvider(PushConfig{
+		ServerKey: "secret-fcm-server-key-123",
+		Timeout:   2 * time.Second,
+	})
+	if fcmProv.Channel() != "PUSH" || fcmProv.ProviderName() != "fcm" {
+		t.Fatalf("unexpected FCM provider channel or name")
+	}
+
+	err = fcmProv.Send(ctx, Notification{
+		Recipient: "device-fcm-token",
+		Subject:   "Promo",
+		Content:   "50% off today",
+		Channel:   "PUSH",
+	})
+	if err != nil {
+		t.Fatalf("expected FCM send success, got: %v", err)
+	}
+
+	// FCM Push Missing Server Key
+	fcmNoKey := NewFCMPushProvider(PushConfig{Timeout: 1 * time.Second})
+	err = fcmNoKey.Send(ctx, Notification{
+		Recipient: "device-fcm-token",
+		Content:   "Hello",
+	})
+	if !errors.Is(err, ErrProviderMisconfigured) {
+		t.Fatalf("expected ErrProviderMisconfigured, got: %v", err)
+	}
+
+	// FCM Push Invalid Recipient
+	err = fcmProv.Send(ctx, Notification{
+		Recipient: "   ",
+		Content:   "Hello",
+	})
+	if !errors.Is(err, ErrInvalidRecipient) {
+		t.Fatalf("expected ErrInvalidRecipient for whitespace recipient, got: %v", err)
+	}
 }
 
 func TestNewRegistryFromConfig(t *testing.T) {
