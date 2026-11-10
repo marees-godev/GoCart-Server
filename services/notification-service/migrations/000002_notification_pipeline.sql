@@ -8,7 +8,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE channel_type AS ENUM ('EMAIL', 'SMS', 'IN_APP', 'PUSH');
+    CREATE TYPE channel_type AS ENUM ('EMAIL', 'IN_APP', 'PUSH');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -79,7 +79,6 @@ CREATE INDEX IF NOT EXISTS idx_notification_jobs_created_at ON notification_jobs
 -- Seed Channels
 INSERT INTO notification_channels (code, name, is_active) VALUES
     ('EMAIL', 'Email Notifications', TRUE),
-    ('SMS', 'SMS Notifications', TRUE),
     ('IN_APP', 'In-App Notifications', TRUE),
     ('PUSH', 'Push Notifications', TRUE)
 ON CONFLICT (code) DO NOTHING;
