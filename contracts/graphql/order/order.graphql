@@ -40,6 +40,7 @@ type OrderList {
 }
 
 input CreateOrderInput {
+  deliveryPartnerId: String!
   userId: String
   cartId: String
   shippingAddress: String
@@ -47,7 +48,6 @@ input CreateOrderInput {
   billingAddressId: String
   currency: String
   idempotencyKey: String
-  shippingFee: Float
   discountAmount: Float
 }
 

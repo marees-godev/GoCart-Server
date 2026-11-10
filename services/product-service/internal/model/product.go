@@ -39,6 +39,7 @@ type Product struct {
 	Status              ProductStatus    `json:"status" db:"status"`
 	ImageURL            string           `json:"image_url,omitempty" db:"image_url"`
 	AvgRating           float64          `json:"avg_rating" db:"avg_rating"`
+	Weight      float64          `json:"weight" db:"weight"`
 	IsExchangeEligible  bool             `json:"is_exchange_eligible" db:"is_exchange_eligible"`
 	MaxExchangeDiscount float64          `json:"max_exchange_discount" db:"max_exchange_discount"`
 	Images              []ProductImage   `json:"images,omitempty"`

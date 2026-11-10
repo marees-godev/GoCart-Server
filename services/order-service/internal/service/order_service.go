@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"encoding/json"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -48,6 +51,7 @@ type orderService struct {
 	cartClient      client.CartClient
 	productClient   client.ProductClient
 	inventoryClient client.InventoryClient
+	deliveryClient  client.DeliveryClient
 	clientTimeout   time.Duration
 	log             *slog.Logger
 }
@@ -57,6 +61,7 @@ func NewOrderService(
 	cartClient client.CartClient,
 	productClient client.ProductClient,
 	inventoryClient client.InventoryClient,
+	deliveryClient client.DeliveryClient,
 	timeoutSeconds int,
 	log *slog.Logger,
 ) OrderService {
@@ -71,6 +76,7 @@ func NewOrderService(
 		cartClient:      cartClient,
 		productClient:   productClient,
 		inventoryClient: inventoryClient,
+		deliveryClient:  deliveryClient,
 		clientTimeout:   time.Duration(timeoutSeconds) * time.Second,
 		log:             log,
 	}
@@ -153,6 +159,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		tax         float64
 		discount    float64
 		totalPrice  float64
+		weight      float64
 	}
 
 	storeMap := make(map[string][]enrichedItem)
@@ -172,11 +179,17 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			cancel()
 
 			if invErr != nil {
+				s.log.Warn("Failed to verify stock with inventory service", "product_id", item.ProductID, "error", invErr)
 				st, ok := status.FromError(invErr)
-				if ok && st.Code() == codes.NotFound {
-					return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", item.ProductID))
+				if ok {
+					if st.Code() == codes.NotFound {
+						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", item.ProductID))
+					}
+					if st.Code() == codes.Unavailable {
+						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
+					}
 				}
-				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s", item.ProductID))
+				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", item.ProductID, invErr))
 			}
 
 			if stock == nil || stock.GetAvailableQuantity() < int32(item.Quantity) {
@@ -190,6 +203,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 		// 2b. Validate product existence, status, and authoritative pricing with Product Service
 		unitPrice := 0.0
+		weight := 0.0
 		sku := fmt.Sprintf("SKU-%s", item.ProductID[:8])
 		productName := "Product " + item.ProductID
 		storeID := item.StoreID
@@ -218,6 +232,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 			// Authoritative price snapshot
 			unitPrice = product.GetPrice()
+			weight = product.GetWeight()
 			if product.GetSku() != "" {
 				sku = product.GetSku()
 			}
@@ -258,6 +273,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			tax:         itemTax,
 			discount:    itemDiscount,
 			totalPrice:  itemTotal,
+			weight:      weight,
 		})
 	}
 
@@ -279,19 +295,82 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	orders := make([]*model.Order, 0, len(storeMap))
 	envelopes := make([]*events.EventEnvelope, 0, len(storeMap))
 
+	var destCity, destState, destPostalCode string
+	if strings.TrimSpace(input.ShippingAddress) != "" {
+		var addrPayload events.ShippingAddressPayload
+		if err := json.Unmarshal([]byte(input.ShippingAddress), &addrPayload); err == nil {
+			destCity = addrPayload.City
+			destState = addrPayload.State
+			destPostalCode = addrPayload.PostalCode
+			// destCountry
+		}
+	}
+
 	// Split store shipping fee and discount evenly if provided at order level
 	numStores := float64(len(storeMap))
-	storeShippingFee := 0.0
+	baseStoreShippingFee := 0.0
 	if input.ShippingFee > 0 {
-		storeShippingFee = math.Round((input.ShippingFee/numStores)*100) / 100
+		baseStoreShippingFee = math.Round((input.ShippingFee/numStores)*100) / 100
 	}
 	storeDiscount := 0.0
 	if input.DiscountAmount > 0 {
 		storeDiscount = math.Round((input.DiscountAmount/numStores)*100) / 100
 	}
 
+	requiresShipping := strings.TrimSpace(input.ShippingAddress) != "" || strings.TrimSpace(input.ShippingAddressID) != ""
+	needsShippingCalculation := requiresShipping && input.ShippingFee <= 0
+	if needsShippingCalculation && s.deliveryClient == nil {
+		s.log.Error("Delivery service client is unavailable for mandatory shipping fee calculation")
+		return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+	}
+
 	firstStore := true
 	for storeID, items := range storeMap {
+		storeShippingFee := baseStoreShippingFee
+		if needsShippingCalculation {
+			var shipItems []*deliverypb.ShippingItem
+			for _, it := range items {
+				w := it.weight
+				if w > 0 && w <= 50 {
+					w = w * 1000.0
+				}
+				shipItems = append(shipItems, &deliverypb.ShippingItem{
+					ProductId:   it.productID,
+					WeightGrams: w,
+					Quantity:    int32(it.quantity),
+				})
+			}
+			calcCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+			feeResp, feeErr := s.deliveryClient.CalculateShippingFee(calcCtx, &deliverypb.CalculateShippingFeeRequest{
+				Items:                 shipItems,
+				DestinationPostalCode: destPostalCode,
+				DestinationCity:       destCity,
+				DestinationState:      destState,
+				ShippingAddress:       input.ShippingAddress,
+			})
+			cancel()
+			if feeErr != nil {
+				s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
+				var appErr *appErrors.AppError
+				if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
+					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				}
+				st, ok := status.FromError(feeErr)
+				if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
+					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				}
+				return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
+			}
+			if feeResp == nil {
+				s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
+				return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
+			}
+			if feeResp.ShippingFee < 0 {
+				s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
+				return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
+			}
+			storeShippingFee = feeResp.ShippingFee
+		}
 		orderID := uuid.New().String()
 		orderNumber := generateOrderNumber()
 
@@ -725,19 +804,22 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 	}
 
 	// 1. Authorization check: Cancellation authorization is enforced by Order Service.
+	// Only user who ordered the product can cancel; not even admin has right to cancel.
 	callerUserID := strings.TrimSpace(userID)
 	callerRole := ""
 	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil {
 		if callerUserID == "" {
 			callerUserID = userCtx.UserID
 		}
-		callerRole = userCtx.Role
+		callerRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	}
 
-	if callerRole != "ADMIN" && callerRole != auth.RoleAdmin {
-		if callerUserID == "" || order.UserID != callerUserID {
-			return nil, appErrors.Forbidden("you do not have permission to cancel this order")
-		}
+	if callerRole == "ADMIN" || callerRole == auth.RoleAdmin {
+		return nil, appErrors.Forbidden("admins do not have permission to cancel orders; only the customer who placed the order can cancel")
+	}
+
+	if callerUserID == "" || order.UserID != callerUserID {
+		return nil, appErrors.Forbidden("you do not have permission to cancel this order")
 	}
 
 	// 2. State transition check:

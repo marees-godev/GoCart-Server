@@ -45,6 +45,8 @@ func (m *mockGSTINClient) VerifyGSTIN(ctx context.Context, gstinStr string) (*gs
 
 type mockDeliveryRepoForServiceTest struct {
 	repository.DeliveryRepository
+	getByIDFunc                             func(ctx context.Context, id string) (*model.Delivery, error)
+	updateStatusWithDetailsFunc             func(ctx context.Context, id string, status model.DeliveryStatus, est, act *time.Time, loc, notes string) (*model.Delivery, error)
 	getPartnerProfileFunc                   func(ctx context.Context, partnerID uuid.UUID) (*model.DeliveryPartnerProfile, error)
 	getPartnerProfileByGSTINFunc            func(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error)
 	upsertPartnerProfileFunc                func(ctx context.Context, profile *model.DeliveryPartnerProfile) error
@@ -56,6 +58,20 @@ type mockDeliveryRepoForServiceTest struct {
 
 func (m *mockDeliveryRepoForServiceTest) GetByOrderID(ctx context.Context, orderID string) (*model.Delivery, error) {
 	return nil, appErrors.NotFound("delivery not found")
+}
+
+func (m *mockDeliveryRepoForServiceTest) GetByID(ctx context.Context, id string) (*model.Delivery, error) {
+	if m.getByIDFunc != nil {
+		return m.getByIDFunc(ctx, id)
+	}
+	return nil, appErrors.NotFound("delivery not found")
+}
+
+func (m *mockDeliveryRepoForServiceTest) UpdateStatusWithDetails(ctx context.Context, id string, status model.DeliveryStatus, est, act *time.Time, loc, notes string) (*model.Delivery, error) {
+	if m.updateStatusWithDetailsFunc != nil {
+		return m.updateStatusWithDetailsFunc(ctx, id, status, est, act, loc, notes)
+	}
+	return nil, nil
 }
 
 func (m *mockDeliveryRepoForServiceTest) GetPartnerProfileByGSTIN(ctx context.Context, gstin string) (*model.DeliveryPartnerProfile, error) {
@@ -1656,4 +1672,100 @@ func TestMatchCompanyName_ExactNormalizedMatching(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeliveryService_CancelDelivery(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successful cancellation from CREATED state", func(t *testing.T) {
+		deliveryID := uuid.New().String()
+		orderID := uuid.New().String()
+		d := &model.Delivery{
+			ID:      deliveryID,
+			OrderID: orderID,
+			Status:  model.StatusCreated,
+		}
+
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Delivery, error) {
+				return d, nil
+			},
+			updateStatusWithDetailsFunc: func(ctx context.Context, id string, status model.DeliveryStatus, est, act *time.Time, loc, notes string) (*model.Delivery, error) {
+				d.Status = status
+				return d, nil
+			},
+		}
+
+		svc := NewDeliveryService(mockRepo)
+		res, err := svc.CancelDelivery(ctx, deliveryID, "", "Customer cancelled")
+		if err != nil {
+			t.Fatalf("expected cancel to succeed, got %v", err)
+		}
+		if res.Status != model.StatusCancelled {
+			t.Fatalf("expected status CANCELLED, got %s", res.Status)
+		}
+	})
+
+	t.Run("rejection when parcel already transitioned to PICKED_UP", func(t *testing.T) {
+		deliveryID := uuid.New().String()
+		d := &model.Delivery{
+			ID:      deliveryID,
+			OrderID: uuid.New().String(),
+			Status:  model.StatusPickedUp,
+		}
+
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Delivery, error) {
+				return d, nil
+			},
+		}
+
+		svc := NewDeliveryService(mockRepo)
+		_, err := svc.CancelDelivery(ctx, deliveryID, "", "Too late")
+		if err == nil {
+			t.Fatalf("expected cancellation of PICKED_UP delivery to be rejected")
+		}
+	})
+
+	t.Run("rejection when parcel in terminal DELIVERED state", func(t *testing.T) {
+		deliveryID := uuid.New().String()
+		d := &model.Delivery{
+			ID:      deliveryID,
+			OrderID: uuid.New().String(),
+			Status:  model.StatusDelivered,
+		}
+
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Delivery, error) {
+				return d, nil
+			},
+		}
+
+		svc := NewDeliveryService(mockRepo)
+		_, err := svc.CancelDelivery(ctx, deliveryID, "", "Package arrived")
+		if err == nil {
+			t.Fatalf("expected cancellation of DELIVERED delivery to be rejected")
+		}
+	})
+
+	t.Run("idempotent cancellation if already CANCELLED", func(t *testing.T) {
+		deliveryID := uuid.New().String()
+		d := &model.Delivery{
+			ID:      deliveryID,
+			OrderID: uuid.New().String(),
+			Status:  model.StatusCancelled,
+		}
+
+		mockRepo := &mockDeliveryRepoForServiceTest{
+			getByIDFunc: func(ctx context.Context, id string) (*model.Delivery, error) {
+				return d, nil
+			},
+		}
+
+		svc := NewDeliveryService(mockRepo)
+		res, err := svc.CancelDelivery(ctx, deliveryID, "", "Duplicate cancel")
+		if err != nil || res.Status != model.StatusCancelled {
+			t.Fatalf("expected idempotent success, got %v", err)
+		}
+	})
 }

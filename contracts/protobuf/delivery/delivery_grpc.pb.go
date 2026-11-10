@@ -24,6 +24,8 @@ const (
 	DeliveryService_GetDeliveryByTracking_FullMethodName       = "/gocart.delivery.v1.DeliveryService/GetDeliveryByTracking"
 	DeliveryService_GetDeliveryByOrder_FullMethodName          = "/gocart.delivery.v1.DeliveryService/GetDeliveryByOrder"
 	DeliveryService_UpdateDeliveryStatus_FullMethodName        = "/gocart.delivery.v1.DeliveryService/UpdateDeliveryStatus"
+	DeliveryService_CancelDelivery_FullMethodName              = "/gocart.delivery.v1.DeliveryService/CancelDelivery"
+	DeliveryService_CalculateShippingFee_FullMethodName        = "/gocart.delivery.v1.DeliveryService/CalculateShippingFee"
 	DeliveryService_CreatePartnerProfile_FullMethodName        = "/gocart.delivery.v1.DeliveryService/CreatePartnerProfile"
 	DeliveryService_GetPartnerProfile_FullMethodName           = "/gocart.delivery.v1.DeliveryService/GetPartnerProfile"
 	DeliveryService_UpdatePartnerProfile_FullMethodName        = "/gocart.delivery.v1.DeliveryService/UpdatePartnerProfile"
@@ -48,6 +50,8 @@ type DeliveryServiceClient interface {
 	GetDeliveryByTracking(ctx context.Context, in *GetDeliveryByTrackingRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error)
 	GetDeliveryByOrder(ctx context.Context, in *GetDeliveryByOrderRequest, opts ...grpc.CallOption) (*GetDeliveryResponse, error)
 	UpdateDeliveryStatus(ctx context.Context, in *UpdateDeliveryStatusRequest, opts ...grpc.CallOption) (*UpdateDeliveryStatusResponse, error)
+	CancelDelivery(ctx context.Context, in *CancelDeliveryRequest, opts ...grpc.CallOption) (*CancelDeliveryResponse, error)
+	CalculateShippingFee(ctx context.Context, in *CalculateShippingFeeRequest, opts ...grpc.CallOption) (*CalculateShippingFeeResponse, error)
 	CreatePartnerProfile(ctx context.Context, in *CreatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
 	GetPartnerProfile(ctx context.Context, in *GetPartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
 	UpdatePartnerProfile(ctx context.Context, in *UpdatePartnerProfileRequest, opts ...grpc.CallOption) (*PartnerProfileResponse, error)
@@ -115,6 +119,26 @@ func (c *deliveryServiceClient) UpdateDeliveryStatus(ctx context.Context, in *Up
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateDeliveryStatusResponse)
 	err := c.cc.Invoke(ctx, DeliveryService_UpdateDeliveryStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) CancelDelivery(ctx context.Context, in *CancelDeliveryRequest, opts ...grpc.CallOption) (*CancelDeliveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelDeliveryResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_CancelDelivery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *deliveryServiceClient) CalculateShippingFee(ctx context.Context, in *CalculateShippingFeeRequest, opts ...grpc.CallOption) (*CalculateShippingFeeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CalculateShippingFeeResponse)
+	err := c.cc.Invoke(ctx, DeliveryService_CalculateShippingFee_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +284,8 @@ type DeliveryServiceServer interface {
 	GetDeliveryByTracking(context.Context, *GetDeliveryByTrackingRequest) (*GetDeliveryResponse, error)
 	GetDeliveryByOrder(context.Context, *GetDeliveryByOrderRequest) (*GetDeliveryResponse, error)
 	UpdateDeliveryStatus(context.Context, *UpdateDeliveryStatusRequest) (*UpdateDeliveryStatusResponse, error)
+	CancelDelivery(context.Context, *CancelDeliveryRequest) (*CancelDeliveryResponse, error)
+	CalculateShippingFee(context.Context, *CalculateShippingFeeRequest) (*CalculateShippingFeeResponse, error)
 	CreatePartnerProfile(context.Context, *CreatePartnerProfileRequest) (*PartnerProfileResponse, error)
 	GetPartnerProfile(context.Context, *GetPartnerProfileRequest) (*PartnerProfileResponse, error)
 	UpdatePartnerProfile(context.Context, *UpdatePartnerProfileRequest) (*PartnerProfileResponse, error)
@@ -297,6 +323,12 @@ func (UnimplementedDeliveryServiceServer) GetDeliveryByOrder(context.Context, *G
 }
 func (UnimplementedDeliveryServiceServer) UpdateDeliveryStatus(context.Context, *UpdateDeliveryStatusRequest) (*UpdateDeliveryStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateDeliveryStatus not implemented")
+}
+func (UnimplementedDeliveryServiceServer) CancelDelivery(context.Context, *CancelDeliveryRequest) (*CancelDeliveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelDelivery not implemented")
+}
+func (UnimplementedDeliveryServiceServer) CalculateShippingFee(context.Context, *CalculateShippingFeeRequest) (*CalculateShippingFeeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CalculateShippingFee not implemented")
 }
 func (UnimplementedDeliveryServiceServer) CreatePartnerProfile(context.Context, *CreatePartnerProfileRequest) (*PartnerProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreatePartnerProfile not implemented")
@@ -444,6 +476,42 @@ func _DeliveryService_UpdateDeliveryStatus_Handler(srv interface{}, ctx context.
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DeliveryServiceServer).UpdateDeliveryStatus(ctx, req.(*UpdateDeliveryStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_CancelDelivery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelDeliveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).CancelDelivery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_CancelDelivery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).CancelDelivery(ctx, req.(*CancelDeliveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DeliveryService_CalculateShippingFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CalculateShippingFeeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DeliveryServiceServer).CalculateShippingFee(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DeliveryService_CalculateShippingFee_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DeliveryServiceServer).CalculateShippingFee(ctx, req.(*CalculateShippingFeeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -708,6 +776,14 @@ var DeliveryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateDeliveryStatus",
 			Handler:    _DeliveryService_UpdateDeliveryStatus_Handler,
+		},
+		{
+			MethodName: "CancelDelivery",
+			Handler:    _DeliveryService_CancelDelivery_Handler,
+		},
+		{
+			MethodName: "CalculateShippingFee",
+			Handler:    _DeliveryService_CalculateShippingFee_Handler,
 		},
 		{
 			MethodName: "CreatePartnerProfile",

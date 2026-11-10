@@ -22,6 +22,13 @@ type Config struct {
 	Services  ServicesConfig
 	GSTIN     GSTINConfig
 	Retention RetentionConfig
+	Shipping  ShippingConfig
+}
+
+type ShippingConfig struct {
+	DefaultModel string
+	BaseFlatRate float64
+	Currency     string
 }
 
 type RetentionConfig struct {
@@ -158,6 +165,11 @@ func LoadEnv() *Config {
 			Period:   time.Duration(GetEnvAsInt("DEACTIVATION_RETENTION_DAYS", 30)) * 24 * time.Hour,
 			Interval: time.Duration(GetEnvAsInt("DEACTIVATION_CHECK_INTERVAL_HOURS", 1)) * time.Hour,
 		},
+		Shipping: ShippingConfig{
+			DefaultModel: GetEnv("SHIPPING_FEE_MODEL", "WEIGHT_BASED"),
+			BaseFlatRate: GetEnvAsFloat("SHIPPING_FLAT_RATE", 50.0),
+			Currency:     GetEnv("SHIPPING_BASE_CURRENCY", "INR"),
+		},
 	}
 }
 
@@ -187,6 +199,18 @@ func GetEnvAsInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	val, err := strconv.Atoi(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return val
+}
+
+func GetEnvAsFloat(key string, defaultValue float64) float64 {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	val, err := strconv.ParseFloat(valStr, 64)
 	if err != nil {
 		return defaultValue
 	}

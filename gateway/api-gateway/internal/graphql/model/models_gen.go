@@ -77,6 +77,22 @@ type CalculateExchangeValuationInput struct {
 	Answers      []*ExchangeUserAnswerInput `json:"answers"`
 }
 
+type CalculateShippingFeeInput struct {
+	DeliveryPartnerID     string               `json:"deliveryPartnerId"`
+	WeightGrams           *float64             `json:"weightGrams,omitempty"`
+	Zone                  *string              `json:"zone,omitempty"`
+	OriginCity            *string              `json:"originCity,omitempty"`
+	OriginState           *string              `json:"originState,omitempty"`
+	DestinationCity       *string              `json:"destinationCity,omitempty"`
+	DestinationState      *string              `json:"destinationState,omitempty"`
+	DestinationPostalCode *string              `json:"destinationPostalCode,omitempty"`
+	ShippingAddress       *string              `json:"shippingAddress,omitempty"`
+	ShippingAddressID     *string              `json:"shippingAddressId,omitempty"`
+	OrderID               *string              `json:"orderId,omitempty"`
+	Items                 []*ShippingItemInput `json:"items,omitempty"`
+	Model                 *string              `json:"model,omitempty"`
+}
+
 type Cart struct {
 	ID          string      `json:"id"`
 	UserID      string      `json:"userId"`
@@ -166,6 +182,7 @@ type CreateInventoryInput struct {
 }
 
 type CreateOrderInput struct {
+	DeliveryPartnerID string   `json:"deliveryPartnerId"`
 	UserID            *string  `json:"userId,omitempty"`
 	CartID            *string  `json:"cartId,omitempty"`
 	ShippingAddress   *string  `json:"shippingAddress,omitempty"`
@@ -173,7 +190,6 @@ type CreateOrderInput struct {
 	BillingAddressID  *string  `json:"billingAddressId,omitempty"`
 	Currency          *string  `json:"currency,omitempty"`
 	IdempotencyKey    *string  `json:"idempotencyKey,omitempty"`
-	ShippingFee       *float64 `json:"shippingFee,omitempty"`
 	DiscountAmount    *float64 `json:"discountAmount,omitempty"`
 }
 
@@ -186,6 +202,7 @@ type CreateProductInput struct {
 	Price               float64                      `json:"price"`
 	Mrp                 float64                      `json:"mrp"`
 	Tax                 *float64                     `json:"tax,omitempty"`
+	Weight              float64                      `json:"weight"`
 	Status              *ProductStatus               `json:"status,omitempty"`
 	ImageURL            *string                      `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`
@@ -662,6 +679,7 @@ type Product struct {
 	Price               float64           `json:"price"`
 	Mrp                 float64           `json:"mrp"`
 	Tax                 float64           `json:"tax"`
+	Weight              float64           `json:"weight"`
 	Status              ProductStatus     `json:"status"`
 	ImageURL            *string           `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool             `json:"isExchangeEligible,omitempty"`
@@ -847,6 +865,21 @@ type SendNotificationInput struct {
 	TemplateID *string `json:"templateId,omitempty"`
 }
 
+type ShippingFeeCalculation struct {
+	ShippingFee      float64 `json:"shippingFee"`
+	Currency         string  `json:"currency"`
+	Zone             string  `json:"zone"`
+	TotalWeightGrams float64 `json:"totalWeightGrams"`
+	CalculationModel string  `json:"calculationModel"`
+	BreakdownDetails *string `json:"breakdownDetails,omitempty"`
+}
+
+type ShippingItemInput struct {
+	ProductID   string  `json:"productId"`
+	Quantity    int     `json:"quantity"`
+	WeightGrams float64 `json:"weightGrams"`
+}
+
 type StarRating struct {
 	FiveStar  int `json:"fiveStar"`
 	FourStar  int `json:"fourStar"`
@@ -958,6 +991,7 @@ type UpdateProductInput struct {
 	Price               *float64                     `json:"price,omitempty"`
 	Mrp                 *float64                     `json:"mrp,omitempty"`
 	Tax                 *float64                     `json:"tax,omitempty"`
+	Weight              *float64                     `json:"weight,omitempty"`
 	Status              *ProductStatus               `json:"status,omitempty"`
 	ImageURL            *string                      `json:"imageUrl,omitempty"`
 	IsExchangeEligible  *bool                        `json:"isExchangeEligible,omitempty"`
