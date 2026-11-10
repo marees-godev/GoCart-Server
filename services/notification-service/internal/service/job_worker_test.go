@@ -41,11 +41,18 @@ func TestJobWorker_ProcessSingleJob_Success(t *testing.T) {
 
 	worker := service.NewJobWorker(mockRepo, reg, logger, 50*time.Millisecond)
 
-	wCtx, cancel := context.WithTimeout(ctx, 120*time.Millisecond)
+	wCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go worker.Start(wCtx)
-	time.Sleep(100 * time.Millisecond)
+	done := make(chan struct{})
+	go func() {
+		worker.Start(wCtx)
+		close(done)
+	}()
+
+	time.Sleep(90 * time.Millisecond)
+	cancel()
+	<-done
 
 	updatedJob, err := mockRepo.GetJobByID(ctx, job.ID)
 	if err != nil || updatedJob == nil {
@@ -94,11 +101,18 @@ func TestJobWorker_ProcessSingleJob_FailureAndRetry(t *testing.T) {
 
 	worker := service.NewJobWorker(mockRepo, reg, logger, 50*time.Millisecond)
 
-	wCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	wCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go worker.Start(wCtx)
+	done := make(chan struct{})
+	go func() {
+		worker.Start(wCtx)
+		close(done)
+	}()
+
 	time.Sleep(90 * time.Millisecond)
+	cancel()
+	<-done
 
 	updatedJob, _ := mockRepo.GetJobByID(ctx, job.ID)
 	if updatedJob.RetryCount != 1 {
@@ -135,11 +149,18 @@ func TestJobWorker_ProcessSingleJob_MaxRetriesExceeded_Fails(t *testing.T) {
 
 	worker := service.NewJobWorker(mockRepo, reg, logger, 50*time.Millisecond)
 
-	wCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	wCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go worker.Start(wCtx)
+	done := make(chan struct{})
+	go func() {
+		worker.Start(wCtx)
+		close(done)
+	}()
+
 	time.Sleep(90 * time.Millisecond)
+	cancel()
+	<-done
 
 	updatedJob, _ := mockRepo.GetJobByID(ctx, job.ID)
 	if updatedJob.RetryCount < 3 {
@@ -172,11 +193,18 @@ func TestJobWorker_ProcessSingleJob_UnsupportedChannel(t *testing.T) {
 
 	worker := service.NewJobWorker(mockRepo, reg, logger, 50*time.Millisecond)
 
-	wCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	wCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go worker.Start(wCtx)
+	done := make(chan struct{})
+	go func() {
+		worker.Start(wCtx)
+		close(done)
+	}()
+
 	time.Sleep(90 * time.Millisecond)
+	cancel()
+	<-done
 
 	updatedJob, _ := mockRepo.GetJobByID(ctx, job.ID)
 	if updatedJob.Status != model.JobStatusFailed {
@@ -212,10 +240,16 @@ func TestJobWorker_SwappableProvider_Integration(t *testing.T) {
 	}
 	_ = mockRepo.CreateJob(ctx, job1)
 
-	wCtx1, cancel1 := context.WithTimeout(ctx, 100*time.Millisecond)
-	go worker.Start(wCtx1)
+	wCtx1, cancel1 := context.WithCancel(ctx)
+	done1 := make(chan struct{})
+	go func() {
+		worker.Start(wCtx1)
+		close(done1)
+	}()
+
 	time.Sleep(90 * time.Millisecond)
 	cancel1()
+	<-done1
 
 	if len(provider1.SentNotifications()) != 1 {
 		t.Fatalf("expected provider1 to receive 1 email, got: %d", len(provider1.SentNotifications()))
@@ -237,10 +271,16 @@ func TestJobWorker_SwappableProvider_Integration(t *testing.T) {
 	}
 	_ = mockRepo.CreateJob(ctx, job2)
 
-	wCtx2, cancel2 := context.WithTimeout(ctx, 100*time.Millisecond)
-	go worker.Start(wCtx2)
+	wCtx2, cancel2 := context.WithCancel(ctx)
+	done2 := make(chan struct{})
+	go func() {
+		worker.Start(wCtx2)
+		close(done2)
+	}()
+
 	time.Sleep(90 * time.Millisecond)
 	cancel2()
+	<-done2
 
 	if len(provider2.SentNotifications()) != 1 {
 		t.Fatalf("expected provider2 to receive 1 email after swap, got: %d", len(provider2.SentNotifications()))
