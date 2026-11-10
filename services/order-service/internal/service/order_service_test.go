@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -630,7 +631,7 @@ func TestOrderService_CreateOrder_AuthoritativePriceEnforced(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, &mockDeliveryClient{}, 5, nil)
 
 	result, err := svc.CreateOrder(ctx, input)
 	if err != nil {
@@ -988,7 +989,7 @@ func TestOrderService_CreateOrder_Idempotency_DuplicateRequest(t *testing.T) {
 		},
 	}
 
-	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, &mockDeliveryClient{}, 5, nil)
 
 	input := dto.CreateOrderInput{
 		UserID:          userID,
@@ -1401,5 +1402,208 @@ func TestOrderService_CreateOrder_CalculatesShippingFeeViaDeliveryClient(t *test
 
 	if res.PrimaryOrder.ShippingFee != 65.0 {
 		t.Errorf("expected primary order shipping fee 65.0, got %v", res.PrimaryOrder.ShippingFee)
+	}
+}
+
+func TestOrderService_CreateOrder_NilDeliveryClient_FailsWhenShippingRequired(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+
+	prodID := uuid.New().String()
+	storeID := uuid.New().String()
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			prodID: {
+				Id:      prodID,
+				Name:    "Test Product",
+				Price:   100.0,
+				Status:  "ACTIVE",
+				StoreId: storeID,
+				Weight:  1.0,
+			},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			prodID: {ProductId: prodID, AvailableQuantity: 10},
+		},
+	}
+
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, nil, 5, nil)
+
+	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+		UserID:          uuid.New().String(),
+		IdempotencyKey:  uuid.New().String(),
+		ShippingAddress: "123 Main St, Chennai",
+		Items: []dto.CreateOrderItemInput{
+			{ProductID: prodID, StoreID: storeID, Quantity: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error when deliveryClient is nil and shipping fee is not provided")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Errorf("expected SERVICE_UNAVAILABLE error code, got %v", err)
+	}
+	if len(repo.orders) != 0 {
+		t.Errorf("expected 0 persisted orders, got %d", len(repo.orders))
+	}
+}
+
+func TestOrderService_CreateOrder_DeliveryCalculationFailures(t *testing.T) {
+	tests := []struct {
+		name         string
+		calcFunc     func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error)
+		expectedCode string
+	}{
+		{
+			name: "delivery service gRPC unavailable",
+			calcFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+				return nil, status.Error(codes.Unavailable, "delivery service down")
+			},
+			expectedCode: appErrors.CodeServiceUnavailable,
+		},
+		{
+			name: "delivery service gRPC deadline exceeded",
+			calcFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+				return nil, status.Error(codes.DeadlineExceeded, "timed out")
+			},
+			expectedCode: appErrors.CodeServiceUnavailable,
+		},
+		{
+			name: "delivery service internal error",
+			calcFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+				return nil, errors.New("shipping rate lookup failed")
+			},
+			expectedCode: appErrors.CodeInternalError,
+		},
+		{
+			name: "delivery service nil response",
+			calcFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+				return nil, nil
+			},
+			expectedCode: appErrors.CodeInternalError,
+		},
+		{
+			name: "delivery service negative shipping fee",
+			calcFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+				return &deliverypb.CalculateShippingFeeResponse{ShippingFee: -10.0}, nil
+			},
+			expectedCode: appErrors.CodeInternalError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			repo := newMockOrderRepo()
+
+			prodID := uuid.New().String()
+			storeID := uuid.New().String()
+			prodClient := &mockProductClient{
+				products: map[string]*productpb.Product{
+					prodID: {
+						Id:      prodID,
+						Name:    "Test Product",
+						Price:   100.0,
+						Status:  "ACTIVE",
+						StoreId: storeID,
+						Weight:  1.0,
+					},
+				},
+			}
+			invClient := &mockInventoryClient{
+				stocks: map[string]*inventorypb.StockItem{
+					prodID: {ProductId: prodID, AvailableQuantity: 10},
+				},
+			}
+			delClient := &mockDeliveryClient{
+				calculateShippingFeeFunc: tt.calcFunc,
+			}
+
+			svc := service.NewOrderService(repo, nil, prodClient, invClient, delClient, 5, nil)
+
+			_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+				UserID:          uuid.New().String(),
+				IdempotencyKey:  uuid.New().String(),
+				ShippingAddress: `{"city":"Chennai","state":"Tamil Nadu","postal_code":"600001"}`,
+				Items: []dto.CreateOrderItemInput{
+					{ProductID: prodID, StoreID: storeID, Quantity: 1},
+				},
+			})
+			if err == nil {
+				t.Fatalf("expected CreateOrder to fail, got nil")
+			}
+			appErr := appErrors.AsAppError(err)
+			if appErr == nil || appErr.Code != tt.expectedCode {
+				t.Errorf("expected error code %s, got %v", tt.expectedCode, err)
+			}
+			if len(repo.orders) != 0 {
+				t.Errorf("expected 0 persisted orders, got %d", len(repo.orders))
+			}
+			if len(repo.outboxEnvelopes) != 0 {
+				t.Errorf("expected 0 outbox envelopes, got %d", len(repo.outboxEnvelopes))
+			}
+		})
+	}
+}
+
+func TestOrderService_CreateOrder_MultiStore_DeliveryFailureAbortsAll(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+
+	storeA := uuid.New().String()
+	storeB := uuid.New().String()
+	prodA := uuid.New().String()
+	prodB := uuid.New().String()
+
+	prodClient := &mockProductClient{
+		products: map[string]*productpb.Product{
+			prodA: {Id: prodA, StoreId: storeA, Price: 50.0, Status: "PUBLISHED", Weight: 1.0},
+			prodB: {Id: prodB, StoreId: storeB, Price: 75.0, Status: "PUBLISHED", Weight: 2.0},
+		},
+	}
+	invClient := &mockInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			prodA: {ProductId: prodA, AvailableQuantity: 10},
+			prodB: {ProductId: prodB, AvailableQuantity: 10},
+		},
+	}
+
+	callCount := 0
+	delClient := &mockDeliveryClient{
+		calculateShippingFeeFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+			callCount++
+			if callCount == 1 {
+				return &deliverypb.CalculateShippingFeeResponse{ShippingFee: 40.0}, nil
+			}
+			return nil, status.Error(codes.Unavailable, "delivery service unavailable on second store")
+		},
+	}
+
+	svc := service.NewOrderService(repo, nil, prodClient, invClient, delClient, 5, nil)
+
+	_, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+		UserID:            uuid.New().String(),
+		IdempotencyKey:    uuid.New().String(),
+		ShippingAddressID: uuid.New().String(),
+		Items: []dto.CreateOrderItemInput{
+			{ProductID: prodA, StoreID: storeA, Quantity: 1},
+			{ProductID: prodB, StoreID: storeB, Quantity: 1},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected error when second store shipping fee calculation fails")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Errorf("expected SERVICE_UNAVAILABLE error code, got %v", err)
+	}
+	if len(repo.orders) != 0 {
+		t.Errorf("expected 0 orders persisted when multi-store delivery calculation fails, got %d", len(repo.orders))
+	}
+	if len(repo.outboxEnvelopes) != 0 {
+		t.Errorf("expected 0 outbox events persisted, got %d", len(repo.outboxEnvelopes))
 	}
 }

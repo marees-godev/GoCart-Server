@@ -47,9 +47,83 @@ type DeliveryRepository interface {
 }
 
 type pgDeliveryRepository struct {
-	db          *database.DB
-	outboxStore *outbox.Store
-	logger      *slog.Logger
+	db              *database.DB
+	outboxStore     *outbox.Store
+	logger          *slog.Logger
+	beginTx         func(ctx context.Context) (pgx.Tx, error)
+	newEnvelope     func(eventType, source, aggregateID string, payload interface{}) (*events.EventEnvelope, error)
+	marshalEnvelope func(env *events.EventEnvelope) ([]byte, error)
+	insertOutbox    func(ctx context.Context, tx pgx.Tx, evt *outbox.Event) error
+}
+
+func (r *pgDeliveryRepository) log() *slog.Logger {
+	if r.logger != nil {
+		return r.logger
+	}
+	return slog.Default()
+}
+
+func (r *pgDeliveryRepository) startTx(ctx context.Context) (pgx.Tx, error) {
+	if r.beginTx != nil {
+		return r.beginTx(ctx)
+	}
+	return r.db.Pool.Begin(ctx)
+}
+
+func (r *pgDeliveryRepository) createEnvelope(eventType, source, aggregateID string, payload interface{}) (*events.EventEnvelope, error) {
+	if r.newEnvelope != nil {
+		return r.newEnvelope(eventType, source, aggregateID, payload)
+	}
+	return events.NewEventEnvelopeWithAggregate(eventType, source, aggregateID, payload)
+}
+
+func (r *pgDeliveryRepository) encodeEnvelope(env *events.EventEnvelope) ([]byte, error) {
+	if r.marshalEnvelope != nil {
+		return r.marshalEnvelope(env)
+	}
+	return env.Marshal()
+}
+
+func (r *pgDeliveryRepository) writeOutbox(ctx context.Context, tx pgx.Tx, evt *outbox.Event) error {
+	if r.insertOutbox != nil {
+		return r.insertOutbox(ctx, tx, evt)
+	}
+	return r.outboxStore.Insert(ctx, tx, evt)
+}
+
+func (r *pgDeliveryRepository) recordOutboxEvent(
+	ctx context.Context,
+	tx pgx.Tx,
+	aggregateType string,
+	outboxAggregateID string,
+	envelopeAggregateID string,
+	eventType string,
+	topic string,
+	payload interface{},
+) error {
+	envelope, err := r.createEnvelope(eventType, "delivery-service", envelopeAggregateID, payload)
+	if err != nil {
+		r.log().Error("Repository: failed to construct event envelope", slog.String("event_type", eventType), slog.Any("error", err))
+		return appErrors.Internal(err, "failed to construct "+eventType+" event envelope")
+	}
+	payloadBytes, err := r.encodeEnvelope(envelope)
+	if err != nil {
+		r.log().Error("Repository: failed to marshal event payload", slog.String("event_type", eventType), slog.Any("error", err))
+		return appErrors.Internal(err, "failed to marshal "+eventType+" event payload")
+	}
+
+	outboxEvt := &outbox.Event{
+		AggregateType: aggregateType,
+		AggregateID:   outboxAggregateID,
+		EventType:     eventType,
+		Payload:       payloadBytes,
+		Topic:         topic,
+	}
+	if err := r.writeOutbox(ctx, tx, outboxEvt); err != nil {
+		r.log().Error("Repository: failed to write event to outbox", slog.String("event_type", eventType), slog.Any("error", err))
+		return appErrors.Internal(err, "failed to record "+eventType+" outbox event")
+	}
+	return nil
 }
 
 func NewDeliveryRepository(db *database.DB, log ...*slog.Logger) DeliveryRepository {
@@ -364,9 +438,9 @@ func (r *pgDeliveryRepository) UpdateStatus(ctx context.Context, id string, stat
 
 func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id string, status model.DeliveryStatus, estimatedDelivery, actualDelivery *time.Time, location, notes string) (*model.Delivery, error) {
 	cleanID := strings.TrimSpace(id)
-	tx, err := r.db.Pool.Begin(ctx)
+	tx, err := r.startTx(ctx)
 	if err != nil {
-		r.logger.Error("Repository: failed to begin transaction for status update", slog.Any("error", err))
+		r.log().Error("Repository: failed to begin transaction for status update", slog.Any("error", err))
 		return nil, appErrors.Internal(err, "failed to begin transaction")
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -512,27 +586,17 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 		ActualDelivery:    updatedDelivery.ActualDelivery,
 		UpdatedAt:         updatedDelivery.UpdatedAt,
 	}
-	changedEnvelope, err := events.NewEventEnvelopeWithAggregate(events.EventTypeDeliveryStatusChanged, "delivery-service", updatedDelivery.ID, changedEvt)
-	if err != nil {
-		r.logger.Error("Repository: failed to construct DeliveryStatusChanged envelope", slog.Any("error", err))
-		return nil, appErrors.Internal(err, "failed to construct event envelope")
-	}
-	changedPayloadBytes, err := changedEnvelope.Marshal()
-	if err != nil {
-		r.logger.Error("Repository: failed to marshal DeliveryStatusChanged payload", slog.Any("error", err))
-		return nil, appErrors.Internal(err, "failed to marshal event payload")
-	}
-
-	outboxChangedEvt := &outbox.Event{
-		AggregateType: "delivery",
-		AggregateID:   updatedDelivery.ID,
-		EventType:     events.EventTypeDeliveryStatusChanged,
-		Payload:       changedPayloadBytes,
-		Topic:         events.TopicDeliveryStatusChanged,
-	}
-	if err := r.outboxStore.Insert(ctx, tx, outboxChangedEvt); err != nil {
-		r.logger.Error("Repository: failed to write DeliveryStatusChanged event to outbox", slog.Any("error", err))
-		return nil, appErrors.Internal(err, "failed to record outbox event")
+	if err := r.recordOutboxEvent(
+		ctx,
+		tx,
+		"delivery",
+		updatedDelivery.ID,
+		updatedDelivery.ID,
+		events.EventTypeDeliveryStatusChanged,
+		events.TopicDeliveryStatusChanged,
+		changedEvt,
+	); err != nil {
+		return nil, err
 	}
 
 	// Also record DeliveryStatusUpdated for backward compatibility
@@ -567,16 +631,17 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 			Carrier:         updatedDelivery.DeliveryPartner,
 			ShippedAt:       time.Now().UTC(),
 		}
-		if shEnv, shErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderShipped, "delivery-service", updatedDelivery.ID, shippedEvt); shErr == nil {
-			if shBytes, mErr := shEnv.Marshal(); mErr == nil {
-				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
-					AggregateType: "order",
-					AggregateID:   updatedDelivery.OrderID,
-					EventType:     events.EventTypeOrderShipped,
-					Payload:       shBytes,
-					Topic:         events.TopicOrderShipped,
-				})
-			}
+		if err := r.recordOutboxEvent(
+			ctx,
+			tx,
+			"order",
+			updatedDelivery.OrderID,
+			updatedDelivery.ID,
+			events.EventTypeOrderShipped,
+			events.TopicOrderShipped,
+			shippedEvt,
+		); err != nil {
+			return nil, err
 		}
 	}
 
@@ -589,16 +654,17 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 			DeliveryPartner: updatedDelivery.DeliveryPartner,
 			DeliveredAt:     time.Now().UTC(),
 		}
-		if delEnv, delErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderDelivered, "delivery-service", updatedDelivery.ID, deliveredEvt); delErr == nil {
-			if delBytes, mErr := delEnv.Marshal(); mErr == nil {
-				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
-					AggregateType: "order",
-					AggregateID:   updatedDelivery.OrderID,
-					EventType:     events.EventTypeOrderDelivered,
-					Payload:       delBytes,
-					Topic:         events.TopicOrderDelivered,
-				})
-			}
+		if err := r.recordOutboxEvent(
+			ctx,
+			tx,
+			"order",
+			updatedDelivery.OrderID,
+			updatedDelivery.ID,
+			events.EventTypeOrderDelivered,
+			events.TopicOrderDelivered,
+			deliveredEvt,
+		); err != nil {
+			return nil, err
 		}
 	}
 
@@ -613,16 +679,17 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 			Reason:      cancelReason,
 			CancelledAt: time.Now().UTC(),
 		}
-		if canEnv, canErr := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderCancelled, "delivery-service", updatedDelivery.ID, cancelledEvt); canErr == nil {
-			if canBytes, mErr := canEnv.Marshal(); mErr == nil {
-				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
-					AggregateType: "order",
-					AggregateID:   updatedDelivery.OrderID,
-					EventType:     events.EventTypeOrderCancelled,
-					Payload:       canBytes,
-					Topic:         events.TopicOrderCancelled,
-				})
-			}
+		if err := r.recordOutboxEvent(
+			ctx,
+			tx,
+			"order",
+			updatedDelivery.OrderID,
+			updatedDelivery.ID,
+			events.EventTypeOrderCancelled,
+			events.TopicOrderCancelled,
+			cancelledEvt,
+		); err != nil {
+			return nil, err
 		}
 	}
 

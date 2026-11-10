@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -316,10 +317,17 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		storeDiscount = math.Round((input.DiscountAmount/numStores)*100) / 100
 	}
 
+	requiresShipping := strings.TrimSpace(input.ShippingAddress) != "" || strings.TrimSpace(input.ShippingAddressID) != ""
+	needsShippingCalculation := requiresShipping && input.ShippingFee <= 0
+	if needsShippingCalculation && s.deliveryClient == nil {
+		s.log.Error("Delivery service client is unavailable for mandatory shipping fee calculation")
+		return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+	}
+
 	firstStore := true
 	for storeID, items := range storeMap {
 		storeShippingFee := baseStoreShippingFee
-		if input.ShippingFee <= 0 && s.deliveryClient != nil {
+		if needsShippingCalculation {
 			var shipItems []*deliverypb.ShippingItem
 			for _, it := range items {
 				w := it.weight
@@ -341,11 +349,27 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 				ShippingAddress:       input.ShippingAddress,
 			})
 			cancel()
-			if feeErr == nil && feeResp != nil {
-				storeShippingFee = feeResp.ShippingFee
-			} else if feeErr != nil {
-				s.log.Warn("Failed to calculate shipping fee from delivery service, defaulting to 0", "error", feeErr)
+			if feeErr != nil {
+				s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
+				var appErr *appErrors.AppError
+				if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
+					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				}
+				st, ok := status.FromError(feeErr)
+				if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
+					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				}
+				return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
 			}
+			if feeResp == nil {
+				s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
+				return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
+			}
+			if feeResp.ShippingFee < 0 {
+				s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
+				return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
+			}
+			storeShippingFee = feeResp.ShippingFee
 		}
 		orderID := uuid.New().String()
 		orderNumber := generateOrderNumber()

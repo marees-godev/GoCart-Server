@@ -32,6 +32,7 @@ type pgProductRepository struct {
 	pool        *pgxpool.Pool
 	outboxStore *outbox.Store
 	logger      *slog.Logger
+	beginTx     func(ctx context.Context) (pgx.Tx, error)
 }
 
 func NewProductRepository(pool *pgxpool.Pool, log ...*slog.Logger) ProductRepository {
@@ -53,8 +54,15 @@ func NewProductRepositoryWithOutbox(pool *pgxpool.Pool, outboxStore *outbox.Stor
 	}
 }
 
+func (r *pgProductRepository) startTx(ctx context.Context) (pgx.Tx, error) {
+	if r.beginTx != nil {
+		return r.beginTx(ctx)
+	}
+	return r.pool.Begin(ctx)
+}
+
 func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Product) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.startTx(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
@@ -64,7 +72,7 @@ func (r *pgProductRepository) CreateProduct(ctx context.Context, p *model.Produc
 		INSERT INTO products (
 			store_id, category_id, sku, name, description, price, mrp, tax, currency, status, image_url, avg_rating, weight, is_exchange_eligible, max_exchange_discount
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 		) RETURNING id, created_at, updated_at
 	`
 
@@ -358,7 +366,7 @@ func (r *pgProductRepository) ListProducts(ctx context.Context, filter dto.ListP
 }
 
 func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Product) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.startTx(ctx)
 	if err != nil {
 		return appErrors.Internal(err, "failed to start database transaction")
 	}
@@ -381,8 +389,8 @@ func (r *pgProductRepository) UpdateProduct(ctx context.Context, p *model.Produc
 
 	query := `
 		UPDATE products
-		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, updated_at = NOW()
-		WHERE id = $9 AND deleted_at IS NULL
+		SET category_id = $1, name = $2, description = $3, price = $4, mrp = $5, tax = $6, status = $7, image_url = $8, weight = $9, is_exchange_eligible = $10, max_exchange_discount = $11, updated_at = NOW()
+		WHERE id = $12 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 
