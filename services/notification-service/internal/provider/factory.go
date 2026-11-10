@@ -8,7 +8,6 @@ import (
 
 type ProviderConfig struct {
 	Email EmailProviderConfig
-	SMS   SMSConfig
 	Push  PushConfig
 }
 
@@ -55,17 +54,7 @@ func NewRegistryFromConfig(cfg ProviderConfig, logger *slog.Logger) Registry {
 		reg.Register("EMAIL", NewMockEmailProvider(cfg.Email.Timeout))
 	}
 
-	// 2. SMS Channel Provider
-	switch strings.ToLower(strings.TrimSpace(cfg.SMS.Provider)) {
-	case "twilio":
-		reg.Register("SMS", NewTwilioSMSProvider(cfg.SMS))
-	case "mock":
-		fallthrough
-	default:
-		reg.Register("SMS", NewMockSMSProvider(cfg.SMS.Timeout))
-	}
-
-	// 3. Push Channel Provider
+	// 2. Push Channel Provider
 	switch strings.ToLower(strings.TrimSpace(cfg.Push.Provider)) {
 	case "fcm":
 		reg.Register("PUSH", NewFCMPushProvider(cfg.Push))
@@ -75,7 +64,7 @@ func NewRegistryFromConfig(cfg ProviderConfig, logger *slog.Logger) Registry {
 		reg.Register("PUSH", NewMockPushProvider(cfg.Push.Timeout))
 	}
 
-	// 4. In-App Channel Provider
+	// 3. In-App Channel Provider
 	reg.Register("IN_APP", NewInAppProvider())
 
 	return reg
