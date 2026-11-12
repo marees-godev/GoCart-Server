@@ -265,6 +265,18 @@ services:
         sync: false
       - key: ADMIN_USER_ID
         value: super-admin-identity
+
+      # ==============================================================================
+      # Google OAuth Configuration
+      # ==============================================================================
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URL
+        sync: false
+      - key: GOOGLE_SCOPES
+        value: openid email profile
       - key: CORS_ALLOWED_ORIGINS
         value: "*"
       - key: CORS_ALLOWED_METHODS
