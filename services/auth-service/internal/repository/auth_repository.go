@@ -15,6 +15,7 @@ import (
 )
 
 var ErrNotFound = errors.New("record not found")
+var ErrOAuthConflict = errors.New("oauth account already linked to another user")
 
 type AuthRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.AuthCredential, error)
@@ -478,10 +479,19 @@ func (r *postgresAuthRepository) CreateOAuthAccount(ctx context.Context, oauthAc
 		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
 		ON CONFLICT (provider, provider_user_id) DO NOTHING
 	`
-	_, err := r.pool.Exec(ctx, query, oauthAcc.ID, oauthAcc.UserID, oauthAcc.Provider.String(), oauthAcc.ProviderUserID, oauthAcc.Email)
+	tag, err := r.pool.Exec(ctx, query, oauthAcc.ID, oauthAcc.UserID, oauthAcc.Provider.String(), oauthAcc.ProviderUserID, oauthAcc.Email)
 	if err != nil {
 		r.logger.Error("Failed to create oauth account", "error", err)
 		return fmt.Errorf("repository: create oauth account failed: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		existing, getErr := r.GetOAuthAccount(ctx, oauthAcc.Provider, oauthAcc.ProviderUserID)
+		if getErr != nil {
+			return fmt.Errorf("repository: verify existing oauth account failed: %w", getErr)
+		}
+		if existing.UserID != oauthAcc.UserID {
+			return ErrOAuthConflict
+		}
 	}
 	return nil
 }

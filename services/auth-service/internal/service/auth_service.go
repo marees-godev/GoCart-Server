@@ -747,26 +747,58 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 		return nil, appErrors.Unauthorized(fmt.Sprintf("invalid google token: %v", err))
 	}
 
+	if !payload.EmailVerified {
+		s.logger.Warn("Google auth rejected: email is not verified", "email", payload.Email)
+		return nil, appErrors.Unauthorized("google account email is not verified")
+	}
+
 	email := cleanEmail(payload.Email)
 	googleSub := strings.TrimSpace(payload.Subject)
 	if email == "" || googleSub == "" {
 		return nil, appErrors.Unauthorized("google token missing required claims")
 	}
 
-	cred, err := s.repo.GetByEmailAndRole(ctx, email, role)
+	existingOAuth, err := s.repo.GetOAuthAccount(ctx, model.AuthProviderGoogle, googleSub)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
-		s.logger.Error("Failed to query credentials for google auth", "email", email, "role", role, "error", err)
+		s.logger.Error("Failed to query oauth account for google auth", "error", err)
 		return nil, appErrors.Internal(err, "database query error")
 	}
 
-	if mode == googleAuthModeLogin && cred == nil {
-		s.logger.Warn("Google login failed: account not found", "email", email, "role", role)
-		return nil, appErrors.NotFound("account not found, please register with google first")
-	}
+	var cred *model.AuthCredential
+	if existingOAuth != nil {
+		if mode == googleAuthModeRegister {
+			s.logger.Warn("Google register failed: google identity already exists", "user_id", existingOAuth.UserID.String())
+			return nil, appErrors.Conflict("an account with this google identity already exists, please login instead")
+		}
+		cred, err = s.repo.GetByUserID(ctx, existingOAuth.UserID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, appErrors.NotFound("linked account not found")
+			}
+			s.logger.Error("Failed to query credential by user id for google auth", "user_id", existingOAuth.UserID.String(), "error", err)
+			return nil, appErrors.Internal(err, "database query error")
+		}
+		if req.Role != "" && cred.Role != role {
+			s.logger.Warn("Google login failed: role mismatch for linked identity", "user_id", cred.UserID.String(), "expected_role", cred.Role, "requested_role", role)
+			return nil, appErrors.Unauthorized("google account is registered with a different role")
+		}
+		role = cred.Role
+	} else {
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			s.logger.Error("Failed to query credentials for google auth", "email", email, "role", role, "error", err)
+			return nil, appErrors.Internal(err, "database query error")
+		}
 
-	if mode == googleAuthModeRegister && cred != nil {
-		s.logger.Warn("Google register failed: account already exists", "email", email, "role", role)
-		return nil, appErrors.Conflict("an account with this email and role already exists, please login instead")
+		if mode == googleAuthModeLogin && cred == nil {
+			s.logger.Warn("Google login failed: account not found", "email", email, "role", role)
+			return nil, appErrors.NotFound("account not found, please register with google first")
+		}
+
+		if mode == googleAuthModeRegister && cred != nil {
+			s.logger.Warn("Google register failed: account already exists", "email", email, "role", role)
+			return nil, appErrors.Conflict("an account with this email and role already exists, please login instead")
+		}
 	}
 
 	isNewUser := false
@@ -786,6 +818,7 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 			return nil, appErrors.ServiceUnavailable("user service unavailable")
 		}
 
+		userCreated := false
 		if role == model.RoleUser && s.userClient != nil {
 			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
 				Id:        userID.String(),
@@ -805,6 +838,7 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 				s.logger.Error("Failed to create user profile in user service", "error", err)
 				return nil, appErrors.Internal(err, "failed to create user profile")
 			}
+			userCreated = true
 		}
 
 		cred = &model.AuthCredential{
@@ -826,6 +860,15 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 		}
 
 		if err := s.repo.CreateCredentialWithOAuth(ctx, cred, oauthAcc); err != nil {
+			if userCreated && s.userClient != nil {
+				rollbackReason := "compensating rollback: auth credential creation failed"
+				if _, delErr := s.userClient.DeleteUser(ctx, &userpb.DeleteUserRequest{
+					Id:     userID.String(),
+					Reason: &rollbackReason,
+				}); delErr != nil {
+					s.logger.Error("Failed to rollback user profile after oauth credential failure", "user_id", userID.String(), "error", delErr)
+				}
+			}
 			s.logger.Error("Failed to persist oauth credentials", "error", err)
 			return nil, appErrors.Internal(err, "failed to save credentials")
 		}
@@ -842,23 +885,22 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 			return nil, appErrors.Unauthorized("account is locked")
 		}
 
-		if !cred.EmailVerified {
-			if err := s.repo.MarkEmailVerified(ctx, userID); err != nil {
-				s.logger.Warn("Failed to mark email verified on google login", "user_id", userID.String(), "error", err)
-			} else {
-				cred.EmailVerified = true
+		if existingOAuth == nil {
+			oauthAcc := &model.OAuthAccount{
+				ID:             uuid.Must(uuid.NewV7()),
+				UserID:         userID,
+				Provider:       model.AuthProviderGoogle,
+				ProviderUserID: googleSub,
+				Email:          email,
 			}
-		}
-
-		oauthAcc := &model.OAuthAccount{
-			ID:             uuid.Must(uuid.NewV7()),
-			UserID:         userID,
-			Provider:       model.AuthProviderGoogle,
-			ProviderUserID: googleSub,
-			Email:          email,
-		}
-		if err := s.repo.CreateOAuthAccount(ctx, oauthAcc); err != nil {
-			s.logger.Warn("Failed to link google account", "user_id", userID.String(), "error", err)
+			if err := s.repo.CreateOAuthAccount(ctx, oauthAcc); err != nil {
+				if errors.Is(err, repository.ErrOAuthConflict) {
+					s.logger.Warn("Google login failed: oauth identity already linked to another user", "user_id", userID.String())
+					return nil, appErrors.Conflict("this google account is already linked to another user")
+				}
+				s.logger.Error("Failed to link google account", "user_id", userID.String(), "error", err)
+				return nil, appErrors.Internal(err, "failed to link google account")
+			}
 		}
 
 		firstName = payload.FirstName

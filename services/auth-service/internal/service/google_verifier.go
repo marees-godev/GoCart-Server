@@ -59,6 +59,11 @@ type tokenInfoResponse struct {
 }
 
 func (v *HTTPGoogleTokenVerifier) Verify(ctx context.Context, idToken string) (*GoogleTokenPayload, error) {
+	expectedClientID := strings.TrimSpace(v.clientID)
+	if expectedClientID == "" {
+		return nil, errors.New("google client ID is not configured")
+	}
+
 	token := strings.TrimSpace(idToken)
 	if token == "" {
 		return nil, errors.New("empty id token")
@@ -108,6 +113,10 @@ func (v *HTTPGoogleTokenVerifier) Verify(ctx context.Context, idToken string) (*
 		emailVerified = strings.EqualFold(ev, "true")
 	}
 
+	if !emailVerified {
+		return nil, errors.New("google email is not verified")
+	}
+
 	var expInt int64
 	switch exp := raw.ExpiresAt.(type) {
 	case float64:
@@ -120,8 +129,12 @@ func (v *HTTPGoogleTokenVerifier) Verify(ctx context.Context, idToken string) (*
 		return nil, errors.New("google token has expired")
 	}
 
-	if v.clientID != "" && raw.Audience != "" && raw.Audience != v.clientID {
-		return nil, fmt.Errorf("google token client ID mismatch: expected %s, got %s", v.clientID, raw.Audience)
+	if strings.TrimSpace(raw.Audience) == "" || raw.Audience != expectedClientID {
+		return nil, fmt.Errorf("google token client ID mismatch: expected %s, got %s", expectedClientID, raw.Audience)
+	}
+
+	if raw.Issuer != "https://accounts.google.com" && raw.Issuer != "accounts.google.com" {
+		return nil, fmt.Errorf("google token invalid issuer: %s", raw.Issuer)
 	}
 
 	firstName := raw.FirstName
