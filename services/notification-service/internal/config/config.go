@@ -64,15 +64,11 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../../.env")
 
 		emailCfg := provider.EmailConfig{
-			Provider:        GetEnv("EMAIL_PROVIDER", "mailer"),
+			Provider:        GetEnv("EMAIL_PROVIDER", "resend_brevo"),
 			ResendAPIKey:    GetEnv("RESEND_API_KEY", ""),
 			ResendFromEmail: GetEnv("RESEND_FROM_EMAIL", GetEnv("EMAIL_FROM", "onboarding@resend.dev")),
 			BrevoAPIKey:     GetEnv("BREVO_API_KEY", ""),
 			BrevoFromEmail:  GetEnv("BREVO_FROM_EMAIL", GetEnv("EMAIL_FROM", "nikotest122@gmail.com")),
-			SMTPHost:        GetEnv("SMTP_HOST", "smtp.gmail.com"),
-			SMTPPort:        GetEnv("SMTP_PORT", "587"),
-			SMTPUser:        GetEnv("SMTP_USER", GetEnv("SMTP_USERNAME", "")),
-			SMTPPass:        GetEnv("SMTP_PASS", GetEnv("SMTP_PASSWORD", "")),
 			FromEmail:       GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
 			Timeout:         GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
 		}
