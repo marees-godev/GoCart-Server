@@ -15,6 +15,7 @@ import (
 )
 
 var ErrNotFound = errors.New("record not found")
+var ErrOAuthConflict = errors.New("oauth account already linked to another user")
 
 type AuthRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.AuthCredential, error)
@@ -32,6 +33,9 @@ type AuthRepository interface {
 	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
 	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error
+	GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error)
+	CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error
+	CreateCredentialWithOAuth(ctx context.Context, cred *model.AuthCredential, oauthAcc *model.OAuthAccount) error
 }
 
 type postgresAuthRepository struct {
@@ -53,7 +57,7 @@ func NewAuthRepository(pool *pgxpool.Pool, log *slog.Logger) AuthRepository {
 
 func (r *postgresAuthRepository) GetByEmail(ctx context.Context, email string) (*model.AuthCredential, error) {
 	query := `
-		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
+		SELECT id, user_id, email, phone, COALESCE(password_hash, ''), role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
 		FROM auth_credentials
 		WHERE LOWER(email) = LOWER($1)
 		LIMIT 1
@@ -86,7 +90,7 @@ func (r *postgresAuthRepository) GetByEmail(ctx context.Context, email string) (
 
 func (r *postgresAuthRepository) GetByEmailAndRole(ctx context.Context, email string, role model.Role) (*model.AuthCredential, error) {
 	query := `
-		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
+		SELECT id, user_id, email, phone, COALESCE(password_hash, ''), role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
 		FROM auth_credentials
 		WHERE LOWER(email) = LOWER($1) AND (UPPER(role::text) = UPPER($2) OR (UPPER($2) IN ('USER', 'CUSTOMER') AND UPPER(role::text) IN ('USER', 'CUSTOMER')))
 		LIMIT 1
@@ -208,11 +212,15 @@ func (r *postgresAuthRepository) CreateCredential(ctx context.Context, cred *mod
 	if cred.UserID == uuid.Nil {
 		cred.UserID = uuid.Must(uuid.NewV7())
 	}
+	var pwd *string
+	if cred.PasswordHash != "" {
+		pwd = &cred.PasswordHash
+	}
 	query := `
 		INSERT INTO auth_credentials (id, user_id, email, phone, password_hash, role, email_verified, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`
-	_, err := r.pool.Exec(ctx, query, cred.ID, cred.UserID, cred.Email, cred.Phone, cred.PasswordHash, cred.Role, cred.EmailVerified, cred.IsActive)
+	_, err := r.pool.Exec(ctx, query, cred.ID, cred.UserID, cred.Email, cred.Phone, pwd, cred.Role, cred.EmailVerified, cred.IsActive)
 	if err != nil {
 		r.logger.Error("Failed to create credential", "error", err)
 		return fmt.Errorf("repository: create credential failed: %w", err)
@@ -303,7 +311,7 @@ func (r *postgresAuthRepository) RevokeRefreshTokensByUserID(ctx context.Context
 
 func (r *postgresAuthRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.AuthCredential, error) {
 	query := `
-		SELECT id, user_id, email, phone, password_hash, role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
+		SELECT id, user_id, email, phone, COALESCE(password_hash, ''), role, email_verified, is_active, failed_login_count, locked_until, created_at, updated_at
 		FROM auth_credentials
 		WHERE user_id = $1
 		LIMIT 1
@@ -432,5 +440,108 @@ func (r *postgresAuthRepository) UpdatePassword(ctx context.Context, userID uuid
 		return fmt.Errorf("repository: commit tx failed: %w", err)
 	}
 
+	return nil
+}
+
+func (r *postgresAuthRepository) GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error) {
+	query := `
+		SELECT id, user_id, provider, provider_user_id, email, created_at, updated_at
+		FROM oauth_accounts
+		WHERE provider = $1 AND provider_user_id = $2
+		LIMIT 1
+	`
+	var acc model.OAuthAccount
+	err := r.pool.QueryRow(ctx, query, provider.String(), providerUserID).Scan(
+		&acc.ID,
+		&acc.UserID,
+		&acc.Provider,
+		&acc.ProviderUserID,
+		&acc.Email,
+		&acc.CreatedAt,
+		&acc.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		r.logger.Error("Failed to get oauth account", "provider", provider, "provider_user_id", providerUserID, "error", err)
+		return nil, fmt.Errorf("repository: get oauth account failed: %w", err)
+	}
+	return &acc, nil
+}
+
+func (r *postgresAuthRepository) CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error {
+	if oauthAcc.ID == uuid.Nil {
+		oauthAcc.ID = uuid.Must(uuid.NewV7())
+	}
+	query := `
+		INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		ON CONFLICT (provider, provider_user_id) DO NOTHING
+	`
+	tag, err := r.pool.Exec(ctx, query, oauthAcc.ID, oauthAcc.UserID, oauthAcc.Provider.String(), oauthAcc.ProviderUserID, oauthAcc.Email)
+	if err != nil {
+		r.logger.Error("Failed to create oauth account", "error", err)
+		return fmt.Errorf("repository: create oauth account failed: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		existing, getErr := r.GetOAuthAccount(ctx, oauthAcc.Provider, oauthAcc.ProviderUserID)
+		if getErr != nil {
+			return fmt.Errorf("repository: verify existing oauth account failed: %w", getErr)
+		}
+		if existing.UserID != oauthAcc.UserID {
+			return ErrOAuthConflict
+		}
+	}
+	return nil
+}
+
+func (r *postgresAuthRepository) CreateCredentialWithOAuth(ctx context.Context, cred *model.AuthCredential, oauthAcc *model.OAuthAccount) error {
+	if cred.ID == uuid.Nil {
+		cred.ID = uuid.Must(uuid.NewV7())
+	}
+	if cred.UserID == uuid.Nil {
+		cred.UserID = uuid.Must(uuid.NewV7())
+	}
+	if oauthAcc.ID == uuid.Nil {
+		oauthAcc.ID = uuid.Must(uuid.NewV7())
+	}
+	oauthAcc.UserID = cred.UserID
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var pwd *string
+	if cred.PasswordHash != "" {
+		pwd = &cred.PasswordHash
+	}
+
+	credQuery := `
+		INSERT INTO auth_credentials (id, user_id, email, phone, password_hash, role, email_verified, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+	`
+	_, err = tx.Exec(ctx, credQuery, cred.ID, cred.UserID, cred.Email, cred.Phone, pwd, cred.Role, cred.EmailVerified, cred.IsActive)
+	if err != nil {
+		r.logger.Error("Failed to insert credential in oauth tx", "error", err)
+		return fmt.Errorf("repository: insert credential failed: %w", err)
+	}
+
+	oauthQuery := `
+		INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+	`
+	_, err = tx.Exec(ctx, oauthQuery, oauthAcc.ID, oauthAcc.UserID, oauthAcc.Provider.String(), oauthAcc.ProviderUserID, oauthAcc.Email)
+	if err != nil {
+		r.logger.Error("Failed to insert oauth account in tx", "error", err)
+		return fmt.Errorf("repository: insert oauth account failed: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit oauth credential tx", "error", err)
+		return fmt.Errorf("repository: commit oauth tx failed: %w", err)
+	}
 	return nil
 }

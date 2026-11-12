@@ -20,6 +20,12 @@ input RegisterInput {
   lastName: String
 }
 
+input GoogleAuthInput {
+  code: String!
+  redirectUri: String
+  role: AuthRole
+}
+
 input RefreshTokenInput {
   refreshToken: String!
 }
@@ -65,7 +71,9 @@ type ChangePasswordPayload {
 
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
+  loginWithGoogle(input: GoogleAuthInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
+  registerWithGoogle(input: GoogleAuthInput!): AuthPayload!
   refreshToken(input: RefreshTokenInput!): AuthPayload!
   logout: LogoutPayload!
   verifyEmail(email: String!, otp: String!, role: AuthRole!): Boolean!

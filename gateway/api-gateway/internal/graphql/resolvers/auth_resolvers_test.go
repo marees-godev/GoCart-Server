@@ -1,12 +1,17 @@
 package resolvers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -20,6 +25,7 @@ type mockAuthClient struct {
 	lastLoginReq       *authpb.LoginRequest
 	lastVerifyEmailReq *authpb.VerifyEmailRequest
 	lastResendReq      *authpb.ResendVerificationEmailRequest
+	lastGoogleAuthReq  *authpb.GoogleAuthRequest
 }
 
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
@@ -57,6 +63,33 @@ func (m *mockAuthClient) Login(ctx context.Context, in *authpb.LoginRequest, opt
 		UserId:       "user-uuid-123",
 		Role:         in.Role,
 	}, nil
+}
+
+func (m *mockAuthClient) GoogleAuth(ctx context.Context, in *authpb.GoogleAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	m.lastGoogleAuthReq = in
+	if in.IdToken == "invalid-google-token" {
+		return nil, appErrors.MapAppErrorToGRPC(appErrors.Unauthorized("invalid google token"))
+	}
+	role := in.Role
+	if role == authpb.Role_ROLE_UNSPECIFIED {
+		role = authpb.Role_USER
+	}
+	return &authpb.AuthResponse{
+		AccessToken:  "google-access-token",
+		RefreshToken: "google-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "google-user-uuid-123",
+		Role:         role,
+	}, nil
+}
+
+func (m *mockAuthClient) GoogleLogin(ctx context.Context, in *authpb.GoogleAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	return m.GoogleAuth(ctx, in, opts...)
+}
+
+func (m *mockAuthClient) GoogleRegister(ctx context.Context, in *authpb.GoogleAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	return m.GoogleAuth(ctx, in, opts...)
 }
 
 func (m *mockAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, opts ...grpcPkg.CallOption) (*authpb.LogoutResponse, error) {
@@ -716,3 +749,195 @@ func TestResendVerificationEmail_Resolver(t *testing.T) {
 	}
 }
 
+type mockTransport func(req *http.Request) (*http.Response, error)
+
+func (m mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m(req)
+}
+
+func TestLoginWithGoogleResolver_Success(t *testing.T) {
+	origClient := googleHTTPClient
+	googleHTTPClient = &http.Client{
+		Transport: mockTransport(func(req *http.Request) (*http.Response, error) {
+			body, _ := json.Marshal(map[string]any{
+				"access_token": "google-access-token",
+				"id_token":     "valid-google-id-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	t.Cleanup(func() {
+		googleHTTPClient = origClient
+	})
+
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+			Config: &config.Config{
+				Google: config.GoogleConfig{
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					RedirectURL:  "http://localhost:8080/api/v1/auth/google/callback",
+				},
+			},
+		},
+	}
+
+	role := model.AuthRoleUser
+	res, err := r.LoginWithGoogle(context.Background(), model.GoogleAuthInput{
+		Code: "valid-auth-code",
+		Role: &role,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Token != "google-access-token" {
+		t.Errorf("expected token 'google-access-token', got '%s'", res.Token)
+	}
+	if res.RefreshToken == nil || *res.RefreshToken != "google-refresh-token" {
+		t.Errorf("expected refresh token 'google-refresh-token'")
+	}
+	if res.Role == nil || *res.Role != model.RoleUser {
+		t.Errorf("expected role USER, got %v", res.Role)
+	}
+	if authCli.lastGoogleAuthReq == nil {
+		t.Fatal("expected lastGoogleAuthReq to not be nil")
+	}
+	if authCli.lastGoogleAuthReq.IdToken != "valid-google-id-token" {
+		t.Errorf("expected id_token 'valid-google-id-token', got '%s'", authCli.lastGoogleAuthReq.IdToken)
+	}
+	if authCli.lastGoogleAuthReq.Role != authpb.Role_USER {
+		t.Errorf("expected role USER, got %v", authCli.lastGoogleAuthReq.Role)
+	}
+}
+
+func TestLoginWithGoogleResolver_EmptyCode(t *testing.T) {
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+		},
+	}
+
+	_, err := r.LoginWithGoogle(context.Background(), model.GoogleAuthInput{
+		Code: "   ",
+	})
+	if err == nil {
+		t.Fatal("expected error for empty code, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 status, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestLoginWithGoogleResolver_ExchangeError(t *testing.T) {
+	origClient := googleHTTPClient
+	googleHTTPClient = &http.Client{
+		Transport: mockTransport(func(req *http.Request) (*http.Response, error) {
+			body, _ := json.Marshal(map[string]any{
+				"error":             "invalid_grant",
+				"error_description": "Code expired",
+			})
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	t.Cleanup(func() {
+		googleHTTPClient = origClient
+	})
+
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+			Config: &config.Config{
+				Google: config.GoogleConfig{
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+				},
+			},
+		},
+	}
+
+	_, err := r.LoginWithGoogle(context.Background(), model.GoogleAuthInput{
+		Code: "expired-auth-code",
+	})
+	if err == nil {
+		t.Fatal("expected error for token exchange failure, got nil")
+	}
+}
+
+func TestRegisterWithGoogleResolver_Success(t *testing.T) {
+	origClient := googleHTTPClient
+	googleHTTPClient = &http.Client{
+		Transport: mockTransport(func(req *http.Request) (*http.Response, error) {
+			body, _ := json.Marshal(map[string]any{
+				"access_token": "google-access-token",
+				"id_token":     "valid-google-id-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	t.Cleanup(func() {
+		googleHTTPClient = origClient
+	})
+
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+			Config: &config.Config{
+				Google: config.GoogleConfig{
+					ClientID:     "test-client-id",
+					ClientSecret: "test-client-secret",
+					RedirectURL:  "http://localhost:8080/api/v1/auth/google/callback",
+				},
+			},
+		},
+	}
+
+	role := model.AuthRoleUser
+	res, err := r.RegisterWithGoogle(context.Background(), model.GoogleAuthInput{
+		Code: "valid-auth-code",
+		Role: &role,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Token != "google-access-token" {
+		t.Errorf("expected token 'google-access-token', got '%s'", res.Token)
+	}
+	if authCli.lastGoogleAuthReq == nil {
+		t.Fatal("expected lastGoogleAuthReq to not be nil")
+	}
+	if authCli.lastGoogleAuthReq.IdToken != "valid-google-id-token" {
+		t.Errorf("expected id_token 'valid-google-id-token', got '%s'", authCli.lastGoogleAuthReq.IdToken)
+	}
+}

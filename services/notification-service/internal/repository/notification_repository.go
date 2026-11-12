@@ -344,7 +344,7 @@ func (r *notificationRepository) ListPendingJobs(ctx context.Context, limit int)
 func (r *notificationRepository) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
 		WITH claimable AS (
-			SELECT id
+			SELECT id, channel_id
 			FROM notification_jobs
 			WHERE status = 'PENDING'::notification_job_status AND retry_count < max_retries
 			ORDER BY created_at ASC
@@ -354,7 +354,7 @@ func (r *notificationRepository) ClaimPendingJobs(ctx context.Context, limit int
 		UPDATE notification_jobs j
 		SET status = 'PROCESSING'::notification_job_status, updated_at = NOW()
 		FROM claimable
-		LEFT JOIN notification_channels c ON j.channel_id = c.id
+		LEFT JOIN notification_channels c ON claimable.channel_id = c.id
 		WHERE j.id = claimable.id
 		RETURNING j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
 		          j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
