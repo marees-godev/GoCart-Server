@@ -771,13 +771,12 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 
 	isNewUser := false
 	var userID uuid.UUID
-	var credID uuid.UUID
 	var firstName string
 	var lastName string
 
 	if cred == nil {
 		isNewUser = true
-		credID = uuid.Must(uuid.NewV7())
+		credID := uuid.Must(uuid.NewV7())
 		userID = uuid.Must(uuid.NewV7())
 		firstName = payload.FirstName
 		lastName = payload.LastName
@@ -832,7 +831,6 @@ func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAut
 		}
 	} else {
 		userID = cred.UserID
-		credID = cred.ID
 
 		if !cred.IsActive {
 			s.logger.Warn("Google login failed: account inactive", "user_id", userID.String(), "email", email)
