@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/marees-godev/GoCart-Server/pkg/mailer"
 )
 
 // Helper to spin up a local dummy SMTP server for testing SMTPProvider
@@ -362,76 +364,117 @@ func TestProviderRegistry_SwappableImplementations(t *testing.T) {
 	}
 }
 
-func TestPushProviders(t *testing.T) {
+type testMailerClient struct {
+	sent     []mailer.Message
+	failNext error
+}
+
+func (m *testMailerClient) Send(ctx context.Context, msg mailer.Message) error {
+	if m.failNext != nil {
+		err := m.failNext
+		m.failNext = nil
+		return err
+	}
+	m.sent = append(m.sent, msg)
+	return nil
+}
+
+func TestMailerEmailProvider_SendSuccess(t *testing.T) {
+	client := &testMailerClient{}
+	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
+
+	if p.Channel() != "EMAIL" || p.ProviderName() != "mailer" {
+		t.Fatalf("unexpected provider channel or name")
+	}
+
+	ctx := context.Background()
+	notif := Notification{
+		ID:        "job-email-1",
+		Recipient: "customer@example.com",
+		Subject:   "Order Update",
+		Content:   "<h1>Your order has been placed</h1>",
+		Channel:   "EMAIL",
+	}
+
+	err := p.Send(ctx, notif)
+	if err != nil {
+		t.Fatalf("expected MailerEmailProvider send success, got: %v", err)
+	}
+
+	if len(client.sent) != 1 {
+		t.Fatalf("expected 1 sent email via mailer, got: %d", len(client.sent))
+	}
+	if client.sent[0].To != notif.Recipient || client.sent[0].Subject != notif.Subject {
+		t.Errorf("sent message mismatch: %+v", client.sent[0])
+	}
+}
+
+func TestMailerEmailProvider_InvalidRecipient(t *testing.T) {
+	client := &testMailerClient{}
+	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
 	ctx := context.Background()
 
-	// Push Mock Provider
-	pushProv := NewMockPushProvider(2 * time.Second)
-	err := pushProv.Send(ctx, Notification{
-		Recipient: "device-token-abc-123",
-		Subject:   "Order Update",
-		Content:   "Your order has shipped",
-		Channel:   "PUSH",
-	})
-	if err != nil {
-		t.Fatalf("expected Push send success, got: %v", err)
+	testCases := []string{"", "   ", "invalid-no-at-sign"}
+	for _, tc := range testCases {
+		notif := Notification{
+			ID:        "job-invalid",
+			Recipient: tc,
+			Subject:   "Subject",
+			Content:   "Content",
+			Channel:   "EMAIL",
+		}
+		err := p.Send(ctx, notif)
+		if !errors.Is(err, ErrInvalidRecipient) {
+			t.Errorf("expected ErrInvalidRecipient for recipient '%s', got: %v", tc, err)
+		}
+	}
+}
+
+func TestMailerEmailProvider_DeliveryFailure(t *testing.T) {
+	client := &testMailerClient{
+		failNext: errors.New("upstream service connection refused"),
+	}
+	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
+	ctx := context.Background()
+
+	notif := Notification{
+		ID:        "job-fail",
+		Recipient: "user@example.com",
+		Subject:   "Subject",
+		Content:   "Content",
+		Channel:   "EMAIL",
 	}
 
-	// Push Invalid Recipient
-	err = pushProv.Send(ctx, Notification{
-		Recipient: "",
-		Content:   "Push content",
-	})
-	if !errors.Is(err, ErrInvalidRecipient) {
-		t.Fatalf("expected ErrInvalidRecipient for empty push recipient, got: %v", err)
+	err := p.Send(ctx, notif)
+	if !errors.Is(err, ErrProviderUnavailable) {
+		t.Fatalf("expected ErrProviderUnavailable, got: %v", err)
+	}
+}
+
+func TestMailerEmailProvider_Timeout(t *testing.T) {
+	client := &testMailerClient{}
+	p := NewMailerEmailProvider(client, "notifications@gocart.local", 50*time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // canceled context
+
+	notif := Notification{
+		ID:        "job-timeout",
+		Recipient: "user@example.com",
+		Subject:   "Subject",
+		Content:   "Content",
+		Channel:   "EMAIL",
 	}
 
-	// FCM Push Provider
-	fcmProv := NewFCMPushProvider(PushConfig{
-		ServerKey: "secret-fcm-server-key-123",
-		Timeout:   2 * time.Second,
-	})
-	if fcmProv.Channel() != "PUSH" || fcmProv.ProviderName() != "fcm" {
-		t.Fatalf("unexpected FCM provider channel or name")
-	}
-
-	err = fcmProv.Send(ctx, Notification{
-		Recipient: "device-fcm-token",
-		Subject:   "Promo",
-		Content:   "50% off today",
-		Channel:   "PUSH",
-	})
-	if err != nil {
-		t.Fatalf("expected FCM send success, got: %v", err)
-	}
-
-	// FCM Push Missing Server Key
-	fcmNoKey := NewFCMPushProvider(PushConfig{Timeout: 1 * time.Second})
-	err = fcmNoKey.Send(ctx, Notification{
-		Recipient: "device-fcm-token",
-		Content:   "Hello",
-	})
-	if !errors.Is(err, ErrProviderMisconfigured) {
-		t.Fatalf("expected ErrProviderMisconfigured, got: %v", err)
-	}
-
-	// FCM Push Invalid Recipient
-	err = fcmProv.Send(ctx, Notification{
-		Recipient: "   ",
-		Content:   "Hello",
-	})
-	if !errors.Is(err, ErrInvalidRecipient) {
-		t.Fatalf("expected ErrInvalidRecipient for whitespace recipient, got: %v", err)
+	err := p.Send(ctx, notif)
+	if !errors.Is(err, ErrProviderTimeout) {
+		t.Fatalf("expected ErrProviderTimeout, got: %v", err)
 	}
 }
 
 func TestNewRegistryFromConfig(t *testing.T) {
 	cfg := ProviderConfig{
 		Email: EmailProviderConfig{
-			Provider: "mock",
-			Timeout:  1 * time.Second,
-		},
-		Push: PushConfig{
 			Provider: "mock",
 			Timeout:  1 * time.Second,
 		},
@@ -444,19 +487,21 @@ func TestNewRegistryFromConfig(t *testing.T) {
 		t.Fatalf("expected EMAIL provider in registry, got: %v", err)
 	}
 
+	// PUSH should not be supported (push removed, email alone)
+	_, err = reg.Get("PUSH")
+	if !errors.Is(err, ErrChannelNotSupported) {
+		t.Fatalf("expected ErrChannelNotSupported for PUSH, got: %v", err)
+	}
+
+	// IN_APP should not be supported (email kept alone)
+	_, err = reg.Get("IN_APP")
+	if !errors.Is(err, ErrChannelNotSupported) {
+		t.Fatalf("expected ErrChannelNotSupported for IN_APP, got: %v", err)
+	}
+
 	// SMS should not be supported
 	_, err = reg.Get("SMS")
 	if !errors.Is(err, ErrChannelNotSupported) {
 		t.Fatalf("expected ErrChannelNotSupported for SMS, got: %v", err)
-	}
-
-	pushP, err := reg.Get("PUSH")
-	if err != nil || pushP.Channel() != "PUSH" {
-		t.Fatalf("expected PUSH provider in registry, got: %v", err)
-	}
-
-	inAppP, err := reg.Get("IN_APP")
-	if err != nil || inAppP.Channel() != "IN_APP" {
-		t.Fatalf("expected IN_APP provider in registry, got: %v", err)
 	}
 }

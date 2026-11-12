@@ -17,6 +17,7 @@ type Config struct {
 	Logger    LoggerConfig
 	Tracing   TracingConfig
 	Kafka     KafkaConfig
+	Email     provider.EmailConfig
 	Providers provider.ProviderConfig
 }
 
@@ -62,6 +63,20 @@ func LoadEnv() *Config {
 	_ = godotenv.Load("../.env")
 	_ = godotenv.Load("../../.env")
 
+		emailCfg := provider.EmailConfig{
+			Provider:        GetEnv("EMAIL_PROVIDER", "mailer"),
+			ResendAPIKey:    GetEnv("RESEND_API_KEY", ""),
+			ResendFromEmail: GetEnv("RESEND_FROM_EMAIL", GetEnv("EMAIL_FROM", "onboarding@resend.dev")),
+			BrevoAPIKey:     GetEnv("BREVO_API_KEY", ""),
+			BrevoFromEmail:  GetEnv("BREVO_FROM_EMAIL", GetEnv("EMAIL_FROM", "nikotest122@gmail.com")),
+			SMTPHost:        GetEnv("SMTP_HOST", "smtp.gmail.com"),
+			SMTPPort:        GetEnv("SMTP_PORT", "587"),
+			SMTPUser:        GetEnv("SMTP_USER", GetEnv("SMTP_USERNAME", "")),
+			SMTPPass:        GetEnv("SMTP_PASS", GetEnv("SMTP_PASSWORD", "")),
+			FromEmail:       GetEnv("EMAIL_FROM", "onboarding@resend.dev"),
+			Timeout:         GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
+		}
+
 	return &Config{
 		App: AppConfig{
 			Name:        GetEnv("APP_NAME", "notification-service"),
@@ -93,22 +108,9 @@ func LoadEnv() *Config {
 			GroupID:  GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
 			Enabled:  GetEnvAsBool("KAFKA_ENABLED", true),
 		},
+		Email: emailCfg,
 		Providers: provider.ProviderConfig{
-			Email: provider.EmailProviderConfig{
-				Provider: GetEnv("EMAIL_PROVIDER", "mock"),
-				Host:     GetEnv("SMTP_HOST", "localhost"),
-				Port:     GetEnvAsInt("SMTP_PORT", 587),
-				Username: GetEnv("SMTP_USERNAME", ""),
-				Password: GetEnv("SMTP_PASSWORD", ""),
-				From:     GetEnv("SMTP_FROM", "no-reply@gocart.local"),
-				UseTLS:   GetEnvAsBool("SMTP_USE_TLS", false),
-				Timeout:  GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
-			},
-			Push: provider.PushConfig{
-				Provider:  GetEnv("PUSH_PROVIDER", "mock"),
-				ServerKey: GetEnv("PUSH_SERVER_KEY", ""),
-				Timeout:   GetEnvAsDuration("PUSH_TIMEOUT", 5*time.Second),
-			},
+			Email: emailCfg,
 		},
 	}
 }
