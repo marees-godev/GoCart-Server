@@ -25,6 +25,11 @@ type Config struct {
 	Redis           redis.Config
 	UserServiceAddr string
 	Services        ServicesConfig
+	Google          GoogleConfig
+}
+
+type GoogleConfig struct {
+	ClientID string
 }
 
 type SecurityConfig struct {
@@ -177,6 +182,9 @@ func LoadEnv() *Config {
 		Services: ServicesConfig{
 			MerchantServiceURL: GetEnv("MERCHANT_SERVICE_GRPC_URL", "localhost:50056"),
 			DeliveryServiceURL: GetEnv("DELIVERY_SERVICE_GRPC_URL", "localhost:50061"),
+		},
+		Google: GoogleConfig{
+			ClientID: GetEnv("GOOGLE_CLIENT_ID", ""),
 		},
 	}
 }

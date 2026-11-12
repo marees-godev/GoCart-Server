@@ -48,6 +48,9 @@ type EventPublisher interface {
 type AuthService interface {
 	Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error)
 	Register(ctx context.Context, req *dto.RegisterRequest) (*dto.LoginResponse, error)
+	GoogleAuth(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error)
+	GoogleLogin(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error)
+	GoogleRegister(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error)
 	ValidateToken(ctx context.Context, req *dto.ValidateTokenRequest) (*dto.ValidateTokenResponse, error)
 	RefreshToken(ctx context.Context, req *dto.RefreshTokenRequest) (*dto.LoginResponse, error)
 	Logout(ctx context.Context, req *dto.LogoutRequest) (*dto.LogoutResponse, error)
@@ -71,6 +74,7 @@ type authService struct {
 	deliveryClient deliverypb.DeliveryServiceClient
 	eventPublisher EventPublisher
 	kafkaProducer  *kafka.Producer
+	googleVerifier GoogleTokenVerifier
 }
 
 func NewAuthService(repo repository.AuthRepository, cfg *config.Config, log *slog.Logger, clients ...any) AuthService {
@@ -116,7 +120,16 @@ func NewAuthServiceWithMailer(repo repository.AuthRepository, cfg *config.Config
 			s.eventPublisher = client
 		case *kafka.Producer:
 			s.kafkaProducer = client
+		case GoogleTokenVerifier:
+			s.googleVerifier = client
 		}
+	}
+	if s.googleVerifier == nil {
+		var clientID string
+		if s.cfg != nil {
+			clientID = s.cfg.Google.ClientID
+		}
+		s.googleVerifier = NewHTTPGoogleTokenVerifier(clientID)
 	}
 	if s.otpStore == nil {
 		s.otpStore = otp.NewMemoryStore()
@@ -680,6 +693,314 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 
 	if err := s.repo.CreateLoginSession(ctx, refreshTokenModel, outboxEvt); err != nil {
 		return nil, err
+	}
+
+	return &dto.LoginResponse{
+		AccessToken:   accessToken,
+		RefreshToken:  rawRefreshToken,
+		TokenType:     "Bearer",
+		ExpiresIn:     int(accessTTL.Seconds()),
+		UserID:        userID.String(),
+		Role:          cred.Role.String(),
+		MerchantID:    merchantID,
+		PartnerID:     partnerID,
+		CustomerID:    customerID,
+		BusinessEmail: businessEmail,
+		FirstName:     firstName,
+		LastName:      lastName,
+	}, nil
+}
+
+type googleAuthMode int
+
+const (
+	googleAuthModeUnified googleAuthMode = iota
+	googleAuthModeLogin
+	googleAuthModeRegister
+)
+
+func (s *authService) GoogleLogin(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error) {
+	return s.googleAuthInternal(ctx, req, googleAuthModeLogin)
+}
+
+func (s *authService) GoogleRegister(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error) {
+	return s.googleAuthInternal(ctx, req, googleAuthModeRegister)
+}
+
+func (s *authService) GoogleAuth(ctx context.Context, req *dto.GoogleAuthRequest) (*dto.LoginResponse, error) {
+	return s.googleAuthInternal(ctx, req, googleAuthModeUnified)
+}
+
+func (s *authService) googleAuthInternal(ctx context.Context, req *dto.GoogleAuthRequest, mode googleAuthMode) (*dto.LoginResponse, error) {
+	if req == nil || strings.TrimSpace(req.IDToken) == "" {
+		return nil, appErrors.BadRequest("id_token is required")
+	}
+
+	role := model.RoleUser
+	if req.Role != "" {
+		role = model.NormalizeRole(req.Role)
+	}
+
+	payload, err := s.googleVerifier.Verify(ctx, req.IDToken)
+	if err != nil {
+		s.logger.Warn("Google token verification failed", "error", err)
+		return nil, appErrors.Unauthorized(fmt.Sprintf("invalid google token: %v", err))
+	}
+
+	if !payload.EmailVerified {
+		s.logger.Warn("Google auth rejected: email is not verified", "email", payload.Email)
+		return nil, appErrors.Unauthorized("google account email is not verified")
+	}
+
+	email := cleanEmail(payload.Email)
+	googleSub := strings.TrimSpace(payload.Subject)
+	if email == "" || googleSub == "" {
+		return nil, appErrors.Unauthorized("google token missing required claims")
+	}
+
+	existingOAuth, err := s.repo.GetOAuthAccount(ctx, model.AuthProviderGoogle, googleSub)
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		s.logger.Error("Failed to query oauth account for google auth", "error", err)
+		return nil, appErrors.Internal(err, "database query error")
+	}
+
+	var cred *model.AuthCredential
+	if existingOAuth != nil {
+		if mode == googleAuthModeRegister {
+			s.logger.Warn("Google register failed: google identity already exists", "user_id", existingOAuth.UserID.String())
+			return nil, appErrors.Conflict("an account with this google identity already exists, please login instead")
+		}
+		cred, err = s.repo.GetByUserID(ctx, existingOAuth.UserID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, appErrors.NotFound("linked account not found")
+			}
+			s.logger.Error("Failed to query credential by user id for google auth", "user_id", existingOAuth.UserID.String(), "error", err)
+			return nil, appErrors.Internal(err, "database query error")
+		}
+		if req.Role != "" && cred.Role != role {
+			s.logger.Warn("Google login failed: role mismatch for linked identity", "user_id", cred.UserID.String(), "expected_role", cred.Role, "requested_role", role)
+			return nil, appErrors.Unauthorized("google account is registered with a different role")
+		}
+		role = cred.Role
+	} else {
+		cred, err = s.repo.GetByEmailAndRole(ctx, email, role)
+		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+			s.logger.Error("Failed to query credentials for google auth", "email", email, "role", role, "error", err)
+			return nil, appErrors.Internal(err, "database query error")
+		}
+
+		if mode == googleAuthModeLogin && cred == nil {
+			s.logger.Warn("Google login failed: account not found", "email", email, "role", role)
+			return nil, appErrors.NotFound("account not found, please register with google first")
+		}
+
+		if mode == googleAuthModeRegister && cred != nil {
+			s.logger.Warn("Google register failed: account already exists", "email", email, "role", role)
+			return nil, appErrors.Conflict("an account with this email and role already exists, please login instead")
+		}
+	}
+
+	isNewUser := false
+	var userID uuid.UUID
+	var firstName string
+	var lastName string
+
+	if cred == nil {
+		isNewUser = true
+		credID := uuid.Must(uuid.NewV7())
+		userID = uuid.Must(uuid.NewV7())
+		firstName = payload.FirstName
+		lastName = payload.LastName
+
+		if role == model.RoleUser && s.userClient == nil {
+			s.logger.Error("Google auth signup failed: user service client unavailable")
+			return nil, appErrors.ServiceUnavailable("user service unavailable")
+		}
+
+		userCreated := false
+		if role == model.RoleUser && s.userClient != nil {
+			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+				Id:        userID.String(),
+				Email:     email,
+				FirstName: firstName,
+				LastName:  lastName,
+			})
+			if err != nil {
+				if st, ok := status.FromError(err); ok {
+					switch st.Code() {
+					case codes.AlreadyExists:
+						return nil, appErrors.Conflict("user with this email already exists")
+					case codes.InvalidArgument:
+						return nil, appErrors.BadRequest(st.Message())
+					}
+				}
+				s.logger.Error("Failed to create user profile in user service", "error", err)
+				return nil, appErrors.Internal(err, "failed to create user profile")
+			}
+			userCreated = true
+		}
+
+		cred = &model.AuthCredential{
+			ID:            credID,
+			UserID:        userID,
+			Email:         email,
+			Role:          role,
+			EmailVerified: true,
+			IsActive:      true,
+			PasswordHash:  "",
+		}
+
+		oauthAcc := &model.OAuthAccount{
+			ID:             uuid.Must(uuid.NewV7()),
+			UserID:         userID,
+			Provider:       model.AuthProviderGoogle,
+			ProviderUserID: googleSub,
+			Email:          email,
+		}
+
+		if err := s.repo.CreateCredentialWithOAuth(ctx, cred, oauthAcc); err != nil {
+			if userCreated && s.userClient != nil {
+				rollbackReason := "compensating rollback: auth credential creation failed"
+				if _, delErr := s.userClient.DeleteUser(ctx, &userpb.DeleteUserRequest{
+					Id:     userID.String(),
+					Reason: &rollbackReason,
+				}); delErr != nil {
+					s.logger.Error("Failed to rollback user profile after oauth credential failure", "user_id", userID.String(), "error", delErr)
+				}
+			}
+			s.logger.Error("Failed to persist oauth credentials", "error", err)
+			return nil, appErrors.Internal(err, "failed to save credentials")
+		}
+	} else {
+		userID = cred.UserID
+
+		if !cred.IsActive {
+			s.logger.Warn("Google login failed: account inactive", "user_id", userID.String(), "email", email)
+			return nil, appErrors.Unauthorized("account is inactive")
+		}
+
+		if cred.LockedUntil != nil && time.Now().Before(*cred.LockedUntil) {
+			s.logger.Warn("Google login failed: account locked", "user_id", userID.String(), "email", email)
+			return nil, appErrors.Unauthorized("account is locked")
+		}
+
+		if existingOAuth == nil {
+			oauthAcc := &model.OAuthAccount{
+				ID:             uuid.Must(uuid.NewV7()),
+				UserID:         userID,
+				Provider:       model.AuthProviderGoogle,
+				ProviderUserID: googleSub,
+				Email:          email,
+			}
+			if err := s.repo.CreateOAuthAccount(ctx, oauthAcc); err != nil {
+				if errors.Is(err, repository.ErrOAuthConflict) {
+					s.logger.Warn("Google login failed: oauth identity already linked to another user", "user_id", userID.String())
+					return nil, appErrors.Conflict("this google account is already linked to another user")
+				}
+				s.logger.Error("Failed to link google account", "user_id", userID.String(), "error", err)
+				return nil, appErrors.Internal(err, "failed to link google account")
+			}
+		}
+
+		firstName = payload.FirstName
+		lastName = payload.LastName
+		if s.userClient != nil && role == model.RoleUser {
+			uResp, uErr := s.userClient.GetUser(ctx, &userpb.GetUserRequest{Id: userID.String()})
+			if uErr == nil && uResp != nil && uResp.User != nil {
+				if uResp.User.FirstName != "" {
+					firstName = uResp.User.FirstName
+				}
+				if uResp.User.LastName != "" {
+					lastName = uResp.User.LastName
+				}
+			}
+		}
+	}
+
+	ttlMinutes := s.cfg.JWT.ExpiryMinutes
+	if ttlMinutes <= 0 {
+		ttlMinutes = 15
+	}
+	accessTTL := time.Duration(ttlMinutes) * time.Minute
+
+	var partnerID, customerID, merchantID, businessEmail string
+	switch role {
+	case model.RoleDeliveryPartner:
+		partnerID = userID.String()
+	case model.RoleMerchant:
+		merchantID = userID.String()
+	default:
+		customerID = userID.String()
+	}
+
+	accessToken, err := auth.GenerateToken(auth.UserContext{
+		UserID:     userID.String(),
+		Role:       cred.Role.String(),
+		Email:      cred.Email,
+		PartnerID:  partnerID,
+		MerchantID: merchantID,
+		CustomerID: customerID,
+	}, s.cfg.JWT.Secret, accessTTL)
+	if err != nil {
+		s.logger.Error("Google auth failed: token generation error", "user_id", userID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to generate access token")
+	}
+
+	rawRefreshToken, err := generateRandomToken(32)
+	if err != nil {
+		s.logger.Error("Google auth failed: refresh token generation error", "user_id", userID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to generate refresh token")
+	}
+
+	tokenHash := hashToken(rawRefreshToken)
+	refreshTokenModel := &model.RefreshToken{
+		ID:        uuid.Must(uuid.NewV7()),
+		UserID:    userID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(RefreshTokenTTL),
+		Revoked:   false,
+	}
+
+	var outboxEvt *outbox.Event
+	if isNewUser {
+		eventPayload, _ := json.Marshal(map[string]any{
+			"customer_id":   customerID,
+			"user_id":       userID.String(),
+			"email":         cred.Email,
+			"role":          cred.Role.String(),
+			"registered_at": time.Now().UTC(),
+			"provider":      "GOOGLE",
+		})
+		outboxEvt = &outbox.Event{
+			ID:            uuid.Must(uuid.NewV7()),
+			AggregateType: "auth",
+			AggregateID:   userID.String(),
+			EventType:     "UserRegistered",
+			Topic:         "auth.user.registered",
+			Payload:       eventPayload,
+		}
+	} else {
+		eventPayload, _ := json.Marshal(map[string]any{
+			"user_id":      userID.String(),
+			"email":        cred.Email,
+			"role":         cred.Role.String(),
+			"logged_in_at": time.Now().UTC(),
+			"provider":     "GOOGLE",
+		})
+		outboxEvt = &outbox.Event{
+			ID:            uuid.Must(uuid.NewV7()),
+			AggregateType: "auth",
+			AggregateID:   userID.String(),
+			EventType:     "UserLoggedIn",
+			Topic:         "auth.user.logged_in",
+			Payload:       eventPayload,
+		}
+	}
+
+	if err := s.repo.CreateLoginSession(ctx, refreshTokenModel, outboxEvt); err != nil {
+		s.logger.Error("Google auth failed: create login session error", "user_id", userID.String(), "error", err)
+		return nil, appErrors.Internal(err, "failed to store session")
 	}
 
 	return &dto.LoginResponse{

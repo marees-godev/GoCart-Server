@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type Config struct {
 	JWT                         JWTConfig
 	RateLimit                   RateLimitConfig
 	CORS                        middleware.CORSConfig
+	Google                      GoogleConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -93,6 +95,13 @@ type RateLimitConfig struct {
 	Enabled bool
 	Max     int
 	Window  time.Duration
+}
+
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	Scopes       string
 }
 
 func LoadEnv() *Config {
@@ -199,6 +208,12 @@ func LoadEnv() *Config {
 		GraphQLIntrospectionEnabled: introEnabled,
 		AdminAPIKey:                 GetEnv("ADMIN_KEY", GetEnv("ADMIN_API_KEY", "")),
 		AdminUserID:                 GetEnv("ADMIN_USER_ID", "admin"),
+		Google: GoogleConfig{
+			ClientID:     GetEnv("GOOGLE_CLIENT_ID", ""),
+			ClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
+			RedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", fmt.Sprintf("http://localhost:%s/api/v1/auth/google/callback", GetEnv("PORT", "8080"))),
+			Scopes:       GetEnv("GOOGLE_SCOPES", "openid email profile"),
+		},
 	}
 }
 

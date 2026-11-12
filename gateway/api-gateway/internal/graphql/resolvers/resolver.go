@@ -5,6 +5,7 @@ import (
 
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 )
@@ -22,6 +23,7 @@ func (r *Resolver) getUserClient() userpb.UserServiceClient {
 type Resolver struct {
 	Clients   *grpc.Clients
 	ClientMgr *client.ClientManager
+	Config    *config.Config
 	Version   string
 }
 

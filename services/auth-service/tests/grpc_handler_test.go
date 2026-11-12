@@ -122,6 +122,18 @@ func (r *inMemoryAuthRepo) DeleteCredential(ctx context.Context, id uuid.UUID) e
 	return nil
 }
 
+func (r *inMemoryAuthRepo) GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error) {
+	return nil, repository.ErrNotFound
+}
+
+func (r *inMemoryAuthRepo) CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error {
+	return nil
+}
+
+func (r *inMemoryAuthRepo) CreateCredentialWithOAuth(ctx context.Context, cred *model.AuthCredential, oauthAcc *model.OAuthAccount) error {
+	return r.CreateCredential(ctx, cred)
+}
+
 func (r *inMemoryAuthRepo) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
 	return nil
 }

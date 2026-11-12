@@ -117,3 +117,8 @@ type ChangePasswordResponse struct {
 	Message string `json:"message"`
 }
 
+type GoogleAuthRequest struct {
+	IDToken string `json:"id_token"`
+	Role    string `json:"role,omitempty"`
+}
+
