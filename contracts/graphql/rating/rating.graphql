@@ -6,6 +6,13 @@ enum FlagCategory {
   OTHER
 }
 
+type RatingImage {
+  id: ID!
+  ratingId: String!
+  url: String!
+  createdAt: String!
+}
+
 type Rating {
   id: ID!
   productId: String!
@@ -16,6 +23,7 @@ type Rating {
   review: String!
   isFlagged: Boolean!
   isHidden: Boolean!
+  images: [RatingImage!]
   createdAt: String
   updatedAt: String
 }
@@ -94,6 +102,21 @@ type ModerateRatingResponse {
   message: String!
 }
 
+input UploadRatingImagesInput {
+  ratingId: ID!
+  images: [String!]
+  imagesUpload: [Upload!]
+}
+
+type UploadRatingImagesResponse {
+  images: [RatingImage!]!
+}
+
+type DeleteRatingImageResponse {
+  success: Boolean!
+  message: String!
+}
+
 extend type Query {
   productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
   getRating(id: ID!): Rating @auth
@@ -106,4 +129,6 @@ extend type Mutation {
   deleteRating(id: ID!): DeleteRatingResponse @auth
   flagRating(input: FlagRatingInput!): FlagRatingResponse @auth
   moderateRating(input: ModerateRatingInput!): ModerateRatingResponse! @auth(requires:[ADMIN])
+  uploadRatingImages(input: UploadRatingImagesInput!): UploadRatingImagesResponse! @auth
+  deleteRatingImage(imageId: ID!): DeleteRatingImageResponse! @auth
 }

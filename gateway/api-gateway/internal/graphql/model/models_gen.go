@@ -281,6 +281,11 @@ type DeleteProductVariantResponse struct {
 	Message string `json:"message"`
 }
 
+type DeleteRatingImageResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type DeleteRatingResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
@@ -742,17 +747,18 @@ type Query struct {
 }
 
 type Rating struct {
-	ID          string  `json:"id"`
-	ProductID   string  `json:"productId"`
-	UserID      string  `json:"userId"`
-	OrderID     string  `json:"orderId"`
-	OrderItemID string  `json:"orderItemId"`
-	Rating      int     `json:"rating"`
-	Review      string  `json:"review"`
-	IsFlagged   bool    `json:"isFlagged"`
-	IsHidden    bool    `json:"isHidden"`
-	CreatedAt   *string `json:"createdAt,omitempty"`
-	UpdatedAt   *string `json:"updatedAt,omitempty"`
+	ID          string         `json:"id"`
+	ProductID   string         `json:"productId"`
+	UserID      string         `json:"userId"`
+	OrderID     string         `json:"orderId"`
+	OrderItemID string         `json:"orderItemId"`
+	Rating      int            `json:"rating"`
+	Review      string         `json:"review"`
+	IsFlagged   bool           `json:"isFlagged"`
+	IsHidden    bool           `json:"isHidden"`
+	Images      []*RatingImage `json:"images,omitempty"`
+	CreatedAt   *string        `json:"createdAt,omitempty"`
+	UpdatedAt   *string        `json:"updatedAt,omitempty"`
 }
 
 type RatingFlagInfo struct {
@@ -761,6 +767,13 @@ type RatingFlagInfo struct {
 	Category  FlagCategory `json:"category"`
 	Reason    *string      `json:"reason,omitempty"`
 	CreatedAt string       `json:"createdAt"`
+}
+
+type RatingImage struct {
+	ID        string `json:"id"`
+	RatingID  string `json:"ratingId"`
+	URL       string `json:"url"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type RefreshTokenInput struct {
@@ -1062,6 +1075,16 @@ type UpdateWarehouseInput struct {
 	State             *string `json:"state,omitempty"`
 	PostalCode        *string `json:"postalCode,omitempty"`
 	IsActive          *bool   `json:"isActive,omitempty"`
+}
+
+type UploadRatingImagesInput struct {
+	RatingID     string            `json:"ratingId"`
+	Images       []string          `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
+}
+
+type UploadRatingImagesResponse struct {
+	Images []*RatingImage `json:"images"`
 }
 
 type User struct {

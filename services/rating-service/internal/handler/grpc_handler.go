@@ -245,9 +245,69 @@ func (h *RatingGRPCHandler) ModerateRatings(ctx context.Context, req *ratingpb.M
 	}, nil
 }
 
+func (h *RatingGRPCHandler) UploadRatingImages(ctx context.Context, req *ratingpb.UploadRatingImagesRequest) (*ratingpb.UploadRatingImagesResponse, error) {
+
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request must not be nil")
+	}
+
+	images, err := h.service.UploadRatingImages(ctx, dto.UploadRatingImagesInput{
+		RatingID: req.RatingId,
+		UserID:   req.UserId,
+		Images:   req.Images,
+	})
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	pbImages := make([]*ratingpb.RatingImage, 0, len(images))
+	for _, img := range images {
+		pbImages = append(pbImages, &ratingpb.RatingImage{
+			Id:        img.ID,
+			RatingId:  img.RatingID,
+			Url:       img.URL,
+			CreatedAt: img.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return &ratingpb.UploadRatingImagesResponse{
+		Images: pbImages,
+	}, nil
+}
+
+func (h *RatingGRPCHandler) DeleteRatingImage(ctx context.Context, req *ratingpb.DeleteRatingImageRequest) (*ratingpb.DeleteRatingImageResponse, error) {
+
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request must not be nil")
+	}
+
+	err := h.service.DeleteRatingImage(ctx, dto.DeleteRatingImageInput{
+		ImageID: req.ImageId,
+		UserID:  req.UserId,
+	})
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &ratingpb.DeleteRatingImageResponse{
+		Success: true,
+		Message: "rating image deleted successfully",
+	}, nil
+}
+
 func mapModelToProto(r *model.Rating) *ratingpb.Rating {
 	if r == nil {
 		return nil
+	}
+
+	pbImages := make([]*ratingpb.RatingImage, 0, len(r.Images))
+	for _, img := range r.Images {
+		pbImages = append(pbImages, &ratingpb.RatingImage{
+			Id:        img.ID,
+			RatingId:  img.RatingID,
+			Url:       img.URL,
+			CreatedAt: img.CreatedAt.Format(time.RFC3339),
+		})
 	}
 
 	return &ratingpb.Rating{
@@ -262,5 +322,6 @@ func mapModelToProto(r *model.Rating) *ratingpb.Rating {
 		IsHidden:    r.IsHidden,
 		CreatedAt:   r.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   r.UpdatedAt.Format(time.RFC3339),
+		Images:      pbImages,
 	}
 }

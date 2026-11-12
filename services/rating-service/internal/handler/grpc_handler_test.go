@@ -17,11 +17,13 @@ import (
 
 type mockRatingService struct {
 	ratings map[string]*model.Rating
+	images  map[string]*model.RatingImage
 }
 
 func newMockRatingService() *mockRatingService {
 	return &mockRatingService{
 		ratings: make(map[string]*model.Rating),
+		images:  make(map[string]*model.RatingImage),
 	}
 }
 
@@ -153,6 +155,54 @@ func (m *mockRatingService) ModerateRatings(ctx context.Context, input dto.Moder
 		r.IsFlagged = false
 	}
 
+	return nil
+}
+
+func (m *mockRatingService) UploadRatingImages(ctx context.Context, input dto.UploadRatingImagesInput) ([]*model.RatingImage, error) {
+	if input.RatingID == "" {
+		return nil, appErrors.BadRequest("rating_id is required")
+	}
+
+	r, ok := m.ratings[input.RatingID]
+	if !ok {
+		return nil, appErrors.NotFound("rating not found")
+	}
+	if r.UserID != input.UserID {
+		return nil, appErrors.Forbidden("you are not authorized to upload image to this rating")
+	}
+	if len(input.Images) == 0 {
+		return nil, appErrors.BadRequest("at least one image is required")
+	}
+
+	now := time.Now().UTC()
+	created := make([]*model.RatingImage, 0, len(input.Images))
+	for _, url := range input.Images {
+		img := model.RatingImage{
+			ID:        uuid.New().String(),
+			RatingID:  input.RatingID,
+			URL:       url,
+			CreatedAt: now,
+		}
+		m.images[img.ID] = &img
+		r.Images = append(r.Images, img)
+		created = append(created, &img)
+	}
+	return created, nil
+}
+
+func (m mockRatingService) DeleteRatingImage(ctx context.Context, input dto.DeleteRatingImageInput) error {
+	if input.ImageID == "" {
+		return appErrors.BadRequest("image_id is required")
+	}
+	img, ok := m.images[input.ImageID]
+	if !ok {
+		return appErrors.NotFound("rating image not found")
+	}
+	r, ok := m.ratings[img.RatingID]
+	if !ok || r.UserID != input.UserID {
+		return appErrors.Forbidden("you are not authorized to delete this rating image")
+	}
+	delete(m.images, input.ImageID)
 	return nil
 }
 
@@ -301,6 +351,73 @@ func TestRatingGRPCHandler(t *testing.T) {
 		}
 		if !unhideResp.GetSuccess() || unhideResp.GetMessage() != "Rating unhidden successfully" {
 			t.Errorf("unexpected unhide response: %+v", unhideResp)
+		}
+	})
+
+	var uploadedImageID string
+
+	t.Run("UploadRatingImages RPC", func(t *testing.T) {
+		_, err := h.UploadRatingImages(ctx, nil)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument for nil request, got %v", err)
+		}
+
+		resp, err := h.UploadRatingImages(ctx, &ratingpb.UploadRatingImagesRequest{
+			RatingId: ratingID,
+			UserId:   userID,
+			Images: []string{
+				"https://cdn.gocart.local/ratings/img1.jpg",
+				"https://cdn.gocart.local/ratings/img2.jpg",
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error uploading images: %v", err)
+		}
+		if len(resp.GetImages()) != 2 {
+			t.Fatalf("expected 2 uploaded images, got %d", len(resp.GetImages()))
+		}
+		uploadedImageID = resp.GetImages()[0].GetId()
+
+		getResp, err := h.GetRating(ctx, &ratingpb.GetRatingRequest{Id: ratingID})
+		if err != nil {
+			t.Fatalf("GetRating failed: %v", err)
+		}
+		if len(getResp.GetRating().GetImages()) != 2 {
+			t.Errorf("expected GetRating to return 2 images, got %d", len(getResp.GetRating().GetImages()))
+		}
+	})
+
+	t.Run("DeleteRatingImage RPC", func(t *testing.T) {
+		_, err := h.DeleteRatingImage(ctx, nil)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("expected InvalidArgument for nil request, got %v", err)
+		}
+
+		_, err = h.DeleteRatingImage(ctx, &ratingpb.DeleteRatingImageRequest{
+			ImageId: uuid.New().String(),
+			UserId:  userID,
+		})
+		if status.Code(err) != codes.NotFound {
+			t.Errorf("expected NotFound for non-existent image, got %v", err)
+		}
+
+		_, err = h.DeleteRatingImage(ctx, &ratingpb.DeleteRatingImageRequest{
+			ImageId: uploadedImageID,
+			UserId:  uuid.New().String(),
+		})
+		if status.Code(err) != codes.PermissionDenied {
+			t.Errorf("expected PermissionDenied for non author, got %v", err)
+		}
+
+		delResp, err := h.DeleteRatingImage(ctx, &ratingpb.DeleteRatingImageRequest{
+			ImageId: uploadedImageID,
+			UserId:  userID,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error deleting image: %v", err)
+		}
+		if !delResp.GetSuccess() {
+			t.Errorf("expected success true")
 		}
 	})
 

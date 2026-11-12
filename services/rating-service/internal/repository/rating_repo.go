@@ -17,6 +17,7 @@ import (
 var (
 	ErrRatingAlreadyExists = errors.New("user has already submitted a rating for this order item")
 	ErrRatingNotFound      = errors.New("rating not found")
+	ErrRatingImageNotFound = errors.New("rating image not found")
 )
 
 type RatingRepository interface {
@@ -28,6 +29,9 @@ type RatingRepository interface {
 	CreateFlag(ctx context.Context, f *model.RatingFlag) error
 	GetFlaggedRatings(ctx context.Context, limit, offset int32) ([]*dto.FlaggedRatingItem, int32, error)
 	ModerateRatings(ctx context.Context, ishidden bool, ratingID string) error
+	AddRatingImages(ctx context.Context, ratingID string, urls []string) ([]*model.RatingImage, error)
+	GetRatingImageByID(ctx context.Context, imageID string) (*model.RatingImage, error)
+	DeleteRatingImage(ctx context.Context, imageID string) error
 }
 
 type RatingRepo struct {
@@ -118,6 +122,10 @@ func (r *RatingRepo) GetRatingByID(ctx context.Context, id string) (*model.Ratin
 		return nil, fmt.Errorf("failed to query rating: %w", err)
 	}
 
+	if imgMap, err := r.fetchImagesForRatings(ctx, []string{rt.ID}); err == nil {
+		rt.Images = imgMap[rt.ID]
+	}
+
 	return &rt, nil
 }
 
@@ -180,6 +188,17 @@ func (r *RatingRepo) GetProductRatings(ctx context.Context, productID string, li
 		return nil, 0, 0, dto.StarRating{}, fmt.Errorf("error during rating rows iteration: %w", err)
 	}
 
+	ratingIDs := make([]string, len(ratings))
+	for i, rt := range ratings {
+		ratingIDs[i] = rt.ID
+	}
+
+	if imgMap, err := r.fetchImagesForRatings(ctx, ratingIDs); err == nil {
+		for _, rt := range ratings {
+			rt.Images = imgMap[rt.ID]
+		}
+	}
+
 	return ratings, avg, total, star, nil
 }
 
@@ -214,6 +233,10 @@ func (r *RatingRepo) UpdateRating(ctx context.Context, id string, rating int, re
 			return nil, ErrRatingNotFound
 		}
 		return nil, fmt.Errorf("failed to update rating: %w", err)
+	}
+
+	if imgMap, err := r.fetchImagesForRatings(ctx, []string{rt.ID}); err == nil {
+		rt.Images = imgMap[rt.ID]
 	}
 
 	return &rt, nil
@@ -363,6 +386,16 @@ func (r *RatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset int32)
 		return nil, 0, fmt.Errorf("error during flagged rating rows iteration: %w", err)
 	}
 
+	ratingIDs := make([]string, len(items))
+	for i, it := range items {
+		ratingIDs[i] = it.Rating.ID
+	}
+	if imgMap, err := r.fetchImagesForRatings(ctx, ratingIDs); err == nil {
+		for _, it := range items {
+			it.Rating.Images = imgMap[it.Rating.ID]
+		}
+	}
+
 	return items, total, nil
 }
 
@@ -404,5 +437,100 @@ func (r *RatingRepo) ModerateRatings(ctx context.Context, isHidden bool, ratingI
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	return nil
+}
+
+func (r *RatingRepo) fetchImagesForRatings(ctx context.Context, ratingIDs []string) (map[string][]model.RatingImage, error) {
+	result := make(map[string][]model.RatingImage)
+	if len(ratingIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT id, rating_id, url, created_at 
+		FROM rating_images 
+		WHERE rating_id = ANY($1::uuid[]) AND deleted_at IS NULL 
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, ratingIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query rating images: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var img model.RatingImage
+		if err := rows.Scan(&img.ID, &img.RatingID, &img.URL, &img.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan rating image: %w", err)
+		}
+		result[img.RatingID] = append(result[img.RatingID], img)
+	}
+	return result, rows.Err()
+}
+
+func (r *RatingRepo) AddRatingImages(ctx context.Context, ratingID string, urls []string) ([]*model.RatingImage, error) {
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	insertQuery := `
+		INSERT INTO rating_images (rating_id,url)
+		VALUES ($1, $2)
+		RETURNING id,rating_id,url,created_at
+	`
+
+	created := make([]*model.RatingImage, 0, len(urls))
+	for _, u := range urls {
+		var img model.RatingImage
+		if err := tx.QueryRow(ctx, insertQuery, ratingID, u).Scan(&img.ID, &img.RatingID, &img.URL, &img.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to insert rating image: %w", err)
+		}
+		created = append(created, &img)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return created, nil
+}
+
+func (r *RatingRepo) GetRatingImageByID(ctx context.Context, imageID string) (*model.RatingImage, error) {
+	query := `
+		SELECT id, rating_id, url, created_at 
+		FROM rating_images
+		WHERE id = $1 AND deleted_at IS NULL	
+	`
+
+	var img model.RatingImage
+
+	err := r.db.Pool.QueryRow(ctx, query, imageID).Scan(&img.ID, &img.RatingID, &img.URL, &img.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRatingImageNotFound
+		}
+		return nil, fmt.Errorf("failed to query rating image: %w", err)
+	}
+
+	return &img, nil
+}
+
+func (r *RatingRepo) DeleteRatingImage(ctx context.Context, imageID string) error {
+	query := `
+		UPDATE rating_images
+		SET deleted_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	tag, err := r.db.Pool.Exec(ctx, query, imageID)
+	if err != nil {
+		return fmt.Errorf("failed to delete rating image: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrRatingImageNotFound
+	}
 	return nil
 }

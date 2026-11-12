@@ -143,6 +143,11 @@ type ComplexityRoot struct {
 		Success func(childComplexity int) int
 	}
 
+	DeleteRatingImageResponse struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	DeleteRatingResponse struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
@@ -436,6 +441,7 @@ type ComplexityRoot struct {
 		DeleteProduct                  func(childComplexity int, id string) int
 		DeleteProductVariant           func(childComplexity int, productID string, id string) int
 		DeleteRating                   func(childComplexity int, id string) int
+		DeleteRatingImage              func(childComplexity int, imageID string) int
 		DeleteUserAddress              func(childComplexity int, id string) int
 		DeleteWarehouse                func(childComplexity int, id string, deliveryPartnerID *string) int
 		Empty                          func(childComplexity int) int
@@ -488,6 +494,7 @@ type ComplexityRoot struct {
 		UpdateUser                     func(childComplexity int, id string, input model.UpdateUserInput) int
 		UpdateUserAddress              func(childComplexity int, id string, input model.UpdateAddressInput) int
 		UpdateWarehouse                func(childComplexity int, input model.UpdateWarehouseInput) int
+		UploadRatingImages             func(childComplexity int, input model.UploadRatingImagesInput) int
 		VerifyDeliveryPartnerGstin     func(childComplexity int, partnerID string) int
 		VerifyEmail                    func(childComplexity int, email string, otp string, role model.AuthRole) int
 		VerifyExchangeProduct          func(childComplexity int, input model.VerifyExchangeProductInput) int
@@ -681,6 +688,7 @@ type ComplexityRoot struct {
 	Rating struct {
 		CreatedAt   func(childComplexity int) int
 		ID          func(childComplexity int) int
+		Images      func(childComplexity int) int
 		IsFlagged   func(childComplexity int) int
 		IsHidden    func(childComplexity int) int
 		OrderID     func(childComplexity int) int
@@ -698,6 +706,13 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		Reason    func(childComplexity int) int
 		UserID    func(childComplexity int) int
+	}
+
+	RatingImage struct {
+		CreatedAt func(childComplexity int) int
+		ID        func(childComplexity int) int
+		RatingID  func(childComplexity int) int
+		URL       func(childComplexity int) int
 	}
 
 	RefundPayload struct {
@@ -811,6 +826,10 @@ type ComplexityRoot struct {
 		UploadURL        func(childComplexity int) int
 	}
 
+	UploadRatingImagesResponse struct {
+		Images func(childComplexity int) int
+	}
+
 	User struct {
 		AlternatePhone func(childComplexity int) int
 		AvatarURL      func(childComplexity int) int
@@ -910,6 +929,8 @@ type MutationResolver interface {
 	DeleteRating(ctx context.Context, id string) (*model.DeleteRatingResponse, error)
 	FlagRating(ctx context.Context, input model.FlagRatingInput) (*model.FlagRatingResponse, error)
 	ModerateRating(ctx context.Context, input model.ModerateRatingInput) (*model.ModerateRatingResponse, error)
+	UploadRatingImages(ctx context.Context, input model.UploadRatingImagesInput) (*model.UploadRatingImagesResponse, error)
+	DeleteRatingImage(ctx context.Context, imageID string) (*model.DeleteRatingImageResponse, error)
 	RequestReturn(ctx context.Context, input model.RequestReturnInput) (*model.ReturnOrder, error)
 	RequestReplacement(ctx context.Context, input model.RequestReplacementInput) (*model.ReturnOrder, error)
 	VerifyProduct(ctx context.Context, input model.VerifyProductInput) (*model.ReturnOrder, error)
@@ -1410,6 +1431,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.DeleteProductVariantResponse.Success(childComplexity), true
+
+	case "DeleteRatingImageResponse.message":
+		if e.complexity.DeleteRatingImageResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.DeleteRatingImageResponse.Message(childComplexity), true
+
+	case "DeleteRatingImageResponse.success":
+		if e.complexity.DeleteRatingImageResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.DeleteRatingImageResponse.Success(childComplexity), true
 
 	case "DeleteRatingResponse.message":
 		if e.complexity.DeleteRatingResponse.Message == nil {
@@ -3084,6 +3119,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteRating(childComplexity, args["id"].(string)), true
 
+	case "Mutation.deleteRatingImage":
+		if e.complexity.Mutation.DeleteRatingImage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteRatingImage_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteRatingImage(childComplexity, args["imageId"].(string)), true
+
 	case "Mutation.deleteUserAddress":
 		if e.complexity.Mutation.DeleteUserAddress == nil {
 			break
@@ -3687,6 +3734,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateWarehouse(childComplexity, args["input"].(model.UpdateWarehouseInput)), true
+
+	case "Mutation.uploadRatingImages":
+		if e.complexity.Mutation.UploadRatingImages == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_uploadRatingImages_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UploadRatingImages(childComplexity, args["input"].(model.UploadRatingImagesInput)), true
 
 	case "Mutation.verifyDeliveryPartnerGSTIN":
 		if e.complexity.Mutation.VerifyDeliveryPartnerGstin == nil {
@@ -4991,6 +5050,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Rating.ID(childComplexity), true
 
+	case "Rating.images":
+		if e.complexity.Rating.Images == nil {
+			break
+		}
+
+		return e.complexity.Rating.Images(childComplexity), true
+
 	case "Rating.isFlagged":
 		if e.complexity.Rating.IsFlagged == nil {
 			break
@@ -5088,6 +5154,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RatingFlagInfo.UserID(childComplexity), true
+
+	case "RatingImage.createdAt":
+		if e.complexity.RatingImage.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.RatingImage.CreatedAt(childComplexity), true
+
+	case "RatingImage.id":
+		if e.complexity.RatingImage.ID == nil {
+			break
+		}
+
+		return e.complexity.RatingImage.ID(childComplexity), true
+
+	case "RatingImage.ratingId":
+		if e.complexity.RatingImage.RatingID == nil {
+			break
+		}
+
+		return e.complexity.RatingImage.RatingID(childComplexity), true
+
+	case "RatingImage.url":
+		if e.complexity.RatingImage.URL == nil {
+			break
+		}
+
+		return e.complexity.RatingImage.URL(childComplexity), true
 
 	case "RefundPayload.amount":
 		if e.complexity.RefundPayload.Amount == nil {
@@ -5614,6 +5708,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StoreUploadUrlPayload.UploadURL(childComplexity), true
 
+	case "UploadRatingImagesResponse.images":
+		if e.complexity.UploadRatingImagesResponse.Images == nil {
+			break
+		}
+
+		return e.complexity.UploadRatingImagesResponse.Images(childComplexity), true
+
 	case "User.alternatePhone":
 		if e.complexity.User.AlternatePhone == nil {
 			break
@@ -5875,6 +5976,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUpdateStoreInput,
 		ec.unmarshalInputUpdateUserInput,
 		ec.unmarshalInputUpdateWarehouseInput,
+		ec.unmarshalInputUploadRatingImagesInput,
 		ec.unmarshalInputVerifyExchangeProductInput,
 		ec.unmarshalInputVerifyProductInput,
 	)
@@ -6773,6 +6875,13 @@ extend type Mutation {
   OTHER
 }
 
+type RatingImage {
+  id: ID!
+  ratingId: String!
+  url: String!
+  createdAt: String!
+}
+
 type Rating {
   id: ID!
   productId: String!
@@ -6783,6 +6892,7 @@ type Rating {
   review: String!
   isFlagged: Boolean!
   isHidden: Boolean!
+  images: [RatingImage!]
   createdAt: String
   updatedAt: String
 }
@@ -6861,6 +6971,21 @@ type ModerateRatingResponse {
   message: String!
 }
 
+input UploadRatingImagesInput {
+  ratingId: ID!
+  images: [String!]
+  imagesUpload: [Upload!]
+}
+
+type UploadRatingImagesResponse {
+  images: [RatingImage!]!
+}
+
+type DeleteRatingImageResponse {
+  success: Boolean!
+  message: String!
+}
+
 extend type Query {
   productRatings(productId: ID!, limit: Int, offset: Int): ProductRatings!
   getRating(id: ID!): Rating @auth
@@ -6873,6 +6998,8 @@ extend type Mutation {
   deleteRating(id: ID!): DeleteRatingResponse @auth
   flagRating(input: FlagRatingInput!): FlagRatingResponse @auth
   moderateRating(input: ModerateRatingInput!): ModerateRatingResponse! @auth(requires:[ADMIN])
+  uploadRatingImages(input: UploadRatingImagesInput!): UploadRatingImagesResponse! @auth
+  deleteRatingImage(imageId: ID!): DeleteRatingImageResponse! @auth
 }
 `, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/return/return.graphql", Input: `enum ReturnStatus {
@@ -8054,6 +8181,21 @@ func (ec *executionContext) field_Mutation_deleteProduct_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteRatingImage_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["imageId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imageId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["imageId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteRating_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -9006,6 +9148,21 @@ func (ec *executionContext) field_Mutation_updateWarehouse_args(ctx context.Cont
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNUpdateWarehouseInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateWarehouseInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_uploadRatingImages_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UploadRatingImagesInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNUploadRatingImagesInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUploadRatingImagesInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -12499,6 +12656,94 @@ func (ec *executionContext) _DeleteProductVariantResponse_message(ctx context.Co
 func (ec *executionContext) fieldContext_DeleteProductVariantResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "DeleteProductVariantResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeleteRatingImageResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.DeleteRatingImageResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeleteRatingImageResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeleteRatingImageResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeleteRatingImageResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DeleteRatingImageResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.DeleteRatingImageResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeleteRatingImageResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeleteRatingImageResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeleteRatingImageResponse",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -18486,6 +18731,8 @@ func (ec *executionContext) fieldContext_FlaggedRatingItem_rating(_ context.Cont
 				return ec.fieldContext_Rating_isFlagged(ctx, field)
 			case "isHidden":
 				return ec.fieldContext_Rating_isHidden(ctx, field)
+			case "images":
+				return ec.fieldContext_Rating_images(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Rating_createdAt(ctx, field)
 			case "updatedAt":
@@ -25174,6 +25421,8 @@ func (ec *executionContext) fieldContext_Mutation_createRating(ctx context.Conte
 				return ec.fieldContext_Rating_isFlagged(ctx, field)
 			case "isHidden":
 				return ec.fieldContext_Rating_isHidden(ctx, field)
+			case "images":
+				return ec.fieldContext_Rating_images(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Rating_createdAt(ctx, field)
 			case "updatedAt":
@@ -25270,6 +25519,8 @@ func (ec *executionContext) fieldContext_Mutation_updateRating(ctx context.Conte
 				return ec.fieldContext_Rating_isFlagged(ctx, field)
 			case "isHidden":
 				return ec.fieldContext_Rating_isHidden(ctx, field)
+			case "images":
+				return ec.fieldContext_Rating_images(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Rating_createdAt(ctx, field)
 			case "updatedAt":
@@ -25527,6 +25778,166 @@ func (ec *executionContext) fieldContext_Mutation_moderateRating(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_moderateRating_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_uploadRatingImages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_uploadRatingImages(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UploadRatingImages(rctx, fc.Args["input"].(model.UploadRatingImagesInput))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.UploadRatingImagesResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.UploadRatingImagesResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.UploadRatingImagesResponse)
+	fc.Result = res
+	return ec.marshalNUploadRatingImagesResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUploadRatingImagesResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_uploadRatingImages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "images":
+				return ec.fieldContext_UploadRatingImagesResponse_images(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UploadRatingImagesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_uploadRatingImages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteRatingImage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteRatingImage(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().DeleteRatingImage(rctx, fc.Args["imageId"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0, nil)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*model.DeleteRatingImageResponse); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model.DeleteRatingImageResponse`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DeleteRatingImageResponse)
+	fc.Result = res
+	return ec.marshalNDeleteRatingImageResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteRatingImageResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteRatingImage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_DeleteRatingImageResponse_success(ctx, field)
+			case "message":
+				return ec.fieldContext_DeleteRatingImageResponse_message(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DeleteRatingImageResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteRatingImage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -32467,6 +32878,8 @@ func (ec *executionContext) fieldContext_ProductRatings_ratings(_ context.Contex
 				return ec.fieldContext_Rating_isFlagged(ctx, field)
 			case "isHidden":
 				return ec.fieldContext_Rating_isHidden(ctx, field)
+			case "images":
+				return ec.fieldContext_Rating_images(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Rating_createdAt(ctx, field)
 			case "updatedAt":
@@ -36204,6 +36617,8 @@ func (ec *executionContext) fieldContext_Query_getRating(ctx context.Context, fi
 				return ec.fieldContext_Rating_isFlagged(ctx, field)
 			case "isHidden":
 				return ec.fieldContext_Rating_isHidden(ctx, field)
+			case "images":
+				return ec.fieldContext_Rating_images(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_Rating_createdAt(ctx, field)
 			case "updatedAt":
@@ -38204,6 +38619,57 @@ func (ec *executionContext) fieldContext_Rating_isHidden(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Rating_images(ctx context.Context, field graphql.CollectedField, obj *model.Rating) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Rating_images(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Images, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.RatingImage)
+	fc.Result = res
+	return ec.marshalORatingImage2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImageᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Rating_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Rating",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_RatingImage_id(ctx, field)
+			case "ratingId":
+				return ec.fieldContext_RatingImage_ratingId(ctx, field)
+			case "url":
+				return ec.fieldContext_RatingImage_url(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_RatingImage_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RatingImage", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Rating_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Rating) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Rating_createdAt(ctx, field)
 	if err != nil {
@@ -38493,6 +38959,182 @@ func (ec *executionContext) _RatingFlagInfo_createdAt(ctx context.Context, field
 func (ec *executionContext) fieldContext_RatingFlagInfo_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RatingFlagInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RatingImage_id(ctx context.Context, field graphql.CollectedField, obj *model.RatingImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RatingImage_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RatingImage_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RatingImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RatingImage_ratingId(ctx context.Context, field graphql.CollectedField, obj *model.RatingImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RatingImage_ratingId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RatingID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RatingImage_ratingId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RatingImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RatingImage_url(ctx context.Context, field graphql.CollectedField, obj *model.RatingImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RatingImage_url(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.URL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RatingImage_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RatingImage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RatingImage_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.RatingImage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RatingImage_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RatingImage_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RatingImage",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -41825,6 +42467,60 @@ func (ec *executionContext) fieldContext_StoreUploadUrlPayload_expiresInSeconds(
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UploadRatingImagesResponse_images(ctx context.Context, field graphql.CollectedField, obj *model.UploadRatingImagesResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UploadRatingImagesResponse_images(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Images, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.RatingImage)
+	fc.Result = res
+	return ec.marshalNRatingImage2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImageᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_UploadRatingImagesResponse_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UploadRatingImagesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_RatingImage_id(ctx, field)
+			case "ratingId":
+				return ec.fieldContext_RatingImage_ratingId(ctx, field)
+			case "url":
+				return ec.fieldContext_RatingImage_url(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_RatingImage_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RatingImage", field.Name)
 		},
 	}
 	return fc, nil
@@ -47793,6 +48489,47 @@ func (ec *executionContext) unmarshalInputUpdateWarehouseInput(ctx context.Conte
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUploadRatingImagesInput(ctx context.Context, obj interface{}) (model.UploadRatingImagesInput, error) {
+	var it model.UploadRatingImagesInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"ratingId", "images", "imagesUpload"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "ratingId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ratingId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RatingID = data
+		case "images":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("images"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Images = data
+		case "imagesUpload":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imagesUpload"))
+			data, err := ec.unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImagesUpload = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputVerifyExchangeProductInput(ctx context.Context, obj interface{}) (model.VerifyExchangeProductInput, error) {
 	var it model.VerifyExchangeProductInput
 	asMap := map[string]interface{}{}
@@ -48583,6 +49320,50 @@ func (ec *executionContext) _DeleteProductVariantResponse(ctx context.Context, s
 			}
 		case "message":
 			out.Values[i] = ec._DeleteProductVariantResponse_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var deleteRatingImageResponseImplementors = []string{"DeleteRatingImageResponse"}
+
+func (ec *executionContext) _DeleteRatingImageResponse(ctx context.Context, sel ast.SelectionSet, obj *model.DeleteRatingImageResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deleteRatingImageResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeleteRatingImageResponse")
+		case "success":
+			out.Values[i] = ec._DeleteRatingImageResponse_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._DeleteRatingImageResponse_message(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -50538,6 +51319,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "moderateRating":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_moderateRating(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "uploadRatingImages":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_uploadRatingImages(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteRatingImage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteRatingImage(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -52555,6 +53350,8 @@ func (ec *executionContext) _Rating(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "images":
+			out.Values[i] = ec._Rating_images(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Rating_createdAt(ctx, field, obj)
 		case "updatedAt":
@@ -52612,6 +53409,60 @@ func (ec *executionContext) _RatingFlagInfo(ctx context.Context, sel ast.Selecti
 			out.Values[i] = ec._RatingFlagInfo_reason(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._RatingFlagInfo_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var ratingImageImplementors = []string{"RatingImage"}
+
+func (ec *executionContext) _RatingImage(ctx context.Context, sel ast.SelectionSet, obj *model.RatingImage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, ratingImageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RatingImage")
+		case "id":
+			out.Values[i] = ec._RatingImage_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ratingId":
+			out.Values[i] = ec._RatingImage_ratingId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._RatingImage_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._RatingImage_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -53326,6 +54177,45 @@ func (ec *executionContext) _StoreUploadUrlPayload(ctx context.Context, sel ast.
 			}
 		case "expiresInSeconds":
 			out.Values[i] = ec._StoreUploadUrlPayload_expiresInSeconds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var uploadRatingImagesResponseImplementors = []string{"UploadRatingImagesResponse"}
+
+func (ec *executionContext) _UploadRatingImagesResponse(ctx context.Context, sel ast.SelectionSet, obj *model.UploadRatingImagesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, uploadRatingImagesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UploadRatingImagesResponse")
+		case "images":
+			out.Values[i] = ec._UploadRatingImagesResponse_images(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -54240,6 +55130,20 @@ func (ec *executionContext) marshalNDeleteProductVariantResponse2ᚖgithubᚗcom
 		return graphql.Null
 	}
 	return ec._DeleteProductVariantResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDeleteRatingImageResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteRatingImageResponse(ctx context.Context, sel ast.SelectionSet, v model.DeleteRatingImageResponse) graphql.Marshaler {
+	return ec._DeleteRatingImageResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDeleteRatingImageResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDeleteRatingImageResponse(ctx context.Context, sel ast.SelectionSet, v *model.DeleteRatingImageResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeleteRatingImageResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNDelivery2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐDelivery(ctx context.Context, sel ast.SelectionSet, v model.Delivery) graphql.Marshaler {
@@ -55374,6 +56278,60 @@ func (ec *executionContext) marshalNRatingFlagInfo2ᚖgithubᚗcomᚋmareesᚑgo
 	return ec._RatingFlagInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNRatingImage2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RatingImage) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRatingImage2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImage(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRatingImage2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImage(ctx context.Context, sel ast.SelectionSet, v *model.RatingImage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RatingImage(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNRefreshTokenInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRefreshTokenInput(ctx context.Context, v interface{}) (model.RefreshTokenInput, error) {
 	res, err := ec.unmarshalInputRefreshTokenInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -55776,6 +56734,25 @@ func (ec *executionContext) marshalNUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgen�
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUploadRatingImagesInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUploadRatingImagesInput(ctx context.Context, v interface{}) (model.UploadRatingImagesInput, error) {
+	res, err := ec.unmarshalInputUploadRatingImagesInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUploadRatingImagesResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUploadRatingImagesResponse(ctx context.Context, sel ast.SelectionSet, v model.UploadRatingImagesResponse) graphql.Marshaler {
+	return ec._UploadRatingImagesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUploadRatingImagesResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUploadRatingImagesResponse(ctx context.Context, sel ast.SelectionSet, v *model.UploadRatingImagesResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UploadRatingImagesResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNValidateCategoryResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐValidateCategoryResponse(ctx context.Context, sel ast.SelectionSet, v model.ValidateCategoryResponse) graphql.Marshaler {
@@ -56646,6 +57623,53 @@ func (ec *executionContext) marshalORating2ᚖgithubᚗcomᚋmareesᚑgodevᚋGo
 		return graphql.Null
 	}
 	return ec._Rating(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORatingImage2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RatingImage) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRatingImage2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRatingImage(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalORefundPayload2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRefundPayload(ctx context.Context, sel ast.SelectionSet, v *model.RefundPayload) graphql.Marshaler {

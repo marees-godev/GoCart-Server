@@ -55,3 +55,14 @@ type ModerateRatingInput struct {
 	AdminId  string `json:"admin_id"`
 	IsHidden bool   `json:"is_hidden"`
 }
+
+type UploadRatingImagesInput struct {
+	RatingID string   `json:"rating_id"`
+	UserID   string   `json:"user_id"`
+	Images   []string `json:"images"`
+}
+
+type DeleteRatingImageInput struct {
+	ImageID string `json:"image_id"`
+	UserID  string `json:"user_id"`
+}

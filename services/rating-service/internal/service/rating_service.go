@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"strings"
@@ -9,9 +10,15 @@ import (
 	"github.com/google/uuid"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/repository"
+)
+
+const (
+	maxImagesPerReview = 5
+	maxImageSizeBytes  = 5 * 1024 * 1024
 )
 
 type RatingService interface {
@@ -23,21 +30,25 @@ type RatingService interface {
 	FlagRating(ctx context.Context, input dto.FlagRatingInput) error
 	GetFlaggedRatings(ctx context.Context, input dto.GetFlaggedRatingsInput) ([]*dto.FlaggedRatingItem, int32, error)
 	ModerateRatings(ctx context.Context, input dto.ModerateRatingInput) error
+	UploadRatingImages(ctx context.Context, input dto.UploadRatingImagesInput) ([]*model.RatingImage, error)
+	DeleteRatingImage(ctx context.Context, input dto.DeleteRatingImageInput) error
 }
 
 type ratingService struct {
 	repo        repository.RatingRepository
 	orderClient orderpb.OrderServiceClient
+	uploader    storage.Uploader
 	log         *slog.Logger
 }
 
-func NewRatingService(repo repository.RatingRepository, orderClient orderpb.OrderServiceClient, log *slog.Logger) RatingService {
+func NewRatingService(repo repository.RatingRepository, orderClient orderpb.OrderServiceClient, uploader storage.Uploader, log *slog.Logger) RatingService {
 	if log == nil {
 		log = slog.Default()
 	}
 	return &ratingService{
 		repo:        repo,
 		orderClient: orderClient,
+		uploader:    uploader,
 		log:         log,
 	}
 }
@@ -396,6 +407,154 @@ func (s *ratingService) ModerateRatings(ctx context.Context, input dto.ModerateR
 		"rating_id", input.RatingId,
 		"is_hidden", input.IsHidden,
 	)
+
+	return nil
+}
+
+func (s *ratingService) processImageDataURL(ctx context.Context, input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", appErrors.BadRequest("image cannot be empty")
+	}
+
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed, nil
+	}
+	if !strings.HasPrefix(trimmed, "data:") {
+		return "", appErrors.BadRequest("invalid image format: must be a valid URL or base64 data URI")
+	}
+	if s.uploader == nil {
+		return "", appErrors.Internal(nil, "storage uploader not configured")
+	}
+	parts := strings.SplitN(trimmed, ";base64,", 2)
+	if len(parts) != 2 {
+		return "", appErrors.BadRequest("invalid base64 image format")
+	}
+
+	header := parts[0]
+	var contentType, ext string
+	switch {
+	case strings.Contains(header, "image/jpeg"), strings.Contains(header, "image/jpg"):
+		contentType, ext = "image/jpeg", ".jpg"
+	case strings.Contains(header, "image/png"):
+		contentType, ext = "image/png", ".png"
+	case strings.Contains(header, "image/webp"):
+		contentType, ext = "image/webp", ".webp"
+	default:
+		return "", appErrors.BadRequest("unsupported image format: allowed jpeg, png, webp")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", appErrors.BadRequest("failed to decode base64 image")
+	}
+	if len(decoded) > maxImageSizeBytes {
+		return "", appErrors.BadRequest("image exceeds maximum allowed size of 5MB")
+	}
+	key := s.uploader.GenerateKey("ratings", "review"+ext)
+	uploadedURL, err := s.uploader.UploadBytes(ctx, key, decoded, contentType)
+	if err != nil {
+		return "", appErrors.Internal(err, "failed to upload image to storage")
+	}
+	return uploadedURL, nil
+}
+
+func (s *ratingService) UploadRatingImages(ctx context.Context, input dto.UploadRatingImagesInput) ([]*model.RatingImage, error) {
+	if input.RatingID == "" {
+		return nil, appErrors.BadRequest("rating_id is required")
+	}
+
+	if _, err := uuid.Parse(input.RatingID); err != nil {
+		return nil, appErrors.BadRequest("invalid rating_id format")
+	}
+
+	if input.UserID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if _, err := uuid.Parse(input.UserID); err != nil {
+		return nil, appErrors.BadRequest("invalid user_id format")
+	}
+
+	if len(input.Images) == 0 {
+		return nil, appErrors.BadRequest("at least one image is required")
+	}
+
+	existing, err := s.repo.GetRatingByID(ctx, input.RatingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingNotFound) {
+			return nil, appErrors.NotFound("rating not found")
+		}
+		return nil, appErrors.Internal(err, "failed to fetch rating")
+	}
+
+	if existing.UserID != input.UserID {
+		return nil, appErrors.Forbidden("you are not authorized to upload images to this rating")
+	}
+	if len(existing.Images)+len(input.Images) > maxImagesPerReview {
+		return nil, appErrors.BadRequest("maximum 5 images allowed per review")
+	}
+
+	uploadedURLs := make([]string, 0, len(input.Images))
+	for _, raw := range input.Images {
+		u, err := s.processImageDataURL(ctx, raw)
+		if err != nil {
+			return nil, err
+		}
+		uploadedURLs = append(uploadedURLs, u)
+	}
+
+	saved, err := s.repo.AddRatingImages(ctx, input.RatingID, uploadedURLs)
+	if err != nil {
+		s.log.Error("Failed to persist rating images", "error", err)
+		return nil, appErrors.Internal(err, "failed to save rating images")
+	}
+	return saved, nil
+}
+
+func (s *ratingService) DeleteRatingImage(ctx context.Context, input dto.DeleteRatingImageInput) error {
+
+	if input.ImageID == "" {
+		return appErrors.BadRequest("image_id is required")
+	}
+
+	if _, err := uuid.Parse(input.ImageID); err != nil {
+		return appErrors.BadRequest("invalid image_id format")
+	}
+
+	if input.UserID == "" {
+		return appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if _, err := uuid.Parse(input.UserID); err != nil {
+		return appErrors.BadRequest("invalid user_id format")
+	}
+
+	img, err := s.repo.GetRatingImageByID(ctx, input.ImageID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingImageNotFound) {
+			return appErrors.NotFound("rating image not found")
+		}
+		return appErrors.Internal(err, "failed to fetch rating image")
+	}
+
+	rating, err := s.repo.GetRatingByID(ctx, img.RatingID)
+	if err != nil {
+		if errors.Is(err, repository.ErrRatingNotFound) {
+			return appErrors.NotFound("rating not found")
+		}
+		return appErrors.Internal(err, "failed to fetch parent rating")
+	}
+
+	if rating.UserID != input.UserID {
+		return appErrors.Forbidden("you are not authorized to delete this rating image")
+	}
+
+	if err := s.repo.DeleteRatingImage(ctx, input.ImageID); err != nil {
+		if errors.Is(err, repository.ErrRatingImageNotFound) {
+			return appErrors.NotFound("rating image is not found")
+		}
+		return appErrors.Internal(err, "failed to delete rating image")
+	}
 
 	return nil
 }
