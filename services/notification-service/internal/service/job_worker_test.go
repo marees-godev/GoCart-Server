@@ -83,7 +83,7 @@ func TestJobWorker_ProcessSingleJob_FailureAndRetry(t *testing.T) {
 
 	reg := provider.NewRegistry()
 	mockEmail := provider.NewMockEmailProvider(1 * time.Second)
-	mockEmail.SetFailNext(errors.New("simulated SMTP connection error"))
+	mockEmail.SetFailNext(errors.New("simulated provider connection error"))
 	reg.Register("EMAIL", mockEmail)
 
 	job := &model.NotificationJob{

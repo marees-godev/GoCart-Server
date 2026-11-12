@@ -1,114 +1,16 @@
 package provider
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
-	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/marees-godev/GoCart-Server/pkg/mailer"
 )
-
-// Helper to spin up a local dummy SMTP server for testing SMTPProvider
-func startTestSMTPServer(t *testing.T, shouldFailAuth bool) (string, func()) {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("failed to start test smtp server: %v", err)
-	}
-
-	done := make(chan struct{})
-
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				select {
-				case <-done:
-					return
-				default:
-					return
-				}
-			}
-
-			go handleSMTPConn(conn, shouldFailAuth)
-		}
-	}()
-
-	teardown := func() {
-		close(done)
-		_ = listener.Close()
-	}
-
-	return listener.Addr().String(), teardown
-}
-
-func handleSMTPConn(conn net.Conn, shouldFailAuth bool) {
-	defer conn.Close()
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-
-	// 220 Service ready
-	_, _ = writer.WriteString("220 test.smtp.local Simple Mail Transfer Service Ready\r\n")
-	_ = writer.Flush()
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return
-		}
-		cmd := strings.ToUpper(strings.TrimSpace(line))
-
-		if strings.HasPrefix(cmd, "EHLO") || strings.HasPrefix(cmd, "HELO") {
-			_, _ = writer.WriteString("250-test.smtp.local\r\n250-AUTH PLAIN\r\n250 8BITMIME\r\n")
-			_ = writer.Flush()
-		} else if strings.HasPrefix(cmd, "AUTH") {
-			if shouldFailAuth {
-				_, _ = writer.WriteString("535 5.7.8 Authentication credentials invalid\r\n")
-				_ = writer.Flush()
-			} else {
-				_, _ = writer.WriteString("235 2.7.0 Authentication successful\r\n")
-				_ = writer.Flush()
-			}
-		} else if strings.HasPrefix(cmd, "MAIL FROM:") {
-			_, _ = writer.WriteString("250 2.1.0 Ok\r\n")
-			_ = writer.Flush()
-		} else if strings.HasPrefix(cmd, "RCPT TO:") {
-			if strings.Contains(cmd, "REJECT@EXAMPLE.COM") {
-				_, _ = writer.WriteString("550 5.1.1 User unknown\r\n")
-			} else {
-				_, _ = writer.WriteString("250 2.1.5 Ok\r\n")
-			}
-			_ = writer.Flush()
-		} else if strings.HasPrefix(cmd, "DATA") {
-			_, _ = writer.WriteString("354 End data with <CR><LF>.<CR><LF>\r\n")
-			_ = writer.Flush()
-
-			for {
-				dataLine, err := reader.ReadString('\n')
-				if err != nil {
-					return
-				}
-				if strings.TrimSpace(dataLine) == "." {
-					break
-				}
-			}
-			_, _ = writer.WriteString("250 2.0.0 Ok: queued\r\n")
-			_ = writer.Flush()
-		} else if strings.HasPrefix(cmd, "QUIT") {
-			_, _ = writer.WriteString("221 2.0.0 Bye\r\n")
-			_ = writer.Flush()
-			return
-		} else {
-			_, _ = writer.WriteString("500 5.5.1 Unrecognized command\r\n")
-			_ = writer.Flush()
-		}
-	}
-}
 
 func TestMockEmailProvider_SendSuccess(t *testing.T) {
 	p := NewMockEmailProvider(2 * time.Second)
@@ -175,146 +77,6 @@ func TestMockEmailProvider_ExplicitTimeout(t *testing.T) {
 	}
 }
 
-func TestSMTPProvider_SendSuccess(t *testing.T) {
-	addr, teardown := startTestSMTPServer(t, false)
-	defer teardown()
-
-	parts := strings.Split(addr, ":")
-	host := parts[0]
-	var port int
-	_, _ = fmt.Sscanf(parts[1], "%d", &port)
-
-	p, err := NewSMTPProvider(SMTPConfig{
-		Host:     host,
-		Port:     port,
-		Username: "gocart-user",
-		Password: "secret-password-123",
-		From:     "notifications@gocart.local",
-		Timeout:  3 * time.Second,
-	})
-	if err != nil {
-		t.Fatalf("failed creating SMTP provider: %v", err)
-	}
-
-	ctx := context.Background()
-	notif := Notification{
-		ID:        "job-smtp-1",
-		Recipient: "buyer@example.com",
-		Subject:   "Welcome to GoCart",
-		Content:   "<p>Welcome!</p>",
-		Channel:   "EMAIL",
-	}
-
-	err = p.Send(ctx, notif)
-	if err != nil {
-		t.Fatalf("expected SMTP send success, got: %v", err)
-	}
-}
-
-func TestSMTPProvider_InvalidRecipient(t *testing.T) {
-	p, err := NewSMTPProvider(SMTPConfig{
-		Host:    "localhost",
-		Port:    25,
-		Timeout: 2 * time.Second,
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	err = p.Send(context.Background(), Notification{
-		Recipient: "",
-		Subject:   "Hi",
-		Content:   "Body",
-	})
-	if !errors.Is(err, ErrInvalidRecipient) {
-		t.Fatalf("expected ErrInvalidRecipient, got: %v", err)
-	}
-}
-
-func TestSMTPProvider_ServerRejectsRecipient(t *testing.T) {
-	addr, teardown := startTestSMTPServer(t, false)
-	defer teardown()
-
-	parts := strings.Split(addr, ":")
-	var port int
-	_, _ = fmt.Sscanf(parts[1], "%d", &port)
-
-	p, _ := NewSMTPProvider(SMTPConfig{
-		Host:    parts[0],
-		Port:    port,
-		Timeout: 3 * time.Second,
-	})
-
-	err := p.Send(context.Background(), Notification{
-		Recipient: "reject@example.com",
-		Subject:   "Test",
-		Content:   "Test body",
-	})
-	if !errors.Is(err, ErrInvalidRecipient) {
-		t.Fatalf("expected ErrInvalidRecipient when server rejects rcpt, got: %v", err)
-	}
-}
-
-func TestSMTPProvider_CredentialsNeverLoggedOrLeaked(t *testing.T) {
-	addr, teardown := startTestSMTPServer(t, true) // will fail auth
-	defer teardown()
-
-	parts := strings.Split(addr, ":")
-	var port int
-	_, _ = fmt.Sscanf(parts[1], "%d", &port)
-
-	secretPassword := "ultra-sensitive-smtp-password-999!"
-	secretUsername := "super-secret-user"
-
-	p, _ := NewSMTPProvider(SMTPConfig{
-		Host:     parts[0],
-		Port:     port,
-		Username: secretUsername,
-		Password: secretPassword,
-		Timeout:  3 * time.Second,
-	})
-
-	err := p.Send(context.Background(), Notification{
-		Recipient: "authfail@example.com",
-		Subject:   "Auth Test",
-		Content:   "Body",
-	})
-
-	if err == nil {
-		t.Fatalf("expected auth failure, got nil")
-	}
-
-	errString := err.Error()
-	if strings.Contains(errString, secretPassword) {
-		t.Fatalf("SECURITY VIOLATION: Password leaked in error string: %s", errString)
-	}
-	if strings.Contains(errString, secretUsername) {
-		t.Fatalf("SECURITY VIOLATION: Username leaked in error string: %s", errString)
-	}
-}
-
-func TestSMTPProvider_ExplicitTimeout(t *testing.T) {
-	// Connect to non-routable port or blackhole address to force timeout
-	p, _ := NewSMTPProvider(SMTPConfig{
-		Host:    "10.255.255.1",
-		Port:    9999,
-		Timeout: 50 * time.Millisecond,
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-
-	err := p.Send(ctx, Notification{
-		Recipient: "timeout@example.com",
-		Subject:   "Subject",
-		Content:   "Body",
-	})
-
-	if !errors.Is(err, ErrProviderTimeout) && !errors.Is(err, ErrProviderUnavailable) {
-		t.Fatalf("expected timeout or unavailable error, got: %v", err)
-	}
-}
-
 func TestProviderRegistry_RegistrationAndLookup(t *testing.T) {
 	reg := NewRegistry()
 
@@ -351,16 +113,206 @@ func TestProviderRegistry_SwappableImplementations(t *testing.T) {
 	}
 
 	// Replace provider without modifying consumer or business logic
-	replacementEmail, _ := NewSMTPProvider(SMTPConfig{
-		Host:    "smtp.replaced.com",
-		Port:    587,
-		Timeout: 1 * time.Second,
-	})
+	replacementEmail := NewEmailProvider(EmailConfig{
+		ResendAPIKey: "test-key",
+		Timeout:      1 * time.Second,
+	}, nil)
 	reg.Register("EMAIL", replacementEmail)
 
 	newP, _ := reg.Get("EMAIL")
-	if newP.ProviderName() != "smtp" {
-		t.Fatalf("expected smtp provider after replacement, got: %s", newP.ProviderName())
+	if newP.ProviderName() != "resend_brevo" {
+		t.Fatalf("expected resend_brevo provider after replacement, got: %s", newP.ProviderName())
+	}
+}
+
+func TestEmailProvider_ResendSuccess(t *testing.T) {
+	resendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer re_valid_key" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"resend-123"}`))
+	}))
+	defer resendServer.Close()
+
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey:  "re_valid_key",
+		ResendBaseURL: resendServer.URL,
+		Timeout:       2 * time.Second,
+	}, nil)
+
+	ctx := context.Background()
+	err := p.Send(ctx, Notification{
+		Recipient: "user@example.com",
+		Subject:   "Order Delivered",
+		Content:   "Your package arrived",
+		Channel:   "EMAIL",
+	})
+	if err != nil {
+		t.Fatalf("expected Resend send success, got: %v", err)
+	}
+}
+
+func TestEmailProvider_ResendFails_BrevoFallbackSuccess(t *testing.T) {
+	resendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"resend rate limit"}`))
+	}))
+	defer resendServer.Close()
+
+	brevoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("api-key") != "xkeysib-valid" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"messageId":"brevo-456"}`))
+	}))
+	defer brevoServer.Close()
+
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey:  "re_rate_limited",
+		ResendBaseURL: resendServer.URL,
+		BrevoAPIKey:   "xkeysib-valid",
+		BrevoBaseURL:  brevoServer.URL,
+		Timeout:       2 * time.Second,
+	}, nil)
+
+	ctx := context.Background()
+	err := p.Send(ctx, Notification{
+		Recipient: "user@example.com",
+		Subject:   "Fallback Test",
+		Content:   "Testing Brevo fallback",
+		Channel:   "EMAIL",
+	})
+	if err != nil {
+		t.Fatalf("expected Brevo fallback success after Resend error, got: %v", err)
+	}
+}
+
+func TestEmailProvider_BothFail(t *testing.T) {
+	resendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer resendServer.Close()
+
+	brevoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer brevoServer.Close()
+
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey:  "re_failing",
+		ResendBaseURL: resendServer.URL,
+		BrevoAPIKey:   "xkeysib-failing",
+		BrevoBaseURL:  brevoServer.URL,
+		Timeout:       2 * time.Second,
+	}, nil)
+
+	ctx := context.Background()
+	err := p.Send(ctx, Notification{
+		Recipient: "user@example.com",
+		Subject:   "Subject",
+		Content:   "Body",
+		Channel:   "EMAIL",
+	})
+	if !errors.Is(err, ErrDeliveryFailed) {
+		t.Fatalf("expected ErrDeliveryFailed when both fail, got: %v", err)
+	}
+}
+
+func TestEmailProvider_NeitherConfigured(t *testing.T) {
+	p := NewEmailProvider(EmailConfig{
+		Timeout: 2 * time.Second,
+	}, nil)
+
+	ctx := context.Background()
+	err := p.Send(ctx, Notification{
+		Recipient: "user@example.com",
+		Subject:   "Subject",
+		Content:   "Body",
+		Channel:   "EMAIL",
+	})
+	if !errors.Is(err, ErrProviderMisconfigured) {
+		t.Fatalf("expected ErrProviderMisconfigured, got: %v", err)
+	}
+}
+
+func TestEmailProvider_InvalidRecipient(t *testing.T) {
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey: "key",
+		Timeout:      2 * time.Second,
+	}, nil)
+
+	err := p.Send(context.Background(), Notification{
+		Recipient: "not-an-email",
+		Subject:   "Subject",
+		Content:   "Body",
+	})
+	if !errors.Is(err, ErrInvalidRecipient) {
+		t.Fatalf("expected ErrInvalidRecipient, got: %v", err)
+	}
+}
+
+func TestEmailProvider_Timeout(t *testing.T) {
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey: "key",
+		Timeout:      20 * time.Millisecond,
+	}, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := p.Send(ctx, Notification{
+		Recipient: "user@example.com",
+		Subject:   "Subject",
+		Content:   "Body",
+	})
+	if !errors.Is(err, ErrProviderTimeout) {
+		t.Fatalf("expected ErrProviderTimeout, got: %v", err)
+	}
+}
+
+func TestEmailProvider_APIKeysNeverLeaked(t *testing.T) {
+	secretResendKey := "re_ultra_secret_key_12345"
+	secretBrevoKey := "xkeysib_ultra_secret_key_67890"
+
+	resendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("invalid key: " + secretResendKey))
+	}))
+	defer resendServer.Close()
+
+	brevoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("invalid key: " + secretBrevoKey))
+	}))
+	defer brevoServer.Close()
+
+	p := NewEmailProvider(EmailConfig{
+		ResendAPIKey:  secretResendKey,
+		ResendBaseURL: resendServer.URL,
+		BrevoAPIKey:   secretBrevoKey,
+		BrevoBaseURL:  brevoServer.URL,
+		Timeout:       2 * time.Second,
+	}, nil)
+
+	err := p.Send(context.Background(), Notification{
+		Recipient: "user@example.com",
+		Subject:   "Security Test",
+		Content:   "Body",
+	})
+	if err == nil {
+		t.Fatalf("expected error from failed authentication, got nil")
+	}
+
+	errStr := err.Error()
+	if strings.Contains(errStr, secretResendKey) {
+		t.Fatalf("SECURITY VIOLATION: Resend API key leaked in error message: %s", errStr)
+	}
+	if strings.Contains(errStr, secretBrevoKey) {
+		t.Fatalf("SECURITY VIOLATION: Brevo API key leaked in error message: %s", errStr)
 	}
 }
 
@@ -379,96 +331,21 @@ func (m *testMailerClient) Send(ctx context.Context, msg mailer.Message) error {
 	return nil
 }
 
-func TestMailerEmailProvider_SendSuccess(t *testing.T) {
+func TestEmailProvider_CustomClient(t *testing.T) {
 	client := &testMailerClient{}
-	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
+	p := NewEmailProviderWithClient(client, "notifications@gocart.local", 2*time.Second)
 
-	if p.Channel() != "EMAIL" || p.ProviderName() != "mailer" {
-		t.Fatalf("unexpected provider channel or name")
-	}
-
-	ctx := context.Background()
-	notif := Notification{
-		ID:        "job-email-1",
-		Recipient: "customer@example.com",
-		Subject:   "Order Update",
-		Content:   "<h1>Your order has been placed</h1>",
+	err := p.Send(context.Background(), Notification{
+		Recipient: "buyer@example.com",
+		Subject:   "Welcome",
+		Content:   "Hello",
 		Channel:   "EMAIL",
-	}
-
-	err := p.Send(ctx, notif)
+	})
 	if err != nil {
-		t.Fatalf("expected MailerEmailProvider send success, got: %v", err)
+		t.Fatalf("expected send success, got: %v", err)
 	}
-
 	if len(client.sent) != 1 {
-		t.Fatalf("expected 1 sent email via mailer, got: %d", len(client.sent))
-	}
-	if client.sent[0].To != notif.Recipient || client.sent[0].Subject != notif.Subject {
-		t.Errorf("sent message mismatch: %+v", client.sent[0])
-	}
-}
-
-func TestMailerEmailProvider_InvalidRecipient(t *testing.T) {
-	client := &testMailerClient{}
-	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
-	ctx := context.Background()
-
-	testCases := []string{"", "   ", "invalid-no-at-sign"}
-	for _, tc := range testCases {
-		notif := Notification{
-			ID:        "job-invalid",
-			Recipient: tc,
-			Subject:   "Subject",
-			Content:   "Content",
-			Channel:   "EMAIL",
-		}
-		err := p.Send(ctx, notif)
-		if !errors.Is(err, ErrInvalidRecipient) {
-			t.Errorf("expected ErrInvalidRecipient for recipient '%s', got: %v", tc, err)
-		}
-	}
-}
-
-func TestMailerEmailProvider_DeliveryFailure(t *testing.T) {
-	client := &testMailerClient{
-		failNext: errors.New("upstream service connection refused"),
-	}
-	p := NewMailerEmailProvider(client, "notifications@gocart.local", 2*time.Second)
-	ctx := context.Background()
-
-	notif := Notification{
-		ID:        "job-fail",
-		Recipient: "user@example.com",
-		Subject:   "Subject",
-		Content:   "Content",
-		Channel:   "EMAIL",
-	}
-
-	err := p.Send(ctx, notif)
-	if !errors.Is(err, ErrProviderUnavailable) {
-		t.Fatalf("expected ErrProviderUnavailable, got: %v", err)
-	}
-}
-
-func TestMailerEmailProvider_Timeout(t *testing.T) {
-	client := &testMailerClient{}
-	p := NewMailerEmailProvider(client, "notifications@gocart.local", 50*time.Millisecond)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // canceled context
-
-	notif := Notification{
-		ID:        "job-timeout",
-		Recipient: "user@example.com",
-		Subject:   "Subject",
-		Content:   "Content",
-		Channel:   "EMAIL",
-	}
-
-	err := p.Send(ctx, notif)
-	if !errors.Is(err, ErrProviderTimeout) {
-		t.Fatalf("expected ErrProviderTimeout, got: %v", err)
+		t.Fatalf("expected 1 sent message, got %d", len(client.sent))
 	}
 }
 
