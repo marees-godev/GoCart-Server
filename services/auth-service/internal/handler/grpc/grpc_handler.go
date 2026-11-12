@@ -53,6 +53,59 @@ func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.
 	}, nil
 }
 
+func (h *AuthGRPCHandler) GoogleAuth(ctx context.Context, req *pb.GoogleAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.GoogleAuth(ctx, &dto.GoogleAuthRequest{
+		IDToken: req.GetIdToken(),
+		Role:    fromPBRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) GoogleLogin(ctx context.Context, req *pb.GoogleAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.GoogleLogin(ctx, &dto.GoogleAuthRequest{
+		IDToken: req.GetIdToken(),
+		Role:    fromPBRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) GoogleRegister(ctx context.Context, req *pb.GoogleAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.GoogleRegister(ctx, &dto.GoogleAuthRequest{
+		IDToken: req.GetIdToken(),
+		Role:    fromPBRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func toPBAuthResponse(resp *dto.LoginResponse) *pb.AuthResponse {
+	return &pb.AuthResponse{
+		AccessToken:   resp.AccessToken,
+		RefreshToken:  resp.RefreshToken,
+		TokenType:     resp.TokenType,
+		ExpiresIn:     int64(resp.ExpiresIn),
+		UserId:        resp.UserID,
+		Role:          toPBRole(resp.Role),
+		MerchantId:    resp.MerchantID,
+		BusinessEmail: resp.BusinessEmail,
+		FirstName:     resp.FirstName,
+		LastName:      resp.LastName,
+		PartnerId:     resp.PartnerID,
+		CustomerId:    resp.CustomerID,
+	}
+}
+
 func (h *AuthGRPCHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Register(ctx, &dto.RegisterRequest{
 		Email:     req.GetEmail(),

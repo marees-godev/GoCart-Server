@@ -65,6 +65,76 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	return payload, nil
 }
 
+// LoginWithGoogle is the resolver for the loginWithGoogle field.
+func (r *mutationResolver) LoginWithGoogle(ctx context.Context, input model.GoogleAuthInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
+	code := strings.TrimSpace(input.Code)
+	if code == "" {
+		return nil, appErrors.BadRequest("code is required")
+	}
+
+	clientID := ""
+	clientSecret := ""
+	redirectURI := ""
+	if r.Resolver != nil && r.Resolver.Config != nil {
+		clientID = strings.TrimSpace(r.Resolver.Config.Google.ClientID)
+		clientSecret = strings.TrimSpace(r.Resolver.Config.Google.ClientSecret)
+		redirectURI = strings.TrimSpace(r.Resolver.Config.Google.RedirectURL)
+	}
+	if input.RedirectURI != nil && strings.TrimSpace(*input.RedirectURI) != "" {
+		redirectURI = strings.TrimSpace(*input.RedirectURI)
+	}
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8080/api/v1/auth/google/callback"
+	}
+
+	idToken, exErr := exchangeGoogleAuthCode(ctx, clientID, clientSecret, redirectURI, code)
+	if exErr != nil {
+		return nil, appErrors.BadRequest(exErr.Error())
+	}
+
+	role := authpb.Role_USER
+	if input.Role != nil {
+		role = authRoleToAuthPBRole(*input.Role)
+	}
+
+	res, err := authClient.GoogleLogin(ctx, &authpb.GoogleAuthRequest{
+		IdToken: idToken,
+		Role:    role,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	resRole := model.RoleUser
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		Role:  &resRole,
+	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
+
+	return payload, nil
+}
+
 // Register is the resolver for the register field.
 func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error) {
 	authClient, err := r.getAuthClient()
@@ -120,6 +190,76 @@ func (r *mutationResolver) Register(ctx context.Context, input model.RegisterInp
 	}
 
 	resRole := model.Role(input.Role)
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		Role:  &resRole,
+	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
+
+	return payload, nil
+}
+
+// RegisterWithGoogle is the resolver for the registerWithGoogle field.
+func (r *mutationResolver) RegisterWithGoogle(ctx context.Context, input model.GoogleAuthInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
+	code := strings.TrimSpace(input.Code)
+	if code == "" {
+		return nil, appErrors.BadRequest("code is required")
+	}
+
+	clientID := ""
+	clientSecret := ""
+	redirectURI := ""
+	if r.Resolver != nil && r.Resolver.Config != nil {
+		clientID = strings.TrimSpace(r.Resolver.Config.Google.ClientID)
+		clientSecret = strings.TrimSpace(r.Resolver.Config.Google.ClientSecret)
+		redirectURI = strings.TrimSpace(r.Resolver.Config.Google.RedirectURL)
+	}
+	if input.RedirectURI != nil && strings.TrimSpace(*input.RedirectURI) != "" {
+		redirectURI = strings.TrimSpace(*input.RedirectURI)
+	}
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8080/api/v1/auth/google/callback"
+	}
+
+	idToken, exErr := exchangeGoogleAuthCode(ctx, clientID, clientSecret, redirectURI, code)
+	if exErr != nil {
+		return nil, appErrors.BadRequest(exErr.Error())
+	}
+
+	role := authpb.Role_USER
+	if input.Role != nil {
+		role = authRoleToAuthPBRole(*input.Role)
+	}
+
+	res, err := authClient.GoogleRegister(ctx, &authpb.GoogleAuthRequest{
+		IdToken: idToken,
+		Role:    role,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	resRole := model.RoleUser
 	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
 		resRole = fromAuthPBRole(res.Role)
 	}

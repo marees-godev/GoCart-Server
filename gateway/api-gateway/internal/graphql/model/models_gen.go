@@ -511,6 +511,12 @@ type GenerateStoreUploadURLInput struct {
 	ContentType *string `json:"contentType,omitempty"`
 }
 
+type GoogleAuthInput struct {
+	Code        string    `json:"code"`
+	RedirectURI *string   `json:"redirectUri,omitempty"`
+	Role        *AuthRole `json:"role,omitempty"`
+}
+
 type InventoryItem struct {
 	InventoryID       string  `json:"inventoryId"`
 	WarehouseID       *string `json:"warehouseId,omitempty"`

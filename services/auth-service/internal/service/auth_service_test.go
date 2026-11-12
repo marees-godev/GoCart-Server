@@ -36,6 +36,7 @@ type mockAuthRepository struct {
 	lockedUntilMap     map[uuid.UUID]*time.Time
 	refreshTokens      []*model.RefreshToken
 	outboxEvents       []*outbox.Event
+	oauthAccounts      map[string]*model.OAuthAccount
 	getByEmailErr      error
 	createSessionErr   error
 }
@@ -46,6 +47,7 @@ func newMockAuthRepository() *mockAuthRepository {
 		byEmailRole:    make(map[string]*model.AuthCredential),
 		failedCountMap: make(map[uuid.UUID]int),
 		lockedUntilMap: make(map[uuid.UUID]*time.Time),
+		oauthAccounts:  make(map[string]*model.OAuthAccount),
 	}
 }
 
@@ -242,6 +244,32 @@ func (m *mockAuthRepository) UpdatePassword(ctx context.Context, userID uuid.UUI
 		}
 	}
 	return repository.ErrNotFound
+}
+
+func (m *mockAuthRepository) GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error) {
+	key := provider.String() + ":" + providerUserID
+	acc, ok := m.oauthAccounts[key]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return acc, nil
+}
+
+func (m *mockAuthRepository) CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error {
+	if m.oauthAccounts == nil {
+		m.oauthAccounts = make(map[string]*model.OAuthAccount)
+	}
+	key := oauthAcc.Provider.String() + ":" + oauthAcc.ProviderUserID
+	m.oauthAccounts[key] = oauthAcc
+	return nil
+}
+
+func (m *mockAuthRepository) CreateCredentialWithOAuth(ctx context.Context, cred *model.AuthCredential, oauthAcc *model.OAuthAccount) error {
+	if err := m.CreateCredential(ctx, cred); err != nil {
+		return err
+	}
+	oauthAcc.UserID = cred.UserID
+	return m.CreateOAuthAccount(ctx, oauthAcc)
 }
 
 func setupTestService() (AuthService, *mockAuthRepository, *config.Config) {
@@ -2613,6 +2641,360 @@ func TestForgotPasswordAndReset_SameEmail_DifferentRoles_Independent(t *testing.
 	}
 	if loginCustResp.Role != "CUSTOMER" {
 		t.Errorf("expected role CUSTOMER, got %s", loginCustResp.Role)
+	}
+}
+
+type mockGoogleVerifier struct {
+	payload *GoogleTokenPayload
+	err     error
+}
+
+func (m *mockGoogleVerifier) Verify(ctx context.Context, idToken string) (*GoogleTokenPayload, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.payload, nil
+}
+
+func TestGoogleAuth_NewUser_Success(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockUserClient := &mockUserServiceClient{}
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject:       "google-sub-999",
+			Email:         "newgoogleuser@example.com",
+			EmailVerified: true,
+			FirstName:     "Jane",
+			LastName:      "Doe",
+		},
+	}
+
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, verifier)
+
+	resp, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-google-token",
+		Role:    "USER",
+	})
+	if err != nil {
+		t.Fatalf("expected successful google auth, got: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Error("expected non-empty access and refresh tokens")
+	}
+	if resp.UserID == "" {
+		t.Error("expected non-empty user ID")
+	}
+
+	if len(mockUserClient.createdUsers) != 1 {
+		t.Fatalf("expected 1 call to user service, got %d", len(mockUserClient.createdUsers))
+	}
+	created := mockUserClient.createdUsers[0]
+	if created.Email != "newgoogleuser@example.com" {
+		t.Errorf("expected email newgoogleuser@example.com, got %s", created.Email)
+	}
+	if created.FirstName != "Jane" || created.LastName != "Doe" {
+		t.Errorf("expected Jane Doe, got %s %s", created.FirstName, created.LastName)
+	}
+
+	cred, err := mockRepo.GetByEmail(context.Background(), "newgoogleuser@example.com")
+	if err != nil {
+		t.Fatalf("expected credential in repo, got err: %v", err)
+	}
+	if !cred.EmailVerified {
+		t.Error("expected email_verified to be true")
+	}
+	oauthAcc, err := mockRepo.GetOAuthAccount(context.Background(), model.AuthProviderGoogle, "google-sub-999")
+	if err != nil {
+		t.Fatalf("expected oauth account in repo, got err: %v", err)
+	}
+	if oauthAcc.UserID != cred.UserID {
+		t.Errorf("expected oauthAcc.UserID %s to match cred.UserID %s", oauthAcc.UserID, cred.UserID)
+	}
+
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
+	}
+	if mockRepo.outboxEvents[0].EventType != "UserRegistered" {
+		t.Errorf("expected UserRegistered event, got %s", mockRepo.outboxEvents[0].EventType)
+	}
+}
+
+func TestGoogleAuth_ExistingUser_Success(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	existingUserID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmailRole["existing@example.com:USER"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        existingUserID,
+		Email:         "existing@example.com",
+		Role:          model.RoleUser,
+		EmailVerified: false,
+		IsActive:      true,
+	}
+
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject:       "google-sub-888",
+			Email:         "existing@example.com",
+			EmailVerified: true,
+			FirstName:     "Existing",
+			LastName:      "User",
+		},
+	}
+
+	mockUserClient := &mockUserServiceClient{}
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, verifier)
+
+	resp, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-google-token",
+		Role:    "USER",
+	})
+	if err != nil {
+		t.Fatalf("expected successful existing user google login, got: %v", err)
+	}
+	if resp.UserID != existingUserID.String() {
+		t.Errorf("expected user ID %s, got %s", existingUserID, resp.UserID)
+	}
+
+	if len(mockUserClient.createdUsers) != 0 {
+		t.Errorf("expected 0 user service CreateUser calls, got %d", len(mockUserClient.createdUsers))
+	}
+
+	oauthAcc, err := mockRepo.GetOAuthAccount(context.Background(), model.AuthProviderGoogle, "google-sub-888")
+	if err != nil {
+		t.Fatalf("expected oauth account linked, got: %v", err)
+	}
+	if oauthAcc.UserID != existingUserID {
+		t.Errorf("expected linked user ID %s, got %s", existingUserID, oauthAcc.UserID)
+	}
+
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
+	}
+	if mockRepo.outboxEvents[0].EventType != "UserLoggedIn" {
+		t.Errorf("expected UserLoggedIn event, got %s", mockRepo.outboxEvents[0].EventType)
+	}
+}
+
+func TestGoogleAuth_ExistingUser_AccountInactive(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockRepo.byEmailRole["inactive@example.com:USER"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        uuid.Must(uuid.NewV7()),
+		Email:         "inactive@example.com",
+		Role:          model.RoleUser,
+		EmailVerified: true,
+		IsActive:      false,
+	}
+
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject: "google-sub-777",
+			Email:   "inactive@example.com",
+		},
+	}
+
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, verifier)
+	_, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-token",
+		Role:    "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error for inactive account, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 401 {
+		t.Errorf("expected 401, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleAuth_InvalidToken(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	verifier := &mockGoogleVerifier{
+		err: errors.New("signature invalid"),
+	}
+
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{}, verifier)
+	_, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "bad-token",
+		Role:    "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid token, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 401 {
+		t.Errorf("expected 401, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleAuth_MissingToken(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, &mockUserServiceClient{})
+	_, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "",
+	})
+	if err == nil {
+		t.Fatal("expected error for empty token, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleAuth_UserServiceUnavailable(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject: "google-sub-555",
+			Email:   "brandnew@example.com",
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, verifier)
+	_, err := svc.GoogleAuth(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-token",
+		Role:    "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error when user service is nil, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 503 {
+		t.Errorf("expected 503, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleLogin_UserNotFound_ReturnsError(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject: "google-sub-unregistered",
+			Email:   "unregistered@example.com",
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, verifier)
+	_, err := svc.GoogleLogin(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-token",
+		Role:    "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error for unregistered user on login, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 404 {
+		t.Errorf("expected 404 not found, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleRegister_UserAlreadyExists_ReturnsError(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockRepo.byEmailRole["alreadyhere@example.com:USER"] = &model.AuthCredential{
+		ID:       uuid.Must(uuid.NewV7()),
+		UserID:   uuid.Must(uuid.NewV7()),
+		Email:    "alreadyhere@example.com",
+		Role:     model.RoleUser,
+		IsActive: true,
+	}
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject: "google-sub-existing",
+			Email:   "alreadyhere@example.com",
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, verifier)
+	_, err := svc.GoogleRegister(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-token",
+		Role:    "USER",
+	})
+	if err == nil {
+		t.Fatal("expected error for already existing user on register, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 409 {
+		t.Errorf("expected 409 conflict, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestGoogleRegister_NewUser_Success(t *testing.T) {
+	mockRepo := newMockAuthRepository()
+	cfg := &config.Config{
+		JWT: config.JWTConfig{
+			Secret:        "test-secret-key-12345",
+			ExpiryMinutes: 15,
+		},
+	}
+	mockUserClient := &mockUserServiceClient{}
+	verifier := &mockGoogleVerifier{
+		payload: &GoogleTokenPayload{
+			Subject:       "google-sub-newreg",
+			Email:         "newreg@example.com",
+			EmailVerified: true,
+			FirstName:     "Fresh",
+			LastName:      "User",
+		},
+	}
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, verifier)
+	resp, err := svc.GoogleRegister(context.Background(), &dto.GoogleAuthRequest{
+		IDToken: "valid-token",
+		Role:    "USER",
+	})
+	if err != nil {
+		t.Fatalf("expected successful registration, got: %v", err)
+	}
+	if resp.AccessToken == "" {
+		t.Error("expected non-empty access token")
+	}
+	if len(mockUserClient.createdUsers) != 1 {
+		t.Errorf("expected user profile creation, got %d calls", len(mockUserClient.createdUsers))
 	}
 }
 
