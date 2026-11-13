@@ -177,6 +177,29 @@ func TestRatingDatabasePersistenceAndModeration(t *testing.T) {
 		t.Errorf("expected IsFlagged to be reset to false after unhide, got true")
 	}
 
+	// Test Rating Images Persistence & Soft delete
+	savedImages, err := repo.AddRatingImages(ctx, createdRating.ID, []string{
+		"https://cdn.gocart.local/ratings/test1.jpg",
+		"https://cdn.gocart.local/ratings/test2.jpg",
+	})
+	if err != nil || len(savedImages) != 2 {
+		t.Fatalf("failed to persist rating images: err = %v len = %d", err, len(savedImages))
+	}
+
+	ratingWithImgs, err := repo.GetRatingByID(ctx, createdRating.ID)
+	if err != nil || len(ratingWithImgs.Images) != 2 {
+		t.Errorf("expected 2 images on GetRatingByID, got len=%d err=%v", len(ratingWithImgs.Images), err)
+	}
+
+	if err := repo.DeleteRatingImage(ctx, savedImages[0].ID); err != nil {
+		t.Fatalf("failed to soft delete rating image: %v", err)
+	}
+
+	ratingAfterImgDel, err := repo.GetRatingByID(ctx, createdRating.ID)
+	if err != nil || len(ratingAfterImgDel.Images) != 1 {
+		t.Errorf("expected 1 remaining image after soft delete, got len=%d err=%v", len(ratingAfterImgDel.Images), err)
+	}
+
 	// 6. Test Soft Delete
 	if err := repo.DeleteRating(ctx, createdRating.ID); err != nil {
 		t.Fatalf("failed to soft delete rating: %v", err)

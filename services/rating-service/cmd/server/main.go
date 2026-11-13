@@ -19,6 +19,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/config"
 	"github.com/marees-godev/GoCart-Server/services/rating-service/internal/handler"
@@ -99,7 +100,19 @@ func main() {
 		log.Warn("Failed to dial Order Service", "error", err)
 	}
 
-	ratingService := service.NewRatingService(ratingRepo, ordClient, log)
+	s3Client, err := storage.NewS3Client(ctx, storage.Config{
+		Endpoint:        cfg.Storage.Endpoint,
+		Region:          cfg.Storage.Region,
+		AccessKeyID:     cfg.Storage.AccessKeyID,
+		SecretAccessKey: cfg.Storage.SecretAccessKey,
+		Bucket:          cfg.Storage.Bucket,
+		PublicURLPrefix: cfg.Storage.PublicURLPrefix,
+	})
+	if err != nil {
+		log.Warn("Failed to initialize S3 storage client for rating service", "error", err)
+	}
+
+	ratingService := service.NewRatingService(ratingRepo, ordClient, s3Client, log)
 	ratingGRPCHandler := handler.NewRatingGRPCHandler(ratingService, log)
 
 	// 6. Setup gRPC Server

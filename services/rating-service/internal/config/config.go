@@ -12,6 +12,7 @@ type Config struct {
 	HTTP     HTTPConfig
 	GRPC     GRPCConfig
 	Database DatabaseConfig
+	Storage  StorageConfig
 	Logger   LoggerConfig
 	Tracing  TracingConfig
 }
@@ -40,6 +41,14 @@ type DatabaseConfig struct {
 	MigrationsPath string
 }
 
+type StorageConfig struct {
+	Endpoint        string
+	Region          string
+	AccessKeyID     string
+	SecretAccessKey string
+	Bucket          string
+	PublicURLPrefix string
+}
 type LoggerConfig struct {
 	Level  string
 	Format string
@@ -67,7 +76,7 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "5555"),
 		},
 		GRPC: GRPCConfig{
-			Port:             GetEnv("GRPC_PORT", "55063"),
+			Port:             GetEnv("GRPC_PORT", "50063"),
 			OrderServiceAddr: GetEnv("ORDER_SERVICE_GRPC_ADDR", GetEnv("ORDER_SERVICE_ADDR", "localhost:50059")),
 			TimeoutSeconds:   GetEnvAsInt("GRPC_TIMEOUT_SECONDS", 10),
 		},
@@ -77,6 +86,14 @@ func LoadEnv() *Config {
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
 			MigrationsPath: GetEnv("DB_MIGRATIONS_PATH", "./migrations"),
+		},
+		Storage: StorageConfig{
+			Endpoint:        GetEnv("RATINGS_S3_ENDPOINT", GetEnv("S3_ENDPOINT", "")),
+			Region:          GetEnv("RATINGS_S3_REGION", GetEnv("S3_REGION", "ap-south-1")),
+			AccessKeyID:     GetEnv("RATINGS_S3_ACCESS_KEY_ID", GetEnv("S3_ACCESS_KEY_ID", "")),
+			SecretAccessKey: GetEnv("RATINGS_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
+			Bucket:          GetEnv("RATINGS_S3_BUCKET", GetEnv("S3_BUCKET", "rating_bucket")),
+			PublicURLPrefix: GetEnv("RATINGS_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
 		},
 		Logger: LoggerConfig{
 			Level:  GetEnv("LOG_LEVEL", "debug"),

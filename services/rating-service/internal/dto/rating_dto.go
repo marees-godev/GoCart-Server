@@ -3,12 +3,13 @@ package dto
 import "github.com/marees-godev/GoCart-Server/services/rating-service/internal/model"
 
 type CreateRatingInput struct {
-	UserID      string `json:"user_id"`
-	ProductID   string `json:"product_id"`
-	OrderID     string `json:"order_id"`
-	OrderItemID string `json:"order_item_id"`
-	Rating      int    `json:"rating"`
-	Review      string `json:"review"`
+	UserID      string   `json:"user_id"`
+	ProductID   string   `json:"product_id"`
+	OrderID     string   `json:"order_id"`
+	OrderItemID string   `json:"order_item_id"`
+	Rating      int      `json:"rating"`
+	Review      string   `json:"review"`
+	Images      []string `json:"images"`
 }
 
 type UpdateRatingInput struct {
@@ -54,4 +55,15 @@ type ModerateRatingInput struct {
 	RatingId string `json:"rating_id"`
 	AdminId  string `json:"admin_id"`
 	IsHidden bool   `json:"is_hidden"`
+}
+
+type UploadRatingImagesInput struct {
+	RatingID string   `json:"rating_id"`
+	UserID   string   `json:"user_id"`
+	Images   []string `json:"images"`
+}
+
+type DeleteRatingImageInput struct {
+	ImageID string `json:"image_id"`
+	UserID  string `json:"user_id"`
 }
