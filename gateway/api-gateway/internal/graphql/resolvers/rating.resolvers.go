@@ -31,6 +31,21 @@ func (r *mutationResolver) CreateRating(ctx context.Context, input model.CreateR
 		review = *input.Review
 	}
 
+	var images []string
+	if len(input.Images) > 0 {
+		images = append(images, input.Images...)
+	}
+
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process imagesUpload file upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
 	req := &ratingpb.CreateRatingRequest{
 		ProductId:   input.ProductID,
 		OrderId:     input.OrderID,
@@ -38,6 +53,7 @@ func (r *mutationResolver) CreateRating(ctx context.Context, input model.CreateR
 		UserId:      userID,
 		Rating:      int32(input.Rating),
 		Review:      review,
+		Images:      images,
 	}
 
 	resp, err := r.ClientMgr.RatingClient.CreateRating(ctx, req)
@@ -171,6 +187,78 @@ func (r *mutationResolver) ModerateRating(ctx context.Context, input model.Moder
 	}
 
 	return &model.ModerateRatingResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+	}, nil
+}
+
+// UploadRatingImages is the resolver for the uploadRatingImages field.
+func (r *mutationResolver) UploadRatingImages(ctx context.Context, input model.UploadRatingImagesInput) (*model.UploadRatingImagesResponse, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	var images []string
+	if len(input.Images) > 0 {
+		images = append(images, input.Images...)
+	}
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process imagesUpload file upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
+	if len(images) == 0 {
+		return nil, appErrors.BadRequest("at least one image is required")
+	}
+
+	req := &ratingpb.UploadRatingImagesRequest{
+		RatingId: input.RatingID,
+		UserId:   userID,
+		Images:   images,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.UploadRatingImages(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.UploadRatingImagesResponse{
+		Images: maps.MapRatingImages(resp.GetImages()),
+	}, nil
+}
+
+// DeleteRatingImage is the resolver for the deleteRatingImage field.
+func (r *mutationResolver) DeleteRatingImage(ctx context.Context, imageID string) (*model.DeleteRatingImageResponse, error) {
+	userID := getAuthUserIDFromCtx(ctx)
+	if userID == "" {
+		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	if r.ClientMgr == nil || r.ClientMgr.RatingClient == nil {
+		return nil, appErrors.Internal(nil, "rating service client unavailable")
+	}
+
+	req := &ratingpb.DeleteRatingImageRequest{
+		ImageId: imageID,
+		UserId:  userID,
+	}
+
+	resp, err := r.ClientMgr.RatingClient.DeleteRatingImage(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.DeleteRatingImageResponse{
 		Success: resp.GetSuccess(),
 		Message: resp.GetMessage(),
 	}, nil

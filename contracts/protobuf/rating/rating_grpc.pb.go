@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RatingService_CreateRating_FullMethodName      = "/gocart.rating.v1.RatingService/CreateRating"
-	RatingService_GetRating_FullMethodName         = "/gocart.rating.v1.RatingService/GetRating"
-	RatingService_GetProductRatings_FullMethodName = "/gocart.rating.v1.RatingService/GetProductRatings"
-	RatingService_UpdateRating_FullMethodName      = "/gocart.rating.v1.RatingService/UpdateRating"
-	RatingService_DeleteRating_FullMethodName      = "/gocart.rating.v1.RatingService/DeleteRating"
-	RatingService_FlagRating_FullMethodName        = "/gocart.rating.v1.RatingService/FlagRating"
-	RatingService_GetFlaggedRatings_FullMethodName = "/gocart.rating.v1.RatingService/GetFlaggedRatings"
-	RatingService_ModerateRatings_FullMethodName   = "/gocart.rating.v1.RatingService/ModerateRatings"
+	RatingService_CreateRating_FullMethodName       = "/gocart.rating.v1.RatingService/CreateRating"
+	RatingService_GetRating_FullMethodName          = "/gocart.rating.v1.RatingService/GetRating"
+	RatingService_GetProductRatings_FullMethodName  = "/gocart.rating.v1.RatingService/GetProductRatings"
+	RatingService_UpdateRating_FullMethodName       = "/gocart.rating.v1.RatingService/UpdateRating"
+	RatingService_DeleteRating_FullMethodName       = "/gocart.rating.v1.RatingService/DeleteRating"
+	RatingService_FlagRating_FullMethodName         = "/gocart.rating.v1.RatingService/FlagRating"
+	RatingService_GetFlaggedRatings_FullMethodName  = "/gocart.rating.v1.RatingService/GetFlaggedRatings"
+	RatingService_ModerateRatings_FullMethodName    = "/gocart.rating.v1.RatingService/ModerateRatings"
+	RatingService_UploadRatingImages_FullMethodName = "/gocart.rating.v1.RatingService/UploadRatingImages"
+	RatingService_DeleteRatingImage_FullMethodName  = "/gocart.rating.v1.RatingService/DeleteRatingImage"
 )
 
 // RatingServiceClient is the client API for RatingService service.
@@ -41,6 +43,8 @@ type RatingServiceClient interface {
 	FlagRating(ctx context.Context, in *FlagRatingRequest, opts ...grpc.CallOption) (*FlagRatingResponse, error)
 	GetFlaggedRatings(ctx context.Context, in *GetFlaggedRatingsRequest, opts ...grpc.CallOption) (*GetFlaggedRatingsResponse, error)
 	ModerateRatings(ctx context.Context, in *ModerateRatingRequest, opts ...grpc.CallOption) (*ModerateRatingResponse, error)
+	UploadRatingImages(ctx context.Context, in *UploadRatingImagesRequest, opts ...grpc.CallOption) (*UploadRatingImagesResponse, error)
+	DeleteRatingImage(ctx context.Context, in *DeleteRatingImageRequest, opts ...grpc.CallOption) (*DeleteRatingImageResponse, error)
 }
 
 type ratingServiceClient struct {
@@ -131,6 +135,26 @@ func (c *ratingServiceClient) ModerateRatings(ctx context.Context, in *ModerateR
 	return out, nil
 }
 
+func (c *ratingServiceClient) UploadRatingImages(ctx context.Context, in *UploadRatingImagesRequest, opts ...grpc.CallOption) (*UploadRatingImagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UploadRatingImagesResponse)
+	err := c.cc.Invoke(ctx, RatingService_UploadRatingImages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ratingServiceClient) DeleteRatingImage(ctx context.Context, in *DeleteRatingImageRequest, opts ...grpc.CallOption) (*DeleteRatingImageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteRatingImageResponse)
+	err := c.cc.Invoke(ctx, RatingService_DeleteRatingImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RatingServiceServer is the server API for RatingService service.
 // All implementations must embed UnimplementedRatingServiceServer
 // for forward compatibility.
@@ -143,6 +167,8 @@ type RatingServiceServer interface {
 	FlagRating(context.Context, *FlagRatingRequest) (*FlagRatingResponse, error)
 	GetFlaggedRatings(context.Context, *GetFlaggedRatingsRequest) (*GetFlaggedRatingsResponse, error)
 	ModerateRatings(context.Context, *ModerateRatingRequest) (*ModerateRatingResponse, error)
+	UploadRatingImages(context.Context, *UploadRatingImagesRequest) (*UploadRatingImagesResponse, error)
+	DeleteRatingImage(context.Context, *DeleteRatingImageRequest) (*DeleteRatingImageResponse, error)
 	mustEmbedUnimplementedRatingServiceServer()
 }
 
@@ -176,6 +202,12 @@ func (UnimplementedRatingServiceServer) GetFlaggedRatings(context.Context, *GetF
 }
 func (UnimplementedRatingServiceServer) ModerateRatings(context.Context, *ModerateRatingRequest) (*ModerateRatingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ModerateRatings not implemented")
+}
+func (UnimplementedRatingServiceServer) UploadRatingImages(context.Context, *UploadRatingImagesRequest) (*UploadRatingImagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UploadRatingImages not implemented")
+}
+func (UnimplementedRatingServiceServer) DeleteRatingImage(context.Context, *DeleteRatingImageRequest) (*DeleteRatingImageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteRatingImage not implemented")
 }
 func (UnimplementedRatingServiceServer) mustEmbedUnimplementedRatingServiceServer() {}
 func (UnimplementedRatingServiceServer) testEmbeddedByValue()                       {}
@@ -342,6 +374,42 @@ func _RatingService_ModerateRatings_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RatingService_UploadRatingImages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UploadRatingImagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServiceServer).UploadRatingImages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RatingService_UploadRatingImages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServiceServer).UploadRatingImages(ctx, req.(*UploadRatingImagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RatingService_DeleteRatingImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRatingImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RatingServiceServer).DeleteRatingImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RatingService_DeleteRatingImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RatingServiceServer).DeleteRatingImage(ctx, req.(*DeleteRatingImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RatingService_ServiceDesc is the grpc.ServiceDesc for RatingService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +448,14 @@ var RatingService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ModerateRatings",
 			Handler:    _RatingService_ModerateRatings_Handler,
+		},
+		{
+			MethodName: "UploadRatingImages",
+			Handler:    _RatingService_UploadRatingImages_Handler,
+		},
+		{
+			MethodName: "DeleteRatingImage",
+			Handler:    _RatingService_DeleteRatingImage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

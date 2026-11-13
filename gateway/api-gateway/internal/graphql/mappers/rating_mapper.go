@@ -30,6 +30,7 @@ func MapRating(r *ratingpb.Rating) *model.Rating {
 		Review:      r.Review,
 		IsFlagged:   r.IsFlagged,
 		IsHidden:    r.IsHidden,
+		Images:      MapRatingImages(r.GetImages()),
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 	}
@@ -60,4 +61,31 @@ func MapStarRating(star *ratingpb.StarRating) *model.StarRating {
 		TwoStar:   int(star.TwoStar),
 		OneStar:   int(star.OneStar),
 	}
+}
+
+func MapRatingImage(img *ratingpb.RatingImage) *model.RatingImage {
+	if img == nil {
+		return nil
+	}
+	return &model.RatingImage{
+		ID:        img.GetId(),
+		RatingID:  img.GetRatingId(),
+		URL:       img.GetUrl(),
+		CreatedAt: img.GetCreatedAt(),
+	}
+}
+
+func MapRatingImages(images []*ratingpb.RatingImage) []*model.RatingImage {
+	if images == nil {
+		return []*model.RatingImage{}
+	}
+
+	res := make([]*model.RatingImage, 0, len(images))
+	for _, img := range images {
+		if img != nil {
+			res = append(res, MapRatingImage(img))
+		}
+	}
+
+	return res
 }

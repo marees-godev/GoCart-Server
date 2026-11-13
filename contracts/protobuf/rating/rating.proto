@@ -22,6 +22,8 @@ service RatingService {
   rpc FlagRating (FlagRatingRequest) returns (FlagRatingResponse);
   rpc GetFlaggedRatings (GetFlaggedRatingsRequest) returns (GetFlaggedRatingsResponse);
   rpc ModerateRatings (ModerateRatingRequest) returns (ModerateRatingResponse);
+  rpc UploadRatingImages (UploadRatingImagesRequest) returns (UploadRatingImagesResponse);
+  rpc DeleteRatingImage (DeleteRatingImageRequest) returns (DeleteRatingImageResponse);
 }
 
 message Rating {
@@ -36,6 +38,7 @@ message Rating {
   bool is_hidden = 9;
   string created_at = 10;
   string updated_at = 11;
+  repeated RatingImage images = 12;
 }
 
 message CreateRatingRequest {
@@ -45,6 +48,7 @@ message CreateRatingRequest {
   string user_id = 4;
   int32 rating = 5;
   string review = 6;
+  repeated string images = 7;
 }
 
 message CreateRatingResponse {
@@ -145,6 +149,33 @@ message ModerateRatingRequest {
 }
 
 message ModerateRatingResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message RatingImage {
+  string id = 1;
+  string rating_id = 2;
+  string url = 3;
+  string created_at = 4;
+}
+
+message UploadRatingImagesRequest {
+  string rating_id = 1;
+  string user_id = 2;
+  repeated string images = 3;
+}
+
+message UploadRatingImagesResponse {
+  repeated RatingImage images = 1;
+}
+
+message DeleteRatingImageRequest {
+  string image_id = 1;
+  string user_id = 2;
+}
+
+message DeleteRatingImageResponse {
   bool success = 1;
   string message = 2;
 }

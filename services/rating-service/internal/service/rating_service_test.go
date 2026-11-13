@@ -2,7 +2,9 @@ package service_test
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +23,7 @@ import (
 type mockRatingRepo struct {
 	ratings   map[string]*model.Rating
 	flags     map[string]*model.RatingFlag
+	images    map[string]*model.RatingImage
 	idCounter int
 }
 
@@ -28,6 +31,7 @@ func newMockRatingRepo() *mockRatingRepo {
 	return &mockRatingRepo{
 		ratings: make(map[string]*model.Rating),
 		flags:   make(map[string]*model.RatingFlag),
+		images:  make(map[string]*model.RatingImage),
 	}
 }
 
@@ -48,6 +52,14 @@ func (m *mockRatingRepo) CreateRating(ctx context.Context, r *model.Rating) (*mo
 	}
 	r.UpdatedAt = now
 
+	for i := range r.Images {
+		r.Images[i].ID = uuid.New().String()
+		r.Images[i].RatingID = r.ID
+		r.Images[i].CreatedAt = now
+		imgCopy := r.Images[i]
+		m.images[imgCopy.ID] = &imgCopy
+	}
+
 	cp := *r
 	m.ratings[r.ID] = &cp
 	return &cp, nil
@@ -59,6 +71,12 @@ func (m *mockRatingRepo) GetRatingByID(ctx context.Context, id string) (*model.R
 		return nil, repository.ErrRatingNotFound
 	}
 	cp := *r
+	cp.Images = nil
+	for _, img := range m.images {
+		if img.RatingID == id && img.DeletedAt == nil {
+			cp.Images = append(cp.Images, *img)
+		}
+	}
 	return &cp, nil
 }
 
@@ -191,6 +209,79 @@ func (m *mockRatingRepo) GetFlaggedRatings(ctx context.Context, limit, offset in
 	return items[start:end], total, nil
 }
 
+func (m *mockRatingRepo) AddRatingImages(ctx context.Context, ratingID string, urls []string) ([]*model.RatingImage, error) {
+	now := time.Now().UTC()
+	created := make([]*model.RatingImage, 0, len(urls))
+	for _, u := range urls {
+		img := &model.RatingImage{
+			ID:        uuid.New().String(),
+			RatingID:  ratingID,
+			URL:       u,
+			CreatedAt: now,
+		}
+		m.images[img.ID] = img
+		created = append(created, img)
+	}
+	return created, nil
+}
+
+func (m *mockRatingRepo) GetRatingImageByID(ctx context.Context, imageID string) (*model.RatingImage, error) {
+	img, ok := m.images[imageID]
+	if !ok || img.DeletedAt != nil {
+		return nil, repository.ErrRatingImageNotFound
+	}
+	cp := *img
+	return &cp, nil
+}
+
+func (m *mockRatingRepo) DeleteRatingImage(ctx context.Context, imageID string) error {
+	img, ok := m.images[imageID]
+	if !ok || img.DeletedAt != nil {
+		return repository.ErrRatingImageNotFound
+	}
+	now := time.Now().UTC()
+	img.DeletedAt = &now
+	return nil
+}
+
+type mockUploader struct {
+	uploadedURL string
+	err         error
+}
+
+func (m *mockUploader) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	return m.GetPublicURL(key), nil
+}
+
+func (m *mockUploader) UploadBytes(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	if m.uploadedURL != "" {
+		return m.uploadedURL, nil
+	}
+	return m.GetPublicURL(key), nil
+}
+
+func (m *mockUploader) Delete(ctx context.Context, key string) error {
+	return m.err
+}
+
+func (m *mockUploader) GetPublicURL(key string) string {
+	return "https://cdn.gocart.local/" + key
+}
+
+func (m *mockUploader) GenerateKey(prefix, filename string) string {
+	return prefix + "/" + filename
+}
+
+func (m *mockUploader) GetPresignedPutURL(ctx context.Context, key string, contentType string, expiry time.Duration) (string, error) {
+	return "https://cdn.gocart.local/presigned/" + key, m.err
+}
+
 type mockOrderClient struct {
 	orderpb.OrderServiceClient
 	orders map[string]*orderpb.Order
@@ -234,7 +325,7 @@ func TestRatingService_Operations(t *testing.T) {
 		},
 	}
 
-	svc := service.NewRatingService(repo, orderClient, nil)
+	svc := service.NewRatingService(repo, orderClient, nil, nil)
 
 	// 1. Create rating for a delivered order item (should succeed)
 	rating, err := svc.CreateRating(ctx, dto.CreateRatingInput{
@@ -384,7 +475,7 @@ func TestRatingService_Validation(t *testing.T) {
 		},
 	}
 
-	svc := service.NewRatingService(repo, orderClient, nil)
+	svc := service.NewRatingService(repo, orderClient, nil, nil)
 
 	// Rating score validation (< 1 or > 5)
 	_, err := svc.CreateRating(ctx, dto.CreateRatingInput{
@@ -440,7 +531,7 @@ func TestRatingService_Validation(t *testing.T) {
 	}
 
 	// Nil order client
-	nilClientSvc := service.NewRatingService(repo, nil, nil)
+	nilClientSvc := service.NewRatingService(repo, nil, nil, nil)
 	_, err = nilClientSvc.CreateRating(ctx, dto.CreateRatingInput{
 		Rating:      5,
 		UserID:      user1,
@@ -522,7 +613,7 @@ func TestRatingService_Validation(t *testing.T) {
 func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil, nil)
 
 	targetProductID := uuid.New().String()
 	otherProductID := uuid.New().String()
@@ -616,7 +707,7 @@ func TestRatingService_ProductRatings_Aggregation(t *testing.T) {
 func TestRatingService_FlagRating(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil, nil)
 
 	// 1. Missing rating ID
 	err := svc.FlagRating(ctx, dto.FlagRatingInput{
@@ -688,7 +779,7 @@ func TestRatingService_FlagRating(t *testing.T) {
 func TestRatingService_GetFlaggedRatings(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil, nil)
 
 	// 1. Missing admin ID
 	_, _, err := svc.GetFlaggedRatings(ctx, dto.GetFlaggedRatingsInput{
@@ -740,7 +831,7 @@ func TestRatingService_GetFlaggedRatings(t *testing.T) {
 func TestRatingService_ModerateRatings(t *testing.T) {
 	ctx := context.Background()
 	repo := newMockRatingRepo()
-	svc := service.NewRatingService(repo, &mockOrderClient{}, nil)
+	svc := service.NewRatingService(repo, &mockOrderClient{}, nil, nil)
 
 	// 1. Missing rating ID
 	err := svc.ModerateRatings(ctx, dto.ModerateRatingInput{
@@ -844,4 +935,142 @@ func TestRatingService_ModerateRatings(t *testing.T) {
 		t.Errorf("expected IsFlagged to be cleared to false, got true")
 	}
 
+}
+
+func TestRatingService_UploadAndDeleteImages(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	uploader := &mockUploader{}
+	svc := service.NewRatingService(repo, &mockOrderClient{}, uploader, nil)
+
+	authorID := uuid.New().String()
+	otherUserID := uuid.New().String()
+
+	r, err := repo.CreateRating(ctx, &model.Rating{
+		UserID:      authorID,
+		ProductID:   uuid.New().String(),
+		OrderID:     uuid.New().String(),
+		OrderItemID: uuid.New().String(),
+		Rating:      5,
+		Review:      "Great product with photos",
+	})
+	if err != nil {
+		t.Fatalf("failed to seed rating: %v", err)
+	}
+
+	_, err = svc.UploadRatingImages(ctx, dto.UploadRatingImagesInput{
+		RatingID: r.ID,
+		UserID:   otherUserID,
+		Images:   []string{"https://example.com/1.jpg"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not authorized") {
+		t.Errorf("expected forbidden error for non-author, got: %v", err)
+	}
+
+	_, err = svc.UploadRatingImages(ctx, dto.UploadRatingImagesInput{
+		RatingID: r.ID,
+		UserID:   authorID,
+		Images:   []string{"data:application/pdf;base64,JVBERi0x"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported image format") {
+		t.Errorf("expected unsupported image format error, got: %v", err)
+	}
+
+	b64PNG := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("fake-png-bytes"))
+	saved, err := svc.UploadRatingImages(ctx, dto.UploadRatingImagesInput{
+		RatingID: r.ID,
+		UserID:   authorID,
+		Images:   []string{b64PNG, "https://example.com/direct.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("expected upload to suceed, got: %v", err)
+	}
+	if len(saved) != 2 {
+		t.Fatalf("expected 2 saved images,got: %d", len(saved))
+	}
+	if !strings.HasPrefix(saved[0].URL, "https://cdn.gocart.local/ratings/") {
+		t.Errorf("expected S3 uploaded URL, got: %s", saved[0].URL)
+	}
+	if saved[1].URL != "https://example.com/direct.jpg" {
+		t.Errorf("expected direct URL preserved, got: %s", saved[1].URL)
+	}
+
+	_, err = svc.UploadRatingImages(ctx, dto.UploadRatingImagesInput{
+		RatingID: r.ID,
+		UserID:   authorID,
+		Images:   []string{"https://a.com/1.jpg", "https://a.com/2.jpg", "https://a.com/3.jpg", "https://a.com/4.jpg"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "maximum 5 images") {
+		t.Errorf("expected max 5 images error, got: %v", err)
+	}
+
+	err = svc.DeleteRatingImage(ctx, dto.DeleteRatingImageInput{
+		ImageID: saved[0].ID,
+		UserID:  otherUserID,
+	})
+	if err == nil || !strings.Contains(err.Error(), "not authorized") {
+		t.Errorf("expected forbidden error on delete by non-author, got: %v", err)
+	}
+
+	err = svc.DeleteRatingImage(ctx, dto.DeleteRatingImageInput{
+		ImageID: saved[0].ID,
+		UserID:  authorID,
+	})
+	if err != nil {
+		t.Fatalf("expected delete image to suceed, got: %v", err)
+	}
+
+	fetched, err := svc.GetRating(ctx, r.ID)
+	if err != nil {
+		t.Fatalf("GetRating failed: %v", err)
+	}
+	if len(fetched.Images) != 1 || fetched.Images[0].ID != saved[1].ID {
+		t.Errorf("expected 1 remaining image after deletion, got %d", len(fetched.Images))
+	}
+
+}
+
+func TestRatingService_CreateRating_WithImages(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	svc := service.NewRatingService(repo, &mockOrderClient{
+		orders: map[string]*orderpb.Order{
+			"11111111-1111-1111-1111-111111111111": {
+				Id:          "11111111-1111-1111-1111-111111111111",
+				UserId:      "22222222-2222-2222-2222-222222222222",
+				OrderStatus: "DELIVERED",
+				Items: []*orderpb.OrderItem{
+					{Id: "33333333-3333-3333-3333-333333333333", ProductId: "44444444-4444-4444-4444-444444444444"},
+				},
+			},
+		},
+	}, &mockUploader{}, nil)
+
+	_, err := svc.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      "22222222-2222-2222-2222-222222222222",
+		OrderID:     "11111111-1111-1111-1111-111111111111",
+		OrderItemID: "33333333-3333-3333-3333-333333333333",
+		ProductID:   "44444444-4444-4444-4444-444444444444",
+		Rating:      5,
+		Images:      []string{"https://a.com/1.jpg", "https://a.com/2.jpg", "https://a.com/3.jpg", "https://a.com/4.jpg", "https://a.com/5.jpg", "https://a.com/6.jpg"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "maximum 5 images") {
+		t.Fatalf("expected max 5 images error, got: %v", err)
+	}
+
+	created, err := svc.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      "22222222-2222-2222-2222-222222222222",
+		OrderID:     "11111111-1111-1111-1111-111111111111",
+		OrderItemID: "33333333-3333-3333-3333-333333333333",
+		ProductID:   "44444444-4444-4444-4444-444444444444",
+		Rating:      5,
+		Review:      "Great with photo",
+		Images:      []string{"https://cdn.gocart.local/ratings/photo.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("expected CreateRating with image to succeed, got: %v", err)
+	}
+	if len(created.Images) != 1 || created.Images[0].URL != "https://cdn.gocart.local/ratings/photo.jpg" {
+		t.Errorf("expected 1 saved image, got: %+v", created.Images)
+	}
 }

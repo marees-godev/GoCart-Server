@@ -2,8 +2,11 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/99designs/gqlgen/graphql"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
 	ratingpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -39,7 +42,13 @@ type mockRatingClientForResolvers struct {
 	getFlaggedRatingsErr  error
 
 	moderateRatingsResp *ratingpb.ModerateRatingResponse
-	moderateRatingsErr error
+	moderateRatingsErr  error
+
+	uploadImagesResp *ratingpb.UploadRatingImagesResponse
+	uploadImagesErr  error
+
+	deleteImagesResp *ratingpb.DeleteRatingImageResponse
+	deleteImageErr   error
 
 	lastCreateReq            *ratingpb.CreateRatingRequest
 	lastGetReq               *ratingpb.GetRatingRequest
@@ -48,7 +57,9 @@ type mockRatingClientForResolvers struct {
 	lastDeleteReq            *ratingpb.DeleteRatingRequest
 	lastFlagRatingReq        *ratingpb.FlagRatingRequest
 	lastGetFlaggedRatingsReq *ratingpb.GetFlaggedRatingsRequest
-	lastModerateRatingsReq *ratingpb.ModerateRatingRequest
+	lastModerateRatingsReq   *ratingpb.ModerateRatingRequest
+	lastUploadImagesReq      *ratingpb.UploadRatingImagesRequest
+	lastDeleteImageReq       *ratingpb.DeleteRatingImageRequest
 }
 
 func (m *mockRatingClientForResolvers) CreateRating(ctx context.Context, in *ratingpb.CreateRatingRequest, opts ...grpcPkg.CallOption) (*ratingpb.CreateRatingResponse, error) {
@@ -107,8 +118,24 @@ func (m *mockRatingClientForResolvers) GetFlaggedRatings(ctx context.Context, in
 	return m.getFlaggedRatingsResp, nil
 }
 
+func (m *mockRatingClientForResolvers) UploadRatingImages(ctx context.Context, in *ratingpb.UploadRatingImagesRequest, opts ...grpcPkg.CallOption) (*rating.UploadRatingImagesResponse, error) {
+	m.lastUploadImagesReq = in
+	if m.uploadImagesErr != nil {
+		return nil, m.uploadImagesErr
+	}
+	return m.uploadImagesResp, nil
+}
+
+func (m *mockRatingClientForResolvers) DeleteRatingImage(ctx context.Context, in *ratingpb.DeleteRatingImageRequest, opts ...grpcPkg.CallOption) (*ratingpb.DeleteRatingImageResponse, error) {
+	m.lastDeleteImageReq = in
+	if m.deleteImageErr != nil {
+		return nil, m.deleteImageErr
+	}
+	return m.deleteImagesResp, nil
+}
+
 func (m *mockRatingClientForResolvers) ModerateRatings(ctx context.Context, in *ratingpb.ModerateRatingRequest, opts ...grpcPkg.CallOption) (*ratingpb.ModerateRatingResponse, error) {
-	m.lastModerateRatingsReq = in 
+	m.lastModerateRatingsReq = in
 	if m.moderateRatingsErr != nil {
 		return nil, m.moderateRatingsErr
 	}
@@ -872,7 +899,6 @@ func TestRatingResolvers_FlagRating_GRPCError(t *testing.T) {
 	}
 }
 
-
 func TestRatingResolvers_GetFlaggedRating_Unauthenticated(t *testing.T) {
 	mock := &mockRatingClientForResolvers{}
 	_, query := newTestRatingResolver(mock)
@@ -1013,7 +1039,7 @@ func TestRatingResolvers_GetFlaggedRating_GRPCError(t *testing.T) {
 	if !ok || appErr.Code != appErrors.CodeInternalError {
 		t.Fatalf("expected INTERNAL_SERVER_ERROR, got %v", err)
 	}
-	
+
 }
 
 func TestRatingResolvers_ModerateRating_Unauthenticated(t *testing.T) {
@@ -1024,14 +1050,14 @@ func TestRatingResolvers_ModerateRating_Unauthenticated(t *testing.T) {
 		IsHidden: true,
 	}
 
-	_, err := mut.ModerateRating(context.Background(),input)
+	_, err := mut.ModerateRating(context.Background(), input)
 	if err == nil {
 		t.Fatal("expected error for unauthenticated user, got nil")
 	}
 
 	appErr, ok := err.(*appErrors.AppError)
 	if !ok || appErr.Code != appErrors.CodeUnauthorized {
-		t.Fatalf("expected UNAUTHORIZED code, got %v",err)
+		t.Fatalf("expected UNAUTHORIZED code, got %v", err)
 	}
 
 }
@@ -1045,7 +1071,7 @@ func TestRatingResolvers_ModerateRating_Nilclient(t *testing.T) {
 
 	ctx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "admin-101",
-		Role: auth.RoleAdmin,
+		Role:   auth.RoleAdmin,
 	})
 
 	input := model.ModerateRatingInput{
@@ -1072,11 +1098,11 @@ func TestRatingResolvers_ModerateRating_Success_Hide(t *testing.T) {
 		},
 	}
 
-	mut , _ := newTestRatingResolver(mock)
+	mut, _ := newTestRatingResolver(mock)
 
 	ctx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: "admin-101",
-		Role: auth.RoleAdmin,
+		Role:   auth.RoleAdmin,
 	})
 
 	input := model.ModerateRatingInput{
@@ -1084,13 +1110,13 @@ func TestRatingResolvers_ModerateRating_Success_Hide(t *testing.T) {
 		IsHidden: true,
 	}
 
-	res,err := mut.ModerateRating(ctx, input)
+	res, err := mut.ModerateRating(ctx, input)
 	if err != nil {
-		t.Fatalf("unexpected error : %v",err)
+		t.Fatalf("unexpected error : %v", err)
 	}
 
 	if !res.Success || res.Message != "Rating hidden successfully" {
-		t.Errorf("unexpected moderate response: %+v",res)
+		t.Errorf("unexpected moderate response: %+v", res)
 	}
 
 	if mock.lastModerateRatingsReq == nil {
@@ -1098,11 +1124,11 @@ func TestRatingResolvers_ModerateRating_Success_Hide(t *testing.T) {
 	}
 
 	if mock.lastModerateRatingsReq.RatingId != "rate-101" {
-		t.Errorf("expected RatingId rate-101, got %s",mock.lastModerateRatingsReq.RatingId)
+		t.Errorf("expected RatingId rate-101, got %s", mock.lastModerateRatingsReq.RatingId)
 	}
 
 	if mock.lastModerateRatingsReq.AdminId != "admin-101" {
-		t.Errorf("expected AdminId admin-101, got %s",mock.lastModerateRatingsReq.AdminId)
+		t.Errorf("expected AdminId admin-101, got %s", mock.lastModerateRatingsReq.AdminId)
 	}
 
 	if !mock.lastModerateRatingsReq.IsHidden {
@@ -1161,5 +1187,140 @@ func TestRatingResolvers_ModerateRating_GRPCError(t *testing.T) {
 	appErr, ok := err.(*appErrors.AppError)
 	if !ok || appErr.Code != appErrors.CodeNotFound {
 		t.Fatalf("expected NOT_FOUND, got %v", err)
+	}
+}
+
+func TestRatingResolvers_UploadRatingImages_Success(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		uploadImagesResp: &ratingpb.UploadRatingImagesResponse{
+			Images: []*ratingpb.RatingImage{
+				{
+					Id:        "img-1",
+					RatingId:  "rat-1",
+					Url:       "https://cdn.gocart.local/ratings/1.png",
+					CreatedAt: "2026-11-12T10:00:00Z",
+				},
+				{
+					Id:        "img-2",
+					RatingId:  "rat-2",
+					Url:       "https://example.com/photo.jpg",
+					CreatedAt: "2026-11-12T10:00:00Z",
+				},
+			},
+		},
+	}
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "user-123", Role: "CUSTOMER"})
+
+	res, err := mut.UploadRatingImages(ctx, model.UploadRatingImagesInput{
+		RatingID: "rat-1",
+		Images:   []string{"https://example.com/photo.jpg"},
+		ImagesUpload: []*graphql.Upload{
+			{
+				File:        strings.NewReader("fake-png-data"),
+				Filename:    "test.png",
+				ContentType: "image/png",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Images) != 2 {
+		t.Fatalf("expected 2 images returned, got %d", len(res.Images))
+	}
+	if mock.lastUploadImagesReq == nil || len(mock.lastUploadImagesReq.Images) != 2 {
+		t.Fatalf("expected 2 combined image strings sent to gRPC, got %+v", mock.lastUploadImagesReq)
+	}
+	if !strings.HasPrefix(mock.lastUploadImagesReq.Images[1], "data:image/png;base64,") {
+		t.Errorf("expected uploaded file to be base64 data URI, got %s", mock.lastUploadImagesReq.Images[1])
+	}
+}
+
+func TestRatingResolvers_UploadRatingImages_Unauthenticated(t *testing.T) {
+	mut, _ := newTestRatingResolver(&mockRatingClientForResolvers{})
+	_, err := mut.UploadRatingImages(context.Background(), model.UploadRatingImagesInput{
+		RatingID: "rat-1",
+		Images:   []string{"https://example.com/1.jpg"},
+	})
+	if err == nil {
+		t.Fatal("expected unauthorized error")
+	}
+}
+
+func TestRatingResolvers_UploadRatingImages_EmptyImages(t *testing.T) {
+	mut, _ := newTestRatingResolver(&mockRatingClientForResolvers{})
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "user-123", Role: "CUSTOMER"})
+	_, err := mut.UploadRatingImages(ctx, model.UploadRatingImagesInput{
+		RatingID: "rat-1",
+	})
+	if err == nil {
+		t.Fatal("expected validation error when no images provided")
+	}
+}
+
+func TestRatingResolvers_DeleteRatingImage_Success(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		deleteImagesResp: &ratingpb.DeleteRatingImageResponse{
+			Success: true,
+			Message: "rating image deleted successfully",
+		},
+	}
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "user-123", Role: "CUSTOMER"})
+
+	res, err := mut.DeleteRatingImage(ctx, "img-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !res.Success {
+		t.Errorf("expected success true")
+	}
+	if mock.lastDeleteImageReq == nil || mock.lastDeleteImageReq.ImageId != "img-1" || mock.lastDeleteImageReq.UserId != "user-123" {
+		t.Errorf("unexpected gRPC request: %+v", mock.lastDeleteImageReq)
+	}
+}
+
+func TestRatingResolvers_DeleteRatingImage_Unauthenticated(t *testing.T) {
+	mut, _ := newTestRatingResolver(&mockRatingClientForResolvers{})
+	_, err := mut.DeleteRatingImage(context.Background(), "img-1")
+	if err == nil {
+		t.Fatal("expected unauthorized error")
+	}
+}
+
+func TestRatingResolvers_CreateRating_WithImages(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		createResp: &ratingpb.CreateRatingResponse{
+			Rating: &ratingpb.Rating{
+				Id:     "rat-1",
+				Rating: 5,
+				Images: []*ratingpb.RatingImage{{Id: "img-1", RatingId: "rat-1", Url: "https://cdn.gocart.local/ratings/1.png"}},
+			},
+		},
+	}
+
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "user-123", Role: "CUSTOMER"})
+
+	res, err := mut.CreateRating(ctx, model.CreateRatingInput{
+		ProductID:   "prod-1",
+		OrderID:     "ord-1",
+		OrderItemID: "item-1",
+		Rating:      5,
+		Images:      []string{"https://example.com/1.jpg"},
+		ImagesUpload: []*graphql.Upload{
+			{File: strings.NewReader("fake-png"), Filename: "a.png", ContentType: "image/png"},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Images) != 1 {
+		t.Errorf("expected 1 mapped image in response, got: %d", len(res.Images))
+	}
+	if mock.lastCreateReq == nil || len(mock.lastCreateReq.Images) != 2 {
+		t.Errorf("expected 2 images forwarded to gRPC CreateRating, got %+v", mock.lastCreateReq)
 	}
 }
