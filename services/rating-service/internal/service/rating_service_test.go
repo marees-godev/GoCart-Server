@@ -52,6 +52,14 @@ func (m *mockRatingRepo) CreateRating(ctx context.Context, r *model.Rating) (*mo
 	}
 	r.UpdatedAt = now
 
+	for i := range r.Images {
+		r.Images[i].ID = uuid.New().String()
+		r.Images[i].RatingID = r.ID
+		r.Images[i].CreatedAt = now
+		imgCopy := r.Images[i]
+		m.images[imgCopy.ID] = &imgCopy
+	}
+
 	cp := *r
 	m.ratings[r.ID] = &cp
 	return &cp, nil
@@ -1020,4 +1028,49 @@ func TestRatingService_UploadAndDeleteImages(t *testing.T) {
 		t.Errorf("expected 1 remaining image after deletion, got %d", len(fetched.Images))
 	}
 
+}
+
+func TestRatingService_CreateRating_WithImages(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	svc := service.NewRatingService(repo, &mockOrderClient{
+		orders: map[string]*orderpb.Order{
+			"11111111-1111-1111-1111-111111111111": {
+				Id:          "11111111-1111-1111-1111-111111111111",
+				UserId:      "22222222-2222-2222-2222-222222222222",
+				OrderStatus: "DELIVERED",
+				Items: []*orderpb.OrderItem{
+					{Id: "33333333-3333-3333-3333-333333333333", ProductId: "44444444-4444-4444-4444-444444444444"},
+				},
+			},
+		},
+	}, &mockUploader{}, nil)
+
+	_, err := svc.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      "22222222-2222-2222-2222-222222222222",
+		OrderID:     "11111111-1111-1111-1111-111111111111",
+		OrderItemID: "33333333-3333-3333-3333-333333333333",
+		ProductID:   "44444444-4444-4444-4444-444444444444",
+		Rating:      5,
+		Images:      []string{"https://a.com/1.jpg", "https://a.com/2.jpg", "https://a.com/3.jpg", "https://a.com/4.jpg", "https://a.com/5.jpg", "https://a.com/6.jpg"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "maximum 5 images") {
+		t.Fatalf("expected max 5 images error, got: %v", err)
+	}
+
+	created, err := svc.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      "22222222-2222-2222-2222-222222222222",
+		OrderID:     "11111111-1111-1111-1111-111111111111",
+		OrderItemID: "33333333-3333-3333-3333-333333333333",
+		ProductID:   "44444444-4444-4444-4444-444444444444",
+		Rating:      5,
+		Review:      "Great with photo",
+		Images:      []string{"https://cdn.gocart.local/ratings/photo.jpg"},
+	})
+	if err != nil {
+		t.Fatalf("expected CreateRating with image to succeed, got: %v", err)
+	}
+	if len(created.Images) != 1 || created.Images[0].URL != "https://cdn.gocart.local/ratings/photo.jpg" {
+		t.Errorf("expected 1 saved image, got: %+v", created.Images)
+	}
 }

@@ -42,6 +42,7 @@ func (h *RatingGRPCHandler) CreateRating(ctx context.Context, req *ratingpb.Crea
 		OrderItemID: req.GetOrderItemId(),
 		Rating:      int(req.GetRating()),
 		Review:      req.GetReview(),
+		Images:      req.Images,
 	})
 	if err != nil {
 		return nil, appErrors.ToGRPC(err)

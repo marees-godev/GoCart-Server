@@ -222,11 +222,13 @@ type CreateProductVariantInput struct {
 }
 
 type CreateRatingInput struct {
-	ProductID   string  `json:"productId"`
-	OrderID     string  `json:"orderId"`
-	OrderItemID string  `json:"orderItemId"`
-	Rating      int     `json:"rating"`
-	Review      *string `json:"review,omitempty"`
+	ProductID    string            `json:"productId"`
+	OrderID      string            `json:"orderId"`
+	OrderItemID  string            `json:"orderItemId"`
+	Rating       int               `json:"rating"`
+	Review       *string           `json:"review,omitempty"`
+	Images       []string          `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
 }
 
 type CreateStoreInput struct {

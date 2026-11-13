@@ -6928,6 +6928,8 @@ input CreateRatingInput {
   orderItemId: String!
   rating: Int!
   review: String
+  images: [String!]
+  imagesUpload: [Upload!]
 }
 
 input UpdateRatingInput {
@@ -46488,7 +46490,7 @@ func (ec *executionContext) unmarshalInputCreateRatingInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productId", "orderId", "orderItemId", "rating", "review"}
+	fieldsInOrder := [...]string{"productId", "orderId", "orderItemId", "rating", "review", "images", "imagesUpload"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -46530,6 +46532,20 @@ func (ec *executionContext) unmarshalInputCreateRatingInput(ctx context.Context,
 				return it, err
 			}
 			it.Review = data
+		case "images":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("images"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Images = data
+		case "imagesUpload":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imagesUpload"))
+			data, err := ec.unmarshalOUpload2ᚕᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUploadᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImagesUpload = data
 		}
 	}
 

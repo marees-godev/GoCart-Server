@@ -219,6 +219,7 @@ type CreateRatingRequest struct {
 	UserId        string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Rating        int32                  `protobuf:"varint,5,opt,name=rating,proto3" json:"rating,omitempty"`
 	Review        string                 `protobuf:"bytes,6,opt,name=review,proto3" json:"review,omitempty"`
+	Images        []string               `protobuf:"bytes,7,rep,name=images,proto3" json:"images,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -293,6 +294,13 @@ func (x *CreateRatingRequest) GetReview() string {
 		return x.Review
 	}
 	return ""
+}
+
+func (x *CreateRatingRequest) GetImages() []string {
+	if x != nil {
+		return x.Images
+	}
+	return nil
 }
 
 type CreateRatingResponse struct {
@@ -1625,7 +1633,7 @@ const file_contracts_protobuf_rating_rating_proto_rawDesc = "" +
 	" \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\v \x01(\tR\tupdatedAt\x125\n" +
-	"\x06images\x18\f \x03(\v2\x1d.gocart.rating.v1.RatingImageR\x06images\"\xbc\x01\n" +
+	"\x06images\x18\f \x03(\v2\x1d.gocart.rating.v1.RatingImageR\x06images\"\xd4\x01\n" +
 	"\x13CreateRatingRequest\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x19\n" +
@@ -1633,7 +1641,8 @@ const file_contracts_protobuf_rating_rating_proto_rawDesc = "" +
 	"\rorder_item_id\x18\x03 \x01(\tR\vorderItemId\x12\x17\n" +
 	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06rating\x18\x05 \x01(\x05R\x06rating\x12\x16\n" +
-	"\x06review\x18\x06 \x01(\tR\x06review\"H\n" +
+	"\x06review\x18\x06 \x01(\tR\x06review\x12\x16\n" +
+	"\x06images\x18\a \x03(\tR\x06images\"H\n" +
 	"\x14CreateRatingResponse\x120\n" +
 	"\x06rating\x18\x01 \x01(\v2\x18.gocart.rating.v1.RatingR\x06rating\"\"\n" +
 	"\x10GetRatingRequest\x12\x0e\n" +

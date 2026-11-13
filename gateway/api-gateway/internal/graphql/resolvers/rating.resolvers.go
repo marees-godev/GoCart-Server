@@ -31,6 +31,21 @@ func (r *mutationResolver) CreateRating(ctx context.Context, input model.CreateR
 		review = *input.Review
 	}
 
+	var images []string
+	if len(input.Images) > 0 {
+		images = append(images, input.Images...)
+	}
+
+	for _, up := range input.ImagesUpload {
+		if up != nil {
+			processed, err := processUpload(up)
+			if err != nil {
+				return nil, appErrors.BadRequest("failed to process imagesUpload file upload")
+			}
+			images = append(images, processed)
+		}
+	}
+
 	req := &ratingpb.CreateRatingRequest{
 		ProductId:   input.ProductID,
 		OrderId:     input.OrderID,
@@ -38,6 +53,7 @@ func (r *mutationResolver) CreateRating(ctx context.Context, input model.CreateR
 		UserId:      userID,
 		Rating:      int32(input.Rating),
 		Review:      review,
+		Images:      images,
 	}
 
 	resp, err := r.ClientMgr.RatingClient.CreateRating(ctx, req)

@@ -49,6 +49,12 @@ func (r *RatingRepo) CreateRating(ctx context.Context, rating *model.Rating) (*m
 	}
 	rating.UpdatedAt = now
 
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func ()  { _ = tx.Rollback(ctx) }()
+
 	query := `
 		INSERT INTO ratings (
 			user_id, product_id, order_id, order_item_id,
@@ -62,7 +68,7 @@ func (r *RatingRepo) CreateRating(ctx context.Context, rating *model.Rating) (*m
 		RETURNING id, created_at, updated_at;
 	`
 
-	err := r.db.Pool.QueryRow(
+	err = tx.QueryRow(
 		ctx,
 		query,
 		rating.UserID,
@@ -84,6 +90,25 @@ func (r *RatingRepo) CreateRating(ctx context.Context, rating *model.Rating) (*m
 			return nil, ErrRatingAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to insert rating: %w", err)
+	}
+
+	if len(rating.Images) > 0 {
+		imgQuery := `
+			INSERT INTO rating_images (rating_id, url)
+			VALUES ($1, $2)
+			RETURNING id, rating_id, url, created_at	
+		`
+		for i := range rating.Images {
+			var img model.RatingImage 
+			if err := tx.QueryRow(ctx, imgQuery, rating.ID, rating.Images[i].URL).Scan(&img.ID, &img.RatingID, &img.URL, &img.CreatedAt); err != nil {
+				return nil, fmt.Errorf("failed to insert rating image: %w", err)
+			}
+			rating.Images[i] = img
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return rating, nil

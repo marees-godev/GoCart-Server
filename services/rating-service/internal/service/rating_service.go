@@ -119,6 +119,19 @@ func (s *ratingService) CreateRating(ctx context.Context, input dto.CreateRating
 		return nil, appErrors.BadRequest("product_id does not match the purchased order item")
 	}
 
+	if len(input.Images) > maxImagesPerReview {
+		return nil, appErrors.BadRequest("maximum 5 images allowed per review")
+	}
+
+	var ratingImages []model.RatingImage
+	for _, raw := range input.Images {
+		u, err := s.processImageDataURL(ctx, raw)
+		if err != nil {
+			return nil, err
+		}
+		ratingImages = append(ratingImages, model.RatingImage{URL: u})
+	}
+
 	ratingModel := &model.Rating{
 		UserID:             input.UserID,
 		ProductID:          matchedProductID,
@@ -129,6 +142,7 @@ func (s *ratingService) CreateRating(ctx context.Context, input dto.CreateRating
 		IsVerifiedPurchase: true,
 		IsFlagged:          false,
 		IsHidden:           false,
+		Images:             ratingImages,
 	}
 
 	created, err := s.repo.CreateRating(ctx, ratingModel)

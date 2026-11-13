@@ -59,6 +59,8 @@ input CreateRatingInput {
   orderItemId: String!
   rating: Int!
   review: String
+  images: [String!]
+  imagesUpload: [Upload!]
 }
 
 input UpdateRatingInput {

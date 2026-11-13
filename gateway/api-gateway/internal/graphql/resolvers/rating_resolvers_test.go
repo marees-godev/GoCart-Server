@@ -1288,3 +1288,39 @@ func TestRatingResolvers_DeleteRatingImage_Unauthenticated(t *testing.T) {
 		t.Fatal("expected unauthorized error")
 	}
 }
+
+func TestRatingResolvers_CreateRating_WithImages(t *testing.T) {
+	mock := &mockRatingClientForResolvers{
+		createResp: &ratingpb.CreateRatingResponse{
+			Rating: &ratingpb.Rating{
+				Id:     "rat-1",
+				Rating: 5,
+				Images: []*ratingpb.RatingImage{{Id: "img-1", RatingId: "rat-1", Url: "https://cdn.gocart.local/ratings/1.png"}},
+			},
+		},
+	}
+
+	mut, _ := newTestRatingResolver(mock)
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{UserID: "user-123", Role: "CUSTOMER"})
+
+	res, err := mut.CreateRating(ctx, model.CreateRatingInput{
+		ProductID:   "prod-1",
+		OrderID:     "ord-1",
+		OrderItemID: "item-1",
+		Rating:      5,
+		Images:      []string{"https://example.com/1.jpg"},
+		ImagesUpload: []*graphql.Upload{
+			{File: strings.NewReader("fake-png"), Filename: "a.png", ContentType: "image/png"},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Images) != 1 {
+		t.Errorf("expected 1 mapped image in response, got: %d", len(res.Images))
+	}
+	if mock.lastCreateReq == nil || len(mock.lastCreateReq.Images) != 2 {
+		t.Errorf("expected 2 images forwarded to gRPC CreateRating, got %+v", mock.lastCreateReq)
+	}
+}

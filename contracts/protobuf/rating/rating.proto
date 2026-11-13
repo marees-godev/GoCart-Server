@@ -48,6 +48,7 @@ message CreateRatingRequest {
   string user_id = 4;
   int32 rating = 5;
   string review = 6;
+  repeated string images = 7;
 }
 
 message CreateRatingResponse {
