@@ -161,7 +161,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderCreated(ctx, ord)
+	return ord, nil
 }
 
 // Checkout is the resolver for the checkout field.
@@ -207,7 +209,9 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 		})
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderCancelled(ctx, ord, reasonStr)
+	return ord, nil
 }
 
 // UpdateOrderStatus is the resolver for the updateOrderStatus field.
@@ -225,7 +229,9 @@ func (r *mutationResolver) UpdateOrderStatus(ctx context.Context, id string, sta
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderStatusUpdated(ctx, ord, status)
+	return ord, nil
 }
 
 // Order is the resolver for the order field.

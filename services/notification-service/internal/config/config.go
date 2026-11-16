@@ -13,12 +13,15 @@ import (
 type Config struct {
 	App       AppConfig
 	HTTP      HTTPConfig
+	GRPC     GRPCConfig
 	Database  DatabaseConfig
 	Logger    LoggerConfig
 	Tracing   TracingConfig
 	Kafka     KafkaConfig
 	Email     provider.EmailConfig
 	Providers provider.ProviderConfig
+	VAPID    VAPIDConfig
+	Push     PushConfig
 }
 
 type AppConfig struct {
@@ -29,6 +32,12 @@ type AppConfig struct {
 
 type HTTPConfig struct {
 	Port string
+}
+
+type GRPCConfig struct {
+	Port             string
+	OrderServiceAddr string
+	LookupTimeout    time.Duration
 }
 
 type DatabaseConfig struct {
@@ -51,10 +60,30 @@ type TracingConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers  []string
-	ClientID string
-	GroupID  string
-	Enabled  bool
+	Brokers       []string
+	ClientID      string
+	GroupID       string
+	Enabled       bool
+	MaxRetries    int
+	RetryInterval time.Duration
+	DLQSuffix     string
+}
+
+type VAPIDConfig struct {
+	PublicKey  string
+	PrivateKey string
+	Subject    string
+}
+
+func (v VAPIDConfig) IsConfigured() bool {
+	return strings.TrimSpace(v.PublicKey) != "" && strings.TrimSpace(v.PrivateKey) != ""
+}
+
+type PushConfig struct {
+	RequestTimeout time.Duration
+	MaxRetries     int
+	RetryInterval  time.Duration
+	TTLSeconds     int
 }
 
 func LoadEnv() *Config {
@@ -73,6 +102,14 @@ func LoadEnv() *Config {
 			Timeout:         GetEnvAsDuration("EMAIL_TIMEOUT", 10*time.Second),
 		}
 
+	dbURL := GetEnv("NOTIFICATIONS_SERVICE_DATABASE_URL", "")
+	if dbURL == "" {
+		dbURL = GetEnv("NOTIFICATION_SERVICE_DATABASE_URL", "")
+	}
+	if dbURL == "" {
+		dbURL = GetEnv("DATABASE_URL", "")
+	}
+
 	return &Config{
 		App: AppConfig{
 			Name:        GetEnv("APP_NAME", "notification-service"),
@@ -82,8 +119,13 @@ func LoadEnv() *Config {
 		HTTP: HTTPConfig{
 			Port: GetEnv("PORT", "9099"),
 		},
+		GRPC: GRPCConfig{
+			Port:             GetEnv("GRPC_PORT", "50064"),
+			OrderServiceAddr: GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059"),
+			LookupTimeout:    GetEnvAsDuration("GRPC_LOOKUP_TIMEOUT", 2*time.Second),
+		},
 		Database: DatabaseConfig{
-			URL:            GetEnv("NOTIFICATIONS_SERVICE_DATABASE_URL", ""),
+			URL:            dbURL,
 			MaxConns:       int32(GetEnvAsInt("DB_MAX_CONNS", 25)),
 			MinConns:       int32(GetEnvAsInt("DB_MIN_CONNS", 2)),
 			AutoMigrate:    GetEnvAsBool("DB_AUTO_MIGRATE", true),
@@ -99,28 +141,30 @@ func LoadEnv() *Config {
 			OTLPEndpoint: GetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317"),
 		},
 		Kafka: KafkaConfig{
-			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
-			ClientID: GetEnv("KAFKA_CLIENT_ID", "notification-service"),
-			GroupID:  GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
-			Enabled:  GetEnvAsBool("KAFKA_ENABLED", true),
+			Brokers:       GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID:      GetEnv("KAFKA_CLIENT_ID", "notification-service"),
+			GroupID:       GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
+			Enabled:       GetEnvAsBool("KAFKA_ENABLED", true),
+			MaxRetries:    GetEnvAsInt("KAFKA_MAX_RETRIES", 3),
+			RetryInterval: GetEnvAsDuration("KAFKA_RETRY_INTERVAL", 500*time.Millisecond),
+			DLQSuffix:     GetEnv("KAFKA_DLQ_SUFFIX", ".dlq"),
+		},
+		VAPID: VAPIDConfig{
+			PublicKey:  GetEnv("VAPID_PUBLIC_KEY", ""),
+			PrivateKey: GetEnv("VAPID_PRIVATE_KEY", ""),
+			Subject:    GetEnv("VAPID_SUBJECT", "mailto:notifications@gocart.local"),
+		},
+		Push: PushConfig{
+			RequestTimeout: GetEnvAsDuration("PUSH_REQUEST_TIMEOUT", 10*time.Second),
+			MaxRetries:     GetEnvAsInt("PUSH_MAX_RETRIES", 3),
+			RetryInterval:  GetEnvAsDuration("PUSH_RETRY_INTERVAL", 500*time.Millisecond),
+			TTLSeconds:     GetEnvAsInt("PUSH_TTL_SECONDS", 86400),
 		},
 		Email: emailCfg,
 		Providers: provider.ProviderConfig{
 			Email: emailCfg,
 		},
 	}
-}
-
-func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
-	valStr := os.Getenv(key)
-	if valStr == "" {
-		return defaultValue
-	}
-	d, err := time.ParseDuration(valStr)
-	if err != nil {
-		return defaultValue
-	}
-	return d
 }
 
 func GetEnv(key, defaultValue string) string {
@@ -152,6 +196,18 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valStr)
+	if err != nil {
+		return defaultValue
+	}
+	return d
 }
 
 func GetEnvAsStringSlice(key string, defaultValue []string) []string {

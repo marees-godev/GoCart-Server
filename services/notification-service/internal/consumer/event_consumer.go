@@ -12,8 +12,11 @@ import (
 	"github.com/marees-godev/GoCart-Server/services/notification-service/internal/service"
 )
 
+type DLQPublisher func(ctx context.Context, envelope *events.EventEnvelope, reason error) error
+
 type NotificationEventConsumer struct {
 	pipelineService service.NotificationPipelineService
+	dlqPublisher    DLQPublisher
 	logger          *slog.Logger
 }
 
@@ -27,9 +30,12 @@ func NewNotificationEventConsumer(
 	}
 }
 
+func (c *NotificationEventConsumer) SetDLQPublisher(pub DLQPublisher) {
+	c.dlqPublisher = pub
+}
+
 // HandleEvent processes incoming domain events from Kafka topics.
 func (c *NotificationEventConsumer) HandleEvent(ctx context.Context, envelope *events.EventEnvelope) (err error) {
-	// Defensive recovery against unexpected panics
 	defer func() {
 		if r := recover(); r != nil {
 			c.logger.ErrorContext(ctx, "recovered from panic during notification event handling",
@@ -44,7 +50,6 @@ func (c *NotificationEventConsumer) HandleEvent(ctx context.Context, envelope *e
 		return nil
 	}
 
-	// Propagate Correlation ID and Request ID into context
 	if envelope.CorrelationID != "" {
 		ctx = logger.WithCorrelationID(ctx, envelope.CorrelationID)
 		ctx = logger.WithRequestID(ctx, envelope.CorrelationID)
@@ -61,14 +66,24 @@ func (c *NotificationEventConsumer) HandleEvent(ctx context.Context, envelope *e
 	if err != nil {
 		var appErr *appErrors.AppError
 		if errors.As(err, &appErr) && appErr.Code == appErrors.CodeBadRequest {
-			c.logger.WarnContext(ctx, "bad request during event processing, acknowledging without retry to avoid poison pill",
+			c.logger.WarnContext(ctx, "bad request during event processing, routing poison pill without retry",
 				"event_id", envelope.EventID,
+				"event_type", envelope.EventType,
 				"error", err,
 			)
+			if c.dlqPublisher != nil {
+				if dlqErr := c.dlqPublisher(ctx, envelope, err); dlqErr != nil {
+					c.logger.ErrorContext(ctx, "failed publishing malformed event to DLQ",
+						"event_id", envelope.EventID,
+						"error", dlqErr,
+					)
+				}
+			}
 			return nil
 		}
 		c.logger.ErrorContext(ctx, "transient error processing event, triggering retry",
 			"event_id", envelope.EventID,
+			"event_type", envelope.EventType,
 			"error", err,
 		)
 		return err

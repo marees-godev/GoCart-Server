@@ -118,6 +118,14 @@ func ParseShippingAddress(raw string) ShippingAddress {
 				}
 			}
 		}
+		if addr.UserID == "" {
+			for _, k := range []string{"user_id", "userId", "customer_id", "customerId"} {
+				if v, ok := rawMap[k].(string); ok && strings.TrimSpace(v) != "" {
+					addr.UserID = strings.TrimSpace(v)
+					break
+				}
+			}
+		}
 	} else if addr.Street == "" {
 		addr.Street = trimmed
 	}

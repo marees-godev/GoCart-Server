@@ -242,6 +242,7 @@ func (r *pgDeliveryRepository) Create(ctx context.Context, delivery *model.Deliv
 	createdEvt := events.DeliveryCreatedEvent{
 		DeliveryID:      delivery.ID,
 		OrderID:         delivery.OrderID,
+		UserID:          delivery.ShippingAddress.UserID,
 		DeliveryPartner: delivery.DeliveryPartner,
 		TrackingNumber:  delivery.TrackingNumber,
 		Status:          string(delivery.Status),
@@ -579,6 +580,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 	changedEvt := events.DeliveryStatusChangedEvent{
 		DeliveryID:        updatedDelivery.ID,
 		OrderID:           updatedDelivery.OrderID,
+		UserID:            updatedDelivery.ShippingAddress.UserID,
 		PreviousStatus:    string(previousStatus),
 		NewStatus:         string(updatedDelivery.Status),
 		TrackingNumber:    updatedDelivery.TrackingNumber,
@@ -603,6 +605,7 @@ func (r *pgDeliveryRepository) UpdateStatusWithDetails(ctx context.Context, id s
 	updatedEvt := events.DeliveryStatusUpdatedEvent{
 		DeliveryID:     updatedDelivery.ID,
 		OrderID:        updatedDelivery.OrderID,
+		UserID:         updatedDelivery.ShippingAddress.UserID,
 		PreviousStatus: string(previousStatus),
 		NewStatus:      string(updatedDelivery.Status),
 		TrackingNumber: updatedDelivery.TrackingNumber,

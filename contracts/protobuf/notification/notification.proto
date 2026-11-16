@@ -7,6 +7,15 @@ option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/no
 service NotificationService {
   rpc SendNotification (SendNotificationRequest) returns (SendNotificationResponse);
   rpc GetNotifications (GetNotificationsRequest) returns (GetNotificationsResponse);
+  rpc MarkNotificationAsRead (MarkNotificationAsReadRequest) returns (MarkNotificationAsReadResponse);
+  rpc MarkAllNotificationsAsRead (MarkAllNotificationsAsReadRequest) returns (MarkAllNotificationsAsReadResponse);
+  rpc GetUnreadCount (GetUnreadCountRequest) returns (GetUnreadCountResponse);
+
+  rpc RegisterPushSubscription (RegisterPushSubscriptionRequest) returns (PushSubscriptionResponse);
+  rpc GetPushSubscriptions (GetPushSubscriptionsRequest) returns (GetPushSubscriptionsResponse);
+  rpc UpdatePushSubscription (UpdatePushSubscriptionRequest) returns (PushSubscriptionResponse);
+  rpc DeactivatePushSubscription (DeactivatePushSubscriptionRequest) returns (DeactivatePushSubscriptionResponse);
+  rpc GetVAPIDPublicKey (GetVAPIDPublicKeyRequest) returns (GetVAPIDPublicKeyResponse);
 }
 
 message Notification {
@@ -17,6 +26,15 @@ message Notification {
   string content = 5;
   string status = 6;
   string created_at = 7;
+  string event_type = 8;
+  string recipient = 9;
+  string error_message = 10;
+  bool is_read = 11;
+  string read_at = 12;
+  string sent_at = 13;
+  string correlation_id = 14;
+  string event_id = 15;
+  string updated_at = 16;
 }
 
 message SendNotificationRequest {
@@ -26,20 +44,127 @@ message SendNotificationRequest {
   string content = 4;
   string template_id = 5;
   map<string, string> template_data = 6;
+  string event_type = 7;
+  string recipient = 8;
+  string correlation_id = 9;
 }
 
 message SendNotificationResponse {
   string notification_id = 1;
   bool success = 2;
+  string status = 3;
+  string message = 4;
 }
 
 message GetNotificationsRequest {
   string user_id = 1;
   int32 limit = 2;
   int32 offset = 3;
+  string status = 4;
+  string channel = 5;
+  string event_type = 6;
+  optional bool is_read = 7;
 }
 
 message GetNotificationsResponse {
   repeated Notification notifications = 1;
   int32 total = 2;
+  int32 unread_count = 3;
+}
+
+message MarkNotificationAsReadRequest {
+  string notification_id = 1;
+  string user_id = 2;
+  optional bool is_read = 3;
+}
+
+message MarkNotificationAsReadResponse {
+  Notification notification = 1;
+  bool success = 2;
+}
+
+message MarkAllNotificationsAsReadRequest {
+  string user_id = 1;
+}
+
+message MarkAllNotificationsAsReadResponse {
+  int32 updated_count = 1;
+  bool success = 2;
+}
+
+message GetUnreadCountRequest {
+  string user_id = 1;
+}
+
+message GetUnreadCountResponse {
+  int32 unread_count = 1;
+}
+
+message PushSubscription {
+  string id = 1;
+  string user_id = 2;
+  string endpoint = 3;
+  string p256dh = 4;
+  string auth = 5;
+  string user_agent = 6;
+  string device_name = 7;
+  bool is_active = 8;
+  int32 failure_count = 9;
+  string last_error = 10;
+  string last_used_at = 11;
+  string deactivated_at = 12;
+  string created_at = 13;
+  string updated_at = 14;
+}
+
+message RegisterPushSubscriptionRequest {
+  string user_id = 1;
+  string endpoint = 2;
+  string p256dh = 3;
+  string auth = 4;
+  string user_agent = 5;
+  string device_name = 6;
+}
+
+message PushSubscriptionResponse {
+  PushSubscription subscription = 1;
+}
+
+message GetPushSubscriptionsRequest {
+  string user_id = 1;
+  bool active_only = 2;
+}
+
+message GetPushSubscriptionsResponse {
+  repeated PushSubscription subscriptions = 1;
+  int32 total = 2;
+}
+
+message UpdatePushSubscriptionRequest {
+  string id = 1;
+  string user_id = 2;
+  string endpoint = 3;
+  string p256dh = 4;
+  string auth = 5;
+  string user_agent = 6;
+  string device_name = 7;
+  optional bool is_active = 8;
+}
+
+message DeactivatePushSubscriptionRequest {
+  string id = 1;
+  string user_id = 2;
+  string endpoint = 3;
+}
+
+message DeactivatePushSubscriptionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetVAPIDPublicKeyRequest {}
+
+message GetVAPIDPublicKeyResponse {
+  string public_key = 1;
+  string subject = 2;
 }

@@ -32,6 +32,8 @@ const (
 	OrderCreatedTopic       = events.TopicOrderCreated
 	OrderCancelledTopic     = events.TopicOrderCancelled
 	OrderConfirmedTopic     = events.TopicOrderConfirmed
+	OrderShippedTopic       = events.TopicOrderShipped
+	OrderDeliveredTopic     = events.TopicOrderDelivered
 	OrderPaymentFailedTopic = events.TopicOrderPaymentFailed
 )
 
@@ -645,7 +647,61 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", order.Status, orderStatus))
 	}
 
-	updatedOrder, err := s.repo.UpdateOrderStatus(ctx, id, orderStatus, reason...)
+	now := time.Now().UTC()
+	var envelope *events.EventEnvelope
+	var topic string
+	reasonStr := ""
+	if len(reason) > 0 {
+		reasonStr = reason[0]
+	}
+
+	switch orderStatus {
+	case model.OrderStatusConfirmed, model.OrderStatusPaid:
+		topic = OrderConfirmedTopic
+		payload := events.OrderConfirmedEvent{
+			OrderID:       order.ID,
+			UserID:        order.UserID,
+			PaymentStatus: string(model.PaymentStatusPaid),
+			ConfirmedAt:   now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderConfirmed, "order-service", order.ID, payload)
+	case model.OrderStatusShipped, model.OrderStatusOutForDelivery:
+		topic = OrderShippedTopic
+		payload := events.OrderShippedEvent{
+			OrderID:   order.ID,
+			UserID:    order.UserID,
+			ShippedAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderShipped, "order-service", order.ID, payload)
+	case model.OrderStatusDelivered:
+		topic = OrderDeliveredTopic
+		payload := events.OrderDeliveredEvent{
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			DeliveredAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderDelivered, "order-service", order.ID, payload)
+	case model.OrderStatusCancelled:
+		topic = OrderCancelledTopic
+		payload := events.OrderCancelledEvent{
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			Reason:      reasonStr,
+			CancelledAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderCancelled, "order-service", order.ID, payload)
+	case model.OrderStatusPaymentFailed:
+		topic = OrderPaymentFailedTopic
+		payload := events.OrderPaymentFailedEvent{
+			OrderID:  order.ID,
+			UserID:   order.UserID,
+			Reason:   reasonStr,
+			FailedAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", order.ID, payload)
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, id, orderStatus, envelope, topic, reason...)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
@@ -680,9 +736,10 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 
 	now := time.Now().UTC()
 	confirmedEvt := events.OrderConfirmedEvent{
-		OrderID:     order.ID,
-		PaymentStatus:   string(model.OrderStatusPaid),
-		ConfirmedAt: now,
+		OrderID:       order.ID,
+		UserID:        order.UserID,
+		PaymentStatus: string(model.OrderStatusPaid),
+		ConfirmedAt:   now,
 	}
 
 	envelope, err := events.NewEventEnvelopeWithAggregate(
@@ -750,6 +807,7 @@ func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.Pa
 	now := time.Now().UTC()
 	paymentFailedEvt := events.OrderPaymentFailedEvent{
 		OrderID:   order.ID,
+		UserID:    order.UserID,
 		PaymentID: event.PaymentID,
 		Reason:    reason,
 		FailedAt:  now,
@@ -835,6 +893,7 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 	var envelope *events.EventEnvelope
 	eventPayload := events.OrderCancelledEvent{
 		OrderID:     order.ID,
+		UserID:      order.UserID,
 		Reason:      reason,
 		CancelledAt: now,
 	}
