@@ -264,6 +264,74 @@ func (x *GoogleAuthRequest) GetRole() Role {
 	return Role_ROLE_UNSPECIFIED
 }
 
+type FacebookAuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	Role          Role                   `protobuf:"varint,2,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	Code          string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	RedirectUri   string                 `protobuf:"bytes,5,opt,name=redirect_uri,json=redirectUri,proto3" json:"redirect_uri,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FacebookAuthRequest) Reset() {
+	*x = FacebookAuthRequest{}
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FacebookAuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FacebookAuthRequest) ProtoMessage() {}
+
+func (x *FacebookAuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FacebookAuthRequest.ProtoReflect.Descriptor instead.
+func (*FacebookAuthRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FacebookAuthRequest) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *FacebookAuthRequest) GetRole() Role {
+	if x != nil {
+		return x.Role
+	}
+	return Role_ROLE_UNSPECIFIED
+}
+
+func (x *FacebookAuthRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *FacebookAuthRequest) GetRedirectUri() string {
+	if x != nil {
+		return x.RedirectUri
+	}
+	return ""
+}
+
 type ValidateTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
@@ -273,7 +341,7 @@ type ValidateTokenRequest struct {
 
 func (x *ValidateTokenRequest) Reset() {
 	*x = ValidateTokenRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[3]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -285,7 +353,7 @@ func (x *ValidateTokenRequest) String() string {
 func (*ValidateTokenRequest) ProtoMessage() {}
 
 func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[3]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -298,7 +366,7 @@ func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenRequest.ProtoReflect.Descriptor instead.
 func (*ValidateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{3}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ValidateTokenRequest) GetToken() string {
@@ -320,7 +388,7 @@ type ValidateTokenResponse struct {
 
 func (x *ValidateTokenResponse) Reset() {
 	*x = ValidateTokenResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[4]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +400,7 @@ func (x *ValidateTokenResponse) String() string {
 func (*ValidateTokenResponse) ProtoMessage() {}
 
 func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[4]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +413,7 @@ func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenResponse.ProtoReflect.Descriptor instead.
 func (*ValidateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{4}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ValidateTokenResponse) GetValid() bool {
@@ -386,7 +454,7 @@ type RefreshTokenRequest struct {
 
 func (x *RefreshTokenRequest) Reset() {
 	*x = RefreshTokenRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -398,7 +466,7 @@ func (x *RefreshTokenRequest) String() string {
 func (*RefreshTokenRequest) ProtoMessage() {}
 
 func (x *RefreshTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[5]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -411,7 +479,7 @@ func (x *RefreshTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshTokenRequest.ProtoReflect.Descriptor instead.
 func (*RefreshTokenRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{5}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RefreshTokenRequest) GetRefreshToken() string {
@@ -437,7 +505,7 @@ type LogoutRequest struct {
 
 func (x *LogoutRequest) Reset() {
 	*x = LogoutRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -449,7 +517,7 @@ func (x *LogoutRequest) String() string {
 func (*LogoutRequest) ProtoMessage() {}
 
 func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[6]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +530,7 @@ func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
 func (*LogoutRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{6}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LogoutRequest) GetAccessToken() string {
@@ -482,7 +550,7 @@ type LogoutResponse struct {
 
 func (x *LogoutResponse) Reset() {
 	*x = LogoutResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -494,7 +562,7 @@ func (x *LogoutResponse) String() string {
 func (*LogoutResponse) ProtoMessage() {}
 
 func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[7]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -507,7 +575,7 @@ func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutResponse.ProtoReflect.Descriptor instead.
 func (*LogoutResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{7}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *LogoutResponse) GetSuccess() bool {
@@ -544,7 +612,7 @@ type AuthResponse struct {
 
 func (x *AuthResponse) Reset() {
 	*x = AuthResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +624,7 @@ func (x *AuthResponse) String() string {
 func (*AuthResponse) ProtoMessage() {}
 
 func (x *AuthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[8]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +637,7 @@ func (x *AuthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthResponse.ProtoReflect.Descriptor instead.
 func (*AuthResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{8}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AuthResponse) GetAccessToken() string {
@@ -668,7 +736,7 @@ type VerifyEmailRequest struct {
 
 func (x *VerifyEmailRequest) Reset() {
 	*x = VerifyEmailRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -680,7 +748,7 @@ func (x *VerifyEmailRequest) String() string {
 func (*VerifyEmailRequest) ProtoMessage() {}
 
 func (x *VerifyEmailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[9]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -693,7 +761,7 @@ func (x *VerifyEmailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyEmailRequest.ProtoReflect.Descriptor instead.
 func (*VerifyEmailRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{9}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *VerifyEmailRequest) GetEmail() string {
@@ -734,7 +802,7 @@ type VerifyEmailResponse struct {
 
 func (x *VerifyEmailResponse) Reset() {
 	*x = VerifyEmailResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +814,7 @@ func (x *VerifyEmailResponse) String() string {
 func (*VerifyEmailResponse) ProtoMessage() {}
 
 func (x *VerifyEmailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[10]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +827,7 @@ func (x *VerifyEmailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyEmailResponse.ProtoReflect.Descriptor instead.
 func (*VerifyEmailResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{10}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *VerifyEmailResponse) GetSuccess() bool {
@@ -786,7 +854,7 @@ type ResendVerificationEmailRequest struct {
 
 func (x *ResendVerificationEmailRequest) Reset() {
 	*x = ResendVerificationEmailRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -798,7 +866,7 @@ func (x *ResendVerificationEmailRequest) String() string {
 func (*ResendVerificationEmailRequest) ProtoMessage() {}
 
 func (x *ResendVerificationEmailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[11]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -811,7 +879,7 @@ func (x *ResendVerificationEmailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResendVerificationEmailRequest.ProtoReflect.Descriptor instead.
 func (*ResendVerificationEmailRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{11}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResendVerificationEmailRequest) GetEmail() string {
@@ -838,7 +906,7 @@ type ResendVerificationEmailResponse struct {
 
 func (x *ResendVerificationEmailResponse) Reset() {
 	*x = ResendVerificationEmailResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[12]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +918,7 @@ func (x *ResendVerificationEmailResponse) String() string {
 func (*ResendVerificationEmailResponse) ProtoMessage() {}
 
 func (x *ResendVerificationEmailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[12]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +931,7 @@ func (x *ResendVerificationEmailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResendVerificationEmailResponse.ProtoReflect.Descriptor instead.
 func (*ResendVerificationEmailResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{12}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ResendVerificationEmailResponse) GetSuccess() bool {
@@ -891,7 +959,7 @@ type ForgotPasswordRequest struct {
 
 func (x *ForgotPasswordRequest) Reset() {
 	*x = ForgotPasswordRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[13]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -903,7 +971,7 @@ func (x *ForgotPasswordRequest) String() string {
 func (*ForgotPasswordRequest) ProtoMessage() {}
 
 func (x *ForgotPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[13]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -916,7 +984,7 @@ func (x *ForgotPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgotPasswordRequest.ProtoReflect.Descriptor instead.
 func (*ForgotPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{13}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ForgotPasswordRequest) GetEmail() string {
@@ -950,7 +1018,7 @@ type ForgotPasswordResponse struct {
 
 func (x *ForgotPasswordResponse) Reset() {
 	*x = ForgotPasswordResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -962,7 +1030,7 @@ func (x *ForgotPasswordResponse) String() string {
 func (*ForgotPasswordResponse) ProtoMessage() {}
 
 func (x *ForgotPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[14]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -975,7 +1043,7 @@ func (x *ForgotPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForgotPasswordResponse.ProtoReflect.Descriptor instead.
 func (*ForgotPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{14}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ForgotPasswordResponse) GetSuccess() bool {
@@ -1004,7 +1072,7 @@ type ResetPasswordWithOtpRequest struct {
 
 func (x *ResetPasswordWithOtpRequest) Reset() {
 	*x = ResetPasswordWithOtpRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1016,7 +1084,7 @@ func (x *ResetPasswordWithOtpRequest) String() string {
 func (*ResetPasswordWithOtpRequest) ProtoMessage() {}
 
 func (x *ResetPasswordWithOtpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[15]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1029,7 +1097,7 @@ func (x *ResetPasswordWithOtpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetPasswordWithOtpRequest.ProtoReflect.Descriptor instead.
 func (*ResetPasswordWithOtpRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{15}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResetPasswordWithOtpRequest) GetEmail() string {
@@ -1070,7 +1138,7 @@ type ResetPasswordResponse struct {
 
 func (x *ResetPasswordResponse) Reset() {
 	*x = ResetPasswordResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[16]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1082,7 +1150,7 @@ func (x *ResetPasswordResponse) String() string {
 func (*ResetPasswordResponse) ProtoMessage() {}
 
 func (x *ResetPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[16]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1095,7 +1163,7 @@ func (x *ResetPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetPasswordResponse.ProtoReflect.Descriptor instead.
 func (*ResetPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{16}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ResetPasswordResponse) GetSuccess() bool {
@@ -1123,7 +1191,7 @@ type ChangePasswordRequest struct {
 
 func (x *ChangePasswordRequest) Reset() {
 	*x = ChangePasswordRequest{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[17]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +1203,7 @@ func (x *ChangePasswordRequest) String() string {
 func (*ChangePasswordRequest) ProtoMessage() {}
 
 func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[17]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +1216,7 @@ func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
 func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{17}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ChangePasswordRequest) GetUserId() string {
@@ -1182,7 +1250,7 @@ type ChangePasswordResponse struct {
 
 func (x *ChangePasswordResponse) Reset() {
 	*x = ChangePasswordResponse{}
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[18]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1194,7 +1262,7 @@ func (x *ChangePasswordResponse) String() string {
 func (*ChangePasswordResponse) ProtoMessage() {}
 
 func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[18]
+	mi := &file_contracts_protobuf_auth_auth_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1207,7 +1275,7 @@ func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
 func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
-	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{18}
+	return file_contracts_protobuf_auth_auth_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ChangePasswordResponse) GetSuccess() bool {
@@ -1242,7 +1310,12 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x04role\x18\x06 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x05\x10\x06R\vis_merchant\"X\n" +
 	"\x11GoogleAuthRequest\x12\x19\n" +
 	"\bid_token\x18\x01 \x01(\tR\aidToken\x12(\n" +
-	"\x04role\x18\x02 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\",\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\"\xa6\x01\n" +
+	"\x13FacebookAuthRequest\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12(\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\tR\x04code\x12!\n" +
+	"\fredirect_uri\x18\x05 \x01(\tR\vredirectUriJ\x04\b\x03\x10\x04R\x05email\",\n" +
 	"\x14ValidateTokenRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\x99\x01\n" +
 	"\x15ValidateTokenResponse\x12\x14\n" +
@@ -1319,7 +1392,7 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\x04USER\x10\x01\x12\f\n" +
 	"\bMERCHANT\x10\x02\x12\x14\n" +
 	"\x10DELIVERY_PARTNER\x10\x03\x12\t\n" +
-	"\x05ADMIN\x10\x042\x8b\t\n" +
+	"\x05ADMIN\x10\x042\x89\v\n" +
 	"\vAuthService\x12C\n" +
 	"\x05Login\x12\x1c.gocart.auth.v1.LoginRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12I\n" +
 	"\bRegister\x12\x1f.gocart.auth.v1.RegisterRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12\\\n" +
@@ -1334,7 +1407,10 @@ const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
 	"GoogleAuth\x12!.gocart.auth.v1.GoogleAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12N\n" +
 	"\vGoogleLogin\x12!.gocart.auth.v1.GoogleAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12Q\n" +
-	"\x0eGoogleRegister\x12!.gocart.auth.v1.GoogleAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponseBDZBgithub.com/marees-godev/GoCart-Server/contracts/protobuf/auth;authb\x06proto3"
+	"\x0eGoogleRegister\x12!.gocart.auth.v1.GoogleAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12Q\n" +
+	"\fFacebookAuth\x12#.gocart.auth.v1.FacebookAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12R\n" +
+	"\rFacebookLogin\x12#.gocart.auth.v1.FacebookAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponse\x12U\n" +
+	"\x10FacebookRegister\x12#.gocart.auth.v1.FacebookAuthRequest\x1a\x1c.gocart.auth.v1.AuthResponseBDZBgithub.com/marees-godev/GoCart-Server/contracts/protobuf/auth;authb\x06proto3"
 
 var (
 	file_contracts_protobuf_auth_auth_proto_rawDescOnce sync.Once
@@ -1349,70 +1425,78 @@ func file_contracts_protobuf_auth_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_contracts_protobuf_auth_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_contracts_protobuf_auth_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_contracts_protobuf_auth_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_contracts_protobuf_auth_auth_proto_goTypes = []any{
 	(Role)(0),                               // 0: gocart.auth.v1.Role
 	(*LoginRequest)(nil),                    // 1: gocart.auth.v1.LoginRequest
 	(*RegisterRequest)(nil),                 // 2: gocart.auth.v1.RegisterRequest
 	(*GoogleAuthRequest)(nil),               // 3: gocart.auth.v1.GoogleAuthRequest
-	(*ValidateTokenRequest)(nil),            // 4: gocart.auth.v1.ValidateTokenRequest
-	(*ValidateTokenResponse)(nil),           // 5: gocart.auth.v1.ValidateTokenResponse
-	(*RefreshTokenRequest)(nil),             // 6: gocart.auth.v1.RefreshTokenRequest
-	(*LogoutRequest)(nil),                   // 7: gocart.auth.v1.LogoutRequest
-	(*LogoutResponse)(nil),                  // 8: gocart.auth.v1.LogoutResponse
-	(*AuthResponse)(nil),                    // 9: gocart.auth.v1.AuthResponse
-	(*VerifyEmailRequest)(nil),              // 10: gocart.auth.v1.VerifyEmailRequest
-	(*VerifyEmailResponse)(nil),             // 11: gocart.auth.v1.VerifyEmailResponse
-	(*ResendVerificationEmailRequest)(nil),  // 12: gocart.auth.v1.ResendVerificationEmailRequest
-	(*ResendVerificationEmailResponse)(nil), // 13: gocart.auth.v1.ResendVerificationEmailResponse
-	(*ForgotPasswordRequest)(nil),           // 14: gocart.auth.v1.ForgotPasswordRequest
-	(*ForgotPasswordResponse)(nil),          // 15: gocart.auth.v1.ForgotPasswordResponse
-	(*ResetPasswordWithOtpRequest)(nil),     // 16: gocart.auth.v1.ResetPasswordWithOtpRequest
-	(*ResetPasswordResponse)(nil),           // 17: gocart.auth.v1.ResetPasswordResponse
-	(*ChangePasswordRequest)(nil),           // 18: gocart.auth.v1.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil),          // 19: gocart.auth.v1.ChangePasswordResponse
+	(*FacebookAuthRequest)(nil),             // 4: gocart.auth.v1.FacebookAuthRequest
+	(*ValidateTokenRequest)(nil),            // 5: gocart.auth.v1.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil),           // 6: gocart.auth.v1.ValidateTokenResponse
+	(*RefreshTokenRequest)(nil),             // 7: gocart.auth.v1.RefreshTokenRequest
+	(*LogoutRequest)(nil),                   // 8: gocart.auth.v1.LogoutRequest
+	(*LogoutResponse)(nil),                  // 9: gocart.auth.v1.LogoutResponse
+	(*AuthResponse)(nil),                    // 10: gocart.auth.v1.AuthResponse
+	(*VerifyEmailRequest)(nil),              // 11: gocart.auth.v1.VerifyEmailRequest
+	(*VerifyEmailResponse)(nil),             // 12: gocart.auth.v1.VerifyEmailResponse
+	(*ResendVerificationEmailRequest)(nil),  // 13: gocart.auth.v1.ResendVerificationEmailRequest
+	(*ResendVerificationEmailResponse)(nil), // 14: gocart.auth.v1.ResendVerificationEmailResponse
+	(*ForgotPasswordRequest)(nil),           // 15: gocart.auth.v1.ForgotPasswordRequest
+	(*ForgotPasswordResponse)(nil),          // 16: gocart.auth.v1.ForgotPasswordResponse
+	(*ResetPasswordWithOtpRequest)(nil),     // 17: gocart.auth.v1.ResetPasswordWithOtpRequest
+	(*ResetPasswordResponse)(nil),           // 18: gocart.auth.v1.ResetPasswordResponse
+	(*ChangePasswordRequest)(nil),           // 19: gocart.auth.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),          // 20: gocart.auth.v1.ChangePasswordResponse
 }
 var file_contracts_protobuf_auth_auth_proto_depIdxs = []int32{
 	0,  // 0: gocart.auth.v1.LoginRequest.role:type_name -> gocart.auth.v1.Role
 	0,  // 1: gocart.auth.v1.RegisterRequest.role:type_name -> gocart.auth.v1.Role
 	0,  // 2: gocart.auth.v1.GoogleAuthRequest.role:type_name -> gocart.auth.v1.Role
-	0,  // 3: gocart.auth.v1.ValidateTokenResponse.role:type_name -> gocart.auth.v1.Role
-	0,  // 4: gocart.auth.v1.AuthResponse.role:type_name -> gocart.auth.v1.Role
-	0,  // 5: gocart.auth.v1.VerifyEmailRequest.role:type_name -> gocart.auth.v1.Role
-	0,  // 6: gocart.auth.v1.ResendVerificationEmailRequest.role:type_name -> gocart.auth.v1.Role
-	0,  // 7: gocart.auth.v1.ForgotPasswordRequest.role:type_name -> gocart.auth.v1.Role
-	0,  // 8: gocart.auth.v1.ResetPasswordWithOtpRequest.role:type_name -> gocart.auth.v1.Role
-	1,  // 9: gocart.auth.v1.AuthService.Login:input_type -> gocart.auth.v1.LoginRequest
-	2,  // 10: gocart.auth.v1.AuthService.Register:input_type -> gocart.auth.v1.RegisterRequest
-	4,  // 11: gocart.auth.v1.AuthService.ValidateToken:input_type -> gocart.auth.v1.ValidateTokenRequest
-	6,  // 12: gocart.auth.v1.AuthService.RefreshToken:input_type -> gocart.auth.v1.RefreshTokenRequest
-	7,  // 13: gocart.auth.v1.AuthService.Logout:input_type -> gocart.auth.v1.LogoutRequest
-	10, // 14: gocart.auth.v1.AuthService.VerifyEmail:input_type -> gocart.auth.v1.VerifyEmailRequest
-	12, // 15: gocart.auth.v1.AuthService.ResendVerificationEmail:input_type -> gocart.auth.v1.ResendVerificationEmailRequest
-	14, // 16: gocart.auth.v1.AuthService.ForgotPassword:input_type -> gocart.auth.v1.ForgotPasswordRequest
-	16, // 17: gocart.auth.v1.AuthService.ResetPasswordWithOtp:input_type -> gocart.auth.v1.ResetPasswordWithOtpRequest
-	18, // 18: gocart.auth.v1.AuthService.ChangePassword:input_type -> gocart.auth.v1.ChangePasswordRequest
-	3,  // 19: gocart.auth.v1.AuthService.GoogleAuth:input_type -> gocart.auth.v1.GoogleAuthRequest
-	3,  // 20: gocart.auth.v1.AuthService.GoogleLogin:input_type -> gocart.auth.v1.GoogleAuthRequest
-	3,  // 21: gocart.auth.v1.AuthService.GoogleRegister:input_type -> gocart.auth.v1.GoogleAuthRequest
-	9,  // 22: gocart.auth.v1.AuthService.Login:output_type -> gocart.auth.v1.AuthResponse
-	9,  // 23: gocart.auth.v1.AuthService.Register:output_type -> gocart.auth.v1.AuthResponse
-	5,  // 24: gocart.auth.v1.AuthService.ValidateToken:output_type -> gocart.auth.v1.ValidateTokenResponse
-	9,  // 25: gocart.auth.v1.AuthService.RefreshToken:output_type -> gocart.auth.v1.AuthResponse
-	8,  // 26: gocart.auth.v1.AuthService.Logout:output_type -> gocart.auth.v1.LogoutResponse
-	11, // 27: gocart.auth.v1.AuthService.VerifyEmail:output_type -> gocart.auth.v1.VerifyEmailResponse
-	13, // 28: gocart.auth.v1.AuthService.ResendVerificationEmail:output_type -> gocart.auth.v1.ResendVerificationEmailResponse
-	15, // 29: gocart.auth.v1.AuthService.ForgotPassword:output_type -> gocart.auth.v1.ForgotPasswordResponse
-	17, // 30: gocart.auth.v1.AuthService.ResetPasswordWithOtp:output_type -> gocart.auth.v1.ResetPasswordResponse
-	19, // 31: gocart.auth.v1.AuthService.ChangePassword:output_type -> gocart.auth.v1.ChangePasswordResponse
-	9,  // 32: gocart.auth.v1.AuthService.GoogleAuth:output_type -> gocart.auth.v1.AuthResponse
-	9,  // 33: gocart.auth.v1.AuthService.GoogleLogin:output_type -> gocart.auth.v1.AuthResponse
-	9,  // 34: gocart.auth.v1.AuthService.GoogleRegister:output_type -> gocart.auth.v1.AuthResponse
-	22, // [22:35] is the sub-list for method output_type
-	9,  // [9:22] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	0,  // 3: gocart.auth.v1.FacebookAuthRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 4: gocart.auth.v1.ValidateTokenResponse.role:type_name -> gocart.auth.v1.Role
+	0,  // 5: gocart.auth.v1.AuthResponse.role:type_name -> gocart.auth.v1.Role
+	0,  // 6: gocart.auth.v1.VerifyEmailRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 7: gocart.auth.v1.ResendVerificationEmailRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 8: gocart.auth.v1.ForgotPasswordRequest.role:type_name -> gocart.auth.v1.Role
+	0,  // 9: gocart.auth.v1.ResetPasswordWithOtpRequest.role:type_name -> gocart.auth.v1.Role
+	1,  // 10: gocart.auth.v1.AuthService.Login:input_type -> gocart.auth.v1.LoginRequest
+	2,  // 11: gocart.auth.v1.AuthService.Register:input_type -> gocart.auth.v1.RegisterRequest
+	5,  // 12: gocart.auth.v1.AuthService.ValidateToken:input_type -> gocart.auth.v1.ValidateTokenRequest
+	7,  // 13: gocart.auth.v1.AuthService.RefreshToken:input_type -> gocart.auth.v1.RefreshTokenRequest
+	8,  // 14: gocart.auth.v1.AuthService.Logout:input_type -> gocart.auth.v1.LogoutRequest
+	11, // 15: gocart.auth.v1.AuthService.VerifyEmail:input_type -> gocart.auth.v1.VerifyEmailRequest
+	13, // 16: gocart.auth.v1.AuthService.ResendVerificationEmail:input_type -> gocart.auth.v1.ResendVerificationEmailRequest
+	15, // 17: gocart.auth.v1.AuthService.ForgotPassword:input_type -> gocart.auth.v1.ForgotPasswordRequest
+	17, // 18: gocart.auth.v1.AuthService.ResetPasswordWithOtp:input_type -> gocart.auth.v1.ResetPasswordWithOtpRequest
+	19, // 19: gocart.auth.v1.AuthService.ChangePassword:input_type -> gocart.auth.v1.ChangePasswordRequest
+	3,  // 20: gocart.auth.v1.AuthService.GoogleAuth:input_type -> gocart.auth.v1.GoogleAuthRequest
+	3,  // 21: gocart.auth.v1.AuthService.GoogleLogin:input_type -> gocart.auth.v1.GoogleAuthRequest
+	3,  // 22: gocart.auth.v1.AuthService.GoogleRegister:input_type -> gocart.auth.v1.GoogleAuthRequest
+	4,  // 23: gocart.auth.v1.AuthService.FacebookAuth:input_type -> gocart.auth.v1.FacebookAuthRequest
+	4,  // 24: gocart.auth.v1.AuthService.FacebookLogin:input_type -> gocart.auth.v1.FacebookAuthRequest
+	4,  // 25: gocart.auth.v1.AuthService.FacebookRegister:input_type -> gocart.auth.v1.FacebookAuthRequest
+	10, // 26: gocart.auth.v1.AuthService.Login:output_type -> gocart.auth.v1.AuthResponse
+	10, // 27: gocart.auth.v1.AuthService.Register:output_type -> gocart.auth.v1.AuthResponse
+	6,  // 28: gocart.auth.v1.AuthService.ValidateToken:output_type -> gocart.auth.v1.ValidateTokenResponse
+	10, // 29: gocart.auth.v1.AuthService.RefreshToken:output_type -> gocart.auth.v1.AuthResponse
+	9,  // 30: gocart.auth.v1.AuthService.Logout:output_type -> gocart.auth.v1.LogoutResponse
+	12, // 31: gocart.auth.v1.AuthService.VerifyEmail:output_type -> gocart.auth.v1.VerifyEmailResponse
+	14, // 32: gocart.auth.v1.AuthService.ResendVerificationEmail:output_type -> gocart.auth.v1.ResendVerificationEmailResponse
+	16, // 33: gocart.auth.v1.AuthService.ForgotPassword:output_type -> gocart.auth.v1.ForgotPasswordResponse
+	18, // 34: gocart.auth.v1.AuthService.ResetPasswordWithOtp:output_type -> gocart.auth.v1.ResetPasswordResponse
+	20, // 35: gocart.auth.v1.AuthService.ChangePassword:output_type -> gocart.auth.v1.ChangePasswordResponse
+	10, // 36: gocart.auth.v1.AuthService.GoogleAuth:output_type -> gocart.auth.v1.AuthResponse
+	10, // 37: gocart.auth.v1.AuthService.GoogleLogin:output_type -> gocart.auth.v1.AuthResponse
+	10, // 38: gocart.auth.v1.AuthService.GoogleRegister:output_type -> gocart.auth.v1.AuthResponse
+	10, // 39: gocart.auth.v1.AuthService.FacebookAuth:output_type -> gocart.auth.v1.AuthResponse
+	10, // 40: gocart.auth.v1.AuthService.FacebookLogin:output_type -> gocart.auth.v1.AuthResponse
+	10, // 41: gocart.auth.v1.AuthService.FacebookRegister:output_type -> gocart.auth.v1.AuthResponse
+	26, // [26:42] is the sub-list for method output_type
+	10, // [10:26] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_auth_auth_proto_init() }
@@ -1426,7 +1510,7 @@ func file_contracts_protobuf_auth_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_auth_auth_proto_rawDesc), len(file_contracts_protobuf_auth_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

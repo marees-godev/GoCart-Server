@@ -113,3 +113,63 @@ func exchangeGoogleAuthCode(ctx context.Context, clientID, clientSecret, redirec
 	}
 	return tokenResp.IDToken, nil
 }
+
+var (
+	facebookHTTPClient = &http.Client{Timeout: 10 * time.Second}
+)
+
+func exchangeFacebookAuthCode(ctx context.Context, appID, appSecret, redirectURI, code string) (string, error) {
+	if appID == "" {
+		return "", errors.New("FACEBOOK_APP_ID is not configured on the server")
+	}
+	if appSecret == "" {
+		return "", errors.New("FACEBOOK_APP_SECRET is required to exchange authorization code")
+	}
+	if unescaped, err := url.QueryUnescape(code); err == nil && unescaped != "" {
+		code = unescaped
+	}
+	if unescaped, err := url.QueryUnescape(redirectURI); err == nil && unescaped != "" {
+		redirectURI = unescaped
+	}
+
+	endpoint := fmt.Sprintf(
+		"https://graph.facebook.com/v21.0/oauth/access_token?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s",
+		url.QueryEscape(appID),
+		url.QueryEscape(appSecret),
+		url.QueryEscape(redirectURI),
+		url.QueryEscape(code),
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("create facebook token exchange request: %w", err)
+	}
+
+	resp, err := facebookHTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("execute facebook token exchange: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		ExpiresIn   int64  `json:"expires_in"`
+		Error       *struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    int    `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(bodyBytes, &tokenResp); err != nil {
+		return "", errors.New("failed to parse Facebook token exchange response")
+	}
+	if tokenResp.Error != nil && tokenResp.Error.Message != "" {
+		return "", fmt.Errorf("facebook token exchange failed: %s", tokenResp.Error.Message)
+	}
+	if tokenResp.AccessToken == "" {
+		return "", errors.New("facebook token exchange did not return an access_token")
+	}
+	return tokenResp.AccessToken, nil
+}

@@ -13,6 +13,8 @@ func TestLoadEnv(t *testing.T) {
 	_ = os.Setenv("DB_AUTO_MIGRATE", "false")
 	_ = os.Setenv("JWT_SECRET", "test-secret")
 	_ = os.Setenv("JWT_EXPIRY_MINUTES", "120")
+	_ = os.Setenv("FACEBOOK_APP_ID", "fb-123456")
+	_ = os.Setenv("FACEBOOK_APP_SECRET", "fb-secret-xyz")
 
 	defer func() {
 		_ = os.Unsetenv("PORT")
@@ -22,6 +24,8 @@ func TestLoadEnv(t *testing.T) {
 		_ = os.Unsetenv("DB_AUTO_MIGRATE")
 		_ = os.Unsetenv("JWT_SECRET")
 		_ = os.Unsetenv("JWT_EXPIRY_MINUTES")
+		_ = os.Unsetenv("FACEBOOK_APP_ID")
+		_ = os.Unsetenv("FACEBOOK_APP_SECRET")
 	}()
 
 	cfg := LoadEnv()
@@ -43,6 +47,9 @@ func TestLoadEnv(t *testing.T) {
 	}
 	if cfg.JWT.ExpiryMinutes != 120 {
 		t.Fatalf("expected jwt expiry 120, got %d", cfg.JWT.ExpiryMinutes)
+	}
+	if cfg.Facebook.AppID != "fb-123456" || cfg.Facebook.AppSecret != "fb-secret-xyz" {
+		t.Fatalf("expected facebook config, got appID=%s appSecret=%s", cfg.Facebook.AppID, cfg.Facebook.AppSecret)
 	}
 }
 

@@ -26,10 +26,16 @@ type Config struct {
 	UserServiceAddr string
 	Services        ServicesConfig
 	Google          GoogleConfig
+	Facebook        FacebookConfig
 }
 
 type GoogleConfig struct {
 	ClientID string
+}
+
+type FacebookConfig struct {
+	AppID     string
+	AppSecret string
 }
 
 type SecurityConfig struct {
@@ -185,6 +191,10 @@ func LoadEnv() *Config {
 		},
 		Google: GoogleConfig{
 			ClientID: GetEnv("GOOGLE_CLIENT_ID", ""),
+		},
+		Facebook: FacebookConfig{
+			AppID:     GetEnv("FACEBOOK_APP_ID", GetEnv("FACEBOOK_CLIENT_ID", "")),
+			AppSecret: GetEnv("FACEBOOK_APP_SECRET", GetEnv("FACEBOOK_CLIENT_SECRET", "")),
 		},
 	}
 }
