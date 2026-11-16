@@ -254,6 +254,16 @@ type CreateWarehouseInput struct {
 	IsActive          *bool  `json:"isActive,omitempty"`
 }
 
+type CustomerActivity struct {
+	ID         string            `json:"id"`
+	UserID     *string           `json:"userId,omitempty"`
+	SessionID  *string           `json:"sessionId,omitempty"`
+	EventType  ActivityEventType `json:"eventType"`
+	ProductID  *string           `json:"productId,omitempty"`
+	CategoryID *string           `json:"categoryId,omitempty"`
+	CreatedAt  string            `json:"createdAt"`
+}
+
 type DeactivateAccountInput struct {
 	Reason *string `json:"reason,omitempty"`
 }
@@ -976,6 +986,18 @@ type SubmitKYCInput struct {
 	Gstin             string  `json:"gstin"`
 }
 
+type TrackActivityInput struct {
+	EventType  ActivityEventType `json:"eventType"`
+	ProductID  *string           `json:"productId,omitempty"`
+	CategoryID *string           `json:"categoryId,omitempty"`
+	SessionID  *string           `json:"sessionId,omitempty"`
+}
+
+type TrackActivityResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type UpdateAddressInput struct {
 	Label        *string `json:"label,omitempty"`
 	FullName     *string `json:"fullName,omitempty"`
@@ -1151,6 +1173,57 @@ type Warehouse struct {
 	IsActive          bool    `json:"isActive"`
 	CreatedAt         *string `json:"createdAt,omitempty"`
 	UpdatedAt         *string `json:"updatedAt,omitempty"`
+}
+
+type ActivityEventType string
+
+const (
+	ActivityEventTypeProductViewed          ActivityEventType = "PRODUCT_VIEWED"
+	ActivityEventTypeProductSearched        ActivityEventType = "PRODUCT_SEARCHED"
+	ActivityEventTypeCategoryViewed         ActivityEventType = "CATEGORY_VIEWED"
+	ActivityEventTypeProductAddedToCart     ActivityEventType = "PRODUCT_ADDED_TO_CART"
+	ActivityEventTypeProductRemovedFromCart ActivityEventType = "PRODUCT_REMOVED_FROM_CART"
+	ActivityEventTypeProductWishlisted      ActivityEventType = "PRODUCT_WISHLISTED"
+	ActivityEventTypeProductPurchased       ActivityEventType = "PRODUCT_PURCHASED"
+)
+
+var AllActivityEventType = []ActivityEventType{
+	ActivityEventTypeProductViewed,
+	ActivityEventTypeProductSearched,
+	ActivityEventTypeCategoryViewed,
+	ActivityEventTypeProductAddedToCart,
+	ActivityEventTypeProductRemovedFromCart,
+	ActivityEventTypeProductWishlisted,
+	ActivityEventTypeProductPurchased,
+}
+
+func (e ActivityEventType) IsValid() bool {
+	switch e {
+	case ActivityEventTypeProductViewed, ActivityEventTypeProductSearched, ActivityEventTypeCategoryViewed, ActivityEventTypeProductAddedToCart, ActivityEventTypeProductRemovedFromCart, ActivityEventTypeProductWishlisted, ActivityEventTypeProductPurchased:
+		return true
+	}
+	return false
+}
+
+func (e ActivityEventType) String() string {
+	return string(e)
+}
+
+func (e *ActivityEventType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ActivityEventType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ActivityEventType", str)
+	}
+	return nil
+}
+
+func (e ActivityEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type AuthRole string

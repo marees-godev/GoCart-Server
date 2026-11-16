@@ -1,0 +1,39 @@
+enum ActivityEventType {
+    PRODUCT_VIEWED
+    PRODUCT_SEARCHED
+    CATEGORY_VIEWED
+    PRODUCT_ADDED_TO_CART
+    PRODUCT_REMOVED_FROM_CART
+    PRODUCT_WISHLISTED
+    PRODUCT_PURCHASED
+}
+
+input TrackActivityInput {
+    eventType: ActivityEventType!
+    productId: String
+    categoryId: String
+    sessionId: String
+}
+
+type TrackActivityResponse {
+    success: Boolean!
+    message: String!
+}
+
+type CustomerActivity {
+    id: ID!
+    userId: String
+    sessionId: String
+    eventType: ActivityEventType!
+    productId: String
+    categoryId: String
+    createdAt: String!
+}
+
+extend type Mutation {
+    trackActivity(input: TrackActivityInput!): TrackActivityResponse!
+}
+
+extend type Query {
+    customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!
+}

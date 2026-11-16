@@ -85,6 +85,7 @@ type GRPCConfig struct {
 	ReturnServiceAddr       string
 	RatingServiceAddr       string
 	NotificationServiceAddr string
+	PersonalizationServiceAddr string
 }
 
 type JWTConfig struct {
@@ -170,6 +171,7 @@ func LoadEnv() *Config {
 			ReturnServiceAddr:       GetEnv("RETURN_SERVICE_GRPC_ADDR", "localhost:50062"),
 			RatingServiceAddr:       GetEnv("RATING_SERVICE_GRPC_ADDR", "localhost:50063"),
 			NotificationServiceAddr: GetEnv("NOTIFICATION_SERVICE_GRPC_ADDR", "localhost:50064"),
+			PersonalizationServiceAddr: GetEnv("PERSONALIZATION_SERVICE_GRPC_ADDR", "localhost:55065"),
 		},
 		JWT: JWTConfig{
 			Secret: GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),

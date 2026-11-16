@@ -12,6 +12,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
+	"github.com/marees-godev/GoCart-Server/contracts/protobuf/personalization"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/rating"
 	returns "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
@@ -38,8 +39,9 @@ type ClientManager struct {
 	PaymentClient      payment.PaymentServiceClient
 	DeliveryClient     delivery.DeliveryServiceClient
 	ReturnClient       returns.ReturnServiceClient
-	RatingClient       rating.RatingServiceClient
-	NotificationClient notification.NotificationServiceClient
+	RatingClient          rating.RatingServiceClient
+	NotificationClient    notification.NotificationServiceClient
+	PersonalizationClient personalization.PersonalizationServiceClient
 }
 
 // NewClientManager initializes persistent gRPC connections for all services using configuration.
@@ -202,28 +204,52 @@ func NewClientManager(cfg *config.Config, extraOpts ...grpc.DialOption) (*Client
 		return nil, err
 	}
 
+	personalizationAddr := cfg.GRPC.PersonalizationServiceAddr
+	if personalizationAddr == "" {
+		personalizationAddr = "localhost:55065"
+	}
+	personalizationConn, err := dialService(personalizationAddr)
+	if err != nil {
+		authConn.Close()
+		userConn.Close()
+		productConn.Close()
+		categoryConn.Close()
+		storeConn.Close()
+		merchantConn.Close()
+		cartConn.Close()
+		inventoryConn.Close()
+		orderConn.Close()
+		paymentConn.Close()
+		deliveryConn.Close()
+		returnConn.Close()
+		ratingConn.Close()
+		notificationConn.Close()
+		return nil, err
+	}
+
 	conns := []*grpc.ClientConn{
 		authConn, userConn, productConn, categoryConn, storeConn,
 		merchantConn, cartConn, inventoryConn, orderConn, paymentConn,
-		deliveryConn, returnConn, ratingConn, notificationConn,
+		deliveryConn, returnConn, ratingConn, notificationConn, personalizationConn,
 	}
 
 	return &ClientManager{
-		conns:              conns,
-		AuthClient:         auth.NewAuthServiceClient(authConn),
-		UserClient:         user.NewUserServiceClient(userConn),
-		ProductClient:      product.NewProductServiceClient(productConn),
-		CategoryClient:     category.NewCategoryServiceClient(categoryConn),
-		StoreClient:        store.NewStoreServiceClient(storeConn),
-		MerchantClient:     merchant.NewMerchantServiceClient(merchantConn),
-		CartClient:         cart.NewCartServiceClient(cartConn),
-		InventoryClient:    inventory.NewInventoryServiceClient(inventoryConn),
-		OrderClient:        order.NewOrderServiceClient(orderConn),
-		PaymentClient:      payment.NewPaymentServiceClient(paymentConn),
-		DeliveryClient:     delivery.NewDeliveryServiceClient(deliveryConn),
-		ReturnClient:       returns.NewReturnServiceClient(returnConn),
-		RatingClient:       rating.NewRatingServiceClient(ratingConn),
-		NotificationClient: notification.NewNotificationServiceClient(notificationConn),
+		conns:                 conns,
+		AuthClient:            auth.NewAuthServiceClient(authConn),
+		UserClient:            user.NewUserServiceClient(userConn),
+		ProductClient:         product.NewProductServiceClient(productConn),
+		CategoryClient:        category.NewCategoryServiceClient(categoryConn),
+		StoreClient:           store.NewStoreServiceClient(storeConn),
+		MerchantClient:        merchant.NewMerchantServiceClient(merchantConn),
+		CartClient:            cart.NewCartServiceClient(cartConn),
+		InventoryClient:       inventory.NewInventoryServiceClient(inventoryConn),
+		OrderClient:           order.NewOrderServiceClient(orderConn),
+		PaymentClient:         payment.NewPaymentServiceClient(paymentConn),
+		DeliveryClient:        delivery.NewDeliveryServiceClient(deliveryConn),
+		ReturnClient:          returns.NewReturnServiceClient(returnConn),
+		RatingClient:          rating.NewRatingServiceClient(ratingConn),
+		NotificationClient:    notification.NewNotificationServiceClient(notificationConn),
+		PersonalizationClient: personalization.NewPersonalizationServiceClient(personalizationConn),
 	}, nil
 }
 
