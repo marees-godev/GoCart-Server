@@ -13,10 +13,14 @@ import (
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	gwResolver "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/resolvers"
 	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	gatewayGRPC "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const testJWTSecret = "gocart-secret-key-change-in-production"
@@ -39,11 +43,20 @@ func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterReques
 	}, nil
 }
 
+func (m *mockAuthClient) ValidateToken(ctx context.Context, in *authpb.ValidateTokenRequest, opts ...grpc.CallOption) (*authpb.ValidateTokenResponse, error) {
+	return &authpb.ValidateTokenResponse{
+		Valid: true,
+	}, nil
+}
+
 type mockUserClient struct {
 	userpb.UserServiceClient
 }
 
 func (m *mockUserClient) GetUser(ctx context.Context, in *userpb.GetUserRequest, opts ...grpc.CallOption) (*userpb.GetUserResponse, error) {
+	if in.Id == "non-existent" || in.Id == "m-100" || in.Id == "dp-100" || in.Id == "u-admin-no-user" {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
 	return &userpb.GetUserResponse{
 		User: &userpb.User{
 			Id:        in.Id,
@@ -134,10 +147,49 @@ func (m *mockUserClient) SetDefaultUserAddress(ctx context.Context, in *userpb.S
 }
 
 
+type mockMerchantClient struct {
+	merchantpb.MerchantServiceClient
+}
+
+func (m *mockMerchantClient) GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error) {
+	if in.Id == "m-100" {
+		return &merchantpb.GetMerchantResponse{
+			Merchant: &merchantpb.MerchantResponseData{
+				Id:            in.Id,
+				BusinessEmail: "merchant@example.com",
+				FirstName:     "MerchantFirst",
+				LastName:      "MerchantLast",
+				Status:        merchantpb.MerchantStatus_APPROVED,
+			},
+		}, nil
+	}
+	return nil, status.Error(codes.NotFound, "merchant not found")
+}
+
+type mockDeliveryClient struct {
+	deliverypb.DeliveryServiceClient
+}
+
+func (m *mockDeliveryClient) GetPartnerProfile(ctx context.Context, in *deliverypb.GetPartnerProfileRequest, opts ...grpc.CallOption) (*deliverypb.PartnerProfileResponse, error) {
+	if in.PartnerId == "dp-100" {
+		return &deliverypb.PartnerProfileResponse{
+			Profile: &deliverypb.DeliveryPartnerProfile{
+				PartnerId:      in.PartnerId,
+				Email:          "delivery@example.com",
+				CompanyName:    "Fast Partner",
+				ApprovalStatus: "APPROVED",
+			},
+		}, nil
+	}
+	return nil, status.Error(codes.NotFound, "partner not found")
+}
+
 func setupTestApp(introEnabled bool) *fiber.App {
 	clients := gatewayGRPC.NewClientsWithServices(
 		&mockUserClient{},
 		&mockAuthClient{},
+		&mockMerchantClient{},
+		&mockDeliveryClient{},
 	)
 
 	resolver := gwResolver.NewResolver(clients)
@@ -293,6 +345,161 @@ func TestProtectedQuery_Me_ValidToken(t *testing.T) {
 	}
 	if me["id"] != "u-100" {
 		t.Errorf("expected me.id 'u-100', got '%v'", me["id"])
+	}
+}
+
+func TestProtectedQuery_Me_MerchantRole(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, err := auth.GenerateToken(auth.UserContext{
+		UserID:     "m-100",
+		MerchantID: "m-100",
+		Role:       "MERCHANT",
+		Email:      "merchant@example.com",
+	}, testJWTSecret, 1*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email firstName lastName role } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data == nil {
+		t.Fatalf("expected data map, got %v", res)
+	}
+	me, ok := data["me"].(map[string]interface{})
+	if !ok || me == nil {
+		t.Fatalf("expected me map, got %v", data)
+	}
+	if me["id"] != "m-100" {
+		t.Errorf("expected me.id 'm-100', got '%v'", me["id"])
+	}
+	if me["role"] != "MERCHANT" {
+		t.Errorf("expected me.role 'MERCHANT', got '%v'", me["role"])
+	}
+	if me["firstName"] != "MerchantFirst" {
+		t.Errorf("expected me.firstName 'MerchantFirst', got '%v'", me["firstName"])
+	}
+}
+
+func TestProtectedQuery_Me_DeliveryPartnerRole(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, err := auth.GenerateToken(auth.UserContext{
+		UserID:    "dp-100",
+		PartnerID: "dp-100",
+		Role:      "DELIVERY_PARTNER",
+		Email:     "delivery@example.com",
+	}, testJWTSecret, 1*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email username role } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data == nil {
+		t.Fatalf("expected data map, got %v", res)
+	}
+	me, ok := data["me"].(map[string]interface{})
+	if !ok || me == nil {
+		t.Fatalf("expected me map, got %v", data)
+	}
+	if me["id"] != "dp-100" {
+		t.Errorf("expected me.id 'dp-100', got '%v'", me["id"])
+	}
+	if me["role"] != "DELIVERY_PARTNER" {
+		t.Errorf("expected me.role 'DELIVERY_PARTNER', got '%v'", me["role"])
+	}
+	if me["username"] != "Fast Partner" {
+		t.Errorf("expected me.username 'Fast Partner', got '%v'", me["username"])
+	}
+}
+
+func TestProtectedQuery_Me_AdminRole(t *testing.T) {
+	app := setupTestApp(true)
+
+	token, err := auth.GenerateToken(auth.UserContext{
+		UserID: "u-admin-no-user",
+		Role:   "ADMIN",
+		Email:  "admin@gocart.com",
+	}, testJWTSecret, 1*time.Hour)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"query": `query { me { id email role status } }`,
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/query", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+
+	var res map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&res)
+
+	data, ok := res["data"].(map[string]interface{})
+	if !ok || data == nil {
+		t.Fatalf("expected data map, got %v", res)
+	}
+	me, ok := data["me"].(map[string]interface{})
+	if !ok || me == nil {
+		t.Fatalf("expected me map, got %v", data)
+	}
+	if me["id"] != "u-admin-no-user" {
+		t.Errorf("expected me.id 'u-admin-no-user', got '%v'", me["id"])
+	}
+	if me["role"] != "ADMIN" {
+		t.Errorf("expected me.role 'ADMIN', got '%v'", me["role"])
 	}
 }
 
