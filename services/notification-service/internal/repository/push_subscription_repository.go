@@ -185,7 +185,6 @@ func (r *notificationRepository) UpdateSubscription(ctx context.Context, sub *mo
 	if strings.TrimSpace(sub.UserID) != "" {
 		whereClause += fmt.Sprintf(" AND user_id = $%d::uuid", argIdx)
 		args = append(args, sub.UserID)
-		argIdx++
 	}
 
 	query := fmt.Sprintf(
@@ -225,7 +224,6 @@ func (r *notificationRepository) DeactivateSubscription(ctx context.Context, id,
 	if strings.TrimSpace(userID) != "" {
 		whereParts = append(whereParts, fmt.Sprintf("user_id = $%d::uuid", argIdx))
 		args = append(args, strings.TrimSpace(userID))
-		argIdx++
 	}
 
 	query := fmt.Sprintf(`
