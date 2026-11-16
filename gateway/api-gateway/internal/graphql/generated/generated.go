@@ -450,6 +450,7 @@ type ComplexityRoot struct {
 		GenerateStoreUploadURL         func(childComplexity int, input model.GenerateStoreUploadURLInput) int
 		LockExchangeQuote              func(childComplexity int, input model.LockExchangeQuoteInput) int
 		Login                          func(childComplexity int, input model.LoginInput) int
+		LoginWithFacebook              func(childComplexity int, input model.FacebookAuthInput) int
 		LoginWithGoogle                func(childComplexity int, input model.GoogleAuthInput) int
 		Logout                         func(childComplexity int) int
 		MerchantAppeal                 func(childComplexity int, merchantID string, reason string) int
@@ -460,6 +461,7 @@ type ComplexityRoot struct {
 		ReactivateDeliveryPartner      func(childComplexity int) int
 		RefreshToken                   func(childComplexity int, input model.RefreshTokenInput) int
 		Register                       func(childComplexity int, input model.RegisterInput) int
+		RegisterWithFacebook           func(childComplexity int, input model.FacebookAuthInput) int
 		RegisterWithGoogle             func(childComplexity int, input model.GoogleAuthInput) int
 		RejectDeliveryPartner          func(childComplexity int, partnerID string, reason string) int
 		RejectReturn                   func(childComplexity int, id string, reason string) int
@@ -873,8 +875,10 @@ type MutationResolver interface {
 	Empty(ctx context.Context) (*string, error)
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
 	LoginWithGoogle(ctx context.Context, input model.GoogleAuthInput) (*model.AuthPayload, error)
+	LoginWithFacebook(ctx context.Context, input model.FacebookAuthInput) (*model.AuthPayload, error)
 	Register(ctx context.Context, input model.RegisterInput) (*model.AuthPayload, error)
 	RegisterWithGoogle(ctx context.Context, input model.GoogleAuthInput) (*model.AuthPayload, error)
+	RegisterWithFacebook(ctx context.Context, input model.FacebookAuthInput) (*model.AuthPayload, error)
 	RefreshToken(ctx context.Context, input model.RefreshTokenInput) (*model.AuthPayload, error)
 	Logout(ctx context.Context) (*model.LogoutPayload, error)
 	VerifyEmail(ctx context.Context, email string, otp string, role model.AuthRole) (bool, error)
@@ -3222,6 +3226,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Login(childComplexity, args["input"].(model.LoginInput)), true
 
+	case "Mutation.loginWithFacebook":
+		if e.complexity.Mutation.LoginWithFacebook == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_loginWithFacebook_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.LoginWithFacebook(childComplexity, args["input"].(model.FacebookAuthInput)), true
+
 	case "Mutation.loginWithGoogle":
 		if e.complexity.Mutation.LoginWithGoogle == nil {
 			break
@@ -3326,6 +3342,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
+
+	case "Mutation.registerWithFacebook":
+		if e.complexity.Mutation.RegisterWithFacebook == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerWithFacebook_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RegisterWithFacebook(childComplexity, args["input"].(model.FacebookAuthInput)), true
 
 	case "Mutation.registerWithGoogle":
 		if e.complexity.Mutation.RegisterWithGoogle == nil {
@@ -5947,6 +5975,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDeleteAccountInput,
 		ec.unmarshalInputExchangeQuestionAnswerInput,
 		ec.unmarshalInputExchangeUserAnswerInput,
+		ec.unmarshalInputFacebookAuthInput,
 		ec.unmarshalInputFlagRatingInput,
 		ec.unmarshalInputForgotPasswordInput,
 		ec.unmarshalInputGenerateStoreUploadUrlInput,
@@ -6104,6 +6133,12 @@ input GoogleAuthInput {
   role: AuthRole
 }
 
+input FacebookAuthInput {
+  code: String!
+  redirectUri: String
+  role: AuthRole
+}
+
 input RefreshTokenInput {
   refreshToken: String!
 }
@@ -6150,8 +6185,10 @@ type ChangePasswordPayload {
 extend type Mutation {
   login(input: LoginInput!): AuthPayload!
   loginWithGoogle(input: GoogleAuthInput!): AuthPayload!
+  loginWithFacebook(input: FacebookAuthInput!): AuthPayload!
   register(input: RegisterInput!): AuthPayload!
   registerWithGoogle(input: GoogleAuthInput!): AuthPayload!
+  registerWithFacebook(input: FacebookAuthInput!): AuthPayload!
   refreshToken(input: RefreshTokenInput!): AuthPayload!
   logout: LogoutPayload!
   verifyEmail(email: String!, otp: String!, role: AuthRole!): Boolean!
@@ -8312,6 +8349,21 @@ func (ec *executionContext) field_Mutation_lockExchangeQuote_args(ctx context.Co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_loginWithFacebook_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.FacebookAuthInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNFacebookAuthInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐFacebookAuthInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_loginWithGoogle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -8418,6 +8470,21 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 		arg0, err = ec.unmarshalNRefreshTokenInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRefreshTokenInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_registerWithFacebook_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.FacebookAuthInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNFacebookAuthInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐFacebookAuthInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -20770,6 +20837,73 @@ func (ec *executionContext) fieldContext_Mutation_loginWithGoogle(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_loginWithFacebook(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_loginWithFacebook(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().LoginWithFacebook(rctx, fc.Args["input"].(model.FacebookAuthInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.AuthPayload)
+	fc.Result = res
+	return ec.marshalNAuthPayload2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_loginWithFacebook(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "token":
+				return ec.fieldContext_AuthPayload_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "role":
+				return ec.fieldContext_AuthPayload_role(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_AuthPayload_tokenType(ctx, field)
+			case "expiresIn":
+				return ec.fieldContext_AuthPayload_expiresIn(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_loginWithFacebook_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_register(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_register(ctx, field)
 	if err != nil {
@@ -20898,6 +21032,73 @@ func (ec *executionContext) fieldContext_Mutation_registerWithGoogle(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_registerWithGoogle_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_registerWithFacebook(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_registerWithFacebook(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RegisterWithFacebook(rctx, fc.Args["input"].(model.FacebookAuthInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.AuthPayload)
+	fc.Result = res
+	return ec.marshalNAuthPayload2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthPayload(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerWithFacebook(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "token":
+				return ec.fieldContext_AuthPayload_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthPayload_refreshToken(ctx, field)
+			case "role":
+				return ec.fieldContext_AuthPayload_role(ctx, field)
+			case "tokenType":
+				return ec.fieldContext_AuthPayload_tokenType(ctx, field)
+			case "expiresIn":
+				return ec.fieldContext_AuthPayload_expiresIn(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthPayload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerWithFacebook_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -46840,6 +47041,47 @@ func (ec *executionContext) unmarshalInputExchangeUserAnswerInput(ctx context.Co
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFacebookAuthInput(ctx context.Context, obj interface{}) (model.FacebookAuthInput, error) {
+	var it model.FacebookAuthInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"code", "redirectUri", "role"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "code":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Code = data
+		case "redirectUri":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("redirectUri"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RedirectURI = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalOAuthRole2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐAuthRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputFlagRatingInput(ctx context.Context, obj interface{}) (model.FlagRatingInput, error) {
 	var it model.FlagRatingInput
 	asMap := map[string]interface{}{}
@@ -51034,6 +51276,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "loginWithFacebook":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_loginWithFacebook(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "register":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_register(ctx, field)
@@ -51044,6 +51293,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "registerWithGoogle":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_registerWithGoogle(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "registerWithFacebook":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerWithFacebook(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -55531,6 +55787,11 @@ func (ec *executionContext) marshalNExchangeValuationResult2ᚖgithubᚗcomᚋma
 		return graphql.Null
 	}
 	return ec._ExchangeValuationResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFacebookAuthInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐFacebookAuthInput(ctx context.Context, v interface{}) (model.FacebookAuthInput, error) {
+	res, err := ec.unmarshalInputFacebookAuthInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNFlagCategory2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐFlagCategory(ctx context.Context, v interface{}) (model.FlagCategory, error) {

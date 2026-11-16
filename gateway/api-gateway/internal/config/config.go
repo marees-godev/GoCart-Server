@@ -24,6 +24,7 @@ type Config struct {
 	RateLimit                   RateLimitConfig
 	CORS                        middleware.CORSConfig
 	Google                      GoogleConfig
+	Facebook                    FacebookConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -102,6 +103,13 @@ type GoogleConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       string
+}
+
+type FacebookConfig struct {
+	AppID       string
+	AppSecret   string
+	RedirectURL string
+	Scopes      string
 }
 
 func LoadEnv() *Config {
@@ -213,6 +221,12 @@ func LoadEnv() *Config {
 			ClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
 			RedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", fmt.Sprintf("http://localhost:%s/api/v1/auth/google/callback", GetEnv("PORT", "8080"))),
 			Scopes:       GetEnv("GOOGLE_SCOPES", "openid email profile"),
+		},
+		Facebook: FacebookConfig{
+			AppID:       GetEnv("FACEBOOK_APP_ID", GetEnv("FACEBOOK_CLIENT_ID", "")),
+			AppSecret:   GetEnv("FACEBOOK_APP_SECRET", GetEnv("FACEBOOK_CLIENT_SECRET", "")),
+			RedirectURL:  GetEnv("FACEBOOK_REDIRECT_URL", fmt.Sprintf("http://localhost:%s/api/v1/auth/facebook/callback", GetEnv("PORT", "8080"))),
+			Scopes:      GetEnv("FACEBOOK_SCOPES", "email,public_profile"),
 		},
 	}
 }

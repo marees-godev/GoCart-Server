@@ -122,3 +122,10 @@ type GoogleAuthRequest struct {
 	Role    string `json:"role,omitempty"`
 }
 
+type FacebookAuthRequest struct {
+	AccessToken string `json:"access_token"`
+	Role        string `json:"role,omitempty"`
+	Code        string `json:"code,omitempty"`
+	RedirectURI string `json:"redirect_uri,omitempty"`
+}
+

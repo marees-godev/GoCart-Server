@@ -89,6 +89,48 @@ func (h *AuthGRPCHandler) GoogleRegister(ctx context.Context, req *pb.GoogleAuth
 	return toPBAuthResponse(resp), nil
 }
 
+func (h *AuthGRPCHandler) FacebookAuth(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookAuth(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) FacebookLogin(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookLogin(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) FacebookRegister(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookRegister(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
 func toPBAuthResponse(resp *dto.LoginResponse) *pb.AuthResponse {
 	return &pb.AuthResponse{
 		AccessToken:   resp.AccessToken,
@@ -297,4 +339,3 @@ func fromPBRole(r pb.Role) string {
 		return ""
 	}
 }
-
