@@ -32,6 +32,9 @@ const (
 	AuthService_GoogleAuth_FullMethodName              = "/gocart.auth.v1.AuthService/GoogleAuth"
 	AuthService_GoogleLogin_FullMethodName             = "/gocart.auth.v1.AuthService/GoogleLogin"
 	AuthService_GoogleRegister_FullMethodName          = "/gocart.auth.v1.AuthService/GoogleRegister"
+	AuthService_FacebookAuth_FullMethodName            = "/gocart.auth.v1.AuthService/FacebookAuth"
+	AuthService_FacebookLogin_FullMethodName           = "/gocart.auth.v1.AuthService/FacebookLogin"
+	AuthService_FacebookRegister_FullMethodName        = "/gocart.auth.v1.AuthService/FacebookRegister"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -51,6 +54,9 @@ type AuthServiceClient interface {
 	GoogleAuth(ctx context.Context, in *GoogleAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	GoogleLogin(ctx context.Context, in *GoogleAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	GoogleRegister(ctx context.Context, in *GoogleAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	FacebookAuth(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	FacebookLogin(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	FacebookRegister(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 }
 
 type authServiceClient struct {
@@ -191,6 +197,36 @@ func (c *authServiceClient) GoogleRegister(ctx context.Context, in *GoogleAuthRe
 	return out, nil
 }
 
+func (c *authServiceClient) FacebookAuth(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, AuthService_FacebookAuth_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) FacebookLogin(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, AuthService_FacebookLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) FacebookRegister(ctx context.Context, in *FacebookAuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, AuthService_FacebookRegister_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -208,6 +244,9 @@ type AuthServiceServer interface {
 	GoogleAuth(context.Context, *GoogleAuthRequest) (*AuthResponse, error)
 	GoogleLogin(context.Context, *GoogleAuthRequest) (*AuthResponse, error)
 	GoogleRegister(context.Context, *GoogleAuthRequest) (*AuthResponse, error)
+	FacebookAuth(context.Context, *FacebookAuthRequest) (*AuthResponse, error)
+	FacebookLogin(context.Context, *FacebookAuthRequest) (*AuthResponse, error)
+	FacebookRegister(context.Context, *FacebookAuthRequest) (*AuthResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -256,6 +295,15 @@ func (UnimplementedAuthServiceServer) GoogleLogin(context.Context, *GoogleAuthRe
 }
 func (UnimplementedAuthServiceServer) GoogleRegister(context.Context, *GoogleAuthRequest) (*AuthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GoogleRegister not implemented")
+}
+func (UnimplementedAuthServiceServer) FacebookAuth(context.Context, *FacebookAuthRequest) (*AuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FacebookAuth not implemented")
+}
+func (UnimplementedAuthServiceServer) FacebookLogin(context.Context, *FacebookAuthRequest) (*AuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FacebookLogin not implemented")
+}
+func (UnimplementedAuthServiceServer) FacebookRegister(context.Context, *FacebookAuthRequest) (*AuthResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FacebookRegister not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -512,6 +560,60 @@ func _AuthService_GoogleRegister_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_FacebookAuth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FacebookAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).FacebookAuth(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_FacebookAuth_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).FacebookAuth(ctx, req.(*FacebookAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_FacebookLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FacebookAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).FacebookLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_FacebookLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).FacebookLogin(ctx, req.(*FacebookAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_FacebookRegister_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FacebookAuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).FacebookRegister(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_FacebookRegister_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).FacebookRegister(ctx, req.(*FacebookAuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -570,6 +672,18 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GoogleRegister",
 			Handler:    _AuthService_GoogleRegister_Handler,
+		},
+		{
+			MethodName: "FacebookAuth",
+			Handler:    _AuthService_FacebookAuth_Handler,
+		},
+		{
+			MethodName: "FacebookLogin",
+			Handler:    _AuthService_FacebookLogin_Handler,
+		},
+		{
+			MethodName: "FacebookRegister",
+			Handler:    _AuthService_FacebookRegister_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -83,8 +83,9 @@ type PasswordResetToken struct {
 type AuthProviderType string
 
 const (
-	AuthProviderLocal  AuthProviderType = "LOCAL"
-	AuthProviderGoogle AuthProviderType = "GOOGLE"
+	AuthProviderLocal    AuthProviderType = "LOCAL"
+	AuthProviderGoogle   AuthProviderType = "GOOGLE"
+	AuthProviderFacebook AuthProviderType = "FACEBOOK"
 )
 
 func (p AuthProviderType) String() string {

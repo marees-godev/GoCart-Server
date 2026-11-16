@@ -480,6 +480,12 @@ type ExchangeVerification struct {
 	UpdatedAt        *string  `json:"updatedAt,omitempty"`
 }
 
+type FacebookAuthInput struct {
+	Code        string    `json:"code"`
+	RedirectURI *string   `json:"redirectUri,omitempty"`
+	Role        *AuthRole `json:"role,omitempty"`
+}
+
 type FlagRatingInput struct {
 	RatingID string       `json:"ratingId"`
 	Category FlagCategory `json:"category"`
