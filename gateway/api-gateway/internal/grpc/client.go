@@ -10,6 +10,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	returnpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/return"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -23,6 +24,7 @@ type Clients struct {
 	ProductClient   productpb.ProductServiceClient
 	StoreClient     store.StoreServiceClient
 	CategoryClient  categorypb.CategoryServiceClient
+	MerchantClient  merchantpb.MerchantServiceClient
 	CartClient      cartpb.CartServiceClient
 	InventoryClient inventorypb.InventoryServiceClient
 	OrderClient     orderpb.OrderServiceClient
@@ -216,6 +218,9 @@ func NewClientsWithServices(
 		}
 		if cat, ok := svc.(categorypb.CategoryServiceClient); ok {
 			c.CategoryClient = cat
+		}
+		if m, ok := svc.(merchantpb.MerchantServiceClient); ok {
+			c.MerchantClient = m
 		}
 		if p, ok := svc.(productpb.ProductServiceClient); ok {
 			c.ProductClient = p
