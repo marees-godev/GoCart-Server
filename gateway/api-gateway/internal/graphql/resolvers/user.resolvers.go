@@ -423,10 +423,10 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 				}
 			}
 			user := &model.User{
-				ID:        p.PartnerId,
-				Email:     email,
-				Role:      &roleStr,
-				Status:    &statusStr,
+				ID:     p.PartnerId,
+				Email:  email,
+				Role:   &roleStr,
+				Status: &statusStr,
 			}
 			if user.ID == "" && p.Id != "" {
 				user.ID = p.Id
