@@ -68,19 +68,3 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_active
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_created_at
     ON push_subscriptions(created_at DESC);
 
--- 000003_remove_push_channel.sql
--- Remove PUSH and IN_APP notification channels, keeping EMAIL alone
-
-DELETE FROM user_notification_preferences WHERE channel_id IN (SELECT id FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP'));
-DELETE FROM notification_jobs WHERE channel_id IN (SELECT id FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP'));
-DELETE FROM notification_templates WHERE channel_id IN (SELECT id FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP'));
-DELETE FROM notifications WHERE channel_id IN (SELECT id FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP'));
-DELETE FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP');
-
---Restore Push Channel
-INSERT INTO notification_channels (code, name, is_active)
-VALUES ('PUSH'::channel_type, 'Push Notifications', TRUE)
-ON CONFLICT (code) DO UPDATE
-SET name = EXCLUDED.name,     
-    is_active = TRUE;
-
