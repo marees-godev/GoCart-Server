@@ -84,6 +84,7 @@ type PushConfig struct {
 	MaxRetries     int
 	RetryInterval  time.Duration
 	TTLSeconds     int
+	LocalNotify    bool
 }
 
 func LoadEnv() *Config {
@@ -159,6 +160,7 @@ func LoadEnv() *Config {
 			MaxRetries:     GetEnvAsInt("PUSH_MAX_RETRIES", 3),
 			RetryInterval:  GetEnvAsDuration("PUSH_RETRY_INTERVAL", 500*time.Millisecond),
 			TTLSeconds:     GetEnvAsInt("PUSH_TTL_SECONDS", 86400),
+			LocalNotify:    GetEnvAsBool("PUSH_LOCAL_NOTIFICATIONS_ENABLED", true),
 		},
 		Email: emailCfg,
 		Providers: provider.ProviderConfig{

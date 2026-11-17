@@ -108,12 +108,13 @@ func main() {
 	if !pushClient.IsConfigured() {
 		log.Warn("VAPID keys are not configured; Web Push delivery will be marked FAILED when attempted")
 	}
+	localNotifier := push.NewLocalSystemNotifier(log, cfg.Push.LocalNotify)
 
 	repo := repository.NewNotificationRepository(db.Pool)
 	tmplSvc := service.NewTemplateService(repo)
 	prefSvc := service.NewPreferenceService(repo, repo)
 	subSvc := service.NewPushSubscriptionService(repo, cfg.VAPID, log)
-	notifSvc := service.NewNotificationService(repo, repo, repo, repo, tmplSvc, pushClient, log)
+	notifSvc := service.NewNotificationService(repo, repo, repo, repo, tmplSvc, pushClient, log, localNotifier)
 	pipelineSvc := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, repo, repo, notifSvc, orderLookup, log)
 	eventConsumer := consumer.NewNotificationEventConsumer(pipelineSvc, log)
 	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc)

@@ -664,3 +664,85 @@ func TestNotificationService_HistoryPaginationFilteringAndReadManagement(t *test
 		t.Errorf("expected other user's unread count 1, got %d", otherUnread)
 	}
 }
+
+type mockLocalNotifier struct {
+	mu            sync.Mutex
+	notifiedCount int
+	lastContent   string
+}
+
+func (m *mockLocalNotifier) Notify(ctx context.Context, content string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.notifiedCount++
+	m.lastContent = content
+	return nil
+}
+
+func (m *mockLocalNotifier) NotifyAsync(content string) {
+	_ = m.Notify(context.Background(), content)
+}
+
+func (m *mockLocalNotifier) IsEnabled() bool {
+	return true
+}
+
+func TestNotificationService_DeliverPush_TriggersLocalNotifierWithContentOnly(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.Default()
+
+	pushChan := &model.Channel{ID: uuid.NewString(), Code: model.ChannelPush, Name: "Web Push", IsActive: true}
+	chanRepo := &mockChannelRepo{
+		channels: map[string]*model.Channel{
+			model.ChannelPush: pushChan,
+			pushChan.ID:       pushChan,
+		},
+	}
+	prefRepo := &mockPreferenceRepo{preferences: make(map[string]*model.Preference)}
+	historyRepo := newMemHistoryRepo()
+	subRepo := newMemPushSubRepo()
+	tmplSvc := service.NewTemplateService()
+
+	mockLocal := &mockLocalNotifier{}
+	notifSvc := service.NewNotificationService(chanRepo, prefRepo, historyRepo, subRepo, tmplSvc, nil, logger, mockLocal)
+
+	userID := uuid.NewString()
+	expectedContent := "Your order #ORDER-9999 has been packed and is ready for dispatch."
+
+	res, err := notifSvc.SendNotification(ctx, dto.SendNotificationInput{
+		UserID:    userID,
+		Channel:   model.ChannelPush,
+		Subject:   "Order Ready",
+		Content:   expectedContent,
+		EventType: "OrderPacked",
+	})
+	if err != nil {
+		t.Fatalf("expected successful send notification, got err: %v", err)
+	}
+	if res == nil || res.Notification == nil {
+		t.Fatal("expected non-nil notification result")
+	}
+
+	// Verify notification was stored in DB
+	stored, err := historyRepo.GetNotificationByID(ctx, res.Notification.ID)
+	if err != nil || stored == nil {
+		t.Fatalf("expected notification to be stored in history repo: %v", err)
+	}
+	if stored.Content != expectedContent {
+		t.Errorf("expected stored content %q, got %q", expectedContent, stored.Content)
+	}
+
+	// Verify local notifier was triggered with ONLY the content from the DB record
+	mockLocal.mu.Lock()
+	count := mockLocal.notifiedCount
+	receivedContent := mockLocal.lastContent
+	mockLocal.mu.Unlock()
+
+	if count != 1 {
+		t.Fatalf("expected mockLocalNotifier to be called exactly 1 time, got %d", count)
+	}
+	if receivedContent != expectedContent {
+		t.Fatalf("expected local notifier to receive strictly notif.Content %q, got %q", expectedContent, receivedContent)
+	}
+}
+
