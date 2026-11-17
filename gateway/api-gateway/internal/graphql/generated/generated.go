@@ -490,7 +490,6 @@ type ComplexityRoot struct {
 		SubmitKyc                      func(childComplexity int, input model.SubmitKYCInput) int
 		SubmitStore                    func(childComplexity int, id string) int
 		SuspendStore                   func(childComplexity int, id string, reason string) int
-		TrackActivity                  func(childComplexity int, input model.TrackActivityInput) int
 		UnpublishStore                 func(childComplexity int, id string) int
 		UnsuspendStore                 func(childComplexity int, id string, reason *string) int
 		UpdateCategory                 func(childComplexity int, id string, input model.UpdateCategoryInput) int
@@ -840,11 +839,6 @@ type ComplexityRoot struct {
 		UploadURL        func(childComplexity int) int
 	}
 
-	TrackActivityResponse struct {
-		Message func(childComplexity int) int
-		Success func(childComplexity int) int
-	}
-
 	UploadRatingImagesResponse struct {
 		Images func(childComplexity int) int
 	}
@@ -941,7 +935,6 @@ type MutationResolver interface {
 	ProcessPayment(ctx context.Context, input model.ProcessPaymentInput) (*model.Payment, error)
 	CreateRefund(ctx context.Context, paymentID string, amount float64, reason *string, idempotencyKey *string) (*model.RefundPayload, error)
 	CancelPayment(ctx context.Context, paymentID *string, orderID *string, reason *string) (*model.Payment, error)
-	TrackActivity(ctx context.Context, input model.TrackActivityInput) (*model.TrackActivityResponse, error)
 	CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error)
 	UpdateProduct(ctx context.Context, id string, input model.UpdateProductInput) (*model.Product, error)
 	DeleteProduct(ctx context.Context, id string) (*model.DeleteProductResponse, error)
@@ -3639,18 +3632,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.SuspendStore(childComplexity, args["id"].(string), args["reason"].(string)), true
 
-	case "Mutation.trackActivity":
-		if e.complexity.Mutation.TrackActivity == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_trackActivity_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.TrackActivity(childComplexity, args["input"].(model.TrackActivityInput)), true
-
 	case "Mutation.unpublishStore":
 		if e.complexity.Mutation.UnpublishStore == nil {
 			break
@@ -5828,20 +5809,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StoreUploadUrlPayload.UploadURL(childComplexity), true
 
-	case "TrackActivityResponse.message":
-		if e.complexity.TrackActivityResponse.Message == nil {
-			break
-		}
-
-		return e.complexity.TrackActivityResponse.Message(childComplexity), true
-
-	case "TrackActivityResponse.success":
-		if e.complexity.TrackActivityResponse.Success == nil {
-			break
-		}
-
-		return e.complexity.TrackActivityResponse.Success(childComplexity), true
-
 	case "UploadRatingImagesResponse.images":
 		if e.complexity.UploadRatingImagesResponse.Images == nil {
 			break
@@ -6101,7 +6068,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSendNotificationInput,
 		ec.unmarshalInputShippingItemInput,
 		ec.unmarshalInputSubmitKYCInput,
-		ec.unmarshalInputTrackActivityInput,
 		ec.unmarshalInputUpdateAddressInput,
 		ec.unmarshalInputUpdateCategoryInput,
 		ec.unmarshalInputUpdateDeliveryPartnerProfileInput,
@@ -6886,18 +6852,6 @@ extend type Mutation {
     PRODUCT_PURCHASED
 }
 
-input TrackActivityInput {
-    eventType: ActivityEventType!
-    productId: String
-    categoryId: String
-    sessionId: String
-}
-
-type TrackActivityResponse {
-    success: Boolean!
-    message: String!
-}
-
 type CustomerActivity {
     id: ID!
     userId: String
@@ -6908,9 +6862,6 @@ type CustomerActivity {
     createdAt: String!
 }
 
-extend type Mutation {
-    trackActivity(input: TrackActivityInput!): TrackActivityResponse!
-}
 
 extend type Query {
     customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!
@@ -8985,21 +8936,6 @@ func (ec *executionContext) field_Mutation_suspendStore_args(ctx context.Context
 		}
 	}
 	args["reason"] = arg1
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_trackActivity_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.TrackActivityInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNTrackActivityInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐTrackActivityInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
 	return args, nil
 }
 
@@ -25629,67 +25565,6 @@ func (ec *executionContext) fieldContext_Mutation_cancelPayment(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_cancelPayment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_trackActivity(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_trackActivity(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().TrackActivity(rctx, fc.Args["input"].(model.TrackActivityInput))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.TrackActivityResponse)
-	fc.Result = res
-	return ec.marshalNTrackActivityResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐTrackActivityResponse(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_trackActivity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "success":
-				return ec.fieldContext_TrackActivityResponse_success(ctx, field)
-			case "message":
-				return ec.fieldContext_TrackActivityResponse_message(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type TrackActivityResponse", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_trackActivity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -43298,94 +43173,6 @@ func (ec *executionContext) fieldContext_StoreUploadUrlPayload_expiresInSeconds(
 	return fc, nil
 }
 
-func (ec *executionContext) _TrackActivityResponse_success(ctx context.Context, field graphql.CollectedField, obj *model.TrackActivityResponse) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_TrackActivityResponse_success(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Success, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_TrackActivityResponse_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "TrackActivityResponse",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _TrackActivityResponse_message(ctx context.Context, field graphql.CollectedField, obj *model.TrackActivityResponse) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_TrackActivityResponse_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_TrackActivityResponse_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "TrackActivityResponse",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _UploadRatingImagesResponse_images(ctx context.Context, field graphql.CollectedField, obj *model.UploadRatingImagesResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UploadRatingImagesResponse_images(ctx, field)
 	if err != nil {
@@ -48705,54 +48492,6 @@ func (ec *executionContext) unmarshalInputSubmitKYCInput(ctx context.Context, ob
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputTrackActivityInput(ctx context.Context, obj interface{}) (model.TrackActivityInput, error) {
-	var it model.TrackActivityInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"eventType", "productId", "categoryId", "sessionId"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "eventType":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("eventType"))
-			data, err := ec.unmarshalNActivityEventType2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐActivityEventType(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.EventType = data
-		case "productId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.ProductID = data
-		case "categoryId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.CategoryID = data
-		case "sessionId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.SessionID = data
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputUpdateAddressInput(ctx context.Context, obj interface{}) (model.UpdateAddressInput, error) {
 	var it model.UpdateAddressInput
 	asMap := map[string]interface{}{}
@@ -52366,13 +52105,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_cancelPayment(ctx, field)
 			})
-		case "trackActivity":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_trackActivity(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "createProduct":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createProduct(ctx, field)
@@ -55320,50 +55052,6 @@ func (ec *executionContext) _StoreUploadUrlPayload(ctx context.Context, sel ast.
 	return out
 }
 
-var trackActivityResponseImplementors = []string{"TrackActivityResponse"}
-
-func (ec *executionContext) _TrackActivityResponse(ctx context.Context, sel ast.SelectionSet, obj *model.TrackActivityResponse) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, trackActivityResponseImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("TrackActivityResponse")
-		case "success":
-			out.Values[i] = ec._TrackActivityResponse_success(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "message":
-			out.Values[i] = ec._TrackActivityResponse_message(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var uploadRatingImagesResponseImplementors = []string{"UploadRatingImagesResponse"}
 
 func (ec *executionContext) _UploadRatingImagesResponse(ctx context.Context, sel ast.SelectionSet, obj *model.UploadRatingImagesResponse) graphql.Marshaler {
@@ -57893,25 +57581,6 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 func (ec *executionContext) unmarshalNSubmitKYCInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐSubmitKYCInput(ctx context.Context, v interface{}) (model.SubmitKYCInput, error) {
 	res, err := ec.unmarshalInputSubmitKYCInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNTrackActivityInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐTrackActivityInput(ctx context.Context, v interface{}) (model.TrackActivityInput, error) {
-	res, err := ec.unmarshalInputTrackActivityInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNTrackActivityResponse2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐTrackActivityResponse(ctx context.Context, sel ast.SelectionSet, v model.TrackActivityResponse) graphql.Marshaler {
-	return ec._TrackActivityResponse(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNTrackActivityResponse2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐTrackActivityResponse(ctx context.Context, sel ast.SelectionSet, v *model.TrackActivityResponse) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._TrackActivityResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNUpdateAddressInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐUpdateAddressInput(ctx context.Context, v interface{}) (model.UpdateAddressInput, error) {

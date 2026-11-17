@@ -986,18 +986,6 @@ type SubmitKYCInput struct {
 	Gstin             string  `json:"gstin"`
 }
 
-type TrackActivityInput struct {
-	EventType  ActivityEventType `json:"eventType"`
-	ProductID  *string           `json:"productId,omitempty"`
-	CategoryID *string           `json:"categoryId,omitempty"`
-	SessionID  *string           `json:"sessionId,omitempty"`
-}
-
-type TrackActivityResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
 type UpdateAddressInput struct {
 	Label        *string `json:"label,omitempty"`
 	FullName     *string `json:"fullName,omitempty"`

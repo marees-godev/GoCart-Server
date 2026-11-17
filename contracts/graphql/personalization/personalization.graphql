@@ -8,18 +8,6 @@ enum ActivityEventType {
     PRODUCT_PURCHASED
 }
 
-input TrackActivityInput {
-    eventType: ActivityEventType!
-    productId: String
-    categoryId: String
-    sessionId: String
-}
-
-type TrackActivityResponse {
-    success: Boolean!
-    message: String!
-}
-
 type CustomerActivity {
     id: ID!
     userId: String
@@ -30,9 +18,6 @@ type CustomerActivity {
     createdAt: String!
 }
 
-extend type Mutation {
-    trackActivity(input: TrackActivityInput!): TrackActivityResponse!
-}
 
 extend type Query {
     customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!

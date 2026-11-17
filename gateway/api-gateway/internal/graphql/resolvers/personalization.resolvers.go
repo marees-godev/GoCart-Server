@@ -14,48 +14,6 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
-// TrackActivity is the resolver for the trackActivity field.
-func (r *mutationResolver) TrackActivity(ctx context.Context, input model.TrackActivityInput) (*model.TrackActivityResponse, error) {
-	if r.ClientMgr == nil || r.ClientMgr.PersonalizationClient == nil {
-		return nil, appErrors.Internal(nil, "personalization service client unavailable")
-	}
-
-	userID := getAuthUserIDFromCtx(ctx)
-
-	sessionID := ""
-	if input.SessionID != nil {
-		sessionID = *input.SessionID
-	}
-
-	productID := ""
-	if input.ProductID != nil {
-		productID = *input.ProductID
-	}
-
-	categoryID := ""
-	if input.CategoryID != nil {
-		categoryID = *input.CategoryID
-	}
-
-	req := &personalizationpb.TrackActivityRequest{
-		UserId:     userID,
-		SessionId:  sessionID,
-		EventType:  maps.MapGraphQLToProtoEventType(input.EventType),
-		ProductId:  productID,
-		CategoryId: categoryID,
-	}
-
-	resp, err := r.ClientMgr.PersonalizationClient.TrackActivity(ctx, req)
-	if err != nil {
-		return nil, grpcclient.TranslateGRPCError(err)
-	}
-
-	return &model.TrackActivityResponse{
-		Success: resp.GetSuccess(),
-		Message: resp.GetMessage(),
-	}, nil
-}
-
 // CustomerActivities is the resolver for the customerActivities field.
 func (r *queryResolver) CustomerActivities(ctx context.Context, sessionID *string, limit *int, offset *int) ([]*model.CustomerActivity, error) {
 	if r.ClientMgr == nil || r.ClientMgr.PersonalizationClient == nil {
