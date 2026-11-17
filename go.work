@@ -17,4 +17,5 @@ use (
 	./services/return-service
 	./services/store-service
 	./services/user-service
+	./services/personalization-service
 )

@@ -319,12 +319,12 @@ type DeliveryCreatedEvent struct {
 
 // DeliveryStatusUpdatedEvent represents the payload for DeliveryStatusUpdated domain event.
 type DeliveryStatusUpdatedEvent struct {
-	DeliveryID      string    `json:"delivery_id"`
-	OrderID         string    `json:"order_id"`
-	PreviousStatus  string    `json:"previous_status"`
-	NewStatus       string    `json:"new_status"`
-	TrackingNumber  string    `json:"tracking_number"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	DeliveryID     string    `json:"delivery_id"`
+	OrderID        string    `json:"order_id"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	TrackingNumber string    `json:"tracking_number"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // DeliveryStatusChangedEvent represents the payload for DeliveryStatusChanged domain event.
@@ -347,7 +347,6 @@ type DeliveryDispatchedEvent struct {
 	TrackingNumber  string    `json:"tracking_number"`
 	DispatchedAt    time.Time `json:"dispatched_at"`
 }
-
 
 // ProductCreatedEvent represents the payload for ProductCreated domain event.
 type ProductCreatedEvent struct {
@@ -479,7 +478,6 @@ type ReturnCompletedEvent struct {
 	CompletedAt  time.Time `json:"completed_at"`
 }
 
-
 // PartnerRegisteredEvent represents the payload for PartnerRegistered domain event.
 type PartnerRegisteredEvent struct {
 	PartnerID     string `json:"partner_id"`
@@ -530,4 +528,14 @@ type ExchangeCompletedEvent struct {
 	UserID        string    `json:"user_id"`
 	FinalDiscount float64   `json:"final_discount"`
 	CompletedAt   time.Time `json:"completed_at"`
+}
+
+// CustomerActivityEvent represents the payload for customer interaction events.
+type CustomerActivityEvent struct {
+	UserID     string    `json:"user_id,omitempty"`
+	SessionID  string    `json:"session_id,omitempty"`
+	EventType  string    `json:"event_type,omitempty"`
+	ProductID  string    `json:"product_id,omitempty"`
+	CategoryID string    `json:"category_id,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
 }
