@@ -57,7 +57,8 @@ func TestRecord_OrderAndDeliveryNotificationsPersistedAndRetrieved(t *testing.T)
 	go func() { _ = srv.Serve(lis) }()
 	defer srv.Stop()
 
-	conn, err := grpc.DialContext(ctx, "bufnet",
+	conn, err := grpc.NewClient(
+		"passthrough:///bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return lis.Dial() }),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
