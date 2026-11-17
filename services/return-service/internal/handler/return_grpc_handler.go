@@ -715,7 +715,12 @@ func mapErrorToGRPC(err error) error {
 		errors.Is(err, service.ErrUnknownExchangeQuestion),
 		errors.Is(err, service.ErrUnknownExchangeOption),
 		errors.Is(err, service.ErrDuplicateExchangeAnswer),
-		errors.Is(err, service.ErrMissingRequiredQuestion):
+		errors.Is(err, service.ErrMissingRequiredQuestion),
+		errors.Is(err, service.ErrInvalidImageFormat),
+		errors.Is(err, service.ErrInvalidBase64Image),
+		errors.Is(err, service.ErrFailedToDecodeBase64Image),
+		errors.Is(err, service.ErrEmptyImageData),
+		errors.Is(err, service.ErrUnsupportedImageFormat):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, service.ErrDuplicateReturnRequest):
 		return status.Error(codes.AlreadyExists, err.Error())
@@ -750,7 +755,8 @@ func mapErrorToGRPC(err error) error {
 	case errors.Is(err, service.ErrUnauthorizedReturnRequest),
 		errors.Is(err, service.ErrCustomerCannotReviewOwnReturn):
 		return status.Error(codes.PermissionDenied, err.Error())
-	case errors.Is(err, service.ErrProductServiceUnavailable):
+	case errors.Is(err, service.ErrProductServiceUnavailable),
+		errors.Is(err, service.ErrStorageUnavailable):
 		return status.Error(codes.Unavailable, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())

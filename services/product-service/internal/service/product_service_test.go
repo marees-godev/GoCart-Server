@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -613,3 +615,248 @@ func TestProductService_PublishingRulesAndPrerequisites(t *testing.T) {
 	})
 }
 
+type mockProductUploader struct {
+	failUpload bool
+}
+
+func (m *mockProductUploader) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	if m.failUpload {
+		return "", errors.New("supabase storage upload failed")
+	}
+	return "https://storage.supabase.co/storage/v1/object/public/products/" + key, nil
+}
+
+func (m *mockProductUploader) UploadBytes(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if m.failUpload {
+		return "", errors.New("supabase storage upload failed")
+	}
+	return "https://storage.supabase.co/storage/v1/object/public/products/" + key, nil
+}
+
+func (m *mockProductUploader) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
+func (m *mockProductUploader) GetPublicURL(key string) string {
+	return "https://storage.supabase.co/storage/v1/object/public/products/" + key
+}
+
+func (m *mockProductUploader) GenerateKey(prefix, filename string) string {
+	return prefix + "/" + filename
+}
+
+func (m *mockProductUploader) GetPresignedPutURL(ctx context.Context, key string, contentType string, expiry time.Duration) (string, error) {
+	return "", nil
+}
+
+func TestProductService_ImageUpload_StorageUnavailable(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	svc := service.NewProductService(repo, storeClient, catClient, nil)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Img := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	_, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+		StoreID:    validStoreID,
+		CategoryID: validCatID,
+		SKU:        "SKU-TEST-1",
+		Name:       "Test Product",
+		Price:      100,
+		MRP:        120,
+		ImageURL:   base64Img,
+	})
+	if err == nil {
+		t.Fatal("expected error when storage uploader is unavailable, got nil")
+	}
+	if !strings.Contains(err.Error(), "storage service is not configured or unavailable") {
+		t.Fatalf("expected storage unavailable error, got: %v", err)
+	}
+}
+
+func TestProductService_ImageUpload_UploadFailure(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	failingUploader := &mockProductUploader{failUpload: true}
+	svc := service.NewProductService(repo, storeClient, catClient, failingUploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Img := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	_, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+		StoreID:    validStoreID,
+		CategoryID: validCatID,
+		SKU:        "SKU-TEST-2",
+		Name:       "Test Product 2",
+		Price:      100,
+		MRP:        120,
+		ImageURL:   base64Img,
+	})
+	if err == nil {
+		t.Fatal("expected error when storage upload fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to upload image to storage") {
+		t.Fatalf("expected failed to upload image error, got: %v", err)
+	}
+
+	// Verify no product was persisted with base64 url
+	p, err := repo.GetProductBySKU(ctx, validStoreID, "SKU-TEST-2")
+	if err == nil && p != nil {
+		t.Fatalf("product should not have been saved on upload failure")
+	}
+}
+
+func TestProductService_ImageUpload_Success(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	uploader := &mockProductUploader{failUpload: false}
+	svc := service.NewProductService(repo, storeClient, catClient, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Img := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	prod, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+		StoreID:    validStoreID,
+		CategoryID: validCatID,
+		SKU:        "SKU-TEST-3",
+		Name:       "Test Product 3",
+		Price:      100,
+		MRP:        120,
+		ImageURL:   base64Img,
+		Images:     []string{base64Img},
+	})
+	if err != nil {
+		t.Fatalf("expected successful product creation, got: %v", err)
+	}
+	if strings.HasPrefix(prod.ImageURL, "data:") {
+		t.Fatalf("expected Supabase Storage URL, got base64 data URL: %s", prod.ImageURL)
+	}
+	if !strings.HasPrefix(prod.ImageURL, "https://storage.supabase.co/") {
+		t.Fatalf("expected Supabase Storage URL prefix, got: %s", prod.ImageURL)
+	}
+	if len(prod.Images) > 0 && strings.HasPrefix(prod.Images[0].URL, "data:") {
+		t.Fatalf("expected product gallery image to have Supabase Storage URL, got base64: %s", prod.Images[0].URL)
+	}
+}
+
+func TestProductService_UpdateProduct_ImageUploadFailuresAndSuccess(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	uploader := &mockProductUploader{failUpload: false}
+	svc := service.NewProductService(repo, storeClient, catClient, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	prod, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+		StoreID:    validStoreID,
+		CategoryID: validCatID,
+		SKU:        "SKU-UPDATE-1",
+		Name:       "Initial Product",
+		Price:      100,
+		MRP:        120,
+		ImageURL:   "https://existing.cdn.com/product.png",
+	})
+	if err != nil {
+		t.Fatalf("failed to create initial product: %v", err)
+	}
+
+	base64Img := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	// Test upload failure
+	uploader.failUpload = true
+	_, err = svc.UpdateProduct(merchantCtx, dto.UpdateProductRequest{
+		ID:       prod.ID,
+		ImageURL: &base64Img,
+	})
+	if err == nil {
+		t.Fatal("expected error on update when upload fails, got nil")
+	}
+
+	// Verify original URL is preserved and no base64 was saved
+	fetched, err := repo.GetProductByID(ctx, prod.ID)
+	if err != nil {
+		t.Fatalf("failed to get product: %v", err)
+	}
+	if fetched.ImageURL != "https://existing.cdn.com/product.png" {
+		t.Fatalf("expected existing URL preserved, got: %s", fetched.ImageURL)
+	}
+
+	// Test upload success
+	uploader.failUpload = false
+	updated, err := svc.UpdateProduct(merchantCtx, dto.UpdateProductRequest{
+		ID:       prod.ID,
+		ImageURL: &base64Img,
+	})
+	if err != nil {
+		t.Fatalf("expected successful update, got: %v", err)
+	}
+	if strings.HasPrefix(updated.ImageURL, "data:") {
+		t.Fatalf("expected storage URL, got base64 data URL: %s", updated.ImageURL)
+	}
+	if !strings.HasPrefix(updated.ImageURL, "https://storage.supabase.co/") {
+		t.Fatalf("expected Supabase Storage URL prefix, got: %s", updated.ImageURL)
+	}
+}

@@ -1513,6 +1513,111 @@ func TestUpdateUser_AvatarUpload_NoImageProcessor_ReturnsInternalError(t *testin
 	}
 }
 
+func TestUpdateUser_AvatarDataURI_StorageError_DoesNotFallbackToBase64(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{
+		processFunc: func(ctx context.Context, userID string, input service.AvatarInput) (string, error) {
+			return "", appErrors.Internal(nil, "supabase storage: upload failed")
+		},
+	}
+	svc := service.NewUserService(repo, imgProc)
+
+	initialAvatar := "https://example.com/initial-avatar.jpg"
+	user := &model.User{
+		ID:        "user-data-uri-err",
+		Email:     "datauri@example.com",
+		FirstName: "Data",
+		LastName:  "URI",
+		Status:    "active",
+		AvatarURL: &initialAvatar,
+	}
+	repo.users[user.ID] = user
+
+	pngData := createTestPNG(20, 20)
+	b64 := base64.StdEncoding.EncodeToString(pngData)
+	dataURI := "data:image/png;base64," + b64
+
+	req := dto.UpdateUserRequest{
+		AvatarURL: &dataURI,
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected error on storage failure, got nil")
+	}
+
+	// Verify database avatar URL did NOT fall back to the base64 data URI
+	saved := repo.users[user.ID]
+	if *saved.AvatarURL != initialAvatar {
+		t.Errorf("expected database avatar to remain '%s', got '%s'", initialAvatar, *saved.AvatarURL)
+	}
+	if strings.HasPrefix(*saved.AvatarURL, "data:") {
+		t.Errorf("database must never persist Base64 fallback avatar URL")
+	}
+}
+
+func TestUpdateUser_AvatarDataURI_NilProcessor_DoesNotFallbackToBase64(t *testing.T) {
+	repo := newMockRepo()
+	svc := service.NewUserService(repo, nil)
+
+	initialAvatar := "https://example.com/initial-avatar2.jpg"
+	user := &model.User{
+		ID:        "user-data-uri-nil",
+		Email:     "dataurinil@example.com",
+		FirstName: "Data",
+		LastName:  "Nil",
+		Status:    "active",
+		AvatarURL: &initialAvatar,
+	}
+	repo.users[user.ID] = user
+
+	pngData := createTestPNG(20, 20)
+	b64 := base64.StdEncoding.EncodeToString(pngData)
+	dataURI := "data:image/png;base64," + b64
+
+	req := dto.UpdateUserRequest{
+		AvatarURL: &dataURI,
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected error when storage/processor is nil, got nil")
+	}
+
+	saved := repo.users[user.ID]
+	if *saved.AvatarURL != initialAvatar {
+		t.Errorf("expected database avatar to remain '%s', got '%s'", initialAvatar, *saved.AvatarURL)
+	}
+	if strings.HasPrefix(*saved.AvatarURL, "data:") {
+		t.Errorf("database must never persist Base64 fallback avatar URL")
+	}
+}
+
+func TestUpdateUser_AvatarInvalidFormat_ReturnsBadRequest(t *testing.T) {
+	repo := newMockRepo()
+	imgProc := &mockCustomImageProcessor{}
+	svc := service.NewUserService(repo, imgProc)
+
+	user := &model.User{
+		ID:        "user-invalid-avatar",
+		Email:     "invalidavatar@example.com",
+		FirstName: "Invalid",
+		LastName:  "Avatar",
+		Status:    "active",
+	}
+	repo.users[user.ID] = user
+
+	invalidURI := "not-a-url-and-not-data-uri"
+	req := dto.UpdateUserRequest{
+		AvatarURL: &invalidURI,
+	}
+
+	_, err := svc.UpdateUser(context.Background(), user.ID, user.ID, req)
+	if err == nil {
+		t.Fatal("expected error for invalid avatar URL format, got nil")
+	}
+}
+
 
 
 

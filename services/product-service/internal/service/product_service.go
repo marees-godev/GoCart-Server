@@ -115,13 +115,18 @@ func (s *productService) checkPublishPrerequisites(ctx context.Context, storeID 
 	return nil
 }
 
-func (s *productService) processImageDataURL(ctx context.Context, input string, folder string) string {
-	if s.uploader == nil || !strings.HasPrefix(input, "data:") {
-		return input
+func (s *productService) processImageDataURL(ctx context.Context, input string, folder string) (string, error) {
+	if !strings.HasPrefix(input, "data:") {
+		return input, nil
 	}
+
+	if s.uploader == nil {
+		return "", appErrors.Internal(nil, "storage service is not configured or unavailable")
+	}
+
 	parts := strings.SplitN(input, ";base64,", 2)
 	if len(parts) != 2 {
-		return input
+		return "", appErrors.BadRequest("invalid image data URL format")
 	}
 	header := parts[0]
 	b64Data := parts[1]
@@ -149,16 +154,16 @@ func (s *productService) processImageDataURL(ctx context.Context, input string, 
 
 	decoded, err := base64.StdEncoding.DecodeString(b64Data)
 	if err != nil {
-		return input
+		return "", appErrors.BadRequest("failed to decode base64 image data")
 	}
 
 	key := s.uploader.GenerateKey(folder, "product"+ext)
 	uploadedURL, err := s.uploader.UploadBytes(ctx, key, decoded, contentType)
 	if err != nil {
-		return input
+		return "", appErrors.Internal(err, "failed to upload image to storage")
 	}
 
-	return uploadedURL
+	return uploadedURL, nil
 }
 
 func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProductRequest) (*model.Product, error) {
@@ -196,11 +201,17 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 
 	name := req.Name
 
-	imgURL := s.processImageDataURL(ctx, req.ImageURL, "products")
+	imgURL, err := s.processImageDataURL(ctx, req.ImageURL, "products")
+	if err != nil {
+		return nil, err
+	}
 
 	images := make([]model.ProductImage, 0, len(req.Images))
 	for i, raw := range req.Images {
-		u := s.processImageDataURL(ctx, raw, "products")
+		u, err := s.processImageDataURL(ctx, raw, "products")
+		if err != nil {
+			return nil, err
+		}
 		images = append(images, model.ProductImage{
 			URL:          u,
 			IsPrimary:    i == 0,
@@ -344,7 +355,11 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 	}
 
 	if req.ImageURL != nil {
-		existing.ImageURL = s.processImageDataURL(ctx, *req.ImageURL, "products")
+		u, err := s.processImageDataURL(ctx, *req.ImageURL, "products")
+		if err != nil {
+			return nil, err
+		}
+		existing.ImageURL = u
 	}
 
 	if req.IsExchangeEligible != nil {
@@ -357,7 +372,10 @@ func (s *productService) UpdateProduct(ctx context.Context, req dto.UpdateProduc
 	if len(req.Images) > 0 {
 		newImages := make([]model.ProductImage, 0, len(req.Images))
 		for i, raw := range req.Images {
-			u := s.processImageDataURL(ctx, raw, "products")
+			u, err := s.processImageDataURL(ctx, raw, "products")
+			if err != nil {
+				return nil, err
+			}
 			newImages = append(newImages, model.ProductImage{
 				ProductID:    existing.ID,
 				URL:          u,

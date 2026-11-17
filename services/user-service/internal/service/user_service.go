@@ -299,30 +299,35 @@ func (s *userService) UpdateUser(ctx context.Context, authUserID, targetUserID s
 			return nil, err
 		}
 		user.AvatarURL = &avatarURL
-	} else if req.AvatarURL != nil && strings.HasPrefix(*req.AvatarURL, "data:image/") {
-		if s.imageProcessor == nil {
-			slog.WarnContext(ctx, "image processor not configured in UpdateUser", "user_id", targetUserID)
-			return nil, errors.Internal(nil, "storage uploader is not configured")
-		}
-
-		data, contentType, err := ParseDataURI(*req.AvatarURL)
-		if err != nil {
-			slog.WarnContext(ctx, "failed to parse avatar data URI in UpdateUser", "user_id", targetUserID, "error", err)
-			return nil, err
-		}
-
-		avatarURL, err := s.imageProcessor.ProcessAndUploadAvatar(ctx, user.ID, AvatarInput{
-			Data:        data,
-			ContentType: contentType,
-			Filename:    "avatar",
-		})
-		if err != nil {
-			slog.WarnContext(ctx, "failed to process avatar image from data URI in UpdateUser", "user_id", targetUserID, "error", err)
-			return nil, err
-		}
-		user.AvatarURL = &avatarURL
 	} else if req.AvatarURL != nil {
-		user.AvatarURL = req.AvatarURL
+		trimmedAvatar := strings.TrimSpace(*req.AvatarURL)
+		if strings.HasPrefix(trimmedAvatar, "data:") {
+			if s.imageProcessor == nil {
+				slog.WarnContext(ctx, "image processor not configured in UpdateUser", "user_id", targetUserID)
+				return nil, errors.Internal(nil, "storage uploader is not configured")
+			}
+
+			data, contentType, err := ParseDataURI(trimmedAvatar)
+			if err != nil {
+				slog.WarnContext(ctx, "failed to parse avatar data URI in UpdateUser", "user_id", targetUserID, "error", err)
+				return nil, err
+			}
+
+			avatarURL, err := s.imageProcessor.ProcessAndUploadAvatar(ctx, user.ID, AvatarInput{
+				Data:        data,
+				ContentType: contentType,
+				Filename:    "avatar",
+			})
+			if err != nil {
+				slog.WarnContext(ctx, "failed to process avatar image from data URI in UpdateUser", "user_id", targetUserID, "error", err)
+				return nil, err
+			}
+			user.AvatarURL = &avatarURL
+		} else if strings.HasPrefix(trimmedAvatar, "http://") || strings.HasPrefix(trimmedAvatar, "https://") || trimmedAvatar == "" {
+			user.AvatarURL = req.AvatarURL
+		} else {
+			return nil, errors.BadRequest("invalid avatar URL format: must be a valid HTTP/HTTPS URL or base64 data URI")
+		}
 	}
 
 	if err := s.repo.UpdateUser(ctx, user); err != nil {

@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -1072,5 +1073,75 @@ func TestRatingService_CreateRating_WithImages(t *testing.T) {
 	}
 	if len(created.Images) != 1 || created.Images[0].URL != "https://cdn.gocart.local/ratings/photo.jpg" {
 		t.Errorf("expected 1 saved image, got: %+v", created.Images)
+	}
+}
+
+func TestRatingService_ImageUpload_StorageFailures(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRatingRepo()
+	authorID := uuid.New().String()
+	orderID := "11111111-1111-1111-1111-111111111111"
+	orderItemID := "33333333-3333-3333-3333-333333333333"
+	productID := "44444444-4444-4444-4444-444444444444"
+
+	orderClient := &mockOrderClient{
+		orders: map[string]*orderpb.Order{
+			orderID: {
+				Id:          orderID,
+				UserId:      authorID,
+				OrderStatus: "DELIVERED",
+				Items: []*orderpb.OrderItem{
+					{Id: orderItemID, ProductId: productID},
+				},
+			},
+		},
+	}
+
+	b64PNG := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("fake-png-bytes"))
+
+	// 1. Storage uploader is nil (unavailable)
+	svcNoUploader := service.NewRatingService(repo, orderClient, nil, nil)
+	_, err := svcNoUploader.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      authorID,
+		OrderID:     orderID,
+		OrderItemID: orderItemID,
+		ProductID:   productID,
+		Rating:      5,
+		Review:      "Uploader nil test",
+		Images:      []string{b64PNG},
+	})
+	if err == nil {
+		t.Fatal("expected error when storage uploader is nil, got nil")
+	}
+	if !strings.Contains(err.Error(), "storage uploader not configured") {
+		t.Fatalf("expected uploader not configured error, got: %v", err)
+	}
+
+	// 2. Storage upload fails
+	failingUploader := &mockUploader{err: errors.New("supabase storage error")}
+	svcFailing := service.NewRatingService(repo, orderClient, failingUploader, nil)
+	_, err = svcFailing.CreateRating(ctx, dto.CreateRatingInput{
+		UserID:      authorID,
+		OrderID:     orderID,
+		OrderItemID: orderItemID,
+		ProductID:   productID,
+		Rating:      5,
+		Review:      "Upload failure test",
+		Images:      []string{b64PNG},
+	})
+	if err == nil {
+		t.Fatal("expected error when storage upload fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to upload image to storage") {
+		t.Fatalf("expected failed to upload image error, got: %v", err)
+	}
+
+	// Verify no ratings were saved with base64
+	ratings, _, _, _, err := repo.GetProductRatings(ctx, productID, 10, 0)
+	if err != nil {
+		t.Fatalf("failed to list ratings: %v", err)
+	}
+	if len(ratings) != 0 {
+		t.Fatalf("expected 0 ratings saved after upload failures, got: %d", len(ratings))
 	}
 }

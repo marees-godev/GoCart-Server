@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/events"
@@ -53,6 +55,13 @@ var (
 	ErrExchangeBrandModelRequired     = errors.New("old brand and old model are required for exchange")
 	ErrExchangeProductRequired        = errors.New("product id is required for exchange")
 	ErrExchangeFunctionalRequired     = errors.New("device must be functional and serial must match to approve exchange")
+	ErrStorageUnavailable              = errors.New("storage service is unavailable")
+	ErrStorageUploadFailed             = errors.New("failed to upload image to storage")
+	ErrInvalidImageFormat              = errors.New("invalid image format: must be a valid URL or base64 data URI")
+	ErrInvalidBase64Image              = errors.New("invalid base64 image format")
+	ErrFailedToDecodeBase64Image       = errors.New("failed to decode base64 image")
+	ErrEmptyImageData                  = errors.New("image data cannot be empty")
+	ErrUnsupportedImageFormat          = errors.New("unsupported image format: allowed jpeg, png, webp")
 	ErrReturnNotEligibleForRefund     = errors.New("refund can only be triggered after return is received or verified")
 	ErrRefundExceedsPaidAmount        = errors.New("refund amount cannot exceed total paid amount")
 	ErrPaymentNotFound                  = errors.New("payment not found for order")
@@ -105,6 +114,7 @@ type returnService struct {
 	orderClient      client.OrderClient
 	productClient    client.ProductClient
 	paymentClient    client.PaymentClient
+	uploader         storage.Uploader
 	returnWindowDays int
 	logger           *slog.Logger
 }
@@ -121,6 +131,7 @@ func NewReturnService(
 	}
 	var l *slog.Logger
 	var payClient client.PaymentClient
+	var up storage.Uploader
 	for _, opt := range opts {
 		if opt == nil {
 			continue
@@ -130,6 +141,8 @@ func NewReturnService(
 			l = v
 		case client.PaymentClient:
 			payClient = v
+		case storage.Uploader:
+			up = v
 		}
 	}
 	if l == nil {
@@ -140,9 +153,68 @@ func NewReturnService(
 		orderClient:      orderClient,
 		productClient:    productClient,
 		paymentClient:    payClient,
+		uploader:         up,
 		returnWindowDays: returnWindowDays,
 		logger:           l,
 	}
+}
+
+func (s *returnService) processProofImage(ctx context.Context, input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", nil
+	}
+
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed, nil
+	}
+
+	if !strings.HasPrefix(trimmed, "data:") {
+		return "", ErrInvalidImageFormat
+	}
+
+	if s.uploader == nil {
+		return "", ErrStorageUnavailable
+	}
+
+	parts := strings.SplitN(trimmed, ";base64,", 2)
+	if len(parts) != 2 {
+		parts = strings.SplitN(trimmed, ",", 2)
+		if len(parts) != 2 {
+			return "", ErrInvalidBase64Image
+		}
+	}
+
+	header := parts[0]
+	b64Data := parts[1]
+
+	var contentType, ext string
+	switch {
+	case strings.Contains(header, "image/jpeg") || strings.Contains(header, "image/jpg"):
+		contentType, ext = "image/jpeg", ".jpg"
+	case strings.Contains(header, "image/png"):
+		contentType, ext = "image/png", ".png"
+	case strings.Contains(header, "image/webp"):
+		contentType, ext = "image/webp", ".webp"
+	default:
+		return "", ErrUnsupportedImageFormat
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(b64Data)
+	if err != nil {
+		return "", ErrFailedToDecodeBase64Image
+	}
+	if len(decoded) == 0 {
+		return "", ErrEmptyImageData
+	}
+
+	key := s.uploader.GenerateKey("returns/proofs", "proof"+ext)
+	uploadedURL, err := s.uploader.UploadBytes(ctx, key, decoded, contentType)
+	if err != nil {
+		return "", ErrStorageUploadFailed
+	}
+
+	return uploadedURL, nil
 }
 
 func (s *returnService) SetPaymentClient(c client.PaymentClient) {
@@ -604,8 +676,12 @@ func (s *returnService) VerifyProduct(ctx context.Context, req *dto.VerifyProduc
 	for _, img := range req.ProofImages {
 		tImg := strings.TrimSpace(img)
 		if tImg != "" && !seen[tImg] {
+			uploaded, err := s.processProofImage(ctx, tImg)
+			if err != nil {
+				return nil, nil, err
+			}
 			seen[tImg] = true
-			cleanedImages = append(cleanedImages, tImg)
+			cleanedImages = append(cleanedImages, uploaded)
 		}
 	}
 
@@ -1009,8 +1085,12 @@ func (s *returnService) VerifyExchangeProduct(ctx context.Context, req *dto.Veri
 	for _, img := range req.ProofImages {
 		tImg := strings.TrimSpace(img)
 		if tImg != "" && !seen[tImg] {
+			uploaded, err := s.processProofImage(ctx, tImg)
+			if err != nil {
+				return nil, nil, err
+			}
 			seen[tImg] = true
-			cleanedImages = append(cleanedImages, tImg)
+			cleanedImages = append(cleanedImages, uploaded)
 		}
 	}
 
