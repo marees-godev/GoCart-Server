@@ -131,25 +131,18 @@ func (s *productService) processImageDataURL(ctx context.Context, input string, 
 	header := parts[0]
 	b64Data := parts[1]
 
-	contentType := "image/png"
-	if strings.Contains(header, "image/jpeg") || strings.Contains(header, "image/jpg") {
-		contentType = "image/jpeg"
-	} else if strings.Contains(header, "image/webp") {
-		contentType = "image/webp"
-	} else if strings.Contains(header, "image/svg+xml") {
-		contentType = "image/svg+xml"
-	}
-
-	var ext string
-	switch contentType {
-	case "image/jpeg":
-		ext = ".jpg"
-	case "image/webp":
-		ext = ".webp"
-	case "image/svg+xml":
-		ext = ".svg"
+	var contentType, ext string
+	switch {
+	case strings.Contains(header, "image/jpeg") || strings.Contains(header, "image/jpg"):
+		contentType, ext = "image/jpeg", ".jpg"
+	case strings.Contains(header, "image/png"):
+		contentType, ext = "image/png", ".png"
+	case strings.Contains(header, "image/webp"):
+		contentType, ext = "image/webp", ".webp"
+	case strings.Contains(header, "image/svg+xml"):
+		contentType, ext = "image/svg+xml", ".svg"
 	default:
-		ext = ".png"
+		return "", appErrors.BadRequest("unsupported image type: only JPEG, PNG, WebP, and SVG are allowed")
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(b64Data)

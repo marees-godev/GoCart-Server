@@ -860,3 +860,158 @@ func TestProductService_UpdateProduct_ImageUploadFailuresAndSuccess(t *testing.T
 		t.Fatalf("expected Supabase Storage URL prefix, got: %s", updated.ImageURL)
 	}
 }
+
+func TestProductService_ImageUpload_Formats(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	uploader := &mockProductUploader{failUpload: false}
+	svc := service.NewProductService(repo, storeClient, catClient, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	formats := []struct {
+		name    string
+		dataURL string
+	}{
+		{"PNG", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="},
+		{"JPEG", "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="},
+		{"WebP", "data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAfQ//73v/+BiOh/AAA="},
+	}
+
+	for _, tc := range formats {
+		t.Run(tc.name, func(t *testing.T) {
+			prod, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+				StoreID:    validStoreID,
+				CategoryID: validCatID,
+				SKU:        "SKU-FMT-" + tc.name,
+				Name:       "Test Product " + tc.name,
+				Price:      100,
+				MRP:        120,
+				ImageURL:   tc.dataURL,
+			})
+			if err != nil {
+				t.Fatalf("expected successful image processing for %s, got: %v", tc.name, err)
+			}
+			if !strings.HasPrefix(prod.ImageURL, "https://storage.supabase.co/") {
+				t.Errorf("expected Supabase storage URL prefix, got: %s", prod.ImageURL)
+			}
+			if strings.HasPrefix(prod.ImageURL, "data:") {
+				t.Errorf("expected image URL to not be data URI, got: %s", prod.ImageURL)
+			}
+		})
+	}
+}
+
+func TestProductService_ImageUpload_InvalidData(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	uploader := &mockProductUploader{failUpload: false}
+	svc := service.NewProductService(repo, storeClient, catClient, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	cases := []struct {
+		name        string
+		dataURL     string
+		expectedErr string
+	}{
+		{"InvalidBase64Encoding", "data:image/png;base64,invalid!not-base64!***", "failed to decode base64 image data"},
+		{"UnsupportedGIF", "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "unsupported image type"},
+		{"MalformedDataURI", "data:image/png,notbase64", "invalid image data URL format"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+				StoreID:    validStoreID,
+				CategoryID: validCatID,
+				SKU:        "SKU-INV-" + tc.name,
+				Name:       "Invalid Product",
+				Price:      100,
+				MRP:        120,
+				ImageURL:   tc.dataURL,
+			})
+			if err == nil {
+				t.Fatalf("expected error for %s, got nil", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("expected error containing '%s', got: %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestProductService_ImageUpload_NormalURLPreserved(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	validStoreID := "11111111-1111-1111-1111-111111111111"
+	validCatID := "22222222-2222-2222-2222-222222222222"
+	storeClient := &mockStoreClient{
+		stores: map[string]*storepb.Store{
+			validStoreID: {Id: validStoreID, MerchantId: "merchant-1", Name: "Test Store", ApprovalStatus: "APPROVED"},
+		},
+	}
+	catClient := &mockCategoryClient{
+		categories: map[string]*categorypb.Category{
+			validCatID: {Id: validCatID, Name: "Electronics", IsActive: true},
+		},
+	}
+	// uploader is nil: normal URL should not need uploader
+	svc := service.NewProductService(repo, storeClient, catClient, nil)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	normalURL := "https://cdn.example.com/products/headphones.jpg"
+	prod, err := svc.CreateProduct(merchantCtx, dto.CreateProductRequest{
+		StoreID:    validStoreID,
+		CategoryID: validCatID,
+		SKU:        "SKU-NORMAL-URL",
+		Name:       "Normal URL Product",
+		Price:      100,
+		MRP:        120,
+		ImageURL:   normalURL,
+		Images:     []string{normalURL},
+	})
+	if err != nil {
+		t.Fatalf("expected success with normal URL, got: %v", err)
+	}
+	if prod.ImageURL != normalURL {
+		t.Errorf("expected %s, got: %s", normalURL, prod.ImageURL)
+	}
+	if len(prod.Images) == 0 || prod.Images[0].URL != normalURL {
+		t.Errorf("expected gallery image URL to be preserved, got: %+v", prod.Images)
+	}
+}
