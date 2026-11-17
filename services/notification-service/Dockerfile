@@ -21,6 +21,6 @@ COPY --from=builder /app/services/notification-service/migrations ./migrations
 
 USER appuser
 
-EXPOSE 9099
+EXPOSE 9099 50064
 
 ENTRYPOINT ["/app/server"]

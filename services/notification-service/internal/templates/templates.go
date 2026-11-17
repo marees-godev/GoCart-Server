@@ -43,7 +43,9 @@ func initRegistry() {
 			UpdatedAt:       now,
 		}
 		key := strings.ToLower(item.EventType)
-		registry[key] = tmpl
+		if _, exists := registry[key]; !exists || strings.EqualFold(item.Channel, model.ChannelEmail) {
+			registry[key] = tmpl
+		}
 		if item.Channel != "" {
 			channelKey := strings.ToLower(item.EventType + ":" + item.Channel)
 			registry[channelKey] = tmpl
@@ -80,4 +82,3 @@ func GetAllTemplates() []*model.Template {
 	}
 	return result
 }
-

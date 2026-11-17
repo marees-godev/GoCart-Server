@@ -3,9 +3,12 @@ package resolvers
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -29,6 +32,10 @@ func (m *mockDeliveryForOrderTest) CalculateShippingFee(ctx context.Context, in 
 		return m.feeResp, nil
 	}
 	return &deliverypb.CalculateShippingFeeResponse{ShippingFee: 55.0}, nil
+}
+
+func (m *mockDeliveryForOrderTest) CancelDelivery(ctx context.Context, in *deliverypb.CancelDeliveryRequest, opts ...grpcPkg.CallOption) (*deliverypb.CancelDeliveryResponse, error) {
+	return &deliverypb.CancelDeliveryResponse{Success: true}, nil
 }
 
 type mockUserForOrderTest struct {
@@ -432,4 +439,131 @@ func TestOrderResolvers_CancelOrder(t *testing.T) {
 	if appErr == nil || appErr.Code != appErrors.CodeBadRequest {
 		t.Errorf("expected BAD_REQUEST app error, got %v", err)
 	}
+}
+
+type mockNotifForOrderTest struct {
+	notificationpb.NotificationServiceClient
+	mu       sync.Mutex
+	sentReqs []*notificationpb.SendNotificationRequest
+}
+
+func (m *mockNotifForOrderTest) SendNotification(ctx context.Context, in *notificationpb.SendNotificationRequest, opts ...grpcPkg.CallOption) (*notificationpb.SendNotificationResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sentReqs = append(m.sentReqs, in)
+	return &notificationpb.SendNotificationResponse{Success: true, NotificationId: "notif-test"}, nil
+}
+
+func TestOrderResolvers_SendNotificationOnCreateCancelUpdate(t *testing.T) {
+	userID := "usr-notif-1"
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: userID,
+		Role:   auth.RoleCustomer,
+	})
+
+	mockOrder := &mockOrderServiceClient{
+		createResp: &orderpb.CreateOrderResponse{
+			Order: &orderpb.Order{
+				Id:          "ord-notif-1",
+				UserId:      userID,
+				Status:      "CREATED",
+				TotalAmount: 250.00,
+				Currency:    "INR",
+			},
+		},
+		cancelResp: &orderpb.CancelOrderResponse{
+			Order: &orderpb.Order{
+				Id:          "ord-notif-1",
+				UserId:      userID,
+				Status:      "CANCELLED",
+				TotalAmount: 250.00,
+				Currency:    "INR",
+			},
+		},
+		updateResp: &orderpb.UpdateOrderStatusResponse{
+			Order: &orderpb.Order{
+				Id:          "ord-notif-1",
+				UserId:      userID,
+				Status:      "CONFIRMED",
+				TotalAmount: 250.00,
+				Currency:    "INR",
+			},
+		},
+	}
+	mockNotif := &mockNotifForOrderTest{}
+	clients := &grpc.Clients{
+		OrderClient:        mockOrder,
+		DeliveryClient:     &mockDeliveryForOrderTest{},
+		NotificationClient: mockNotif,
+	}
+	r := NewResolver(clients, "1.0.0")
+	mut := &mutationResolver{r}
+
+	// 1. CreateOrder
+	input := model.CreateOrderInput{
+		DeliveryPartnerID: "partner-1",
+	}
+	ord, err := mut.CreateOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("CreateOrder failed: %v", err)
+	}
+	if ord == nil {
+		t.Fatal("expected order response")
+	}
+
+	// Wait briefly for background notification dispatch
+	time.Sleep(50 * time.Millisecond)
+
+	mockNotif.mu.Lock()
+	if len(mockNotif.sentReqs) == 0 {
+		t.Errorf("expected SendNotification called on CreateOrder")
+	} else {
+		req := mockNotif.sentReqs[len(mockNotif.sentReqs)-1]
+		if req.GetEventType() != "OrderCreated" {
+			t.Errorf("expected event_type OrderCreated, got %s", req.GetEventType())
+		}
+		if req.GetUserId() != userID {
+			t.Errorf("expected user_id %s, got %s", userID, req.GetUserId())
+		}
+	}
+	mockNotif.mu.Unlock()
+
+	// 2. CancelOrder
+	reason := "Wrong address"
+	_, err = mut.CancelOrder(ctx, "ord-notif-1", &reason)
+	if err != nil {
+		t.Fatalf("CancelOrder failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	mockNotif.mu.Lock()
+	if len(mockNotif.sentReqs) < 2 {
+		t.Errorf("expected at least 2 SendNotification calls, got %d", len(mockNotif.sentReqs))
+	} else {
+		req := mockNotif.sentReqs[len(mockNotif.sentReqs)-1]
+		if req.GetEventType() != "OrderCancelled" {
+			t.Errorf("expected event_type OrderCancelled, got %s", req.GetEventType())
+		}
+	}
+	mockNotif.mu.Unlock()
+
+	// 3. UpdateOrderStatus
+	_, err = mut.UpdateOrderStatus(ctx, "ord-notif-1", "CONFIRMED")
+	if err != nil {
+		t.Fatalf("UpdateOrderStatus failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	mockNotif.mu.Lock()
+	if len(mockNotif.sentReqs) < 3 {
+		t.Errorf("expected at least 3 SendNotification calls, got %d", len(mockNotif.sentReqs))
+	} else {
+		req := mockNotif.sentReqs[len(mockNotif.sentReqs)-1]
+		if req.GetEventType() != "OrderConfirmed" {
+			t.Errorf("expected event_type OrderConfirmed, got %s", req.GetEventType())
+		}
+	}
+	mockNotif.mu.Unlock()
 }

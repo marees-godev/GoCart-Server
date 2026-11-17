@@ -30,6 +30,15 @@ type Notification struct {
 	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
 	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	EventType     string                 `protobuf:"bytes,8,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`
+	Recipient     string                 `protobuf:"bytes,9,opt,name=recipient,proto3" json:"recipient,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,10,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	IsRead        bool                   `protobuf:"varint,11,opt,name=is_read,json=isRead,proto3" json:"is_read,omitempty"`
+	ReadAt        string                 `protobuf:"bytes,12,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`
+	SentAt        string                 `protobuf:"bytes,13,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	CorrelationId string                 `protobuf:"bytes,14,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	EventId       string                 `protobuf:"bytes,15,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,16,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -113,6 +122,69 @@ func (x *Notification) GetCreatedAt() string {
 	return ""
 }
 
+func (x *Notification) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *Notification) GetRecipient() string {
+	if x != nil {
+		return x.Recipient
+	}
+	return ""
+}
+
+func (x *Notification) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *Notification) GetIsRead() bool {
+	if x != nil {
+		return x.IsRead
+	}
+	return false
+}
+
+func (x *Notification) GetReadAt() string {
+	if x != nil {
+		return x.ReadAt
+	}
+	return ""
+}
+
+func (x *Notification) GetSentAt() string {
+	if x != nil {
+		return x.SentAt
+	}
+	return ""
+}
+
+func (x *Notification) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+func (x *Notification) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *Notification) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 type SendNotificationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -121,6 +193,9 @@ type SendNotificationRequest struct {
 	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	TemplateId    string                 `protobuf:"bytes,5,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
 	TemplateData  map[string]string      `protobuf:"bytes,6,rep,name=template_data,json=templateData,proto3" json:"template_data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	EventType     string                 `protobuf:"bytes,7,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`
+	Recipient     string                 `protobuf:"bytes,8,opt,name=recipient,proto3" json:"recipient,omitempty"`
+	CorrelationId string                 `protobuf:"bytes,9,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -197,10 +272,33 @@ func (x *SendNotificationRequest) GetTemplateData() map[string]string {
 	return nil
 }
 
+func (x *SendNotificationRequest) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *SendNotificationRequest) GetRecipient() string {
+	if x != nil {
+		return x.Recipient
+	}
+	return ""
+}
+
+func (x *SendNotificationRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
 type SendNotificationResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	NotificationId string                 `protobuf:"bytes,1,opt,name=notification_id,json=notificationId,proto3" json:"notification_id,omitempty"`
 	Success        bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Status         string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Message        string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -249,11 +347,29 @@ func (x *SendNotificationResponse) GetSuccess() bool {
 	return false
 }
 
+func (x *SendNotificationResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *SendNotificationResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type GetNotificationsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	Channel       string                 `protobuf:"bytes,5,opt,name=channel,proto3" json:"channel,omitempty"`
+	EventType     string                 `protobuf:"bytes,6,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`
+	IsRead        *bool                  `protobuf:"varint,7,opt,name=is_read,json=isRead,proto3,oneof" json:"is_read,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -309,10 +425,39 @@ func (x *GetNotificationsRequest) GetOffset() int32 {
 	return 0
 }
 
+func (x *GetNotificationsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *GetNotificationsRequest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *GetNotificationsRequest) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *GetNotificationsRequest) GetIsRead() bool {
+	if x != nil && x.IsRead != nil {
+		return *x.IsRead
+	}
+	return false
+}
+
 type GetNotificationsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Notifications []*Notification        `protobuf:"bytes,1,rep,name=notifications,proto3" json:"notifications,omitempty"`
 	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	UnreadCount   int32                  `protobuf:"varint,3,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -361,11 +506,994 @@ func (x *GetNotificationsResponse) GetTotal() int32 {
 	return 0
 }
 
+func (x *GetNotificationsResponse) GetUnreadCount() int32 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
+type MarkNotificationAsReadRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	NotificationId string                 `protobuf:"bytes,1,opt,name=notification_id,json=notificationId,proto3" json:"notification_id,omitempty"`
+	UserId         string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	IsRead         *bool                  `protobuf:"varint,3,opt,name=is_read,json=isRead,proto3,oneof" json:"is_read,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *MarkNotificationAsReadRequest) Reset() {
+	*x = MarkNotificationAsReadRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNotificationAsReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNotificationAsReadRequest) ProtoMessage() {}
+
+func (x *MarkNotificationAsReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNotificationAsReadRequest.ProtoReflect.Descriptor instead.
+func (*MarkNotificationAsReadRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MarkNotificationAsReadRequest) GetNotificationId() string {
+	if x != nil {
+		return x.NotificationId
+	}
+	return ""
+}
+
+func (x *MarkNotificationAsReadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *MarkNotificationAsReadRequest) GetIsRead() bool {
+	if x != nil && x.IsRead != nil {
+		return *x.IsRead
+	}
+	return false
+}
+
+type MarkNotificationAsReadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notification  *Notification          `protobuf:"bytes,1,opt,name=notification,proto3" json:"notification,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkNotificationAsReadResponse) Reset() {
+	*x = MarkNotificationAsReadResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNotificationAsReadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNotificationAsReadResponse) ProtoMessage() {}
+
+func (x *MarkNotificationAsReadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNotificationAsReadResponse.ProtoReflect.Descriptor instead.
+func (*MarkNotificationAsReadResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *MarkNotificationAsReadResponse) GetNotification() *Notification {
+	if x != nil {
+		return x.Notification
+	}
+	return nil
+}
+
+func (x *MarkNotificationAsReadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type MarkAllNotificationsAsReadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkAllNotificationsAsReadRequest) Reset() {
+	*x = MarkAllNotificationsAsReadRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAllNotificationsAsReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAllNotificationsAsReadRequest) ProtoMessage() {}
+
+func (x *MarkAllNotificationsAsReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAllNotificationsAsReadRequest.ProtoReflect.Descriptor instead.
+func (*MarkAllNotificationsAsReadRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *MarkAllNotificationsAsReadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type MarkAllNotificationsAsReadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UpdatedCount  int32                  `protobuf:"varint,1,opt,name=updated_count,json=updatedCount,proto3" json:"updated_count,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkAllNotificationsAsReadResponse) Reset() {
+	*x = MarkAllNotificationsAsReadResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAllNotificationsAsReadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAllNotificationsAsReadResponse) ProtoMessage() {}
+
+func (x *MarkAllNotificationsAsReadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAllNotificationsAsReadResponse.ProtoReflect.Descriptor instead.
+func (*MarkAllNotificationsAsReadResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *MarkAllNotificationsAsReadResponse) GetUpdatedCount() int32 {
+	if x != nil {
+		return x.UpdatedCount
+	}
+	return 0
+}
+
+func (x *MarkAllNotificationsAsReadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type GetUnreadCountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUnreadCountRequest) Reset() {
+	*x = GetUnreadCountRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUnreadCountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUnreadCountRequest) ProtoMessage() {}
+
+func (x *GetUnreadCountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUnreadCountRequest.ProtoReflect.Descriptor instead.
+func (*GetUnreadCountRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetUnreadCountRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUnreadCountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UnreadCount   int32                  `protobuf:"varint,1,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUnreadCountResponse) Reset() {
+	*x = GetUnreadCountResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUnreadCountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUnreadCountResponse) ProtoMessage() {}
+
+func (x *GetUnreadCountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUnreadCountResponse.ProtoReflect.Descriptor instead.
+func (*GetUnreadCountResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetUnreadCountResponse) GetUnreadCount() int32 {
+	if x != nil {
+		return x.UnreadCount
+	}
+	return 0
+}
+
+type PushSubscription struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	P256Dh        string                 `protobuf:"bytes,4,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
+	Auth          string                 `protobuf:"bytes,5,opt,name=auth,proto3" json:"auth,omitempty"`
+	UserAgent     string                 `protobuf:"bytes,6,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	DeviceName    string                 `protobuf:"bytes,7,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	IsActive      bool                   `protobuf:"varint,8,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
+	FailureCount  int32                  `protobuf:"varint,9,opt,name=failure_count,json=failureCount,proto3" json:"failure_count,omitempty"`
+	LastError     string                 `protobuf:"bytes,10,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	LastUsedAt    string                 `protobuf:"bytes,11,opt,name=last_used_at,json=lastUsedAt,proto3" json:"last_used_at,omitempty"`
+	DeactivatedAt string                 `protobuf:"bytes,12,opt,name=deactivated_at,json=deactivatedAt,proto3" json:"deactivated_at,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PushSubscription) Reset() {
+	*x = PushSubscription{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushSubscription) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushSubscription) ProtoMessage() {}
+
+func (x *PushSubscription) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushSubscription.ProtoReflect.Descriptor instead.
+func (*PushSubscription) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PushSubscription) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetP256Dh() string {
+	if x != nil {
+		return x.P256Dh
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetAuth() string {
+	if x != nil {
+		return x.Auth
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetDeviceName() string {
+	if x != nil {
+		return x.DeviceName
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetIsActive() bool {
+	if x != nil {
+		return x.IsActive
+	}
+	return false
+}
+
+func (x *PushSubscription) GetFailureCount() int32 {
+	if x != nil {
+		return x.FailureCount
+	}
+	return 0
+}
+
+func (x *PushSubscription) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetLastUsedAt() string {
+	if x != nil {
+		return x.LastUsedAt
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetDeactivatedAt() string {
+	if x != nil {
+		return x.DeactivatedAt
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *PushSubscription) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+type RegisterPushSubscriptionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	P256Dh        string                 `protobuf:"bytes,3,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
+	Auth          string                 `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
+	UserAgent     string                 `protobuf:"bytes,5,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	DeviceName    string                 `protobuf:"bytes,6,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterPushSubscriptionRequest) Reset() {
+	*x = RegisterPushSubscriptionRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterPushSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterPushSubscriptionRequest) ProtoMessage() {}
+
+func (x *RegisterPushSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterPushSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*RegisterPushSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RegisterPushSubscriptionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RegisterPushSubscriptionRequest) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *RegisterPushSubscriptionRequest) GetP256Dh() string {
+	if x != nil {
+		return x.P256Dh
+	}
+	return ""
+}
+
+func (x *RegisterPushSubscriptionRequest) GetAuth() string {
+	if x != nil {
+		return x.Auth
+	}
+	return ""
+}
+
+func (x *RegisterPushSubscriptionRequest) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+func (x *RegisterPushSubscriptionRequest) GetDeviceName() string {
+	if x != nil {
+		return x.DeviceName
+	}
+	return ""
+}
+
+type PushSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *PushSubscription      `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PushSubscriptionResponse) Reset() {
+	*x = PushSubscriptionResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushSubscriptionResponse) ProtoMessage() {}
+
+func (x *PushSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*PushSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PushSubscriptionResponse) GetSubscription() *PushSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+type GetPushSubscriptionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ActiveOnly    bool                   `protobuf:"varint,2,opt,name=active_only,json=activeOnly,proto3" json:"active_only,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPushSubscriptionsRequest) Reset() {
+	*x = GetPushSubscriptionsRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPushSubscriptionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPushSubscriptionsRequest) ProtoMessage() {}
+
+func (x *GetPushSubscriptionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPushSubscriptionsRequest.ProtoReflect.Descriptor instead.
+func (*GetPushSubscriptionsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetPushSubscriptionsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetPushSubscriptionsRequest) GetActiveOnly() bool {
+	if x != nil {
+		return x.ActiveOnly
+	}
+	return false
+}
+
+type GetPushSubscriptionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscriptions []*PushSubscription    `protobuf:"bytes,1,rep,name=subscriptions,proto3" json:"subscriptions,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPushSubscriptionsResponse) Reset() {
+	*x = GetPushSubscriptionsResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPushSubscriptionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPushSubscriptionsResponse) ProtoMessage() {}
+
+func (x *GetPushSubscriptionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPushSubscriptionsResponse.ProtoReflect.Descriptor instead.
+func (*GetPushSubscriptionsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetPushSubscriptionsResponse) GetSubscriptions() []*PushSubscription {
+	if x != nil {
+		return x.Subscriptions
+	}
+	return nil
+}
+
+func (x *GetPushSubscriptionsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type UpdatePushSubscriptionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	P256Dh        string                 `protobuf:"bytes,4,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
+	Auth          string                 `protobuf:"bytes,5,opt,name=auth,proto3" json:"auth,omitempty"`
+	UserAgent     string                 `protobuf:"bytes,6,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	DeviceName    string                 `protobuf:"bytes,7,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	IsActive      *bool                  `protobuf:"varint,8,opt,name=is_active,json=isActive,proto3,oneof" json:"is_active,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePushSubscriptionRequest) Reset() {
+	*x = UpdatePushSubscriptionRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePushSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePushSubscriptionRequest) ProtoMessage() {}
+
+func (x *UpdatePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePushSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*UpdatePushSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdatePushSubscriptionRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetP256Dh() string {
+	if x != nil {
+		return x.P256Dh
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetAuth() string {
+	if x != nil {
+		return x.Auth
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetDeviceName() string {
+	if x != nil {
+		return x.DeviceName
+	}
+	return ""
+}
+
+func (x *UpdatePushSubscriptionRequest) GetIsActive() bool {
+	if x != nil && x.IsActive != nil {
+		return *x.IsActive
+	}
+	return false
+}
+
+type DeactivatePushSubscriptionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivatePushSubscriptionRequest) Reset() {
+	*x = DeactivatePushSubscriptionRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivatePushSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivatePushSubscriptionRequest) ProtoMessage() {}
+
+func (x *DeactivatePushSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivatePushSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*DeactivatePushSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DeactivatePushSubscriptionRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DeactivatePushSubscriptionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *DeactivatePushSubscriptionRequest) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+type DeactivatePushSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeactivatePushSubscriptionResponse) Reset() {
+	*x = DeactivatePushSubscriptionResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeactivatePushSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeactivatePushSubscriptionResponse) ProtoMessage() {}
+
+func (x *DeactivatePushSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeactivatePushSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*DeactivatePushSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DeactivatePushSubscriptionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeactivatePushSubscriptionResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type GetVAPIDPublicKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetVAPIDPublicKeyRequest) Reset() {
+	*x = GetVAPIDPublicKeyRequest{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetVAPIDPublicKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetVAPIDPublicKeyRequest) ProtoMessage() {}
+
+func (x *GetVAPIDPublicKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetVAPIDPublicKeyRequest.ProtoReflect.Descriptor instead.
+func (*GetVAPIDPublicKeyRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{19}
+}
+
+type GetVAPIDPublicKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PublicKey     string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetVAPIDPublicKeyResponse) Reset() {
+	*x = GetVAPIDPublicKeyResponse{}
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetVAPIDPublicKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetVAPIDPublicKeyResponse) ProtoMessage() {}
+
+func (x *GetVAPIDPublicKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_notification_notification_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetVAPIDPublicKeyResponse.ProtoReflect.Descriptor instead.
+func (*GetVAPIDPublicKeyResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_notification_notification_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetVAPIDPublicKeyResponse) GetPublicKey() string {
+	if x != nil {
+		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *GetVAPIDPublicKeyResponse) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
 var File_contracts_protobuf_notification_notification_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_notification_notification_proto_rawDesc = "" +
 	"\n" +
-	"2contracts/protobuf/notification/notification.proto\x12\x16gocart.notification.v1\"\xbc\x01\n" +
+	"2contracts/protobuf/notification/notification.proto\x12\x16gocart.notification.v1\"\xca\x03\n" +
 	"\fNotification\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x18\n" +
@@ -374,7 +1502,19 @@ const file_contracts_protobuf_notification_notification_proto_rawDesc = "" +
 	"\acontent\x18\x05 \x01(\tR\acontent\x12\x16\n" +
 	"\x06status\x18\x06 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\a \x01(\tR\tcreatedAt\"\xca\x02\n" +
+	"created_at\x18\a \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\b \x01(\tR\teventType\x12\x1c\n" +
+	"\trecipient\x18\t \x01(\tR\trecipient\x12#\n" +
+	"\rerror_message\x18\n" +
+	" \x01(\tR\ferrorMessage\x12\x17\n" +
+	"\ais_read\x18\v \x01(\bR\x06isRead\x12\x17\n" +
+	"\aread_at\x18\f \x01(\tR\x06readAt\x12\x17\n" +
+	"\asent_at\x18\r \x01(\tR\x06sentAt\x12%\n" +
+	"\x0ecorrelation_id\x18\x0e \x01(\tR\rcorrelationId\x12\x19\n" +
+	"\bevent_id\x18\x0f \x01(\tR\aeventId\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x10 \x01(\tR\tupdatedAt\"\xae\x03\n" +
 	"\x17SendNotificationRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x18\n" +
 	"\achannel\x18\x02 \x01(\tR\achannel\x12\x18\n" +
@@ -382,23 +1522,129 @@ const file_contracts_protobuf_notification_notification_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1f\n" +
 	"\vtemplate_id\x18\x05 \x01(\tR\n" +
 	"templateId\x12f\n" +
-	"\rtemplate_data\x18\x06 \x03(\v2A.gocart.notification.v1.SendNotificationRequest.TemplateDataEntryR\ftemplateData\x1a?\n" +
+	"\rtemplate_data\x18\x06 \x03(\v2A.gocart.notification.v1.SendNotificationRequest.TemplateDataEntryR\ftemplateData\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\a \x01(\tR\teventType\x12\x1c\n" +
+	"\trecipient\x18\b \x01(\tR\trecipient\x12%\n" +
+	"\x0ecorrelation_id\x18\t \x01(\tR\rcorrelationId\x1a?\n" +
 	"\x11TemplateDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8f\x01\n" +
 	"\x18SendNotificationResponse\x12'\n" +
 	"\x0fnotification_id\x18\x01 \x01(\tR\x0enotificationId\x12\x18\n" +
-	"\asuccess\x18\x02 \x01(\bR\asuccess\"`\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\xdb\x01\n" +
 	"\x17GetNotificationsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x05R\x06offset\"|\n" +
+	"\x06offset\x18\x03 \x01(\x05R\x06offset\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x18\n" +
+	"\achannel\x18\x05 \x01(\tR\achannel\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\x06 \x01(\tR\teventType\x12\x1c\n" +
+	"\ais_read\x18\a \x01(\bH\x00R\x06isRead\x88\x01\x01B\n" +
+	"\n" +
+	"\b_is_read\"\x9f\x01\n" +
 	"\x18GetNotificationsResponse\x12J\n" +
 	"\rnotifications\x18\x01 \x03(\v2$.gocart.notification.v1.NotificationR\rnotifications\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total2\x83\x02\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12!\n" +
+	"\funread_count\x18\x03 \x01(\x05R\vunreadCount\"\x8b\x01\n" +
+	"\x1dMarkNotificationAsReadRequest\x12'\n" +
+	"\x0fnotification_id\x18\x01 \x01(\tR\x0enotificationId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1c\n" +
+	"\ais_read\x18\x03 \x01(\bH\x00R\x06isRead\x88\x01\x01B\n" +
+	"\n" +
+	"\b_is_read\"\x84\x01\n" +
+	"\x1eMarkNotificationAsReadResponse\x12H\n" +
+	"\fnotification\x18\x01 \x01(\v2$.gocart.notification.v1.NotificationR\fnotification\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\"<\n" +
+	"!MarkAllNotificationsAsReadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"c\n" +
+	"\"MarkAllNotificationsAsReadResponse\x12#\n" +
+	"\rupdated_count\x18\x01 \x01(\x05R\fupdatedCount\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\"0\n" +
+	"\x15GetUnreadCountRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\";\n" +
+	"\x16GetUnreadCountResponse\x12!\n" +
+	"\funread_count\x18\x01 \x01(\x05R\vunreadCount\"\xab\x03\n" +
+	"\x10PushSubscription\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bendpoint\x18\x03 \x01(\tR\bendpoint\x12\x16\n" +
+	"\x06p256dh\x18\x04 \x01(\tR\x06p256dh\x12\x12\n" +
+	"\x04auth\x18\x05 \x01(\tR\x04auth\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\x06 \x01(\tR\tuserAgent\x12\x1f\n" +
+	"\vdevice_name\x18\a \x01(\tR\n" +
+	"deviceName\x12\x1b\n" +
+	"\tis_active\x18\b \x01(\bR\bisActive\x12#\n" +
+	"\rfailure_count\x18\t \x01(\x05R\ffailureCount\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\n" +
+	" \x01(\tR\tlastError\x12 \n" +
+	"\flast_used_at\x18\v \x01(\tR\n" +
+	"lastUsedAt\x12%\n" +
+	"\x0edeactivated_at\x18\f \x01(\tR\rdeactivatedAt\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\r \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x0e \x01(\tR\tupdatedAt\"\xc2\x01\n" +
+	"\x1fRegisterPushSubscriptionRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12\x16\n" +
+	"\x06p256dh\x18\x03 \x01(\tR\x06p256dh\x12\x12\n" +
+	"\x04auth\x18\x04 \x01(\tR\x04auth\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\x05 \x01(\tR\tuserAgent\x12\x1f\n" +
+	"\vdevice_name\x18\x06 \x01(\tR\n" +
+	"deviceName\"h\n" +
+	"\x18PushSubscriptionResponse\x12L\n" +
+	"\fsubscription\x18\x01 \x01(\v2(.gocart.notification.v1.PushSubscriptionR\fsubscription\"W\n" +
+	"\x1bGetPushSubscriptionsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vactive_only\x18\x02 \x01(\bR\n" +
+	"activeOnly\"\x84\x01\n" +
+	"\x1cGetPushSubscriptionsResponse\x12N\n" +
+	"\rsubscriptions\x18\x01 \x03(\v2(.gocart.notification.v1.PushSubscriptionR\rsubscriptions\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x80\x02\n" +
+	"\x1dUpdatePushSubscriptionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bendpoint\x18\x03 \x01(\tR\bendpoint\x12\x16\n" +
+	"\x06p256dh\x18\x04 \x01(\tR\x06p256dh\x12\x12\n" +
+	"\x04auth\x18\x05 \x01(\tR\x04auth\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\x06 \x01(\tR\tuserAgent\x12\x1f\n" +
+	"\vdevice_name\x18\a \x01(\tR\n" +
+	"deviceName\x12 \n" +
+	"\tis_active\x18\b \x01(\bH\x00R\bisActive\x88\x01\x01B\f\n" +
+	"\n" +
+	"_is_active\"h\n" +
+	"!DeactivatePushSubscriptionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bendpoint\x18\x03 \x01(\tR\bendpoint\"X\n" +
+	"\"DeactivatePushSubscriptionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x1a\n" +
+	"\x18GetVAPIDPublicKeyRequest\"T\n" +
+	"\x19GetVAPIDPublicKeyResponse\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject2\xb4\n" +
+	"\n" +
 	"\x13NotificationService\x12u\n" +
 	"\x10SendNotification\x12/.gocart.notification.v1.SendNotificationRequest\x1a0.gocart.notification.v1.SendNotificationResponse\x12u\n" +
-	"\x10GetNotifications\x12/.gocart.notification.v1.GetNotificationsRequest\x1a0.gocart.notification.v1.GetNotificationsResponseBTZRgithub.com/marees-godev/GoCart-Server/contracts/protobuf/notification;notificationb\x06proto3"
+	"\x10GetNotifications\x12/.gocart.notification.v1.GetNotificationsRequest\x1a0.gocart.notification.v1.GetNotificationsResponse\x12\x87\x01\n" +
+	"\x16MarkNotificationAsRead\x125.gocart.notification.v1.MarkNotificationAsReadRequest\x1a6.gocart.notification.v1.MarkNotificationAsReadResponse\x12\x93\x01\n" +
+	"\x1aMarkAllNotificationsAsRead\x129.gocart.notification.v1.MarkAllNotificationsAsReadRequest\x1a:.gocart.notification.v1.MarkAllNotificationsAsReadResponse\x12o\n" +
+	"\x0eGetUnreadCount\x12-.gocart.notification.v1.GetUnreadCountRequest\x1a..gocart.notification.v1.GetUnreadCountResponse\x12\x85\x01\n" +
+	"\x18RegisterPushSubscription\x127.gocart.notification.v1.RegisterPushSubscriptionRequest\x1a0.gocart.notification.v1.PushSubscriptionResponse\x12\x81\x01\n" +
+	"\x14GetPushSubscriptions\x123.gocart.notification.v1.GetPushSubscriptionsRequest\x1a4.gocart.notification.v1.GetPushSubscriptionsResponse\x12\x81\x01\n" +
+	"\x16UpdatePushSubscription\x125.gocart.notification.v1.UpdatePushSubscriptionRequest\x1a0.gocart.notification.v1.PushSubscriptionResponse\x12\x93\x01\n" +
+	"\x1aDeactivatePushSubscription\x129.gocart.notification.v1.DeactivatePushSubscriptionRequest\x1a:.gocart.notification.v1.DeactivatePushSubscriptionResponse\x12x\n" +
+	"\x11GetVAPIDPublicKey\x120.gocart.notification.v1.GetVAPIDPublicKeyRequest\x1a1.gocart.notification.v1.GetVAPIDPublicKeyResponseBTZRgithub.com/marees-godev/GoCart-Server/contracts/protobuf/notification;notificationb\x06proto3"
 
 var (
 	file_contracts_protobuf_notification_notification_proto_rawDescOnce sync.Once
@@ -412,27 +1658,62 @@ func file_contracts_protobuf_notification_notification_proto_rawDescGZIP() []byt
 	return file_contracts_protobuf_notification_notification_proto_rawDescData
 }
 
-var file_contracts_protobuf_notification_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_contracts_protobuf_notification_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_contracts_protobuf_notification_notification_proto_goTypes = []any{
-	(*Notification)(nil),             // 0: gocart.notification.v1.Notification
-	(*SendNotificationRequest)(nil),  // 1: gocart.notification.v1.SendNotificationRequest
-	(*SendNotificationResponse)(nil), // 2: gocart.notification.v1.SendNotificationResponse
-	(*GetNotificationsRequest)(nil),  // 3: gocart.notification.v1.GetNotificationsRequest
-	(*GetNotificationsResponse)(nil), // 4: gocart.notification.v1.GetNotificationsResponse
-	nil,                              // 5: gocart.notification.v1.SendNotificationRequest.TemplateDataEntry
+	(*Notification)(nil),                       // 0: gocart.notification.v1.Notification
+	(*SendNotificationRequest)(nil),            // 1: gocart.notification.v1.SendNotificationRequest
+	(*SendNotificationResponse)(nil),           // 2: gocart.notification.v1.SendNotificationResponse
+	(*GetNotificationsRequest)(nil),            // 3: gocart.notification.v1.GetNotificationsRequest
+	(*GetNotificationsResponse)(nil),           // 4: gocart.notification.v1.GetNotificationsResponse
+	(*MarkNotificationAsReadRequest)(nil),      // 5: gocart.notification.v1.MarkNotificationAsReadRequest
+	(*MarkNotificationAsReadResponse)(nil),     // 6: gocart.notification.v1.MarkNotificationAsReadResponse
+	(*MarkAllNotificationsAsReadRequest)(nil),  // 7: gocart.notification.v1.MarkAllNotificationsAsReadRequest
+	(*MarkAllNotificationsAsReadResponse)(nil), // 8: gocart.notification.v1.MarkAllNotificationsAsReadResponse
+	(*GetUnreadCountRequest)(nil),              // 9: gocart.notification.v1.GetUnreadCountRequest
+	(*GetUnreadCountResponse)(nil),             // 10: gocart.notification.v1.GetUnreadCountResponse
+	(*PushSubscription)(nil),                   // 11: gocart.notification.v1.PushSubscription
+	(*RegisterPushSubscriptionRequest)(nil),    // 12: gocart.notification.v1.RegisterPushSubscriptionRequest
+	(*PushSubscriptionResponse)(nil),           // 13: gocart.notification.v1.PushSubscriptionResponse
+	(*GetPushSubscriptionsRequest)(nil),        // 14: gocart.notification.v1.GetPushSubscriptionsRequest
+	(*GetPushSubscriptionsResponse)(nil),       // 15: gocart.notification.v1.GetPushSubscriptionsResponse
+	(*UpdatePushSubscriptionRequest)(nil),      // 16: gocart.notification.v1.UpdatePushSubscriptionRequest
+	(*DeactivatePushSubscriptionRequest)(nil),  // 17: gocart.notification.v1.DeactivatePushSubscriptionRequest
+	(*DeactivatePushSubscriptionResponse)(nil), // 18: gocart.notification.v1.DeactivatePushSubscriptionResponse
+	(*GetVAPIDPublicKeyRequest)(nil),           // 19: gocart.notification.v1.GetVAPIDPublicKeyRequest
+	(*GetVAPIDPublicKeyResponse)(nil),          // 20: gocart.notification.v1.GetVAPIDPublicKeyResponse
+	nil,                                        // 21: gocart.notification.v1.SendNotificationRequest.TemplateDataEntry
 }
 var file_contracts_protobuf_notification_notification_proto_depIdxs = []int32{
-	5, // 0: gocart.notification.v1.SendNotificationRequest.template_data:type_name -> gocart.notification.v1.SendNotificationRequest.TemplateDataEntry
-	0, // 1: gocart.notification.v1.GetNotificationsResponse.notifications:type_name -> gocart.notification.v1.Notification
-	1, // 2: gocart.notification.v1.NotificationService.SendNotification:input_type -> gocart.notification.v1.SendNotificationRequest
-	3, // 3: gocart.notification.v1.NotificationService.GetNotifications:input_type -> gocart.notification.v1.GetNotificationsRequest
-	2, // 4: gocart.notification.v1.NotificationService.SendNotification:output_type -> gocart.notification.v1.SendNotificationResponse
-	4, // 5: gocart.notification.v1.NotificationService.GetNotifications:output_type -> gocart.notification.v1.GetNotificationsResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	21, // 0: gocart.notification.v1.SendNotificationRequest.template_data:type_name -> gocart.notification.v1.SendNotificationRequest.TemplateDataEntry
+	0,  // 1: gocart.notification.v1.GetNotificationsResponse.notifications:type_name -> gocart.notification.v1.Notification
+	0,  // 2: gocart.notification.v1.MarkNotificationAsReadResponse.notification:type_name -> gocart.notification.v1.Notification
+	11, // 3: gocart.notification.v1.PushSubscriptionResponse.subscription:type_name -> gocart.notification.v1.PushSubscription
+	11, // 4: gocart.notification.v1.GetPushSubscriptionsResponse.subscriptions:type_name -> gocart.notification.v1.PushSubscription
+	1,  // 5: gocart.notification.v1.NotificationService.SendNotification:input_type -> gocart.notification.v1.SendNotificationRequest
+	3,  // 6: gocart.notification.v1.NotificationService.GetNotifications:input_type -> gocart.notification.v1.GetNotificationsRequest
+	5,  // 7: gocart.notification.v1.NotificationService.MarkNotificationAsRead:input_type -> gocart.notification.v1.MarkNotificationAsReadRequest
+	7,  // 8: gocart.notification.v1.NotificationService.MarkAllNotificationsAsRead:input_type -> gocart.notification.v1.MarkAllNotificationsAsReadRequest
+	9,  // 9: gocart.notification.v1.NotificationService.GetUnreadCount:input_type -> gocart.notification.v1.GetUnreadCountRequest
+	12, // 10: gocart.notification.v1.NotificationService.RegisterPushSubscription:input_type -> gocart.notification.v1.RegisterPushSubscriptionRequest
+	14, // 11: gocart.notification.v1.NotificationService.GetPushSubscriptions:input_type -> gocart.notification.v1.GetPushSubscriptionsRequest
+	16, // 12: gocart.notification.v1.NotificationService.UpdatePushSubscription:input_type -> gocart.notification.v1.UpdatePushSubscriptionRequest
+	17, // 13: gocart.notification.v1.NotificationService.DeactivatePushSubscription:input_type -> gocart.notification.v1.DeactivatePushSubscriptionRequest
+	19, // 14: gocart.notification.v1.NotificationService.GetVAPIDPublicKey:input_type -> gocart.notification.v1.GetVAPIDPublicKeyRequest
+	2,  // 15: gocart.notification.v1.NotificationService.SendNotification:output_type -> gocart.notification.v1.SendNotificationResponse
+	4,  // 16: gocart.notification.v1.NotificationService.GetNotifications:output_type -> gocart.notification.v1.GetNotificationsResponse
+	6,  // 17: gocart.notification.v1.NotificationService.MarkNotificationAsRead:output_type -> gocart.notification.v1.MarkNotificationAsReadResponse
+	8,  // 18: gocart.notification.v1.NotificationService.MarkAllNotificationsAsRead:output_type -> gocart.notification.v1.MarkAllNotificationsAsReadResponse
+	10, // 19: gocart.notification.v1.NotificationService.GetUnreadCount:output_type -> gocart.notification.v1.GetUnreadCountResponse
+	13, // 20: gocart.notification.v1.NotificationService.RegisterPushSubscription:output_type -> gocart.notification.v1.PushSubscriptionResponse
+	15, // 21: gocart.notification.v1.NotificationService.GetPushSubscriptions:output_type -> gocart.notification.v1.GetPushSubscriptionsResponse
+	13, // 22: gocart.notification.v1.NotificationService.UpdatePushSubscription:output_type -> gocart.notification.v1.PushSubscriptionResponse
+	18, // 23: gocart.notification.v1.NotificationService.DeactivatePushSubscription:output_type -> gocart.notification.v1.DeactivatePushSubscriptionResponse
+	20, // 24: gocart.notification.v1.NotificationService.GetVAPIDPublicKey:output_type -> gocart.notification.v1.GetVAPIDPublicKeyResponse
+	15, // [15:25] is the sub-list for method output_type
+	5,  // [5:15] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_notification_notification_proto_init() }
@@ -440,13 +1721,16 @@ func file_contracts_protobuf_notification_notification_proto_init() {
 	if File_contracts_protobuf_notification_notification_proto != nil {
 		return
 	}
+	file_contracts_protobuf_notification_notification_proto_msgTypes[3].OneofWrappers = []any{}
+	file_contracts_protobuf_notification_notification_proto_msgTypes[5].OneofWrappers = []any{}
+	file_contracts_protobuf_notification_notification_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_notification_notification_proto_rawDesc), len(file_contracts_protobuf_notification_notification_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -574,6 +574,11 @@ type LogoutPayload struct {
 	Message *string `json:"message,omitempty"`
 }
 
+type MarkAllNotificationsReadPayload struct {
+	UpdatedCount int  `json:"updatedCount"`
+	Success      bool `json:"success"`
+}
+
 type Merchant struct {
 	ID              string         `json:"id"`
 	BusinessName    string         `json:"businessName"`
@@ -619,18 +624,35 @@ type Mutation struct {
 }
 
 type Notification struct {
-	ID        string  `json:"id"`
-	UserID    string  `json:"userId"`
-	Channel   string  `json:"channel"`
-	Subject   string  `json:"subject"`
-	Content   string  `json:"content"`
-	Status    string  `json:"status"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	Channel       string  `json:"channel"`
+	EventType     *string `json:"eventType,omitempty"`
+	EventID       *string `json:"eventId,omitempty"`
+	Recipient     *string `json:"recipient,omitempty"`
+	Subject       string  `json:"subject"`
+	Content       string  `json:"content"`
+	Status        string  `json:"status"`
+	ErrorMessage  *string `json:"errorMessage,omitempty"`
+	IsRead        bool    `json:"isRead"`
+	ReadAt        *string `json:"readAt,omitempty"`
+	SentAt        *string `json:"sentAt,omitempty"`
+	CorrelationID *string `json:"correlationId,omitempty"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type NotificationFilterInput struct {
+	Status    *string `json:"status,omitempty"`
+	Channel   *string `json:"channel,omitempty"`
+	EventType *string `json:"eventType,omitempty"`
+	IsRead    *bool   `json:"isRead,omitempty"`
 }
 
 type NotificationList struct {
 	Notifications []*Notification `json:"notifications"`
 	Total         int             `json:"total"`
+	UnreadCount   int             `json:"unreadCount"`
 }
 
 type Order struct {
@@ -761,6 +783,26 @@ type ProductVerification struct {
 	UpdatedAt   *string  `json:"updatedAt,omitempty"`
 }
 
+type PushSubscription struct {
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	Endpoint      string  `json:"endpoint"`
+	UserAgent     *string `json:"userAgent,omitempty"`
+	DeviceName    *string `json:"deviceName,omitempty"`
+	IsActive      bool    `json:"isActive"`
+	FailureCount  int     `json:"failureCount"`
+	LastError     *string `json:"lastError,omitempty"`
+	LastUsedAt    *string `json:"lastUsedAt,omitempty"`
+	DeactivatedAt *string `json:"deactivatedAt,omitempty"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type PushSubscriptionList struct {
+	Subscriptions []*PushSubscription `json:"subscriptions"`
+	Total         int                 `json:"total"`
+}
+
 type Query struct {
 }
 
@@ -812,6 +854,14 @@ type RegisterInput struct {
 	Role      AuthRole `json:"role"`
 	FirstName *string  `json:"firstName,omitempty"`
 	LastName  *string  `json:"lastName,omitempty"`
+}
+
+type RegisterPushSubscriptionInput struct {
+	Endpoint   string  `json:"endpoint"`
+	P256dh     string  `json:"p256dh"`
+	Auth       string  `json:"auth"`
+	UserAgent  *string `json:"userAgent,omitempty"`
+	DeviceName *string `json:"deviceName,omitempty"`
 }
 
 type RequestReplacementInput struct {
@@ -900,6 +950,7 @@ type SendNotificationInput struct {
 	Subject    string  `json:"subject"`
 	Content    string  `json:"content"`
 	TemplateID *string `json:"templateId,omitempty"`
+	EventType  *string `json:"eventType,omitempty"`
 }
 
 type ShippingFeeCalculation struct {
@@ -1050,6 +1101,16 @@ type UpdateProductVariantInput struct {
 	Status         *ProductStatus `json:"status,omitempty"`
 }
 
+type UpdatePushSubscriptionInput struct {
+	ID         *string `json:"id,omitempty"`
+	Endpoint   *string `json:"endpoint,omitempty"`
+	P256dh     *string `json:"p256dh,omitempty"`
+	Auth       *string `json:"auth,omitempty"`
+	UserAgent  *string `json:"userAgent,omitempty"`
+	DeviceName *string `json:"deviceName,omitempty"`
+	IsActive   *bool   `json:"isActive,omitempty"`
+}
+
 type UpdateRatingInput struct {
 	ID     string  `json:"id"`
 	Rating int     `json:"rating"`
@@ -1121,6 +1182,11 @@ type User struct {
 	Status         *string `json:"status,omitempty"`
 	CreatedAt      *string `json:"createdAt,omitempty"`
 	UpdatedAt      *string `json:"updatedAt,omitempty"`
+}
+
+type VAPIDPublicKeyPayload struct {
+	PublicKey string `json:"publicKey"`
+	Subject   string `json:"subject"`
 }
 
 type ValidateCategoryResponse struct {
