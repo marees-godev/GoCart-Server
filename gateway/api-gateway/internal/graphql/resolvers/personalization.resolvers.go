@@ -8,6 +8,7 @@ import (
 	"context"
 
 	personalizationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/personalization"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
@@ -39,7 +40,7 @@ func (r *mutationResolver) TrackActivity(ctx context.Context, input model.TrackA
 	req := &personalizationpb.TrackActivityRequest{
 		UserId:     userID,
 		SessionId:  sessionID,
-		EventType:  mapGraphQLToProtoEventType(input.EventType),
+		EventType:  maps.MapGraphQLToProtoEventType(input.EventType),
 		ProductId:  productID,
 		CategoryId: categoryID,
 	}
@@ -120,7 +121,7 @@ func (r *queryResolver) CustomerActivities(ctx context.Context, sessionID *strin
 			ID:         act.GetId(),
 			UserID:     uPtr,
 			SessionID:  sPtr,
-			EventType:  mapProtoToGraphQLEventType(act.GetEventType()),
+			EventType:  maps.MapProtoToGraphQLEventType(act.GetEventType()),
 			ProductID:  pPtr,
 			CategoryID: cPtr,
 			CreatedAt:  act.GetCreatedAt(),
@@ -128,46 +129,4 @@ func (r *queryResolver) CustomerActivities(ctx context.Context, sessionID *strin
 	}
 
 	return result, nil
-}
-
-func mapGraphQLToProtoEventType(e model.ActivityEventType) personalizationpb.ActivityEventType {
-	switch e {
-	case model.ActivityEventTypeProductViewed:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_VIEWED
-	case model.ActivityEventTypeProductSearched:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_SEARCHED
-	case model.ActivityEventTypeCategoryViewed:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_CATEGORY_VIEWED
-	case model.ActivityEventTypeProductAddedToCart:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_ADDED_TO_CART
-	case model.ActivityEventTypeProductRemovedFromCart:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_REMOVED_FROM_CART
-	case model.ActivityEventTypeProductWishlisted:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_WISHLISTED
-	case model.ActivityEventTypeProductPurchased:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_PURCHASED
-	default:
-		return personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_UNSPECIFIED
-	}
-}
-
-func mapProtoToGraphQLEventType(e personalizationpb.ActivityEventType) model.ActivityEventType {
-	switch e {
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_VIEWED:
-		return model.ActivityEventTypeProductViewed
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_SEARCHED:
-		return model.ActivityEventTypeProductSearched
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_CATEGORY_VIEWED:
-		return model.ActivityEventTypeCategoryViewed
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_ADDED_TO_CART:
-		return model.ActivityEventTypeProductAddedToCart
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_REMOVED_FROM_CART:
-		return model.ActivityEventTypeProductRemovedFromCart
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_WISHLISTED:
-		return model.ActivityEventTypeProductWishlisted
-	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_PURCHASED:
-		return model.ActivityEventTypeProductPurchased
-	default:
-		return model.ActivityEventTypeProductViewed
-	}
 }

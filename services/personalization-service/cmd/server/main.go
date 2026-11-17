@@ -116,6 +116,9 @@ func main() {
 				Brokers:        cfg.Kafka.Brokers,
 				ClientID:       cfg.Kafka.ClientID,
 				ConnectTimeout: 10 * time.Second,
+				MaxRetries:     3,
+				RetryInterval:  1 * time.Second,
+				DLQSuffix:      ".dlq",
 			},
 			kafka.ConsumerConfig{
 				GroupID: cfg.Kafka.GroupID,
