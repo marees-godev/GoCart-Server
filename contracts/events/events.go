@@ -173,6 +173,7 @@ type MerchantRegisteredEvent struct {
 // MerchantActivatedEvent represents the payload for MerchantActivated domain event.
 type MerchantActivatedEvent struct {
 	MerchantID     string    `json:"merchant_id"`
+	UserID         string    `json:"user_id,omitempty"`
 	PreviousStatus string    `json:"previous_status"`
 	NewStatus      string    `json:"new_status"`
 	ActivatedBy    string    `json:"activated_by"`
@@ -180,9 +181,32 @@ type MerchantActivatedEvent struct {
 	ActivatedAt    time.Time `json:"activated_at"`
 }
 
+// MerchantApprovedEvent represents the payload for MerchantApproved domain event.
+type MerchantApprovedEvent struct {
+	MerchantID     string    `json:"merchant_id"`
+	UserID         string    `json:"user_id,omitempty"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	ApprovedBy     string    `json:"approved_by"`
+	Reason         string    `json:"reason,omitempty"`
+	ApprovedAt     time.Time `json:"approved_at"`
+}
+
+// MerchantRejectedEvent represents the payload for MerchantRejected domain event.
+type MerchantRejectedEvent struct {
+	MerchantID     string    `json:"merchant_id"`
+	UserID         string    `json:"user_id,omitempty"`
+	PreviousStatus string    `json:"previous_status"`
+	NewStatus      string    `json:"new_status"`
+	RejectedBy     string    `json:"rejected_by"`
+	Reason         string    `json:"reason"`
+	RejectedAt     time.Time `json:"rejected_at"`
+}
+
 // MerchantSuspendedEvent represents the payload for MerchantSuspended domain event.
 type MerchantSuspendedEvent struct {
 	MerchantID     string    `json:"merchant_id"`
+	UserID         string    `json:"user_id,omitempty"`
 	PreviousStatus string    `json:"previous_status"`
 	NewStatus      string    `json:"new_status"`
 	SuspendedBy    string    `json:"suspended_by"`
@@ -255,6 +279,7 @@ type StoreAppealedEvent struct {
 // OrderCancelledEvent represents the payload for OrderCancelled domain event.
 type OrderCancelledEvent struct {
 	OrderID     string    `json:"order_id"`
+	UserID      string    `json:"user_id,omitempty"`
 	Reason      string    `json:"reason,omitempty"`
 	CancelledAt time.Time `json:"cancelled_at"`
 }
@@ -272,6 +297,7 @@ type ShippingAddressPayload struct {
 // OrderConfirmedEvent represents the payload for OrderConfirmed domain event.
 type OrderConfirmedEvent struct {
 	OrderID           string                  `json:"order_id"`
+	UserID            string                  `json:"user_id,omitempty"`
 	ShippingAddressID string                  `json:"shipping_address_id,omitempty"`
 	ShippingAddress   *ShippingAddressPayload `json:"shipping_address,omitempty"`
 	PaymentStatus     string                  `json:"payment_status,omitempty"`
@@ -281,6 +307,7 @@ type OrderConfirmedEvent struct {
 // OrderPaymentFailedEvent represents the payload for OrderPaymentFailed domain event.
 type OrderPaymentFailedEvent struct {
 	OrderID   string    `json:"order_id"`
+	UserID    string    `json:"user_id,omitempty"`
 	PaymentID string    `json:"payment_id,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
 	FailedAt  time.Time `json:"failed_at"`
@@ -311,6 +338,7 @@ type OrderDeliveredEvent struct {
 type DeliveryCreatedEvent struct {
 	DeliveryID      string    `json:"delivery_id"`
 	OrderID         string    `json:"order_id"`
+	UserID          string    `json:"user_id,omitempty"`
 	DeliveryPartner string    `json:"delivery_partner"`
 	TrackingNumber  string    `json:"tracking_number"`
 	Status          string    `json:"status"`
@@ -319,18 +347,20 @@ type DeliveryCreatedEvent struct {
 
 // DeliveryStatusUpdatedEvent represents the payload for DeliveryStatusUpdated domain event.
 type DeliveryStatusUpdatedEvent struct {
-	DeliveryID     string    `json:"delivery_id"`
-	OrderID        string    `json:"order_id"`
-	PreviousStatus string    `json:"previous_status"`
-	NewStatus      string    `json:"new_status"`
-	TrackingNumber string    `json:"tracking_number"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	DeliveryID      string    `json:"delivery_id"`
+	OrderID         string    `json:"order_id"`
+	UserID          string    `json:"user_id,omitempty"`
+	PreviousStatus  string    `json:"previous_status"`
+	NewStatus       string    `json:"new_status"`
+	TrackingNumber  string    `json:"tracking_number"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // DeliveryStatusChangedEvent represents the payload for DeliveryStatusChanged domain event.
 type DeliveryStatusChangedEvent struct {
 	DeliveryID        string     `json:"delivery_id"`
 	OrderID           string     `json:"order_id"`
+	UserID            string     `json:"user_id,omitempty"`
 	PreviousStatus    string     `json:"previous_status"`
 	NewStatus         string     `json:"new_status"`
 	TrackingNumber    string     `json:"tracking_number"`

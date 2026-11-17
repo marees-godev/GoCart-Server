@@ -330,3 +330,37 @@ func TestNotificationPipeline_CorrelationIDAndJobStructure(t *testing.T) {
 		t.Errorf("expected template ID %s, got: %s", templateID, job.TemplateID)
 	}
 }
+
+func TestIsPushSupportedEvent(t *testing.T) {
+	tests := []struct {
+		eventType string
+		expected  bool
+	}{
+		{"OrderCreated", true},
+		{"order.created", true},
+		{"order_created", true},
+		{"OrderPlaced", true},
+		{"OrderCancelled", true},
+		{"order.cancelled", true},
+		{"order_cancelled", true},
+		{"OrderConfirmed", true},
+		{"order.confirmed", true},
+		{"OrderShipped", true},
+		{"order.shipped", true},
+		{"OrderDelivered", true},
+		{"order.delivered", true},
+		{"DeliveryCreated", true},
+		{"delivery.created", true},
+		{"UserRegistered", false},
+		{"StoreApproved", false},
+		{"MerchantApproved", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.eventType, func(t *testing.T) {
+			if got := service.IsPushSupportedEvent(tt.eventType); got != tt.expected {
+				t.Errorf("IsPushSupportedEvent(%q) = %v, want %v", tt.eventType, got, tt.expected)
+			}
+		})
+	}
+}

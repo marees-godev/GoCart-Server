@@ -103,6 +103,7 @@ func TransitionStatus(currentStatus, targetStatus DeliveryStatus) error {
 }
 
 type ShippingAddress struct {
+	UserID        string `json:"user_id,omitempty"`
 	Street        string `json:"street"`
 	City          string `json:"city"`
 	State         string `json:"state"`

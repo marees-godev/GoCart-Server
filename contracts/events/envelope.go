@@ -46,6 +46,8 @@ const (
 
 	// Merchant Service Events
 	EventTypeMerchantRegistered = "MerchantRegistered"
+	EventTypeMerchantApproved   = "MerchantApproved"
+	EventTypeMerchantRejected   = "MerchantRejected"
 	EventTypeMerchantActivated  = "MerchantActivated"
 	EventTypeMerchantSuspended  = "MerchantSuspended"
 
@@ -119,6 +121,8 @@ const (
 
 	// Merchant Service Topics
 	TopicMerchantRegistered = "gocart.merchant.merchant-registered"
+	TopicMerchantApproved   = "gocart.merchant.merchant-approved"
+	TopicMerchantRejected   = "gocart.merchant.merchant-rejected"
 	TopicMerchantActivated  = "gocart.merchant.merchant-activated"
 	TopicMerchantSuspended  = "gocart.merchant.merchant-suspended"
 

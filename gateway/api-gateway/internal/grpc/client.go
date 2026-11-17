@@ -5,6 +5,7 @@ import (
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	inventorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/inventory"
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
@@ -19,18 +20,19 @@ import (
 )
 
 type Clients struct {
-	AuthClient      auth.AuthServiceClient
-	UserClient      userpb.UserServiceClient
-	ProductClient   productpb.ProductServiceClient
-	StoreClient     store.StoreServiceClient
-	CategoryClient  categorypb.CategoryServiceClient
-	MerchantClient  merchantpb.MerchantServiceClient
-	CartClient      cartpb.CartServiceClient
-	InventoryClient inventorypb.InventoryServiceClient
-	OrderClient     orderpb.OrderServiceClient
-	DeliveryClient  deliverypb.DeliveryServiceClient
-	ReturnClient    returnpb.ReturnServiceClient
-	conns           []*grpc.ClientConn
+	AuthClient         auth.AuthServiceClient
+	UserClient         userpb.UserServiceClient
+	ProductClient      productpb.ProductServiceClient
+	StoreClient        store.StoreServiceClient
+	CategoryClient     categorypb.CategoryServiceClient
+	MerchantClient     merchantpb.MerchantServiceClient
+	CartClient         cartpb.CartServiceClient
+	InventoryClient    inventorypb.InventoryServiceClient
+	OrderClient        orderpb.OrderServiceClient
+	DeliveryClient     deliverypb.DeliveryServiceClient
+	ReturnClient       returnpb.ReturnServiceClient
+	NotificationClient notificationpb.NotificationServiceClient
+	conns              []*grpc.ClientConn
 }
 
 func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, error) {
@@ -185,19 +187,39 @@ func NewClients(cfg *config.Config, extraOpts ...grpc.DialOption) (*Clients, err
 		return nil, err
 	}
 
+	notifAddr := cfg.GRPC.NotificationServiceAddr
+	if notifAddr == "" {
+		notifAddr = "localhost:50064"
+	}
+	notifConn, err := grpc.NewClient(notifAddr, opts...)
+	if err != nil {
+		authConn.Close()
+		userConn.Close()
+		productConn.Close()
+		cartConn.Close()
+		orderConn.Close()
+		storeConn.Close()
+		categoryConn.Close()
+		invConn.Close()
+		deliveryConn.Close()
+		returnConn.Close()
+		return nil, err
+	}
+
 	return &Clients{
-		AuthClient:      auth.NewAuthServiceClient(authConn),
-		UserClient:      userpb.NewUserServiceClient(userConn),
-		ProductClient:   productpb.NewProductServiceClient(productConn),
-		StoreClient:     store.NewStoreServiceClient(storeConn),
-		CategoryClient:  categorypb.NewCategoryServiceClient(categoryConn),
-		CartClient:      cartpb.NewCartServiceClient(cartConn),
-		InventoryClient: inventorypb.NewInventoryServiceClient(invConn),
-		OrderClient:     orderpb.NewOrderServiceClient(orderConn),
-		DeliveryClient:  deliverypb.NewDeliveryServiceClient(deliveryConn),
-		ReturnClient:    returnpb.NewReturnServiceClient(returnConn),
+		AuthClient:         auth.NewAuthServiceClient(authConn),
+		UserClient:         userpb.NewUserServiceClient(userConn),
+		ProductClient:      productpb.NewProductServiceClient(productConn),
+		StoreClient:        store.NewStoreServiceClient(storeConn),
+		CategoryClient:     categorypb.NewCategoryServiceClient(categoryConn),
+		CartClient:         cartpb.NewCartServiceClient(cartConn),
+		InventoryClient:    inventorypb.NewInventoryServiceClient(invConn),
+		OrderClient:        orderpb.NewOrderServiceClient(orderConn),
+		DeliveryClient:     deliverypb.NewDeliveryServiceClient(deliveryConn),
+		ReturnClient:       returnpb.NewReturnServiceClient(returnConn),
+		NotificationClient: notificationpb.NewNotificationServiceClient(notifConn),
 		conns: []*grpc.ClientConn{
-			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn, deliveryConn, returnConn,
+			authConn, userConn, productConn, cartConn, orderConn, storeConn, categoryConn, invConn, deliveryConn, returnConn, notifConn,
 		},
 	}, nil
 }
@@ -239,6 +261,9 @@ func NewClientsWithServices(
 		}
 		if ret, ok := svc.(returnpb.ReturnServiceClient); ok {
 			c.ReturnClient = ret
+		}
+		if notif, ok := svc.(notificationpb.NotificationServiceClient); ok {
+			c.NotificationClient = notif
 		}
 	}
 	return c
