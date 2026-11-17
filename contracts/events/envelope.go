@@ -72,6 +72,15 @@ const (
 	EventTypeExchangeOfferApplied = "ExchangeOfferApplied"
 	EventTypeExchangeVerified     = "ExchangeVerified"
 	EventTypeExchangeCompleted    = "ExchangeCompleted"
+
+	// Personalization Service Events
+	EventTypeProductViewed          = "ProductViewed"
+	EventTypeProductSearched        = "ProductSearched"
+	EventTypeCategoryViewed         = "CategoryViewed"
+	EventTypeProductAddedToCart     = "ProductAddedToCart"
+	EventTypeProductRemovedFromCart = "ProductRemovedFromCart"
+	EventTypeProductWishlisted      = "ProductWishlisted"
+	EventTypeProductPurchased       = "ProductPurchased"
 )
 
 // Standard Topic Constants
@@ -137,6 +146,9 @@ const (
 	TopicExchangeOfferApplied = "gocart.return.exchange-offer-applied"
 	TopicExchangeVerified     = "gocart.return.exchange-verified"
 	TopicExchangeCompleted    = "gocart.return.exchange-completed"
+
+	// Personalization Service Topics
+	TopicCustomerActivity = "gocart.activity.customer-interactions"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.

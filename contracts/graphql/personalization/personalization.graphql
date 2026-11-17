@@ -1,0 +1,24 @@
+enum ActivityEventType {
+    PRODUCT_VIEWED
+    PRODUCT_SEARCHED
+    CATEGORY_VIEWED
+    PRODUCT_ADDED_TO_CART
+    PRODUCT_REMOVED_FROM_CART
+    PRODUCT_WISHLISTED
+    PRODUCT_PURCHASED
+}
+
+type CustomerActivity {
+    id: ID!
+    userId: String
+    sessionId: String
+    eventType: ActivityEventType!
+    productId: String
+    categoryId: String
+    createdAt: String!
+}
+
+
+extend type Query {
+    customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!
+}
