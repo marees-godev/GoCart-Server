@@ -2,9 +2,12 @@ package service_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -2692,4 +2695,176 @@ func TestReturnService_TriggerRefund_ProcessedRefundTransitionsToCompleted(t *te
 	if resRet.CompletedAt == nil {
 		t.Errorf("expected CompletedAt to be populated")
 	}
+}
+
+type mockReturnStorageUploader struct {
+	uploadBytesFunc func(ctx context.Context, key string, data []byte, contentType string) (string, error)
+	calls           int
+}
+
+func (m *mockReturnStorageUploader) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	return "", nil
+}
+
+func (m *mockReturnStorageUploader) UploadBytes(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	m.calls++
+	if m.uploadBytesFunc != nil {
+		return m.uploadBytesFunc(ctx, key, data, contentType)
+	}
+	return "https://storage.supabase.co/storage/v1/object/public/returns/" + key, nil
+}
+
+func (m *mockReturnStorageUploader) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
+func (m *mockReturnStorageUploader) GetPublicURL(key string) string {
+	return "https://storage.supabase.co/storage/v1/object/public/returns/" + key
+}
+
+func (m *mockReturnStorageUploader) GenerateKey(prefix, filename string) string {
+	return prefix + "/test-" + filename
+}
+
+func (m *mockReturnStorageUploader) GetPresignedPutURL(ctx context.Context, key string, contentType string, expiry time.Duration) (string, error) {
+	return "https://presigned.supabase.co/" + key, nil
+}
+
+func TestReturnService_ProofImageUpload_SupabaseStorage(t *testing.T) {
+	ctx := context.Background()
+	validBase64PNG := "data:image/png;base64," + base64.StdEncoding.EncodeToString([]byte("fake-proof-png-bytes"))
+
+	setupVerifiableReturn := func(repo *mockReturnRepo) *model.Return {
+		now := time.Now().UTC()
+		ret := &model.Return{
+			ID:           "ret-proof-test",
+			OrderID:      "order-proof-test",
+			OrderItemID:  "item-proof-test",
+			UserID:       "user-proof-test",
+			Reason:       "Defective item",
+			Status:       model.ReturnStatusReceived,
+			Type:         model.ReturnTypeReturn,
+			RefundAmount: 50.0,
+			RequestedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		_ = repo.CreateReturnWithOutbox(ctx, ret, nil)
+		return ret
+	}
+
+	t.Run("VerifyProduct successful upload returns valid Supabase storage URL and persists to DB", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := setupVerifiableReturn(repo)
+		uploader := &mockReturnStorageUploader{}
+		svc := service.NewReturnService(repo, nil, nil, 7, uploader)
+
+		updatedRet, v, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+			ReturnID:    ret.ID,
+			VerifiedBy:  "warehouse-agent-1",
+			Condition:   "GOOD",
+			IsApproved:  true,
+			ProofImages: []string{validBase64PNG},
+		})
+		if err != nil {
+			t.Fatalf("expected verify success, got: %v", err)
+		}
+
+		if uploader.calls == 0 {
+			t.Fatal("expected uploader to be called")
+		}
+
+		expectedPrefix := "https://storage.supabase.co/storage/v1/object/public/returns/"
+		if len(v.ProofImages) != 1 {
+			t.Fatalf("expected 1 proof image, got: %d", len(v.ProofImages))
+		}
+		if !strings.HasPrefix(v.ProofImages[0], expectedPrefix) {
+			t.Errorf("expected Supabase storage URL, got: %s", v.ProofImages[0])
+		}
+		if strings.HasPrefix(v.ProofImages[0], "data:") {
+			t.Errorf("must not return Base64 image URL: %s", v.ProofImages[0])
+		}
+
+		// Verify database persistence
+		savedRet, _ := repo.GetReturnByID(ctx, ret.ID)
+		if savedRet.Status != model.ReturnStatusVerified {
+			t.Errorf("expected return status VERIFIED, got: %s", updatedRet.Status)
+		}
+	})
+
+	t.Run("VerifyProduct storage unavailable returns error and does not verify return or persist Base64", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := setupVerifiableReturn(repo)
+		// uploader is nil (storage service unavailable)
+		svc := service.NewReturnService(repo, nil, nil, 7)
+
+		updatedRet, v, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+			ReturnID:    ret.ID,
+			VerifiedBy:  "warehouse-agent-1",
+			Condition:   "GOOD",
+			IsApproved:  true,
+			ProofImages: []string{validBase64PNG},
+		})
+		if err == nil {
+			t.Fatal("expected error when storage is unavailable, got nil")
+		}
+		if updatedRet != nil || v != nil {
+			t.Fatal("expected nil return and verification on error")
+		}
+
+		// Return status in DB must remain unchanged (RECEIVED)
+		savedRet, _ := repo.GetReturnByID(ctx, ret.ID)
+		if savedRet.Status != model.ReturnStatusReceived {
+			t.Errorf("expected return status to remain RECEIVED, got: %s", savedRet.Status)
+		}
+	})
+
+	t.Run("VerifyProduct storage upload failure returns error and does not verify return or persist Base64", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := setupVerifiableReturn(repo)
+		uploader := &mockReturnStorageUploader{
+			uploadBytesFunc: func(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+				return "", errors.New("supabase storage upload error")
+			},
+		}
+		svc := service.NewReturnService(repo, nil, nil, 7, uploader)
+
+		updatedRet, v, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+			ReturnID:    ret.ID,
+			VerifiedBy:  "warehouse-agent-1",
+			Condition:   "GOOD",
+			IsApproved:  true,
+			ProofImages: []string{validBase64PNG},
+		})
+		if err == nil {
+			t.Fatal("expected error when storage upload fails, got nil")
+		}
+		if updatedRet != nil || v != nil {
+			t.Fatal("expected nil return and verification on error")
+		}
+
+		// Return status in DB must remain unchanged
+		savedRet, _ := repo.GetReturnByID(ctx, ret.ID)
+		if savedRet.Status != model.ReturnStatusReceived {
+			t.Errorf("expected return status to remain RECEIVED, got: %s", savedRet.Status)
+		}
+	})
+
+	t.Run("VerifyProduct invalid base64 image data returns error", func(t *testing.T) {
+		repo := newMockReturnRepo()
+		ret := setupVerifiableReturn(repo)
+		uploader := &mockReturnStorageUploader{}
+		svc := service.NewReturnService(repo, nil, nil, 7, uploader)
+
+		_, _, err := svc.VerifyProduct(ctx, &dto.VerifyProductDTO{
+			ReturnID:    ret.ID,
+			VerifiedBy:  "warehouse-agent-1",
+			Condition:   "GOOD",
+			IsApproved:  true,
+			ProofImages: []string{"data:image/png;base64,invalid!base64!***"},
+		})
+		if err == nil {
+			t.Fatal("expected error for invalid base64 image data, got nil")
+		}
+	})
 }

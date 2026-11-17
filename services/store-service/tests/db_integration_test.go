@@ -29,9 +29,15 @@ func TestDBOutboxIntegration(t *testing.T) {
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		t.Fatalf("failed to connect to postgres database: %v", err)
+		t.Skipf("skipping db outbox test: failed to connect to postgres: %v", err)
+		return
 	}
 	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("skipping db outbox test: database unreachable: %v", err)
+		return
+	}
 
 	repo := repository.NewStoreRepository(pool)
 

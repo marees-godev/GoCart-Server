@@ -2,13 +2,20 @@ package gstin
 
 import (
 	"context"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/config"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
 
 func TestVerifyGSTIN_Valid(t *testing.T) {
 	mockResponse := `{
@@ -22,27 +29,38 @@ func TestVerifyGSTIN_Valid(t *testing.T) {
 		}
 	}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockTransport := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Header.Get("x-api-key") != "test-api-key" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader("unauthorized")),
+				Header:     make(http.Header),
+			}, nil
 		}
 		if r.URL.Path != "/gstin/33AAACC1206D1ZN" {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+				Header:     make(http.Header),
+			}, nil
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(mockResponse))
-	}))
-	defer server.Close()
+		h := make(http.Header)
+		h.Set("Content-Type", "application/json")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(mockResponse)),
+			Header:     h,
+		}, nil
+	})
+
+	httpClient := &http.Client{Transport: mockTransport}
 
 	client := NewGSTINClient(config.GSTINConfig{
 		APIKey:  "test-api-key",
-		BaseURL: server.URL,
+		BaseURL: "https://mock.gstinapi.in",
 		Enabled: true,
 		Timeout: 2 * time.Second,
-	})
+	}, httpClient)
 
 	res, err := client.VerifyGSTIN(context.Background(), "33AAACC1206D1ZN")
 	if err != nil {
@@ -68,15 +86,20 @@ func TestVerifyGSTIN_InvalidFormat(t *testing.T) {
 }
 
 func TestVerifyGSTIN_APIError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "server error", http.StatusInternalServerError)
-	}))
-	defer server.Close()
+	mockTransport := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       io.NopCloser(strings.NewReader("server error")),
+			Header:     make(http.Header),
+		}, nil
+	})
+
+	httpClient := &http.Client{Transport: mockTransport}
 
 	client := NewGSTINClient(config.GSTINConfig{
-		BaseURL: server.URL,
+		BaseURL: "https://mock.gstinapi.in",
 		Timeout: 2 * time.Second,
-	})
+	}, httpClient)
 
 	_, err := client.VerifyGSTIN(context.Background(), "33AAACC1206D1ZN")
 	if err == nil {

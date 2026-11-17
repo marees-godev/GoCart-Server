@@ -2,6 +2,8 @@ package service_test
 
 import (
 	"context"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -1342,5 +1344,193 @@ func TestAppealStore_Rules(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected conflict error for submitting duplicate pending appeal, got nil")
+	}
+}
+
+type mockStoreUploader struct {
+	failUpload bool
+}
+
+func (m *mockStoreUploader) Upload(ctx context.Context, key string, body io.Reader, contentType string) (string, error) {
+	if m.failUpload {
+		return "", errors.New("supabase storage upload error")
+	}
+	return "https://storage.supabase.co/storage/v1/object/public/logos/" + key, nil
+}
+
+func (m *mockStoreUploader) UploadBytes(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if m.failUpload {
+		return "", errors.New("supabase storage upload error")
+	}
+	return "https://storage.supabase.co/storage/v1/object/public/logos/" + key, nil
+}
+
+func (m *mockStoreUploader) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
+func (m *mockStoreUploader) GetPublicURL(key string) string {
+	return "https://storage.supabase.co/storage/v1/object/public/logos/" + key
+}
+
+func (m *mockStoreUploader) GenerateKey(prefix, filename string) string {
+	return prefix + "/" + filename
+}
+
+func (m *mockStoreUploader) GetPresignedPutURL(ctx context.Context, key string, contentType string, expiry time.Duration) (string, error) {
+	return "", nil
+}
+
+func TestStoreService_LogoUpload_StorageUnavailable(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	svc := service.NewStoreService(repo) // no uploader configured
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Logo := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	_, err := svc.CreateStore(merchantCtx, "merchant-1", dto.CreateStoreRequest{
+		Name:          "Test Store Logo",
+		BusinessEmail: "store@example.com",
+		BusinessPhone: "+1234567890",
+		Description:   "Description",
+		Address:       "123 Street",
+		LogoURL:       base64Logo,
+	})
+	if err == nil {
+		t.Fatal("expected error when storage uploader is unavailable, got nil")
+	}
+	if !strings.Contains(err.Error(), "storage service is not configured or unavailable") {
+		t.Fatalf("expected storage unavailable error, got: %v", err)
+	}
+}
+
+func TestStoreService_LogoUpload_UploadFailure(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	uploader := &mockStoreUploader{failUpload: true}
+	svc := service.NewStoreService(repo, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Logo := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	_, err := svc.CreateStore(merchantCtx, "merchant-1", dto.CreateStoreRequest{
+		Name:          "Test Store Logo",
+		BusinessEmail: "store@example.com",
+		BusinessPhone: "+1234567890",
+		Description:   "Description",
+		Address:       "123 Street",
+		LogoURL:       base64Logo,
+	})
+	if err == nil {
+		t.Fatal("expected error when storage upload fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to upload image to storage") {
+		t.Fatalf("expected failed to upload image error, got: %v", err)
+	}
+
+	// Verify store was not created with base64 logo
+	st, err := repo.GetByMerchantID(ctx, "merchant-1")
+	if err == nil && st != nil {
+		t.Fatalf("store should not have been created on logo upload failure")
+	}
+}
+
+func TestStoreService_LogoUpload_Success(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	uploader := &mockStoreUploader{failUpload: false}
+	svc := service.NewStoreService(repo, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	base64Logo := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	st, err := svc.CreateStore(merchantCtx, "merchant-1", dto.CreateStoreRequest{
+		Name:          "Test Store Logo Success",
+		BusinessEmail: "store@example.com",
+		BusinessPhone: "+1234567890",
+		Description:   "Description",
+		Address:       "123 Street",
+		LogoURL:       base64Logo,
+	})
+	if err != nil {
+		t.Fatalf("expected store creation to succeed, got: %v", err)
+	}
+	if strings.HasPrefix(st.LogoURL, "data:") {
+		t.Fatalf("expected Supabase Storage URL, got base64 data URL: %s", st.LogoURL)
+	}
+	if !strings.HasPrefix(st.LogoURL, "https://storage.supabase.co/") {
+		t.Fatalf("expected Supabase Storage URL prefix, got: %s", st.LogoURL)
+	}
+}
+
+func TestStoreService_UpdateStore_LogoUploadFailuresAndSuccess(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	uploader := &mockStoreUploader{failUpload: false}
+	svc := service.NewStoreService(repo, uploader)
+
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{
+		UserID: "merchant-1",
+		Role:   auth.RoleMerchant,
+	})
+
+	st, err := svc.CreateStore(merchantCtx, "merchant-1", dto.CreateStoreRequest{
+		Name:          "Store For Update",
+		BusinessEmail: "store@example.com",
+		BusinessPhone: "+1234567890",
+		Description:   "Description",
+		Address:       "123 Street",
+		LogoURL:       "https://existing.cdn.com/logo.png",
+	})
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	base64Logo := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	// Test upload failure
+	uploader.failUpload = true
+	_, err = svc.UpdateStore(merchantCtx, "merchant-1", st.ID, dto.UpdateStoreRequest{
+		LogoURL: &base64Logo,
+	})
+	if err == nil {
+		t.Fatal("expected error on update when logo upload fails, got nil")
+	}
+
+	// Verify original URL preserved
+	fetched, err := repo.GetByID(ctx, st.ID)
+	if err != nil {
+		t.Fatalf("failed to get store: %v", err)
+	}
+	if fetched.LogoURL != "https://existing.cdn.com/logo.png" {
+		t.Fatalf("expected existing logo URL preserved, got: %s", fetched.LogoURL)
+	}
+
+	// Test upload success
+	uploader.failUpload = false
+	updated, err := svc.UpdateStore(merchantCtx, "merchant-1", st.ID, dto.UpdateStoreRequest{
+		LogoURL: &base64Logo,
+	})
+	if err != nil {
+		t.Fatalf("expected update to succeed, got: %v", err)
+	}
+	if strings.HasPrefix(updated.LogoURL, "data:") {
+		t.Fatalf("expected storage URL, got base64 data URL: %s", updated.LogoURL)
+	}
+	if !strings.HasPrefix(updated.LogoURL, "https://storage.supabase.co/") {
+		t.Fatalf("expected Supabase Storage URL prefix, got: %s", updated.LogoURL)
 	}
 }
