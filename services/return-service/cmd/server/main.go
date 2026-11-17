@@ -24,6 +24,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 	"github.com/marees-godev/GoCart-Server/pkg/outbox"
+	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/return-service/internal/config"
@@ -157,8 +158,25 @@ func main() {
 	}
 
 	// 7. Initialize business layers
+	var s3Uploader storage.Uploader
+	if cfg.Storage.AccessKeyID != "" && cfg.Storage.SecretAccessKey != "" {
+		s3Client, err := storage.NewS3Client(ctx, storage.Config{
+			Endpoint:        cfg.Storage.Endpoint,
+			Region:          cfg.Storage.Region,
+			AccessKeyID:     cfg.Storage.AccessKeyID,
+			SecretAccessKey: cfg.Storage.SecretAccessKey,
+			Bucket:          cfg.Storage.Bucket,
+			PublicURLPrefix: cfg.Storage.PublicURLPrefix,
+		})
+		if err != nil {
+			log.Warn("Failed to initialize storage client", slog.Any("error", err))
+		} else {
+			s3Uploader = s3Client
+		}
+	}
+
 	returnRepo := repository.NewReturnRepository(db, outboxStore, log)
-	returnService := service.NewReturnService(returnRepo, orderClient, productClient, cfg.Return.ReturnWindowDays, log, paymentClient)
+	returnService := service.NewReturnService(returnRepo, orderClient, productClient, cfg.Return.ReturnWindowDays, log, paymentClient, s3Uploader)
 	returnGRPCHandler := handler.NewReturnGRPCHandler(returnService, log)
 
 	// 8. Setup gRPC Server

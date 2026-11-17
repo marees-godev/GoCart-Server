@@ -69,7 +69,7 @@ type client struct {
 	httpClient *http.Client
 }
 
-func NewGSTINClient(cfg config.GSTINConfig) GSTINClient {
+func NewGSTINClient(cfg config.GSTINConfig, customHTTP ...*http.Client) GSTINClient {
 	timeout := cfg.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Second
@@ -78,13 +78,19 @@ func NewGSTINClient(cfg config.GSTINConfig) GSTINClient {
 	if baseURL == "" {
 		baseURL = "https://www.gstinapi.in/v1"
 	}
-	return &client{
-		apiKey:  cfg.APIKey,
-		baseURL: baseURL,
-		enabled: cfg.Enabled,
-		httpClient: &http.Client{
+	var hc *http.Client
+	if len(customHTTP) > 0 && customHTTP[0] != nil {
+		hc = customHTTP[0]
+	} else {
+		hc = &http.Client{
 			Timeout: timeout,
-		},
+		}
+	}
+	return &client{
+		apiKey:     cfg.APIKey,
+		baseURL:    baseURL,
+		enabled:    cfg.Enabled,
+		httpClient: hc,
 	}
 }
 

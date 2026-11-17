@@ -104,49 +104,49 @@ func resolveAdminContext(ctx context.Context, fallbackAdminID string) (string, e
 	return resolveRoleContext(ctx, fallbackAdminID, auth.RoleAdmin)
 }
 
-func (s *storeService) processImage(ctx context.Context, folder, input string) string {
-	if s.uploader == nil || !strings.HasPrefix(input, "data:image/") {
-		return input
+func (s *storeService) processImage(ctx context.Context, folder, input string) (string, error) {
+	if !strings.HasPrefix(input, "data:image/") {
+		return input, nil
+	}
+
+	if s.uploader == nil {
+		return "", errors.Internal(nil, "storage service is not configured or unavailable")
 	}
 
 	parts := strings.SplitN(input, ",", 2)
 	if len(parts) != 2 {
-		return input
+		return "", errors.BadRequest("invalid image data URL format")
 	}
 
 	header := parts[0] // e.g. "data:image/png;base64"
 	b64Data := parts[1]
 
-	contentType := "image/png"
-	if strings.Contains(header, "image/jpeg") || strings.Contains(header, "image/jpg") {
-		contentType = "image/jpeg"
-	} else if strings.Contains(header, "image/webp") {
-		contentType = "image/webp"
-	} else if strings.Contains(header, "image/svg+xml") {
-		contentType = "image/svg+xml"
-	}
-
-	ext := ".png"
-	if contentType == "image/jpeg" {
-		ext = ".jpg"
-	} else if contentType == "image/webp" {
-		ext = ".webp"
-	} else if contentType == "image/svg+xml" {
-		ext = ".svg"
+	var contentType, ext string
+	switch {
+	case strings.Contains(header, "image/jpeg") || strings.Contains(header, "image/jpg"):
+		contentType, ext = "image/jpeg", ".jpg"
+	case strings.Contains(header, "image/png"):
+		contentType, ext = "image/png", ".png"
+	case strings.Contains(header, "image/webp"):
+		contentType, ext = "image/webp", ".webp"
+	case strings.Contains(header, "image/svg+xml"):
+		contentType, ext = "image/svg+xml", ".svg"
+	default:
+		return "", errors.BadRequest("unsupported image type: only JPEG, PNG, WebP, and SVG are allowed")
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(b64Data)
 	if err != nil {
-		return input
+		return "", errors.BadRequest("failed to decode base64 image data")
 	}
 
 	key := s.uploader.GenerateKey(folder, "image"+ext)
 	uploadedURL, err := s.uploader.UploadBytes(ctx, key, decoded, contentType)
 	if err != nil {
-		return input
+		return "", errors.Internal(err, "failed to upload image to storage")
 	}
 
-	return uploadedURL
+	return uploadedURL, nil
 }
 
 func (s *storeService) CreateStore(ctx context.Context, authMerchantID string, req dto.CreateStoreRequest) (*model.Store, error) {
@@ -188,7 +188,10 @@ func (s *storeService) CreateStore(ctx context.Context, authMerchantID string, r
 		}
 	}
 
-	logoURL := s.processImage(ctx, "logos", req.GetLogo())
+	logoURL, err := s.processImage(ctx, "logos", req.GetLogo())
+	if err != nil {
+		return nil, err
+	}
 
 	store := &model.Store{
 		MerchantID:         merchantID,
@@ -339,7 +342,11 @@ func (s *storeService) UpdateStore(ctx context.Context, authMerchantID, storeID 
 	}
 
 	if logo := req.GetLogo(); logo != nil {
-		existingStore.LogoURL = s.processImage(ctx, "logos", strings.TrimSpace(*logo))
+		logoURL, err := s.processImage(ctx, "logos", strings.TrimSpace(*logo))
+		if err != nil {
+			return nil, err
+		}
+		existingStore.LogoURL = logoURL
 	}
 
 	if req.Address != nil {

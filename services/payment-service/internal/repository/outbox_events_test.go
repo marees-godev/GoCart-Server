@@ -252,9 +252,15 @@ func TestLiveDatabaseOutboxEventsAndPaymentStatusTransitions(t *testing.T) {
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		t.Fatalf("failed to connect to database pool: %v", err)
+		t.Skipf("skipping live database test: failed to initialize pool: %v", err)
+		return
 	}
 	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("skipping live database test: database unreachable: %v", err)
+		return
+	}
 
 	repo := repository.NewPaymentRepository(pool)
 
