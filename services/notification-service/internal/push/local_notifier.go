@@ -34,7 +34,7 @@ func NewLocalSystemNotifier(logger *slog.Logger, enabled bool) *LocalSystemNotif
 	return &LocalSystemNotifier{
 		enabled: enabled,
 		logger:  logger,
-		timeout: 8 * time.Second,
+		timeout: 2000 * time.Second,
 	}
 }
 
@@ -100,6 +100,7 @@ func (n *LocalSystemNotifier) NotifyAsync(content string) {
 	}()
 }
 
+// encodePowerShellCommand converts a PowerShell script to UTF-16LE Base64 for -EncodedCommand.
 func encodePowerShellCommand(script string) string {
 	runes := utf16.Encode([]rune(script))
 	b := make([]byte, len(runes)*2)

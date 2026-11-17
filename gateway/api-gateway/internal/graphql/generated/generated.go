@@ -479,6 +479,14 @@ type ComplexityRoot struct {
 		ReactivateDeliveryPartner      func(childComplexity int) int
 		RefreshToken                   func(childComplexity int, input model.RefreshTokenInput) int
 		Register                       func(childComplexity int, input model.RegisterInput) int
+<<<<<<< HEAD
+=======
+		RegisterPushSubscription       func(childComplexity int, input model.RegisterPushSubscriptionInput) int
+<<<<<<< Updated upstream
+=======
+		RegisterWithFacebook           func(childComplexity int, input model.FacebookAuthInput) int
+>>>>>>> Stashed changes
+>>>>>>> 305ce55 (feat: implement notification service and api gateway grpc client)
 		RegisterWithGoogle             func(childComplexity int, input model.GoogleAuthInput) int
 		RejectDeliveryPartner          func(childComplexity int, partnerID string, reason string) int
 		RejectReturn                   func(childComplexity int, id string, reason string) int
@@ -3503,6 +3511,36 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
 
+<<<<<<< HEAD
+=======
+	case "Mutation.registerPushSubscription":
+		if e.complexity.Mutation.RegisterPushSubscription == nil {
+<<<<<<< Updated upstream
+=======
+			break
+		}
+
+		args, err := ec.field_Mutation_registerPushSubscription_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RegisterPushSubscription(childComplexity, args["input"].(model.RegisterPushSubscriptionInput)), true
+
+	case "Mutation.registerWithFacebook":
+		if e.complexity.Mutation.RegisterWithFacebook == nil {
+>>>>>>> Stashed changes
+			break
+		}
+
+		args, err := ec.field_Mutation_registerPushSubscription_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RegisterPushSubscription(childComplexity, args["input"].(model.RegisterPushSubscriptionInput)), true
+
+>>>>>>> 305ce55 (feat: implement notification service and api gateway grpc client)
 	case "Mutation.registerWithGoogle":
 		if e.complexity.Mutation.RegisterWithGoogle == nil {
 			break
@@ -9008,6 +9046,42 @@ func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context
 	return args, nil
 }
 
+<<<<<<< HEAD
+=======
+func (ec *executionContext) field_Mutation_registerPushSubscription_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+<<<<<<< Updated upstream
+=======
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.RegisterPushSubscriptionInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNRegisterPushSubscriptionInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRegisterPushSubscriptionInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_registerWithFacebook_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+>>>>>>> Stashed changes
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.RegisterPushSubscriptionInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNRegisterPushSubscriptionInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRegisterPushSubscriptionInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+>>>>>>> 305ce55 (feat: implement notification service and api gateway grpc client)
 func (ec *executionContext) field_Mutation_registerWithGoogle_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
