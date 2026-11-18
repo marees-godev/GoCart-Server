@@ -124,6 +124,11 @@ type CategoryList struct {
 	Total      int         `json:"total"`
 }
 
+type CategoryPreference struct {
+	CategoryID string  `json:"categoryId"`
+	Score      float64 `json:"score"`
+}
+
 type ChangePasswordInput struct {
 	OldPassword string `json:"oldPassword"`
 	NewPassword string `json:"newPassword"`
@@ -834,6 +839,16 @@ type RatingImage struct {
 	RatingID  string `json:"ratingId"`
 	URL       string `json:"url"`
 	CreatedAt string `json:"createdAt"`
+}
+
+type RecentlyViewedProduct struct {
+	ProductID    string `json:"productId"`
+	LastViewedAt string `json:"lastViewedAt"`
+}
+
+type RecentlyViewedProductList struct {
+	Products []*RecentlyViewedProduct `json:"products"`
+	Total    int                      `json:"total"`
 }
 
 type RefreshTokenInput struct {

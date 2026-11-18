@@ -425,6 +425,342 @@ func (x *GetCustomerActivitiesResponse) GetTotal() int32 {
 	return 0
 }
 
+type GetRecentlyViewedProductsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecentlyViewedProductsRequest) Reset() {
+	*x = GetRecentlyViewedProductsRequest{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecentlyViewedProductsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecentlyViewedProductsRequest) ProtoMessage() {}
+
+func (x *GetRecentlyViewedProductsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecentlyViewedProductsRequest.ProtoReflect.Descriptor instead.
+func (*GetRecentlyViewedProductsRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetRecentlyViewedProductsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetRecentlyViewedProductsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GetRecentlyViewedProductsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetRecentlyViewedProductsRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type RecentlyViewedProduct struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	LastViewedAt  string                 `protobuf:"bytes,2,opt,name=last_viewed_at,json=lastViewedAt,proto3" json:"last_viewed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecentlyViewedProduct) Reset() {
+	*x = RecentlyViewedProduct{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecentlyViewedProduct) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecentlyViewedProduct) ProtoMessage() {}
+
+func (x *RecentlyViewedProduct) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecentlyViewedProduct.ProtoReflect.Descriptor instead.
+func (*RecentlyViewedProduct) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RecentlyViewedProduct) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *RecentlyViewedProduct) GetLastViewedAt() string {
+	if x != nil {
+		return x.LastViewedAt
+	}
+	return ""
+}
+
+type GetRecentlyViewedProductsResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Products      []*RecentlyViewedProduct `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	Total         int32                    `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecentlyViewedProductsResponse) Reset() {
+	*x = GetRecentlyViewedProductsResponse{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecentlyViewedProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecentlyViewedProductsResponse) ProtoMessage() {}
+
+func (x *GetRecentlyViewedProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecentlyViewedProductsResponse.ProtoReflect.Descriptor instead.
+func (*GetRecentlyViewedProductsResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetRecentlyViewedProductsResponse) GetProducts() []*RecentlyViewedProduct {
+	if x != nil {
+		return x.Products
+	}
+	return nil
+}
+
+func (x *GetRecentlyViewedProductsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type CategoryPreference struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CategoryId    string                 `protobuf:"bytes,1,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Score         float64                `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CategoryPreference) Reset() {
+	*x = CategoryPreference{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CategoryPreference) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CategoryPreference) ProtoMessage() {}
+
+func (x *CategoryPreference) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CategoryPreference.ProtoReflect.Descriptor instead.
+func (*CategoryPreference) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CategoryPreference) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *CategoryPreference) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+type GetCategoryPreferenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCategoryPreferenceRequest) Reset() {
+	*x = GetCategoryPreferenceRequest{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCategoryPreferenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCategoryPreferenceRequest) ProtoMessage() {}
+
+func (x *GetCategoryPreferenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCategoryPreferenceRequest.ProtoReflect.Descriptor instead.
+func (*GetCategoryPreferenceRequest) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetCategoryPreferenceRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetCategoryPreferenceRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GetCategoryPreferenceRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *GetCategoryPreferenceRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type GetCategoryPreferenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Preferences   []*CategoryPreference  `protobuf:"bytes,1,rep,name=preferences,proto3" json:"preferences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCategoryPreferenceResponse) Reset() {
+	*x = GetCategoryPreferenceResponse{}
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCategoryPreferenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCategoryPreferenceResponse) ProtoMessage() {}
+
+func (x *GetCategoryPreferenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_contracts_protobuf_personalization_personalization_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCategoryPreferenceResponse.ProtoReflect.Descriptor instead.
+func (*GetCategoryPreferenceResponse) Descriptor() ([]byte, []int) {
+	return file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetCategoryPreferenceResponse) GetPreferences() []*CategoryPreference {
+	if x != nil {
+		return x.Preferences
+	}
+	return nil
+}
+
 var File_contracts_protobuf_personalization_personalization_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_personalization_personalization_proto_rawDesc = "" +
@@ -466,7 +802,32 @@ const file_contracts_protobuf_personalization_personalization_proto_rawDesc = ""
 	"\n" +
 	"activities\x18\x01 \x03(\v2!.personalization.CustomerActivityR\n" +
 	"activities\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total*\xec\x02\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x88\x01\n" +
+	" GetRecentlyViewedProductsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x04 \x01(\x05R\x06offset\"\\\n" +
+	"\x15RecentlyViewedProduct\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tR\tproductId\x12$\n" +
+	"\x0elast_viewed_at\x18\x02 \x01(\tR\flastViewedAt\"}\n" +
+	"!GetRecentlyViewedProductsResponse\x12B\n" +
+	"\bproducts\x18\x01 \x03(\v2&.personalization.RecentlyViewedProductR\bproducts\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"K\n" +
+	"\x12CategoryPreference\x12\x1f\n" +
+	"\vcategory_id\x18\x01 \x01(\tR\n" +
+	"categoryId\x12\x14\n" +
+	"\x05score\x18\x02 \x01(\x01R\x05score\"\x84\x01\n" +
+	"\x1cGetCategoryPreferenceRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x04 \x01(\x05R\x06offset\"f\n" +
+	"\x1dGetCategoryPreferenceResponse\x12E\n" +
+	"\vpreferences\x18\x01 \x03(\v2#.personalization.CategoryPreferenceR\vpreferences*\xec\x02\n" +
 	"\x11ActivityEventType\x12#\n" +
 	"\x1fACTIVITY_EVENT_TYPE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"ACTIVITY_EVENT_TYPE_PRODUCT_VIEWED\x10\x01\x12(\n" +
@@ -475,10 +836,12 @@ const file_contracts_protobuf_personalization_personalization_proto_rawDesc = ""
 	")ACTIVITY_EVENT_TYPE_PRODUCT_ADDED_TO_CART\x10\x04\x121\n" +
 	"-ACTIVITY_EVENT_TYPE_PRODUCT_REMOVED_FROM_CART\x10\x05\x12*\n" +
 	"&ACTIVITY_EVENT_TYPE_PRODUCT_WISHLISTED\x10\x06\x12)\n" +
-	"%ACTIVITY_EVENT_TYPE_PRODUCT_PURCHASED\x10\a2\xf0\x01\n" +
+	"%ACTIVITY_EVENT_TYPE_PRODUCT_PURCHASED\x10\a2\xee\x03\n" +
 	"\x16PersonalizationService\x12^\n" +
 	"\rTrackActivity\x12%.personalization.TrackActivityRequest\x1a&.personalization.TrackActivityResponse\x12v\n" +
-	"\x15GetCustomerActivities\x12-.personalization.GetCustomerActivitiesRequest\x1a..personalization.GetCustomerActivitiesResponseBZZXgithub.com/marees-godev/GoCart-Server/contracts/protobuf/personalization;personalizationb\x06proto3"
+	"\x15GetCustomerActivities\x12-.personalization.GetCustomerActivitiesRequest\x1a..personalization.GetCustomerActivitiesResponse\x12\x82\x01\n" +
+	"\x19GetRecentlyViewedProducts\x121.personalization.GetRecentlyViewedProductsRequest\x1a2.personalization.GetRecentlyViewedProductsResponse\x12w\n" +
+	"\x16GetCategoryPreferences\x12-.personalization.GetCategoryPreferenceRequest\x1a..personalization.GetCategoryPreferenceResponseBZZXgithub.com/marees-godev/GoCart-Server/contracts/protobuf/personalization;personalizationb\x06proto3"
 
 var (
 	file_contracts_protobuf_personalization_personalization_proto_rawDescOnce sync.Once
@@ -493,28 +856,40 @@ func file_contracts_protobuf_personalization_personalization_proto_rawDescGZIP()
 }
 
 var file_contracts_protobuf_personalization_personalization_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_contracts_protobuf_personalization_personalization_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_contracts_protobuf_personalization_personalization_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_contracts_protobuf_personalization_personalization_proto_goTypes = []any{
-	(ActivityEventType)(0),                // 0: personalization.ActivityEventType
-	(*TrackActivityRequest)(nil),          // 1: personalization.TrackActivityRequest
-	(*TrackActivityResponse)(nil),         // 2: personalization.TrackActivityResponse
-	(*CustomerActivity)(nil),              // 3: personalization.CustomerActivity
-	(*GetCustomerActivitiesRequest)(nil),  // 4: personalization.GetCustomerActivitiesRequest
-	(*GetCustomerActivitiesResponse)(nil), // 5: personalization.GetCustomerActivitiesResponse
+	(ActivityEventType)(0),                    // 0: personalization.ActivityEventType
+	(*TrackActivityRequest)(nil),              // 1: personalization.TrackActivityRequest
+	(*TrackActivityResponse)(nil),             // 2: personalization.TrackActivityResponse
+	(*CustomerActivity)(nil),                  // 3: personalization.CustomerActivity
+	(*GetCustomerActivitiesRequest)(nil),      // 4: personalization.GetCustomerActivitiesRequest
+	(*GetCustomerActivitiesResponse)(nil),     // 5: personalization.GetCustomerActivitiesResponse
+	(*GetRecentlyViewedProductsRequest)(nil),  // 6: personalization.GetRecentlyViewedProductsRequest
+	(*RecentlyViewedProduct)(nil),             // 7: personalization.RecentlyViewedProduct
+	(*GetRecentlyViewedProductsResponse)(nil), // 8: personalization.GetRecentlyViewedProductsResponse
+	(*CategoryPreference)(nil),                // 9: personalization.CategoryPreference
+	(*GetCategoryPreferenceRequest)(nil),      // 10: personalization.GetCategoryPreferenceRequest
+	(*GetCategoryPreferenceResponse)(nil),     // 11: personalization.GetCategoryPreferenceResponse
 }
 var file_contracts_protobuf_personalization_personalization_proto_depIdxs = []int32{
-	0, // 0: personalization.TrackActivityRequest.event_type:type_name -> personalization.ActivityEventType
-	0, // 1: personalization.CustomerActivity.event_type:type_name -> personalization.ActivityEventType
-	3, // 2: personalization.GetCustomerActivitiesResponse.activities:type_name -> personalization.CustomerActivity
-	1, // 3: personalization.PersonalizationService.TrackActivity:input_type -> personalization.TrackActivityRequest
-	4, // 4: personalization.PersonalizationService.GetCustomerActivities:input_type -> personalization.GetCustomerActivitiesRequest
-	2, // 5: personalization.PersonalizationService.TrackActivity:output_type -> personalization.TrackActivityResponse
-	5, // 6: personalization.PersonalizationService.GetCustomerActivities:output_type -> personalization.GetCustomerActivitiesResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: personalization.TrackActivityRequest.event_type:type_name -> personalization.ActivityEventType
+	0,  // 1: personalization.CustomerActivity.event_type:type_name -> personalization.ActivityEventType
+	3,  // 2: personalization.GetCustomerActivitiesResponse.activities:type_name -> personalization.CustomerActivity
+	7,  // 3: personalization.GetRecentlyViewedProductsResponse.products:type_name -> personalization.RecentlyViewedProduct
+	9,  // 4: personalization.GetCategoryPreferenceResponse.preferences:type_name -> personalization.CategoryPreference
+	1,  // 5: personalization.PersonalizationService.TrackActivity:input_type -> personalization.TrackActivityRequest
+	4,  // 6: personalization.PersonalizationService.GetCustomerActivities:input_type -> personalization.GetCustomerActivitiesRequest
+	6,  // 7: personalization.PersonalizationService.GetRecentlyViewedProducts:input_type -> personalization.GetRecentlyViewedProductsRequest
+	10, // 8: personalization.PersonalizationService.GetCategoryPreferences:input_type -> personalization.GetCategoryPreferenceRequest
+	2,  // 9: personalization.PersonalizationService.TrackActivity:output_type -> personalization.TrackActivityResponse
+	5,  // 10: personalization.PersonalizationService.GetCustomerActivities:output_type -> personalization.GetCustomerActivitiesResponse
+	8,  // 11: personalization.PersonalizationService.GetRecentlyViewedProducts:output_type -> personalization.GetRecentlyViewedProductsResponse
+	11, // 12: personalization.PersonalizationService.GetCategoryPreferences:output_type -> personalization.GetCategoryPreferenceResponse
+	9,  // [9:13] is the sub-list for method output_type
+	5,  // [5:9] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_contracts_protobuf_personalization_personalization_proto_init() }
@@ -528,7 +903,7 @@ func file_contracts_protobuf_personalization_personalization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_contracts_protobuf_personalization_personalization_proto_rawDesc), len(file_contracts_protobuf_personalization_personalization_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

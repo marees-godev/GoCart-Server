@@ -18,6 +18,8 @@ type PersonalizationService interface {
 	TrackActivity(ctx context.Context, input *dto.TrackActivityInput) error
 	ProcessEvent(ctx context.Context, envelope *events.EventEnvelope) error
 	GetCustomerActivities(ctx context.Context, userID, sessionID string, limit, offset int) ([]*model.CustomerActivity, int, error)
+	GetRecentlyViewedProducts(ctx context.Context, userID, sessionID string, limit, offset int) ([]*dto.RecentlyViewedProduct, int, error)
+	GetCategoryPreference(ctx context.Context, userID, sessionID string, limit, offset int) ([]*dto.CustomerPreference, error)
 }
 
 type personalizationService struct {
@@ -166,6 +168,42 @@ func (s *personalizationService) GetCustomerActivities(ctx context.Context, user
 		offset = 0
 	}
 	return s.repo.GetCustomerActivities(ctx, userID, sessionID, limit, offset)
+}
+
+func (s *personalizationService) GetRecentlyViewedProducts(ctx context.Context, userID, sessionID string, limit, offset int) ([]*dto.RecentlyViewedProduct, int, error) {
+	if userID == "" && sessionID == "" {
+		return nil, 0, fmt.Errorf("either user_id or session_id must be provided")
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	return s.repo.GetRecentlyViewedProducts(ctx, userID, sessionID, limit, offset)
+}
+
+func (s *personalizationService) GetCategoryPreference(ctx context.Context, userID, sessionID string, limit, offset int) ([]*dto.CustomerPreference, error) {
+	if userID == "" && sessionID == "" {
+		return nil, fmt.Errorf("either user_id or session_id must be provided")
+	}
+
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	return s.repo.GetCategoryPreference(ctx, userID, sessionID, limit, offset)
 }
 
 func mapEventToDBType(eventType string) string {

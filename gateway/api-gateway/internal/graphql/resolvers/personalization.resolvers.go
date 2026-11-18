@@ -27,13 +27,13 @@ func (r *queryResolver) CustomerActivities(ctx context.Context, sessionID *strin
 		sess = *sessionID
 	}
 
-	lim := int32(10)
-	if limit != nil && *limit > 0 {
+	var lim int32
+	if limit != nil {
 		lim = int32(*limit)
 	}
 
-	off := int32(0)
-	if offset != nil && *offset >= 0 {
+	var off int32
+	if offset != nil {
 		off = int32(*offset)
 	}
 
@@ -83,6 +83,101 @@ func (r *queryResolver) CustomerActivities(ctx context.Context, sessionID *strin
 			ProductID:  pPtr,
 			CategoryID: cPtr,
 			CreatedAt:  act.GetCreatedAt(),
+		}
+	}
+
+	return result, nil
+}
+
+// RecentlyViewedProducts is the resolver for the recentlyViewedProducts field.
+func (r *queryResolver) RecentlyViewedProducts(ctx context.Context, sessionID *string, limit *int, offset *int) (*model.RecentlyViewedProductList, error) {
+	if r.ClientMgr == nil || r.ClientMgr.PersonalizationClient == nil {
+		return nil, appErrors.Internal(nil, "personalization service client unavailable")
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+
+	sess := ""
+	if sessionID != nil {
+		sess = *sessionID
+	}
+
+	var lim int32
+	if limit != nil {
+		lim = int32(*limit)
+	}
+
+	var off int32
+	if offset != nil {
+		off = int32(*offset)
+	}
+
+	req := &personalizationpb.GetRecentlyViewedProductsRequest{
+		UserId:    userID,
+		SessionId: sess,
+		Limit:     lim,
+		Offset:    off,
+	}
+
+	resp, err := r.ClientMgr.PersonalizationClient.GetRecentlyViewedProducts(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := make([]*model.RecentlyViewedProduct, len(resp.GetProducts()))
+	for i, p := range resp.GetProducts() {
+		result[i] = &model.RecentlyViewedProduct{
+			ProductID:    p.GetProductId(),
+			LastViewedAt: p.GetLastViewedAt(),
+		}
+	}
+
+	return &model.RecentlyViewedProductList{
+		Products: result,
+		Total:    int(resp.GetTotal()),
+	}, nil
+}
+
+// CategoryPreferences is the resolver for the categoryPreferences field.
+func (r *queryResolver) CategoryPreferences(ctx context.Context, sessionID *string, limit *int, offset *int) ([]*model.CategoryPreference, error) {
+	if r.ClientMgr == nil || r.ClientMgr.PersonalizationClient == nil {
+		return nil, appErrors.Internal(nil, "personalization service client unavailable")
+	}
+
+	userID := getAuthUserIDFromCtx(ctx)
+
+	sess := ""
+	if sessionID != nil {
+		sess = *sessionID
+	}
+
+	var lim int32
+	if limit != nil {
+		lim = int32(*limit)
+	}
+
+	var off int32
+	if offset != nil {
+		off = int32(*offset)
+	}
+
+	req := &personalizationpb.GetCategoryPreferenceRequest{
+		UserId:    userID,
+		SessionId: sess,
+		Limit:     lim,
+		Offset:    off,
+	}
+
+	resp, err := r.ClientMgr.PersonalizationClient.GetCategoryPreferences(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	result := make([]*model.CategoryPreference, len(resp.GetPreferences()))
+	for i, p := range resp.GetPreferences() {
+		result[i] = &model.CategoryPreference{
+			CategoryID: p.GetCategoryId(),
+			Score:      p.GetScore(),
 		}
 	}
 

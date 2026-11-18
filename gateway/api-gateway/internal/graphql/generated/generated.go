@@ -117,6 +117,11 @@ type ComplexityRoot struct {
 		Total      func(childComplexity int) int
 	}
 
+	CategoryPreference struct {
+		CategoryID func(childComplexity int) int
+		Score      func(childComplexity int) int
+	}
+
 	ChangePasswordPayload struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
@@ -694,6 +699,7 @@ type ComplexityRoot struct {
 		Cart                          func(childComplexity int, userID *string) int
 		Categories                    func(childComplexity int, limit *int, offset *int, parentCategoryID *string, rootOnly *bool) int
 		Category                      func(childComplexity int, id string) int
+		CategoryPreferences           func(childComplexity int, sessionID *string, limit *int, offset *int) int
 		ChildCategories               func(childComplexity int, parentCategoryID string, limit *int, offset *int) int
 		CustomerActivities            func(childComplexity int, sessionID *string, limit *int, offset *int) int
 		Delivery                      func(childComplexity int, id string) int
@@ -725,6 +731,7 @@ type ComplexityRoot struct {
 		ProductRatings                func(childComplexity int, productID string, limit *int, offset *int) int
 		Products                      func(childComplexity int, limit *int, offset *int, categoryID *string, storeID *string, status *model.ProductStatus) int
 		PushSubscriptions             func(childComplexity int, activeOnly *bool) int
+		RecentlyViewedProducts        func(childComplexity int, sessionID *string, limit *int, offset *int) int
 		ReturnOrder                   func(childComplexity int, id string) int
 		ReturnOrdersByOrder           func(childComplexity int, orderID string) int
 		Stock                         func(childComplexity int, productID string) int
@@ -769,6 +776,16 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		RatingID  func(childComplexity int) int
 		URL       func(childComplexity int) int
+	}
+
+	RecentlyViewedProduct struct {
+		LastViewedAt func(childComplexity int) int
+		ProductID    func(childComplexity int) int
+	}
+
+	RecentlyViewedProductList struct {
+		Products func(childComplexity int) int
+		Total    func(childComplexity int) int
 	}
 
 	RefundPayload struct {
@@ -1065,6 +1082,8 @@ type QueryResolver interface {
 	Payment(ctx context.Context, id string) (*model.Payment, error)
 	PaymentByOrderID(ctx context.Context, orderID string) (*model.Payment, error)
 	CustomerActivities(ctx context.Context, sessionID *string, limit *int, offset *int) ([]*model.CustomerActivity, error)
+	RecentlyViewedProducts(ctx context.Context, sessionID *string, limit *int, offset *int) (*model.RecentlyViewedProductList, error)
+	CategoryPreferences(ctx context.Context, sessionID *string, limit *int, offset *int) ([]*model.CategoryPreference, error)
 	Product(ctx context.Context, id string) (*model.Product, error)
 	Products(ctx context.Context, limit *int, offset *int, categoryID *string, storeID *string, status *model.ProductStatus) (*model.ProductList, error)
 	ProductRatings(ctx context.Context, productID string, limit *int, offset *int) (*model.ProductRatings, error)
@@ -1426,6 +1445,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CategoryList.Total(childComplexity), true
+
+	case "CategoryPreference.categoryId":
+		if e.complexity.CategoryPreference.CategoryID == nil {
+			break
+		}
+
+		return e.complexity.CategoryPreference.CategoryID(childComplexity), true
+
+	case "CategoryPreference.score":
+		if e.complexity.CategoryPreference.Score == nil {
+			break
+		}
+
+		return e.complexity.CategoryPreference.Score(childComplexity), true
 
 	case "ChangePasswordPayload.message":
 		if e.complexity.ChangePasswordPayload.Message == nil {
@@ -4946,6 +4979,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Category(childComplexity, args["id"].(string)), true
 
+	case "Query.categoryPreferences":
+		if e.complexity.Query.CategoryPreferences == nil {
+			break
+		}
+
+		args, err := ec.field_Query_categoryPreferences_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CategoryPreferences(childComplexity, args["sessionId"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+
 	case "Query.childCategories":
 		if e.complexity.Query.ChildCategories == nil {
 			break
@@ -5303,6 +5348,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.PushSubscriptions(childComplexity, args["activeOnly"].(*bool)), true
 
+	case "Query.recentlyViewedProducts":
+		if e.complexity.Query.RecentlyViewedProducts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_recentlyViewedProducts_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.RecentlyViewedProducts(childComplexity, args["sessionId"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+
 	case "Query.returnOrder":
 		if e.complexity.Query.ReturnOrder == nil {
 			break
@@ -5602,6 +5659,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RatingImage.URL(childComplexity), true
+
+	case "RecentlyViewedProduct.lastViewedAt":
+		if e.complexity.RecentlyViewedProduct.LastViewedAt == nil {
+			break
+		}
+
+		return e.complexity.RecentlyViewedProduct.LastViewedAt(childComplexity), true
+
+	case "RecentlyViewedProduct.productId":
+		if e.complexity.RecentlyViewedProduct.ProductID == nil {
+			break
+		}
+
+		return e.complexity.RecentlyViewedProduct.ProductID(childComplexity), true
+
+	case "RecentlyViewedProductList.products":
+		if e.complexity.RecentlyViewedProductList.Products == nil {
+			break
+		}
+
+		return e.complexity.RecentlyViewedProductList.Products(childComplexity), true
+
+	case "RecentlyViewedProductList.total":
+		if e.complexity.RecentlyViewedProductList.Total == nil {
+			break
+		}
+
+		return e.complexity.RecentlyViewedProductList.Total(childComplexity), true
 
 	case "RefundPayload.amount":
 		if e.complexity.RefundPayload.Amount == nil {
@@ -7273,10 +7358,26 @@ type CustomerActivity {
 }
 
 
+type RecentlyViewedProduct {
+    productId: ID!
+    lastViewedAt: String!
+}
+
+type RecentlyViewedProductList {
+    products: [RecentlyViewedProduct!]!
+    total: Int!
+}
+
+type CategoryPreference {
+    categoryId: ID!
+    score: Float!
+}
+
 extend type Query {
     customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!
-}
-`, BuiltIn: false},
+    recentlyViewedProducts(sessionId: String, limit: Int, offset: Int): RecentlyViewedProductList!
+    categoryPreferences(sessionId: String, limit: Int, offset: Int): [CategoryPreference!]!
+}`, BuiltIn: false},
 	{Name: "../../../../../contracts/graphql/product/product.graphql", Input: `enum ProductStatus {
   DRAFT
   PENDING_REVIEW
@@ -9991,6 +10092,39 @@ func (ec *executionContext) field_Query_categories_args(ctx context.Context, raw
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_categoryPreferences_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["sessionId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["sessionId"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_category_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -10666,6 +10800,39 @@ func (ec *executionContext) field_Query_pushSubscriptions_args(ctx context.Conte
 		}
 	}
 	args["activeOnly"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_recentlyViewedProducts_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["sessionId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sessionId"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["sessionId"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg2
 	return args, nil
 }
 
@@ -12889,6 +13056,94 @@ func (ec *executionContext) fieldContext_CategoryList_total(_ context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CategoryPreference_categoryId(ctx context.Context, field graphql.CollectedField, obj *model.CategoryPreference) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CategoryPreference_categoryId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CategoryID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CategoryPreference_categoryId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CategoryPreference",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CategoryPreference_score(ctx context.Context, field graphql.CollectedField, obj *model.CategoryPreference) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CategoryPreference_score(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Score, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CategoryPreference_score(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CategoryPreference",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
 		},
 	}
 	return fc, nil
@@ -39352,6 +39607,128 @@ func (ec *executionContext) fieldContext_Query_customerActivities(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_recentlyViewedProducts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_recentlyViewedProducts(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().RecentlyViewedProducts(rctx, fc.Args["sessionId"].(*string), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.RecentlyViewedProductList)
+	fc.Result = res
+	return ec.marshalNRecentlyViewedProductList2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProductList(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_recentlyViewedProducts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "products":
+				return ec.fieldContext_RecentlyViewedProductList_products(ctx, field)
+			case "total":
+				return ec.fieldContext_RecentlyViewedProductList_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RecentlyViewedProductList", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_recentlyViewedProducts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_categoryPreferences(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_categoryPreferences(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CategoryPreferences(rctx, fc.Args["sessionId"].(*string), fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.CategoryPreference)
+	fc.Result = res
+	return ec.marshalNCategoryPreference2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategoryPreferenceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_categoryPreferences(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "categoryId":
+				return ec.fieldContext_CategoryPreference_categoryId(ctx, field)
+			case "score":
+				return ec.fieldContext_CategoryPreference_score(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CategoryPreference", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_categoryPreferences_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_product(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_product(ctx, field)
 	if err != nil {
@@ -42169,6 +42546,188 @@ func (ec *executionContext) fieldContext_RatingImage_createdAt(_ context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentlyViewedProduct_productId(ctx context.Context, field graphql.CollectedField, obj *model.RecentlyViewedProduct) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RecentlyViewedProduct_productId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProductID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RecentlyViewedProduct_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentlyViewedProduct",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentlyViewedProduct_lastViewedAt(ctx context.Context, field graphql.CollectedField, obj *model.RecentlyViewedProduct) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RecentlyViewedProduct_lastViewedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LastViewedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RecentlyViewedProduct_lastViewedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentlyViewedProduct",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentlyViewedProductList_products(ctx context.Context, field graphql.CollectedField, obj *model.RecentlyViewedProductList) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RecentlyViewedProductList_products(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Products, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.RecentlyViewedProduct)
+	fc.Result = res
+	return ec.marshalNRecentlyViewedProduct2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProductᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RecentlyViewedProductList_products(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentlyViewedProductList",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "productId":
+				return ec.fieldContext_RecentlyViewedProduct_productId(ctx, field)
+			case "lastViewedAt":
+				return ec.fieldContext_RecentlyViewedProduct_lastViewedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RecentlyViewedProduct", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentlyViewedProductList_total(ctx context.Context, field graphql.CollectedField, obj *model.RecentlyViewedProductList) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RecentlyViewedProductList_total(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Total, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RecentlyViewedProductList_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentlyViewedProductList",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -52472,6 +53031,50 @@ func (ec *executionContext) _CategoryList(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var categoryPreferenceImplementors = []string{"CategoryPreference"}
+
+func (ec *executionContext) _CategoryPreference(ctx context.Context, sel ast.SelectionSet, obj *model.CategoryPreference) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, categoryPreferenceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CategoryPreference")
+		case "categoryId":
+			out.Values[i] = ec._CategoryPreference_categoryId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "score":
+			out.Values[i] = ec._CategoryPreference_score(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var changePasswordPayloadImplementors = []string{"ChangePasswordPayload"}
 
 func (ec *executionContext) _ChangePasswordPayload(ctx context.Context, sel ast.SelectionSet, obj *model.ChangePasswordPayload) graphql.Marshaler {
@@ -56607,6 +57210,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "recentlyViewedProducts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_recentlyViewedProducts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "categoryPreferences":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_categoryPreferences(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "product":
 			field := field
 
@@ -57195,6 +57842,94 @@ func (ec *executionContext) _RatingImage(ctx context.Context, sel ast.SelectionS
 			}
 		case "createdAt":
 			out.Values[i] = ec._RatingImage_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var recentlyViewedProductImplementors = []string{"RecentlyViewedProduct"}
+
+func (ec *executionContext) _RecentlyViewedProduct(ctx context.Context, sel ast.SelectionSet, obj *model.RecentlyViewedProduct) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, recentlyViewedProductImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RecentlyViewedProduct")
+		case "productId":
+			out.Values[i] = ec._RecentlyViewedProduct_productId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastViewedAt":
+			out.Values[i] = ec._RecentlyViewedProduct_lastViewedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var recentlyViewedProductListImplementors = []string{"RecentlyViewedProductList"}
+
+func (ec *executionContext) _RecentlyViewedProductList(ctx context.Context, sel ast.SelectionSet, obj *model.RecentlyViewedProductList) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, recentlyViewedProductListImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RecentlyViewedProductList")
+		case "products":
+			out.Values[i] = ec._RecentlyViewedProductList_products(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total":
+			out.Values[i] = ec._RecentlyViewedProductList_total(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -58802,6 +59537,60 @@ func (ec *executionContext) marshalNCategoryList2ᚖgithubᚗcomᚋmareesᚑgode
 	return ec._CategoryList(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNCategoryPreference2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategoryPreferenceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CategoryPreference) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCategoryPreference2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategoryPreference(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCategoryPreference2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCategoryPreference(ctx context.Context, sel ast.SelectionSet, v *model.CategoryPreference) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CategoryPreference(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNChangePasswordInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐChangePasswordInput(ctx context.Context, v interface{}) (model.ChangePasswordInput, error) {
 	res, err := ec.unmarshalInputChangePasswordInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -60265,6 +61054,74 @@ func (ec *executionContext) marshalNRatingImage2ᚖgithubᚗcomᚋmareesᚑgodev
 		return graphql.Null
 	}
 	return ec._RatingImage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRecentlyViewedProduct2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProductᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RecentlyViewedProduct) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRecentlyViewedProduct2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProduct(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRecentlyViewedProduct2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProduct(ctx context.Context, sel ast.SelectionSet, v *model.RecentlyViewedProduct) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RecentlyViewedProduct(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRecentlyViewedProductList2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProductList(ctx context.Context, sel ast.SelectionSet, v model.RecentlyViewedProductList) graphql.Marshaler {
+	return ec._RecentlyViewedProductList(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRecentlyViewedProductList2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRecentlyViewedProductList(ctx context.Context, sel ast.SelectionSet, v *model.RecentlyViewedProductList) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RecentlyViewedProductList(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNRefreshTokenInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRefreshTokenInput(ctx context.Context, v interface{}) (model.RefreshTokenInput, error) {
