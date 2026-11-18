@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"encoding/json"
+
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
-	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -611,12 +612,12 @@ func (s *orderService) GetOrder(ctx context.Context, id string, userID ...string
 	}
 
 	// 2. If caller is an ADMIN, allow viewing any order.
-	if callerRole == "ADMIN" || callerRole == auth.RoleAdmin {
+	if callerRole == auth.RoleAdmin {
 		return order, nil
 	}
 
 	// 3. If caller is a MERCHANT, only allow if this order belongs to one of the merchant's stores / items.
-	if callerRole == "MERCHANT" || callerRole == auth.RoleMerchant {
+	if callerRole == auth.RoleMerchant {
 		if order.StoreID != "" && order.StoreID == callerUserID {
 			return order, nil
 		}
