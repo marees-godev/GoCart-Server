@@ -83,6 +83,55 @@ func (h *PersonalizationGRPCHandler) GetCustomerActivities(ctx context.Context, 
 	}, nil
 }
 
+func (h *PersonalizationGRPCHandler) GetRecentlyViewedProducts(ctx context.Context, req *personalizationpb.GetRecentlyViewedProductsRequest) (*personalizationpb.GetRecentlyViewedProductsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	items, total, err := h.svc.GetRecentlyViewedProducts(ctx, req.GetUserId(), req.GetSessionId(), int(req.GetLimit()), int(req.GetOffset()))
+	if err != nil {
+		h.log.ErrorContext(ctx, "Failed to get recently viewed products", "error", err)
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	respItems := make([]*personalizationpb.RecentlyViewedProduct, len(items))
+	for i, item := range items {
+		respItems[i] = &personalizationpb.RecentlyViewedProduct{
+			ProductId:    item.ProductID,
+			LastViewedAt: item.LastViewedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return &personalizationpb.GetRecentlyViewedProductsResponse{
+		Products: respItems,
+		Total:    int32(total),
+	}, nil
+}
+
+func (h *PersonalizationGRPCHandler) GetCategoryPreferences(ctx context.Context, req *personalizationpb.GetCategoryPreferenceRequest) (*personalizationpb.GetCategoryPreferenceResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
+	}
+
+	items, err := h.svc.GetCategoryPreference(ctx, req.GetUserId(), req.GetSessionId(), int(req.GetLimit()), int(req.GetOffset()))
+	if err != nil {
+		h.log.ErrorContext(ctx, "Failed to get category preferences", "error", err)
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	respItems := make([]*personalizationpb.CategoryPreference, len(items))
+	for i, item := range items {
+		respItems[i] = &personalizationpb.CategoryPreference{
+			CategoryId: item.CategoryID,
+			Score:      item.Score,
+		}
+	}
+
+	return &personalizationpb.GetCategoryPreferenceResponse{
+		Preferences: respItems,
+	}, nil
+}
+
 func mapProtoToEventType(pbType personalizationpb.ActivityEventType) (string, error) {
 	switch pbType {
 	case personalizationpb.ActivityEventType_ACTIVITY_EVENT_TYPE_PRODUCT_VIEWED:
