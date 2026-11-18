@@ -316,6 +316,7 @@ func TestNotificationPipeline_CorrelationIDAndJobStructure(t *testing.T) {
 
 	if job == nil {
 		t.Fatalf("expected non-nil job")
+		return
 	}
 	if job.CorrelationID != "req-correlation-999" {
 		t.Errorf("expected correlation ID 'req-correlation-999', got: %s", job.CorrelationID)
