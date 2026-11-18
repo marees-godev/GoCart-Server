@@ -281,4 +281,3 @@ func (r *Resolver) notifyDeliveryStatusUpdated(ctx context.Context, delivery *mo
 		}
 	}()
 }
-

@@ -10,6 +10,7 @@ import (
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -61,12 +62,19 @@ func (r *mutationResolver) AddToCart(ctx context.Context, input model.AddToCartI
 
 // RemoveFromCart is the resolver for the removeFromCart field.
 func (r *mutationResolver) RemoveFromCart(ctx context.Context, userID *string, productID string) (*model.Cart, error) {
-	uid := getAuthUserIDFromCtx(ctx)
-	if userID != nil && *userID != "" {
-		uid = *userID
-	}
-	if uid == "" {
+	authUID := getAuthUserIDFromCtx(ctx)
+	if authUID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	uid := authUID
+	if userID != nil && *userID != "" {
+		if !isAdmin && *userID != authUID {
+			return nil, appErrors.Forbidden("cannot access another user's cart")
+		}
+		uid = *userID
 	}
 	if productID == "" {
 		return nil, appErrors.BadRequest("product_id is required")
@@ -90,12 +98,19 @@ func (r *mutationResolver) RemoveFromCart(ctx context.Context, userID *string, p
 
 // ClearCart is the resolver for the clearCart field.
 func (r *mutationResolver) ClearCart(ctx context.Context, userID *string) (bool, error) {
-	uid := getAuthUserIDFromCtx(ctx)
-	if userID != nil && *userID != "" {
-		uid = *userID
-	}
-	if uid == "" {
+	authUID := getAuthUserIDFromCtx(ctx)
+	if authUID == "" {
 		return false, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	uid := authUID
+	if userID != nil && *userID != "" {
+		if !isAdmin && *userID != authUID {
+			return false, appErrors.Forbidden("cannot access another user's cart")
+		}
+		uid = *userID
 	}
 
 	cartClient, err := r.getCartClient()
@@ -115,12 +130,19 @@ func (r *mutationResolver) ClearCart(ctx context.Context, userID *string) (bool,
 
 // Cart is the resolver for the cart field.
 func (r *queryResolver) Cart(ctx context.Context, userID *string) (*model.Cart, error) {
-	uid := getAuthUserIDFromCtx(ctx)
-	if userID != nil && *userID != "" {
-		uid = *userID
-	}
-	if uid == "" {
+	authUID := getAuthUserIDFromCtx(ctx)
+	if authUID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	uid := authUID
+	if userID != nil && *userID != "" {
+		if !isAdmin && *userID != authUID {
+			return nil, appErrors.Forbidden("cannot access another user's cart")
+		}
+		uid = *userID
 	}
 
 	cartClient, err := r.getCartClient()

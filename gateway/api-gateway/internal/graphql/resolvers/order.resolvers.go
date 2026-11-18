@@ -27,12 +27,19 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		return nil, err
 	}
 
-	userID := getAuthUserIDFromCtx(ctx)
-	if userID == "" && input.UserID != nil {
-		userID = *input.UserID
-	}
-	if userID == "" {
+	authUID := getAuthUserIDFromCtx(ctx)
+	if authUID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	userID := authUID
+	if input.UserID != nil && *input.UserID != "" {
+		if !isAdmin && *input.UserID != authUID {
+			return nil, appErrors.Forbidden("cannot create order for another user")
+		}
+		userID = *input.UserID
 	}
 
 	cartID := ""
@@ -311,14 +318,14 @@ func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, o
 	}
 
 	authUserID := getAuthUserIDFromCtx(ctx)
-	userCtx, _ := auth.UserFromContext(ctx)
-	if userCtx == nil || (userCtx.Role != auth.RoleAdmin && userCtx.Role != "ADMIN") {
-		if authUserID != "" {
-			userID = authUserID
-		}
-	}
-	if userID == "" {
+	if authUserID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == auth.RoleAdmin || strings.EqualFold(userCtx.Role, "ADMIN"))
+	if !isAdmin && userID != authUserID {
+		return nil, appErrors.Forbidden("cannot access orders of another user")
 	}
 
 	var l, o int32

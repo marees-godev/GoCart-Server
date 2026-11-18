@@ -451,6 +451,7 @@ func TestNotificationConsumer_AllRequiredDomainEvents(t *testing.T) {
 			}
 			if job == nil {
 				t.Fatalf("expected job to be created for event %s, but got nil", tc.eventType)
+				return
 			}
 
 			if job.Recipient != tc.expectedRecipient {
@@ -593,6 +594,7 @@ func TestNotificationConsumer_UserPreferenceOptOut(t *testing.T) {
 	job, err := repo.GetJobByEventID(ctx, env.EventID)
 	if err != nil || job == nil {
 		t.Fatalf("expected job record with OPTED_OUT status, got: %v", err)
+		return
 	}
 
 	if job.Status != model.JobStatusOptedOut {
@@ -698,6 +700,7 @@ func TestNotificationConsumer_NonUUIDUserID_SafeHandling(t *testing.T) {
 	job, err := repo.GetJobByEventID(ctx, env.EventID)
 	if err != nil || job == nil {
 		t.Fatalf("expected job to be created, got error: %v", err)
+		return
 	}
 
 	if job.UserID != nil {

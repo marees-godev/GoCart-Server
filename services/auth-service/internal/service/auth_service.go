@@ -367,9 +367,8 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		if merchantID == "" {
 			merchantID = cred.UserID.String()
 		}
-	case model.RoleUser:
-		customerID = cred.UserID.String()
 	}
+	customerID = cred.UserID.String()
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID:     cred.UserID.String(),
@@ -524,6 +523,41 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	var topic string
 	var eventPayload []byte
 
+	// Create base user record in user service for ALL roles so that common platform functionality
+	// (profile management, address management, checkout, orders) is available without separate customer accounts.
+	if s.userClient != nil {
+		uFirstName := firstName
+		uLastName := lastName
+		if role == model.RoleDeliveryPartner {
+			if uFirstName == "" {
+				uFirstName = "Delivery"
+			}
+			if uLastName == "" {
+				uLastName = "Partner"
+			}
+		}
+		_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Id:        userID.String(),
+			Email:     cred.Email,
+			FirstName: uFirstName,
+			LastName:  uLastName,
+		})
+		if err != nil {
+			_ = s.repo.DeleteCredential(ctx, credID)
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
+				case codes.AlreadyExists:
+					return nil, appErrors.Conflict("user with this email already exists")
+				case codes.InvalidArgument:
+					return nil, appErrors.BadRequest(st.Message())
+				}
+			}
+			return nil, appErrors.Internal(err, "failed to create user record in user service")
+		}
+	}
+
+	customerID = userID.String()
+
 	switch role {
 	case model.RoleMerchant:
 		mClient := s.merchantClient
@@ -533,6 +567,9 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			if err != nil {
 				s.logger.Error("Failed to connect to merchant service", "error", err)
 				_ = s.repo.DeleteCredential(ctx, credID)
+				if s.userClient != nil {
+					_, _ = s.userClient.DeleteUser(ctx, &userpb.DeleteUserRequest{Id: userID.String()})
+				}
 				return nil, appErrors.Internal(err, "failed to connect to merchant service")
 			}
 			s.merchantClient = mClient
@@ -560,6 +597,9 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			if err != nil {
 				s.logger.Error("Failed to create merchant profile in merchant service", "user_id", userID.String(), "error", err)
 				_ = s.repo.DeleteCredential(ctx, credID)
+				if s.userClient != nil {
+					_, _ = s.userClient.DeleteUser(ctx, &userpb.DeleteUserRequest{Id: userID.String()})
+				}
 				return nil, appErrors.Internal(err, "failed to create merchant profile")
 			}
 			if mResp != nil && mResp.Merchant != nil {
@@ -629,28 +669,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		}
 
 	default: // RoleUser / CUSTOMER
-		if s.userClient != nil {
-			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-				Id:        userID.String(),
-				Email:     cred.Email,
-				FirstName: firstName,
-				LastName:  lastName,
-			})
-			if err != nil {
-				_ = s.repo.DeleteCredential(ctx, credID)
-				if st, ok := status.FromError(err); ok {
-					switch st.Code() {
-					case codes.AlreadyExists:
-						return nil, appErrors.Conflict("user with this email already exists")
-					case codes.InvalidArgument:
-						return nil, appErrors.BadRequest(st.Message())
-					}
-				}
-				return nil, appErrors.Internal(err, "failed to create user record in user service")
-			}
-		}
-
-		customerID = userID.String()
 		eventType = "UserRegistered"
 		topic = "auth.user.registered"
 		eventPayload, _ = json.Marshal(map[string]any{
@@ -928,31 +946,43 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 		merchantCreated := false
 		rollbackReason := "compensating rollback: auth credential creation failed"
 
+		if s.userClient == nil {
+			s.logger.Error("OAuth auth signup failed: user service client unavailable", "provider", providerName)
+			return nil, appErrors.ServiceUnavailable("user service unavailable")
+		}
+		uFirstName := firstName
+		uLastName := lastName
+		if role == model.RoleDeliveryPartner {
+			if uFirstName == "" {
+				uFirstName = "Delivery"
+			}
+			if uLastName == "" {
+				uLastName = "Partner"
+			}
+		}
+		_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Id:        userID.String(),
+			Email:     email,
+			FirstName: uFirstName,
+			LastName:  uLastName,
+		})
+		if err != nil {
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
+				case codes.AlreadyExists:
+					return nil, appErrors.Conflict("user with this email already exists")
+				case codes.InvalidArgument:
+					return nil, appErrors.BadRequest(st.Message())
+				}
+			}
+			s.logger.Error("Failed to create user profile in user service", "error", err)
+			return nil, appErrors.Internal(err, "failed to create user profile")
+		}
+		userCreated = true
+
 		switch role {
 		case model.RoleUser:
-			if s.userClient == nil {
-				s.logger.Error("OAuth auth signup failed: user service client unavailable", "provider", providerName)
-				return nil, appErrors.ServiceUnavailable("user service unavailable")
-			}
-			_, err = s.userClient.CreateUser(ctx, &userpb.CreateUserRequest{
-				Id:        userID.String(),
-				Email:     email,
-				FirstName: firstName,
-				LastName:  lastName,
-			})
-			if err != nil {
-				if st, ok := status.FromError(err); ok {
-					switch st.Code() {
-					case codes.AlreadyExists:
-						return nil, appErrors.Conflict("user with this email already exists")
-					case codes.InvalidArgument:
-						return nil, appErrors.BadRequest(st.Message())
-					}
-				}
-				s.logger.Error("Failed to create user profile in user service", "error", err)
-				return nil, appErrors.Internal(err, "failed to create user profile")
-			}
-			userCreated = true
+			// Base user profile is created above for all roles
 
 		case model.RoleDeliveryPartner:
 			dClient := s.deliveryClient
@@ -1107,7 +1137,7 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 
 		firstName = params.FirstName
 		lastName = params.LastName
-		if s.userClient != nil && cred.Role == model.RoleUser {
+		if s.userClient != nil {
 			uResp, uErr := s.userClient.GetUser(ctx, &userpb.GetUserRequest{Id: userID.String()})
 			if uErr == nil && uResp != nil && uResp.User != nil {
 				if uResp.User.FirstName != "" {
@@ -1133,9 +1163,8 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 	case model.RoleMerchant:
 		merchantID = userID.String()
 		businessEmail = cred.Email
-	default:
-		customerID = userID.String()
 	}
+	customerID = userID.String()
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID:     userID.String(),
@@ -1321,9 +1350,8 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		partnerID = cred.UserID.String()
 	case model.RoleMerchant:
 		merchantID = cred.UserID.String()
-	case model.RoleUser:
-		customerID = cred.UserID.String()
 	}
+	customerID = cred.UserID.String()
 
 	accessToken, err := auth.GenerateToken(auth.UserContext{
 		UserID:     cred.UserID.String(),
