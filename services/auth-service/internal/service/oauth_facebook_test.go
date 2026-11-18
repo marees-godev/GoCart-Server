@@ -117,6 +117,7 @@ func TestFacebookRegister_Merchant_Success(t *testing.T) {
 		JWT: config.JWTConfig{Secret: "test-secret-key-12345", ExpiryMinutes: 15},
 	}
 	mockMerchantClient := &mockMerchantClient{}
+	mockUserClient := &mockUserServiceClient{}
 	verifier := &mockFacebookVerifier{
 		payload: &FacebookTokenPayload{
 			UserID:        "fb-merchant-1",
@@ -127,7 +128,7 @@ func TestFacebookRegister_Merchant_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mockRepo, cfg, nil, mockMerchantClient, verifier)
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, mockMerchantClient, verifier)
 
 	resp, err := svc.FacebookRegister(context.Background(), &dto.FacebookAuthRequest{
 		AccessToken: "valid-fb-token",
@@ -162,6 +163,7 @@ func TestFacebookRegister_DeliveryPartner_Success(t *testing.T) {
 		JWT: config.JWTConfig{Secret: "test-secret-key-12345", ExpiryMinutes: 15},
 	}
 	mockDeliveryClient := &mockDeliveryServiceClientForOAuth{}
+	mockUserClient := &mockUserServiceClient{}
 	verifier := &mockFacebookVerifier{
 		payload: &FacebookTokenPayload{
 			UserID:        "fb-partner-1",
@@ -172,7 +174,7 @@ func TestFacebookRegister_DeliveryPartner_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewAuthService(mockRepo, cfg, nil, mockDeliveryClient, verifier)
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, mockDeliveryClient, verifier)
 
 	resp, err := svc.FacebookRegister(context.Background(), &dto.FacebookAuthRequest{
 		AccessToken: "valid-fb-token",
@@ -390,6 +392,7 @@ func TestFacebookRegister_RollsBackDeliveryPartnerOnCredentialFailure(t *testing
 	mockRepo.createCredWithOAuthErr = errors.New("db failure")
 	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret-key-12345"}}
 	mockDeliveryClient := &mockDeliveryServiceClientForOAuth{}
+	mockUserClient := &mockUserServiceClient{}
 	verifier := &mockFacebookVerifier{
 		payload: &FacebookTokenPayload{
 			UserID:        "fb-rollback-partner",
@@ -398,7 +401,7 @@ func TestFacebookRegister_RollsBackDeliveryPartnerOnCredentialFailure(t *testing
 		},
 	}
 
-	svc := NewAuthService(mockRepo, cfg, nil, mockDeliveryClient, verifier)
+	svc := NewAuthService(mockRepo, cfg, nil, mockUserClient, mockDeliveryClient, verifier)
 
 	_, err := svc.FacebookRegister(context.Background(), &dto.FacebookAuthRequest{
 		AccessToken: "valid-token",
@@ -413,5 +416,11 @@ func TestFacebookRegister_RollsBackDeliveryPartnerOnCredentialFailure(t *testing
 	}
 	if len(mockDeliveryClient.deletedProfiles) != 1 {
 		t.Fatalf("expected 1 compensating delivery profile deletion call, got %d", len(mockDeliveryClient.deletedProfiles))
+	}
+	if len(mockUserClient.createdUsers) != 1 {
+		t.Fatalf("expected 1 user profile creation attempt")
+	}
+	if len(mockUserClient.deletedUsers) != 1 {
+		t.Fatalf("expected 1 compensating user profile deletion call, got %d", len(mockUserClient.deletedUsers))
 	}
 }
