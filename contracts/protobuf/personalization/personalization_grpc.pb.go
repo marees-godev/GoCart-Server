@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PersonalizationService_TrackActivity_FullMethodName         = "/personalization.PersonalizationService/TrackActivity"
-	PersonalizationService_GetCustomerActivities_FullMethodName = "/personalization.PersonalizationService/GetCustomerActivities"
+	PersonalizationService_TrackActivity_FullMethodName             = "/personalization.PersonalizationService/TrackActivity"
+	PersonalizationService_GetCustomerActivities_FullMethodName     = "/personalization.PersonalizationService/GetCustomerActivities"
+	PersonalizationService_GetRecentlyViewedProducts_FullMethodName = "/personalization.PersonalizationService/GetRecentlyViewedProducts"
+	PersonalizationService_GetCategoryPreferences_FullMethodName    = "/personalization.PersonalizationService/GetCategoryPreferences"
 )
 
 // PersonalizationServiceClient is the client API for PersonalizationService service.
@@ -29,6 +31,8 @@ const (
 type PersonalizationServiceClient interface {
 	TrackActivity(ctx context.Context, in *TrackActivityRequest, opts ...grpc.CallOption) (*TrackActivityResponse, error)
 	GetCustomerActivities(ctx context.Context, in *GetCustomerActivitiesRequest, opts ...grpc.CallOption) (*GetCustomerActivitiesResponse, error)
+	GetRecentlyViewedProducts(ctx context.Context, in *GetRecentlyViewedProductsRequest, opts ...grpc.CallOption) (*GetRecentlyViewedProductsResponse, error)
+	GetCategoryPreferences(ctx context.Context, in *GetCategoryPreferenceRequest, opts ...grpc.CallOption) (*GetCategoryPreferenceResponse, error)
 }
 
 type personalizationServiceClient struct {
@@ -59,12 +63,34 @@ func (c *personalizationServiceClient) GetCustomerActivities(ctx context.Context
 	return out, nil
 }
 
+func (c *personalizationServiceClient) GetRecentlyViewedProducts(ctx context.Context, in *GetRecentlyViewedProductsRequest, opts ...grpc.CallOption) (*GetRecentlyViewedProductsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRecentlyViewedProductsResponse)
+	err := c.cc.Invoke(ctx, PersonalizationService_GetRecentlyViewedProducts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *personalizationServiceClient) GetCategoryPreferences(ctx context.Context, in *GetCategoryPreferenceRequest, opts ...grpc.CallOption) (*GetCategoryPreferenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCategoryPreferenceResponse)
+	err := c.cc.Invoke(ctx, PersonalizationService_GetCategoryPreferences_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PersonalizationServiceServer is the server API for PersonalizationService service.
 // All implementations must embed UnimplementedPersonalizationServiceServer
 // for forward compatibility.
 type PersonalizationServiceServer interface {
 	TrackActivity(context.Context, *TrackActivityRequest) (*TrackActivityResponse, error)
 	GetCustomerActivities(context.Context, *GetCustomerActivitiesRequest) (*GetCustomerActivitiesResponse, error)
+	GetRecentlyViewedProducts(context.Context, *GetRecentlyViewedProductsRequest) (*GetRecentlyViewedProductsResponse, error)
+	GetCategoryPreferences(context.Context, *GetCategoryPreferenceRequest) (*GetCategoryPreferenceResponse, error)
 	mustEmbedUnimplementedPersonalizationServiceServer()
 }
 
@@ -80,6 +106,12 @@ func (UnimplementedPersonalizationServiceServer) TrackActivity(context.Context, 
 }
 func (UnimplementedPersonalizationServiceServer) GetCustomerActivities(context.Context, *GetCustomerActivitiesRequest) (*GetCustomerActivitiesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCustomerActivities not implemented")
+}
+func (UnimplementedPersonalizationServiceServer) GetRecentlyViewedProducts(context.Context, *GetRecentlyViewedProductsRequest) (*GetRecentlyViewedProductsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRecentlyViewedProducts not implemented")
+}
+func (UnimplementedPersonalizationServiceServer) GetCategoryPreferences(context.Context, *GetCategoryPreferenceRequest) (*GetCategoryPreferenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCategoryPreferences not implemented")
 }
 func (UnimplementedPersonalizationServiceServer) mustEmbedUnimplementedPersonalizationServiceServer() {
 }
@@ -139,6 +171,42 @@ func _PersonalizationService_GetCustomerActivities_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PersonalizationService_GetRecentlyViewedProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRecentlyViewedProductsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PersonalizationServiceServer).GetRecentlyViewedProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PersonalizationService_GetRecentlyViewedProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PersonalizationServiceServer).GetRecentlyViewedProducts(ctx, req.(*GetRecentlyViewedProductsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PersonalizationService_GetCategoryPreferences_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCategoryPreferenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PersonalizationServiceServer).GetCategoryPreferences(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PersonalizationService_GetCategoryPreferences_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PersonalizationServiceServer).GetCategoryPreferences(ctx, req.(*GetCategoryPreferenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PersonalizationService_ServiceDesc is the grpc.ServiceDesc for PersonalizationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -153,6 +221,14 @@ var PersonalizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCustomerActivities",
 			Handler:    _PersonalizationService_GetCustomerActivities_Handler,
+		},
+		{
+			MethodName: "GetRecentlyViewedProducts",
+			Handler:    _PersonalizationService_GetRecentlyViewedProducts_Handler,
+		},
+		{
+			MethodName: "GetCategoryPreferences",
+			Handler:    _PersonalizationService_GetCategoryPreferences_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

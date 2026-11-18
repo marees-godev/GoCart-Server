@@ -19,6 +19,23 @@ type CustomerActivity {
 }
 
 
+type RecentlyViewedProduct {
+    productId: ID!
+    lastViewedAt: String!
+}
+
+type RecentlyViewedProductList {
+    products: [RecentlyViewedProduct!]!
+    total: Int!
+}
+
+type CategoryPreference {
+    categoryId: ID!
+    score: Float!
+}
+
 extend type Query {
     customerActivities(sessionId: String, limit: Int, offset: Int): [CustomerActivity!]!
+    recentlyViewedProducts(sessionId: String, limit: Int, offset: Int): RecentlyViewedProductList!
+    categoryPreferences(sessionId: String, limit: Int, offset: Int): [CategoryPreference!]!
 }
