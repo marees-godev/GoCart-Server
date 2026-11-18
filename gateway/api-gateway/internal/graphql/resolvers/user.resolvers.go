@@ -91,6 +91,10 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		AvatarFilename:    avatarFilename,
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
+	if err != nil && status.Code(err) == codes.NotFound {
+		r.ensureUserProfileExists(ctx, id)
+		res, err = r.Clients.UserClient.UpdateUser(ctx, req)
+	}
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
@@ -232,6 +236,10 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	}
 
 	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
+	if err != nil {
+		r.ensureUserProfileExists(ctx, userID)
+		res, err = r.Clients.UserClient.CreateUserAddress(ctx, req)
+	}
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
@@ -502,6 +510,17 @@ func (r *queryResolver) UserAddresses(ctx context.Context, userID string) ([]*mo
 	}
 	if userID == "" {
 		return nil, appErrors.BadRequest("user id is required")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	if !isAdmin && authID != userID {
+		return nil, appErrors.Forbidden("cannot access addresses of another user")
 	}
 
 	res, err := r.Clients.UserClient.ListUserAddresses(ctx, &userpb.ListUserAddressesRequest{UserId: userID})

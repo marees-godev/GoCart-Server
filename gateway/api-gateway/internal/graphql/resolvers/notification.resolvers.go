@@ -141,10 +141,18 @@ func (r *mutationResolver) UpdatePushSubscription(ctx context.Context, input mod
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
+	var idStr, endStr string
+	if input.ID != nil {
+		idStr = *input.ID
+	}
+	if input.Endpoint != nil {
+		endStr = *input.Endpoint
+	}
+
 	resp, err := client.UpdatePushSubscription(ctx, &notificationpb.UpdatePushSubscriptionRequest{
-		Id:         stringValueOrEmpty(input.ID),
+		Id:         idStr,
 		UserId:     authUserID,
-		Endpoint:   stringValueOrEmpty(input.Endpoint),
+		Endpoint:   endStr,
 		P256Dh:     stringValueOrEmpty(input.P256dh),
 		Auth:       stringValueOrEmpty(input.Auth),
 		UserAgent:  stringValueOrEmpty(input.UserAgent),

@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"encoding/json"
+
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
-	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -597,16 +598,37 @@ func (s *orderService) GetOrder(ctx context.Context, id string, userID ...string
 		if callerUserID == "" {
 			callerUserID = userCtx.UserID
 		}
-		callerRole = userCtx.Role
+		callerRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	}
 
-	if callerRole != "ADMIN" && callerRole != auth.RoleAdmin && callerRole != "DELIVERY_PARTNER" && callerRole != auth.RoleDeliveryPartner && callerRole != "MERCHANT" && callerRole != auth.RoleMerchant {
-		if callerUserID != "" && order.UserID != callerUserID {
-			return nil, appErrors.Forbidden("you do not have permission to view this order")
+	// If no caller identity context is provided, allow internal service query.
+	if callerUserID == "" && callerRole == "" {
+		return order, nil
+	}
+
+	// 1. If caller is the user who placed the order, allow access regardless of role (CUSTOMER, MERCHANT, DELIVERY_PARTNER).
+	if callerUserID != "" && order.UserID == callerUserID {
+		return order, nil
+	}
+
+	// 2. If caller is an ADMIN, allow viewing any order.
+	if callerRole == auth.RoleAdmin {
+		return order, nil
+	}
+
+	// 3. If caller is a MERCHANT, only allow if this order belongs to one of the merchant's stores / items.
+	if callerRole == auth.RoleMerchant {
+		if order.StoreID != "" && order.StoreID == callerUserID {
+			return order, nil
+		}
+		for _, it := range order.Items {
+			if it.StoreID != "" && it.StoreID == callerUserID {
+				return order, nil
+			}
 		}
 	}
 
-	return order, nil
+	return nil, appErrors.Forbidden("you do not have permission to view this order")
 }
 
 func (s *orderService) ListOrders(ctx context.Context, input dto.ListOrdersInput) (*dto.ListOrdersResult, error) {
