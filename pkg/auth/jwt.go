@@ -62,10 +62,11 @@ func GenerateToken(user UserContext, secret string, ttl time.Duration) (string, 
 		if merchantID == "" {
 			merchantID = user.UserID
 		}
-	case "USER", "CUSTOMER":
-		if customerID == "" {
-			customerID = user.UserID
-		}
+	}
+
+	// All users can participate in common platform functionality (shopping, checkout, orders, addresses)
+	if customerID == "" && user.UserID != "" {
+		customerID = user.UserID
 	}
 
 	now := time.Now()
