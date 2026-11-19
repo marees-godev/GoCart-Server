@@ -16,20 +16,13 @@ import (
 
 type mockUserAddressClient struct {
 	userpb.UserServiceClient
-	users               map[string]*userpb.User
-	addresses           map[string][]*userpb.Address
-	createAddressHook   func(ctx context.Context, in *userpb.CreateUserAddressRequest) (*userpb.CreateUserAddressResponse, error)
-	updateAddressHook   func(ctx context.Context, in *userpb.UpdateUserAddressRequest) (*userpb.UpdateUserAddressResponse, error)
-	deleteAddressHook   func(ctx context.Context, in *userpb.DeleteUserAddressRequest) (*userpb.DeleteUserAddressResponse, error)
-	setDefaultHook      func(ctx context.Context, in *userpb.SetDefaultUserAddressRequest) (*userpb.SetDefaultUserAddressResponse, error)
-	getAddressHook      func(ctx context.Context, in *userpb.GetUserAddressRequest) (*userpb.GetUserAddressResponse, error)
-	listAddressesHook   func(ctx context.Context, in *userpb.ListUserAddressesRequest) (*userpb.ListUserAddressesResponse, error)
+	users             map[string]*userpb.User
+	createAddressHook func(ctx context.Context, in *userpb.CreateUserAddressRequest) (*userpb.CreateUserAddressResponse, error)
 }
 
 func newMockUserAddressClient() *mockUserAddressClient {
 	return &mockUserAddressClient{
-		users:     make(map[string]*userpb.User),
-		addresses: make(map[string][]*userpb.Address),
+		users: make(map[string]*userpb.User),
 	}
 }
 
@@ -73,27 +66,7 @@ func (m *mockUserAddressClient) CreateUserAddress(ctx context.Context, in *userp
 		CreatedAt:    "2026-11-19T10:00:00Z",
 		UpdatedAt:    "2026-11-19T10:00:00Z",
 	}
-	m.addresses[in.UserId] = append(m.addresses[in.UserId], addr)
 	return &userpb.CreateUserAddressResponse{Address: addr}, nil
-}
-
-func (m *mockUserAddressClient) ListUserAddresses(ctx context.Context, in *userpb.ListUserAddressesRequest, opts ...grpcPkg.CallOption) (*userpb.ListUserAddressesResponse, error) {
-	if m.listAddressesHook != nil {
-		return m.listAddressesHook(ctx, in)
-	}
-	return &userpb.ListUserAddressesResponse{Addresses: m.addresses[in.UserId]}, nil
-}
-
-func (m *mockUserAddressClient) GetUserAddress(ctx context.Context, in *userpb.GetUserAddressRequest, opts ...grpcPkg.CallOption) (*userpb.GetUserAddressResponse, error) {
-	if m.getAddressHook != nil {
-		return m.getAddressHook(ctx, in)
-	}
-	for _, a := range m.addresses[in.UserId] {
-		if a.Id == in.AddressId {
-			return &userpb.GetUserAddressResponse{Address: a}, nil
-		}
-	}
-	return nil, status.Error(codes.NotFound, "address not found")
 }
 
 func TestCreateUserAddress_Success(t *testing.T) {
