@@ -450,7 +450,7 @@ type ComplexityRoot struct {
 		CreateRating                   func(childComplexity int, input model.CreateRatingInput) int
 		CreateRefund                   func(childComplexity int, paymentID string, amount float64, reason *string, idempotencyKey *string) int
 		CreateStore                    func(childComplexity int, input model.CreateStoreInput) int
-		CreateUserAddress              func(childComplexity int, userID string, input model.CreateAddressInput) int
+		CreateUserAddress              func(childComplexity int, input model.CreateAddressInput) int
 		CreateWarehouse                func(childComplexity int, input model.CreateWarehouseInput) int
 		DeactivateAccount              func(childComplexity int, input *model.DeactivateAccountInput) int
 		DeactivateDeliveryPartner      func(childComplexity int, reason string) int
@@ -1045,7 +1045,7 @@ type MutationResolver interface {
 	DeactivateAccount(ctx context.Context, input *model.DeactivateAccountInput) (*model.AccountActionResponse, error)
 	ReactivateAccount(ctx context.Context) (*model.AccountActionResponse, error)
 	DeleteAccount(ctx context.Context, input *model.DeleteAccountInput) (*model.AccountActionResponse, error)
-	CreateUserAddress(ctx context.Context, userID string, input model.CreateAddressInput) (*model.Address, error)
+	CreateUserAddress(ctx context.Context, input model.CreateAddressInput) (*model.Address, error)
 	UpdateUserAddress(ctx context.Context, id string, input model.UpdateAddressInput) (*model.Address, error)
 	DeleteUserAddress(ctx context.Context, id string) (bool, error)
 	SetDefaultUserAddress(ctx context.Context, id string) (*model.Address, error)
@@ -3165,7 +3165,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateUserAddress(childComplexity, args["userId"].(string), args["input"].(model.CreateAddressInput)), true
+		return e.complexity.Mutation.CreateUserAddress(childComplexity, args["input"].(model.CreateAddressInput)), true
 
 	case "Mutation.createWarehouse":
 		if e.complexity.Mutation.CreateWarehouse == nil {
@@ -8192,7 +8192,7 @@ extend type Mutation {
   deactivateAccount(input: DeactivateAccountInput): AccountActionResponse! @auth
   reactivateAccount: AccountActionResponse! @auth
   deleteAccount(input: DeleteAccountInput): AccountActionResponse! @auth
-  createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
+  createUserAddress(input: CreateAddressInput!): Address @auth
   updateUserAddress(id: ID!, input: UpdateAddressInput!): Address @auth
   deleteUserAddress(id: ID!): Boolean! @auth
   setDefaultUserAddress(id: ID!): Address @auth
@@ -8665,24 +8665,15 @@ func (ec *executionContext) field_Mutation_createStore_args(ctx context.Context,
 func (ec *executionContext) field_Mutation_createUserAddress_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["userId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["userId"] = arg0
-	var arg1 model.CreateAddressInput
+	var arg0 model.CreateAddressInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg1, err = ec.unmarshalNCreateAddressInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateAddressInput(ctx, tmp)
+		arg0, err = ec.unmarshalNCreateAddressInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐCreateAddressInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["input"] = arg1
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -31016,7 +31007,7 @@ func (ec *executionContext) _Mutation_createUserAddress(ctx context.Context, fie
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().CreateUserAddress(rctx, fc.Args["userId"].(string), fc.Args["input"].(model.CreateAddressInput))
+			return ec.resolvers.Mutation().CreateUserAddress(rctx, fc.Args["input"].(model.CreateAddressInput))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Auth == nil {

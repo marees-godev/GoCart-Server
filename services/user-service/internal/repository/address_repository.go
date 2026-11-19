@@ -3,9 +3,12 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/model"
@@ -81,6 +84,32 @@ func (r *pgAddressRepository) Create(ctx context.Context, address *model.Address
 	).Scan(&address.ID, &address.CreatedAt, &address.UpdatedAt)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to insert user address in Create", "user_id", address.UserID, "error", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			slog.ErrorContext(ctx, "postgres error inserting user address",
+				"user_id", address.UserID,
+				"code", pgErr.Code,
+				"message", pgErr.Message,
+				"detail", pgErr.Detail,
+				"constraint", pgErr.ConstraintName,
+				"column", pgErr.ColumnName,
+			)
+			switch pgErr.Code {
+			case "23502":
+				return appErrors.BadRequest(fmt.Sprintf("%s is required", pgErr.ColumnName))
+			case "23503":
+				if strings.Contains(pgErr.ConstraintName, "user_id") {
+					return appErrors.NotFound("user not found")
+				}
+				return appErrors.BadRequest("invalid referenced resource")
+			case "23505":
+				return appErrors.Conflict("an address with these details already exists")
+			case "22P02":
+				return appErrors.BadRequest("invalid format for user_id or address field")
+			case "23514":
+				return appErrors.BadRequest("address violates data validation constraints")
+			}
+		}
 		return appErrors.Internal(err, "failed to create user address")
 	}
 
@@ -225,6 +254,30 @@ func (r *pgAddressRepository) Update(ctx context.Context, address *model.Address
 			return appErrors.NotFound("address not found")
 		}
 		slog.ErrorContext(ctx, "failed to update address in repository", "address_id", address.ID, "user_id", address.UserID, "error", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			slog.ErrorContext(ctx, "postgres error updating user address",
+				"address_id", address.ID,
+				"user_id", address.UserID,
+				"code", pgErr.Code,
+				"message", pgErr.Message,
+				"detail", pgErr.Detail,
+				"constraint", pgErr.ConstraintName,
+				"column", pgErr.ColumnName,
+			)
+			switch pgErr.Code {
+			case "23502":
+				return appErrors.BadRequest(fmt.Sprintf("%s is required", pgErr.ColumnName))
+			case "23503":
+				return appErrors.BadRequest("invalid referenced resource")
+			case "23505":
+				return appErrors.Conflict("an address with these details already exists")
+			case "22P02":
+				return appErrors.BadRequest("invalid format for address field")
+			case "23514":
+				return appErrors.BadRequest("address violates data validation constraints")
+			}
+		}
 		return appErrors.Internal(err, "failed to update address")
 	}
 
