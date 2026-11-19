@@ -137,3 +137,16 @@ func TestCompoundUniqueMigrationSQL(t *testing.T) {
 	}
 }
 
+func TestRememberMeMigrationSQL(t *testing.T) {
+	migrationPath := filepath.Join("..", "migrations", "000008_add_remember_me_to_refresh_tokens.sql")
+	content, err := os.ReadFile(migrationPath)
+	if err != nil {
+		t.Fatalf("failed to read 000008 migration file: %v", err)
+	}
+
+	sql := string(content)
+	if !strings.Contains(sql, "ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS remember_me BOOLEAN NOT NULL DEFAULT FALSE") {
+		t.Errorf("000008 migration missing required SQL for remember_me column")
+	}
+}
+

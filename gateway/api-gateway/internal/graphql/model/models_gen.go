@@ -564,9 +564,10 @@ type LockExchangeQuoteInput struct {
 }
 
 type LoginInput struct {
-	Email    string   `json:"email"`
-	Password string   `json:"password"`
-	Role     AuthRole `json:"role"`
+	Email      string   `json:"email"`
+	Password   string   `json:"password"`
+	Role       AuthRole `json:"role"`
+	RememberMe *bool    `json:"rememberMe,omitempty"`
 }
 
 type LogoutPayload struct {

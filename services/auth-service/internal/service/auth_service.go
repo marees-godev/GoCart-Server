@@ -37,7 +37,9 @@ import (
 const (
 	MaxFailedLoginAttempts = 5
 	AccountLockDuration    = 15 * time.Minute
-	RefreshTokenTTL        = 7 * 24 * time.Hour
+	DefaultSessionTTL      = 7 * 24 * time.Hour
+	RememberMeSessionTTL   = 30 * 24 * time.Hour
+	RefreshTokenTTL        = DefaultSessionTTL
 	dummyBcryptHash        = "$2a$10$e8N7z.0O2w9tP/V1O8m1o.7Hq6G3V3HkX/N1.1.1.1.1.1.1.1"
 )
 
@@ -181,6 +183,27 @@ func (s *authService) getAccountLockDuration() time.Duration {
 		return s.cfg.Security.AccountLockDuration
 	}
 	return AccountLockDuration
+}
+
+func (s *authService) getDefaultSessionTTL() time.Duration {
+	if s.cfg != nil && s.cfg.Security.DefaultSessionDuration > 0 {
+		return s.cfg.Security.DefaultSessionDuration
+	}
+	return DefaultSessionTTL
+}
+
+func (s *authService) getRememberMeSessionTTL() time.Duration {
+	if s.cfg != nil && s.cfg.Security.RememberMeSessionDuration > 0 {
+		return s.cfg.Security.RememberMeSessionDuration
+	}
+	return RememberMeSessionTTL
+}
+
+func (s *authService) getSessionTTL(rememberMe bool) time.Duration {
+	if rememberMe {
+		return s.getRememberMeSessionTTL()
+	}
+	return s.getDefaultSessionTTL()
 }
 
 func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
@@ -389,13 +412,15 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, appErrors.Internal(err, "failed to generate refresh token")
 	}
 
+	sessionTTL := s.getSessionTTL(req.RememberMe)
 	tokenHash := hashToken(rawRefreshToken)
 	refreshTokenModel := &model.RefreshToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    cred.UserID,
-		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(RefreshTokenTTL),
-		Revoked:   false,
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     cred.UserID,
+		TokenHash:  tokenHash,
+		ExpiresAt:  time.Now().Add(sessionTTL),
+		Revoked:    false,
+		RememberMe: req.RememberMe,
 	}
 
 	eventPayload, _ := json.Marshal(map[string]any{
@@ -473,6 +498,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		s.logger.Error("Registration failed: password hash error", "email", email, "error", err)
 		return nil, appErrors.Internal(err, "failed to hash password")
 	}
+	
 
 	credID := uuid.Must(uuid.NewV7())
 	userID := uuid.Must(uuid.NewV7())
@@ -705,13 +731,15 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, appErrors.Internal(err, "failed to generate refresh token")
 	}
 
+	sessionTTL := s.getSessionTTL(false)
 	tokenHash := hashToken(rawRefreshToken)
 	refreshTokenModel := &model.RefreshToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    userID,
-		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(RefreshTokenTTL),
-		Revoked:   false,
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  tokenHash,
+		ExpiresAt:  time.Now().Add(sessionTTL),
+		Revoked:    false,
+		RememberMe: false,
 	}
 
 	outboxEvt := &outbox.Event{
@@ -1185,13 +1213,15 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 		return nil, appErrors.Internal(err, "failed to generate refresh token")
 	}
 
+	sessionTTL := s.getSessionTTL(false)
 	tokenHash := hashToken(rawRefreshToken)
 	refreshTokenModel := &model.RefreshToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    userID,
-		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(RefreshTokenTTL),
-		Revoked:   false,
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  tokenHash,
+		ExpiresAt:  time.Now().Add(sessionTTL),
+		Revoked:    false,
+		RememberMe: false,
 	}
 
 	var outboxEvt *outbox.Event
@@ -1313,7 +1343,8 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 	}
 
 	if tok.Revoked {
-		s.logger.Warn("Refresh token failed: token is revoked", "user_id", tok.UserID.String())
+		s.logger.Warn("Refresh token reuse detected: token is revoked, invalidating all sessions for user", "user_id", tok.UserID.String())
+		_ = s.repo.RevokeRefreshTokensByUserID(ctx, tok.UserID)
 		return nil, appErrors.Unauthorized("refresh token revoked")
 	}
 
@@ -1372,13 +1403,15 @@ func (s *authService) RefreshToken(ctx context.Context, req *dto.RefreshTokenReq
 		return nil, appErrors.Internal(err, "failed to generate new refresh token")
 	}
 
+	sessionTTL := s.getSessionTTL(tok.RememberMe)
 	newTokenHash := hashToken(newRawRefreshToken)
 	newRefreshTokenModel := &model.RefreshToken{
-		ID:        uuid.Must(uuid.NewV7()),
-		UserID:    cred.UserID,
-		TokenHash: newTokenHash,
-		ExpiresAt: time.Now().Add(RefreshTokenTTL),
-		Revoked:   false,
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     cred.UserID,
+		TokenHash:  newTokenHash,
+		ExpiresAt:  time.Now().Add(sessionTTL),
+		Revoked:    false,
+		RememberMe: tok.RememberMe,
 	}
 
 	if err := s.repo.RotateRefreshToken(ctx, tok.ID, newRefreshTokenModel); err != nil {
