@@ -49,6 +49,15 @@ func toProtoAddress(a *model.Address) *userpb.Address {
 		emailAddress = *a.EmailAddress
 	}
 
+	createdAtStr := ""
+	if !a.CreatedAt.IsZero() {
+		createdAtStr = a.CreatedAt.Format(time.RFC3339)
+	}
+	updatedAtStr := ""
+	if !a.UpdatedAt.IsZero() {
+		updatedAtStr = a.UpdatedAt.Format(time.RFC3339)
+	}
+
 	return &userpb.Address{
 		Id:           a.ID,
 		UserId:       a.UserID,
@@ -62,8 +71,8 @@ func toProtoAddress(a *model.Address) *userpb.Address {
 		PostalCode:   a.PostalCode,
 		Country:      a.Country,
 		IsDefault:    a.IsDefault,
-		CreatedAt:    a.CreatedAt.String(),
-		UpdatedAt:    a.UpdatedAt.String(),
+		CreatedAt:    createdAtStr,
+		UpdatedAt:    updatedAtStr,
 	}
 }
 
@@ -345,11 +354,7 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 		emailAddress = &e
 	}
 
-	var isDefault *bool
-	if req.IsDefault {
-		t := true
-		isDefault = &t
-	}
+	isDefault := req.IsDefault
 
 	createReq := dto.CreateAddressRequest{
 		Label:        label,
@@ -361,7 +366,7 @@ func (s *UserGRPCServer) CreateUserAddress(ctx context.Context, req *userpb.Crea
 		State:        req.State,
 		PostalCode:   req.PostalCode,
 		Country:      req.Country,
-		IsDefault:    isDefault,
+		IsDefault:    &isDefault,
 	}
 
 	addr, err := s.addressService.CreateAddress(ctx, req.UserId, createReq)

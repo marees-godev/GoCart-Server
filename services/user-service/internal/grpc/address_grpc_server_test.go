@@ -507,3 +507,162 @@ func TestGRPC_DeleteUserAddress_SuccessAndIsolation(t *testing.T) {
 		t.Errorf("expected success true")
 	}
 }
+
+func TestGRPC_CreateUserAddress_ExactSampleInput(t *testing.T) {
+	server, userRepo, _ := setupGRPCTestServer()
+	ctx := context.Background()
+
+	targetUserID := "01a1ed98-f4f0-754e-b19c-e2ed887d2cbb"
+	userRepo.users[targetUserID] = &model.User{
+		ID:        targetUserID,
+		Email:     "nikotest122@gmail.com",
+		FirstName: "test",
+		LastName:  "mail",
+		Status:    "active",
+	}
+
+	req := &userpb.CreateUserAddressRequest{
+		UserId:       targetUserID,
+		Label:        "Home",
+		FullName:     "test mail",
+		PhoneNumber:  "9514044440",
+		EmailAddress: "nikotest122@gmail.com",
+		AddressLine:  "laksmipuram",
+		City:         "ramnad",
+		State:        "Tamil Nadu",
+		PostalCode:   "623517",
+		Country:      "United States",
+		IsDefault:    false,
+	}
+
+	res, err := server.CreateUserAddress(ctx, req)
+	if err != nil {
+		t.Fatalf("expected CreateUserAddress to succeed with sample input: %v", err)
+	}
+
+	if res == nil || res.Address == nil {
+		t.Fatal("expected non-nil address in response")
+	}
+
+	addr := res.Address
+	if addr.UserId != targetUserID {
+		t.Errorf("expected UserId %s, got %s", targetUserID, addr.UserId)
+	}
+	if addr.Label != "Home" {
+		t.Errorf("expected Label Home, got %s", addr.Label)
+	}
+	if addr.FullName != "test mail" {
+		t.Errorf("expected FullName 'test mail', got %s", addr.FullName)
+	}
+	if addr.PhoneNumber != "9514044440" {
+		t.Errorf("expected PhoneNumber 9514044440, got %s", addr.PhoneNumber)
+	}
+	if addr.EmailAddress != "nikotest122@gmail.com" {
+		t.Errorf("expected EmailAddress 'nikotest122@gmail.com', got %s", addr.EmailAddress)
+	}
+	if addr.AddressLine != "laksmipuram" {
+		t.Errorf("expected AddressLine 'laksmipuram', got %s", addr.AddressLine)
+	}
+	if addr.City != "ramnad" {
+		t.Errorf("expected City 'ramnad', got %s", addr.City)
+	}
+	if addr.State != "Tamil Nadu" {
+		t.Errorf("expected State 'Tamil Nadu', got %s", addr.State)
+	}
+	if addr.PostalCode != "623517" {
+		t.Errorf("expected PostalCode '623517', got %s", addr.PostalCode)
+	}
+	if addr.Country != "United States" {
+		t.Errorf("expected Country 'United States', got %s", addr.Country)
+	}
+	// First address automatically becomes default
+	if !addr.IsDefault {
+		t.Errorf("expected first address to be default")
+	}
+	if addr.CreatedAt == "" || addr.UpdatedAt == "" {
+		t.Errorf("expected timestamps to be non-empty")
+	}
+}
+
+func TestGRPC_CreateUserAddress_DefaultHandling(t *testing.T) {
+	server, userRepo, _ := setupGRPCTestServer()
+	ctx := context.Background()
+
+	targetUserID := "user-multi-address"
+	userRepo.users[targetUserID] = &model.User{
+		ID:        targetUserID,
+		Email:     "multi@example.com",
+		FirstName: "Multi",
+		LastName:  "User",
+		Status:    "active",
+	}
+
+	// First address created with IsDefault: false -> automatically promotes to default (count == 0)
+	addr1, err := server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
+		UserId:      targetUserID,
+		FullName:    "First Address",
+		PhoneNumber: "1234567890",
+		AddressLine: "123 First St",
+		City:        "City",
+		State:       "State",
+		PostalCode:  "12345",
+		Country:     "United States",
+		IsDefault:   false,
+	})
+	if err != nil {
+		t.Fatalf("failed to create first address: %v", err)
+	}
+	if !addr1.Address.IsDefault {
+		t.Errorf("expected first address to be promoted to default")
+	}
+
+	// Second address created with IsDefault: false -> remains false
+	addr2, err := server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
+		UserId:      targetUserID,
+		FullName:    "Second Address",
+		PhoneNumber: "1234567890",
+		AddressLine: "456 Second St",
+		City:        "City",
+		State:       "State",
+		PostalCode:  "12345",
+		Country:     "United States",
+		IsDefault:   false,
+	})
+	if err != nil {
+		t.Fatalf("failed to create second address: %v", err)
+	}
+	if addr2.Address.IsDefault {
+		t.Errorf("expected second address with IsDefault=false to remain non-default")
+	}
+
+	// Third address created with IsDefault: true -> becomes default, flips first address
+	addr3, err := server.CreateUserAddress(ctx, &userpb.CreateUserAddressRequest{
+		UserId:      targetUserID,
+		FullName:    "Third Address",
+		PhoneNumber: "1234567890",
+		AddressLine: "789 Third St",
+		City:        "City",
+		State:       "State",
+		PostalCode:  "12345",
+		Country:     "United States",
+		IsDefault:   true,
+	})
+	if err != nil {
+		t.Fatalf("failed to create third address: %v", err)
+	}
+	if !addr3.Address.IsDefault {
+		t.Errorf("expected third address with IsDefault=true to be default")
+	}
+
+	// Verify first address is no longer default
+	get1, err := server.GetUserAddress(ctx, &userpb.GetUserAddressRequest{
+		UserId:    targetUserID,
+		AddressId: addr1.Address.Id,
+	})
+	if err != nil {
+		t.Fatalf("failed to get first address: %v", err)
+	}
+	if get1.Address.IsDefault {
+		t.Errorf("expected first address to no longer be default")
+	}
+}

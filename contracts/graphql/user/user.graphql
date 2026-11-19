@@ -104,7 +104,7 @@ extend type Mutation {
   deactivateAccount(input: DeactivateAccountInput): AccountActionResponse! @auth
   reactivateAccount: AccountActionResponse! @auth
   deleteAccount(input: DeleteAccountInput): AccountActionResponse! @auth
-  createUserAddress(userId: ID!, input: CreateAddressInput!): Address @auth
+  createUserAddress(input: CreateAddressInput!): Address @auth
   updateUserAddress(id: ID!, input: UpdateAddressInput!): Address @auth
   deleteUserAddress(id: ID!): Boolean! @auth
   setDefaultUserAddress(id: ID!): Address @auth
