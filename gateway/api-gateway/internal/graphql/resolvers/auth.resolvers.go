@@ -27,10 +27,16 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
+	rememberMe := false
+	if input.RememberMe != nil {
+		rememberMe = *input.RememberMe
+	}
+
 	res, err := authClient.Login(ctx, &authpb.LoginRequest{
-		Email:    input.Email,
-		Password: input.Password,
-		Role:     authRoleToAuthPBRole(input.Role),
+		Email:      input.Email,
+		Password:   input.Password,
+		Role:       authRoleToAuthPBRole(input.Role),
+		RememberMe: rememberMe,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

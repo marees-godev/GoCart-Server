@@ -42,6 +42,8 @@ type SecurityConfig struct {
 	MaxLoginAttempts             int
 	LoginAttemptWindow           time.Duration
 	AccountLockDuration          time.Duration
+	DefaultSessionDuration       time.Duration
+	RememberMeSessionDuration    time.Duration
 	PasswordResetOTPTTLMinutes   int
 	PasswordResetMaxRequests     int
 	PasswordResetRequestWindow   time.Duration
@@ -177,6 +179,8 @@ func LoadEnv() *Config {
 			MaxLoginAttempts:             GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 			LoginAttemptWindow:           GetEnvAsDuration("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
 			AccountLockDuration:          GetEnvAsDuration("ACCOUNT_LOCK_DURATION", 15*time.Minute),
+			DefaultSessionDuration:       GetEnvAsDuration("DEFAULT_SESSION_DURATION", GetEnvAsDuration("REFRESH_TOKEN_DEFAULT_TTL", 24*time.Hour)),
+			RememberMeSessionDuration:    GetEnvAsDuration("REMEMBER_ME_SESSION_DURATION", GetEnvAsDuration("REFRESH_TOKEN_REMEMBER_ME_TTL", 30*24*time.Hour)),
 			PasswordResetOTPTTLMinutes:   GetEnvAsInt("PASSWORD_RESET_OTP_TTL_MINUTES", 15),
 			PasswordResetMaxRequests:     GetEnvAsInt("PASSWORD_RESET_MAX_REQUESTS", 3),
 			PasswordResetRequestWindow:   GetEnvAsDuration("PASSWORD_RESET_REQUEST_WINDOW", 15*time.Minute),

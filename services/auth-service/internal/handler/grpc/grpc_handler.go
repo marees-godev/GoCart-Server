@@ -29,9 +29,10 @@ func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *Auth
 
 func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Login(ctx, &dto.LoginRequest{
-		Email:    req.GetEmail(),
-		Password: req.GetPassword(),
-		Role:     fromPBRole(req.GetRole()),
+		Email:      req.GetEmail(),
+		Password:   req.GetPassword(),
+		Role:       fromPBRole(req.GetRole()),
+		RememberMe: req.GetRememberMe(),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)

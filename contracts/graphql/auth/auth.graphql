@@ -10,6 +10,7 @@ input LoginInput {
   email: String!
   password: String!
   role: AuthRole!
+  rememberMe: Boolean
 }
 
 input RegisterInput {

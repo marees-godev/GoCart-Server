@@ -6611,6 +6611,7 @@ input LoginInput {
   email: String!
   password: String!
   role: AuthRole!
+  rememberMe: Boolean
 }
 
 input RegisterInput {
@@ -50788,7 +50789,7 @@ func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj in
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"email", "password", "role"}
+	fieldsInOrder := [...]string{"email", "password", "role", "rememberMe"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -50816,6 +50817,13 @@ func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj in
 				return it, err
 			}
 			it.Role = data
+		case "rememberMe":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rememberMe"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RememberMe = data
 		}
 	}
 
