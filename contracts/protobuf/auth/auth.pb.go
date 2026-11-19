@@ -81,6 +81,7 @@ type LoginRequest struct {
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=gocart.auth.v1.Role" json:"role,omitempty"`
+	RememberMe    bool                   `protobuf:"varint,5,opt,name=remember_me,json=rememberMe,proto3" json:"remember_me,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -134,6 +135,13 @@ func (x *LoginRequest) GetRole() Role {
 		return x.Role
 	}
 	return Role_ROLE_UNSPECIFIED
+}
+
+func (x *LoginRequest) GetRememberMe() bool {
+	if x != nil {
+		return x.RememberMe
+	}
+	return false
 }
 
 type RegisterRequest struct {
@@ -1296,11 +1304,13 @@ var File_contracts_protobuf_auth_auth_proto protoreflect.FileDescriptor
 
 const file_contracts_protobuf_auth_auth_proto_rawDesc = "" +
 	"\n" +
-	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"}\n" +
+	"\"contracts/protobuf/auth/auth.proto\x12\x0egocart.auth.v1\"\x9e\x01\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12(\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04roleJ\x04\b\x03\x10\x04R\vis_merchant\"\xbc\x01\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x14.gocart.auth.v1.RoleR\x04role\x12\x1f\n" +
+	"\vremember_me\x18\x05 \x01(\bR\n" +
+	"rememberMeJ\x04\b\x03\x10\x04R\vis_merchant\"\xbc\x01\n" +
 	"\x0fRegisterRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +

@@ -37,6 +37,7 @@ message LoginRequest {
   reserved 3;
   reserved "is_merchant";
   Role role = 4;
+  bool remember_me = 5;
 }
 
 message RegisterRequest {

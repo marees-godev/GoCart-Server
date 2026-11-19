@@ -322,6 +322,68 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	if authMock.lastLoginReq.Role != authpb.Role_MERCHANT {
 		t.Errorf("expected Role to be MERCHANT, got %v", authMock.lastLoginReq.Role)
 	}
+	if authMock.lastLoginReq.RememberMe {
+		t.Errorf("expected RememberMe to default to false, got %v", authMock.lastLoginReq.RememberMe)
+	}
+}
+
+func TestLoginResolver_RememberMeStates(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name               string
+		rememberMe         *bool
+		expectedRememberMe bool
+	}{
+		{
+			name:               "rememberMe enabled explicitly",
+			rememberMe:         &trueVal,
+			expectedRememberMe: true,
+		},
+		{
+			name:               "rememberMe disabled explicitly",
+			rememberMe:         &falseVal,
+			expectedRememberMe: false,
+		},
+		{
+			name:               "rememberMe omitted (defaults to false)",
+			rememberMe:         nil,
+			expectedRememberMe: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			input := model.LoginInput{
+				Email:      "user@example.com",
+				Password:   "Password123!",
+				Role:       model.AuthRoleUser,
+				RememberMe: tc.rememberMe,
+			}
+
+			_, err := r.Login(context.Background(), input)
+			if err != nil {
+				t.Fatalf("unexpected login error: %v", err)
+			}
+			if authMock.lastLoginReq == nil {
+				t.Fatal("expected AuthClient.Login to be called")
+			}
+			if authMock.lastLoginReq.RememberMe != tc.expectedRememberMe {
+				t.Errorf("expected RememberMe to be %v, got %v", tc.expectedRememberMe, authMock.lastLoginReq.RememberMe)
+			}
+		})
+	}
 }
 
 func (m *mockAuthClient) RefreshToken(ctx context.Context, in *authpb.RefreshTokenRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {

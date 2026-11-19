@@ -5,6 +5,7 @@ type LoginRequest struct {
 	Password   string `json:"password"`
 	IsMerchant bool   `json:"is_merchant,omitempty"`
 	Role       string `json:"role,omitempty"`
+	RememberMe bool   `json:"remember_me,omitempty"`
 }
 
 type LoginResponse struct {
