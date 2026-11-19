@@ -123,7 +123,7 @@ func (r *pgAddressRepository) Create(ctx context.Context, address *model.Address
 
 func (r *pgAddressRepository) GetByID(ctx context.Context, id string) (*model.Address, error) {
 	query := `
-		SELECT id, user_id, country_id, label, full_name, phone_number, email_address, COALESCE(address_line, address_line1, ''), city, state, postal_code, COALESCE(country, ''), is_default, created_at, updated_at
+		SELECT id, user_id, country_id, label, full_name, phone_number, email_address, COALESCE(address_line, ''), city, state, postal_code, COALESCE(country, ''), is_default, created_at, updated_at
 		FROM user_addresses
 		WHERE id = $1
 	`
@@ -159,7 +159,7 @@ func (r *pgAddressRepository) GetByID(ctx context.Context, id string) (*model.Ad
 
 func (r *pgAddressRepository) ListByUserID(ctx context.Context, userID string) ([]*model.Address, error) {
 	query := `
-		SELECT id, user_id, country_id, label, full_name, phone_number, email_address, COALESCE(address_line, address_line1, ''), city, state, postal_code, COALESCE(country, ''), is_default, created_at, updated_at
+		SELECT id, user_id, country_id, label, full_name, phone_number, email_address, COALESCE(address_line, ''), city, state, postal_code, COALESCE(country, ''), is_default, created_at, updated_at
 		FROM user_addresses
 		WHERE user_id = $1
 		ORDER BY is_default DESC, created_at DESC
