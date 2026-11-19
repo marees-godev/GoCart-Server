@@ -252,7 +252,7 @@ func TestSharedRoles_AddressAccessAndSelfHealing(t *testing.T) {
 			Email:  "legacy@merchant.com",
 		})
 
-		addr, err := resolver.Mutation().CreateUserAddress(ctx, "merchant-legacy", model.CreateAddressInput{
+		addr, err := resolver.Mutation().CreateUserAddress(ctx, model.CreateAddressInput{
 			FullName:    "Legacy Merchant",
 			PhoneNumber: "1234567890",
 			AddressLine: "123 Merchant Way",

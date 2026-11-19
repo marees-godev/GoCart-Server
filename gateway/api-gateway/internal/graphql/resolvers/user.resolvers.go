@@ -7,6 +7,7 @@ package resolvers
 import (
 	"context"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -195,7 +196,7 @@ func (r *mutationResolver) DeleteAccount(ctx context.Context, input *model.Delet
 }
 
 // CreateUserAddress is the resolver for the createUserAddress field.
-func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string, input model.CreateAddressInput) (*model.Address, error) {
+func (r *mutationResolver) CreateUserAddress(ctx context.Context, input model.CreateAddressInput) (*model.Address, error) {
 	if r.Clients == nil || r.Clients.UserClient == nil {
 		return nil, appErrors.Internal(nil, "user client unavailable")
 	}
@@ -203,9 +204,6 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	authID := getAuthUserIDFromCtx(ctx)
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
-	}
-	if authID != userID {
-		return nil, appErrors.BadRequest("user_id does not match the expected value")
 	}
 
 	label := ""
@@ -222,7 +220,7 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	}
 
 	req := &userpb.CreateUserAddressRequest{
-		UserId:       userID,
+		UserId:       authID,
 		Label:        label,
 		FullName:     input.FullName,
 		PhoneNumber:  input.PhoneNumber,
@@ -237,11 +235,21 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 
 	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
 	if err != nil {
-		r.ensureUserProfileExists(ctx, userID)
-		res, err = r.Clients.UserClient.CreateUserAddress(ctx, req)
+		if st, ok := status.FromError(err); ok && (st.Code() == codes.NotFound || strings.Contains(st.Message(), "not found")) {
+			r.ensureUserProfileExists(ctx, authID)
+			res, err = r.Clients.UserClient.CreateUserAddress(ctx, req)
+		}
 	}
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to create user address via user service",
+			"user_id", authID,
+			"error", err,
+		)
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if res == nil || res.Address == nil {
+		slog.ErrorContext(ctx, "empty address returned from user service in CreateUserAddress", "user_id", authID)
+		return nil, appErrors.Internal(nil, "failed to create user address: empty response from user service")
 	}
 	return toModelAddress(res.Address), nil
 }
