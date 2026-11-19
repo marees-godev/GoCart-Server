@@ -37,7 +37,7 @@ import (
 const (
 	MaxFailedLoginAttempts = 5
 	AccountLockDuration    = 15 * time.Minute
-	DefaultSessionTTL      = 7 * 24 * time.Hour
+	DefaultSessionTTL      = 24 * time.Hour
 	RememberMeSessionTTL   = 30 * 24 * time.Hour
 	RefreshTokenTTL        = DefaultSessionTTL
 	dummyBcryptHash        = "$2a$10$e8N7z.0O2w9tP/V1O8m1o.7Hq6G3V3HkX/N1.1.1.1.1.1.1.1"
