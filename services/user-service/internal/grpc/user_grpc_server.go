@@ -17,14 +17,20 @@ import (
 
 type UserGRPCServer struct {
 	userpb.UnimplementedUserServiceServer
-	userService    service.UserService
-	addressService service.AddressService
+	userService     service.UserService
+	addressService  service.AddressService
+	locationService service.LocationService
 }
 
-func NewUserGRPCServer(userService service.UserService, addressService service.AddressService) *UserGRPCServer {
+func NewUserGRPCServer(userService service.UserService, addressService service.AddressService, locationService ...service.LocationService) *UserGRPCServer {
+	var locSvc service.LocationService
+	if len(locationService) > 0 {
+		locSvc = locationService[0]
+	}
 	return &UserGRPCServer{
-		userService:    userService,
-		addressService: addressService,
+		userService:     userService,
+		addressService:  addressService,
+		locationService: locSvc,
 	}
 }
 
@@ -523,3 +529,45 @@ func (s *UserGRPCServer) SetDefaultUserAddress(ctx context.Context, req *userpb.
 		Address: toProtoAddress(addr),
 	}, nil
 }
+
+func (s *UserGRPCServer) GetLocationByPincode(ctx context.Context, req *userpb.GetLocationByPincodeRequest) (*userpb.GetLocationByPincodeResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	if s.locationService == nil {
+		return nil, status.Error(codes.Unimplemented, "location service not configured")
+	}
+
+	loc, err := s.locationService.GetLocationByPincode(ctx, req.Pincode, req.CountryCode)
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	pos := make([]*userpb.LocationPostOffice, 0, len(loc.PostOffices))
+	for _, po := range loc.PostOffices {
+		pos = append(pos, &userpb.LocationPostOffice{
+			Name:           po.Name,
+			BranchType:     po.BranchType,
+			DeliveryStatus: po.DeliveryStatus,
+			Circle:         po.Circle,
+			District:       po.District,
+			Division:       po.Division,
+			Region:         po.Region,
+			State:          po.State,
+			Country:        po.Country,
+			Pincode:        po.Pincode,
+		})
+	}
+
+	return &userpb.GetLocationByPincodeResponse{
+		Location: &userpb.LocationInfo{
+			Pincode:     loc.Pincode,
+			Country:     loc.Country,
+			State:       loc.State,
+			District:    loc.District,
+			PostOffices: pos,
+		},
+	}, nil
+}
+

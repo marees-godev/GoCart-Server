@@ -28,6 +28,14 @@ type mockUserClientForUserResolvers struct {
 	reactivateErr     error
 	updateErr         error
 	getUserErr        error
+	getLocationFunc   func(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error)
+}
+
+func (m *mockUserClientForUserResolvers) GetLocationByPincode(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error) {
+	if m.getLocationFunc != nil {
+		return m.getLocationFunc(ctx, in, opts...)
+	}
+	return nil, status.Error(codes.Unimplemented, "unimplemented")
 }
 
 func (m *mockUserClientForUserResolvers) GetUser(ctx context.Context, in *userpb.GetUserRequest, opts ...grpcPkg.CallOption) (*userpb.GetUserResponse, error) {
@@ -694,6 +702,157 @@ func TestMe_Admin_InvalidToken_ReturnsNotFound(t *testing.T) {
 	appErr := appErrors.AsAppError(err)
 	if appErr == nil || appErr.Code != appErrors.CodeNotFound {
 		t.Errorf("expected NOT_FOUND code, got %v", err)
+	}
+}
+
+func TestLocationByPincode_Success(t *testing.T) {
+	mockClient := &mockUserClientForUserResolvers{
+		getLocationFunc: func(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error) {
+			if in.Pincode != "623517" {
+				t.Errorf("expected pincode 623517, got %s", in.Pincode)
+			}
+			return &userpb.GetLocationByPincodeResponse{
+				Location: &userpb.LocationInfo{
+					Pincode:  "623517",
+					Country:  "India",
+					State:    "Tamil Nadu",
+					District: "Ramanathapuram",
+					PostOffices: []*userpb.LocationPostOffice{
+						{
+							Name:           "Mandapam Camp",
+							BranchType:     "Sub Post Office",
+							DeliveryStatus: "Delivery",
+							Circle:         "Tamilnadu",
+							District:       "Ramanathapuram",
+							Division:       "Ramanathapuram",
+							Region:         "Madurai",
+							State:          "Tamil Nadu",
+							Country:        "India",
+							Pincode:        "623517",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	r := &queryResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				UserClient: mockClient,
+			},
+		},
+	}
+
+	country := "India"
+	res, err := r.LocationByPincode(context.Background(), "623517", &country)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res == nil {
+		t.Fatal("expected location response, got nil")
+	}
+	if res.Pincode != "623517" || res.Country != "India" || res.State != "Tamil Nadu" || res.District != "Ramanathapuram" {
+		t.Errorf("unexpected location data: %+v", res)
+	}
+	if len(res.PostOffices) != 1 || res.PostOffices[0].Name != "Mandapam Camp" {
+		t.Errorf("unexpected post offices: %+v", res.PostOffices)
+	}
+}
+
+func TestLocationByPincode_ValidationRejection(t *testing.T) {
+	called := false
+	mockClient := &mockUserClientForUserResolvers{
+		getLocationFunc: func(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error) {
+			called = true
+			return nil, nil
+		},
+	}
+
+	r := &queryResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				UserClient: mockClient,
+			},
+		},
+	}
+
+	invalidPincodes := []string{
+		"111111",       // all same digits
+		"110101",       // Delhi out of range
+		"123456",       // sequential
+		"012345",       // starts with 0
+		"905u75686588", // alphanumeric
+		"12345",        // too short
+		"1234567",      // too long
+	}
+
+	for _, pin := range invalidPincodes {
+		t.Run("invalid_"+pin, func(t *testing.T) {
+			called = false
+			_, err := r.LocationByPincode(context.Background(), pin, nil)
+			if err == nil {
+				t.Fatalf("expected error for PIN %s, got nil", pin)
+			}
+			appErr := appErrors.AsAppError(err)
+			if appErr == nil || appErr.Code != appErrors.CodeBadRequest {
+				t.Errorf("expected BAD_REQUEST for PIN %s, got %v", pin, err)
+			}
+			if called {
+				t.Errorf("user client should not have been called for invalid PIN %s", pin)
+			}
+		})
+	}
+}
+
+func TestLocationByPincode_NotFound(t *testing.T) {
+	mockClient := &mockUserClientForUserResolvers{
+		getLocationFunc: func(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error) {
+			return nil, status.Error(codes.NotFound, "no location found for PIN code 623999")
+		},
+	}
+
+	r := &queryResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				UserClient: mockClient,
+			},
+		},
+	}
+
+	_, err := r.LocationByPincode(context.Background(), "623999", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeNotFound {
+		t.Errorf("expected NOT_FOUND code, got %v", err)
+	}
+}
+
+func TestLocationByPincode_ServiceUnavailable(t *testing.T) {
+	mockClient := &mockUserClientForUserResolvers{
+		getLocationFunc: func(ctx context.Context, in *userpb.GetLocationByPincodeRequest, opts ...grpcPkg.CallOption) (*userpb.GetLocationByPincodeResponse, error) {
+			return nil, status.Error(codes.Unavailable, "location provider unavailable")
+		},
+	}
+
+	r := &queryResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				UserClient: mockClient,
+			},
+		},
+	}
+
+	_, err := r.LocationByPincode(context.Background(), "623517", nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeServiceUnavailable {
+		t.Errorf("expected SERVICE_UNAVAILABLE code, got %v", err)
 	}
 }
 

@@ -92,11 +92,33 @@ input UpdateAddressInput {
   isDefault: Boolean
 }
 
+type PostOffice {
+  name: String!
+  branchType: String
+  deliveryStatus: String
+  circle: String
+  district: String
+  division: String
+  region: String
+  state: String
+  country: String
+  pincode: String!
+}
+
+type LocationDetails {
+  pincode: String!
+  country: String!
+  state: String!
+  district: String!
+  postOffices: [PostOffice!]!
+}
+
 extend type Query {
   me: User @auth
   user(id: ID!): User @auth(requires: [ADMIN])
   userAddresses(userId: ID!): [Address!]! @auth
   userAddress(id: ID!): Address @auth
+  locationByPincode(pincode: String!, country: String): LocationDetails
 }
 
 extend type Mutation {
