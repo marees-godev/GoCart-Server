@@ -19,6 +19,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/validation"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -560,4 +561,54 @@ func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Addr
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
+}
+
+// LocationByPincode is the resolver for the locationByPincode field.
+func (r *queryResolver) LocationByPincode(ctx context.Context, pincode string, country *string) (*model.LocationDetails, error) {
+	cleanPincode := strings.TrimSpace(pincode)
+	countryCode := "IN"
+	if country != nil && strings.TrimSpace(*country) != "" {
+		countryCode = strings.TrimSpace(*country)
+	}
+
+	normCountry := strings.ToUpper(countryCode)
+	if normCountry == "IN" || normCountry == "IND" || normCountry == "INDIA" {
+		if err := validation.ValidateIndianPincode(cleanPincode); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := validation.ValidatePostalCode(cleanPincode, normCountry); err != nil {
+			return nil, err
+		}
+	}
+
+	userClient := r.getUserClient()
+	if userClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	res, err := userClient.GetLocationByPincode(ctx, &userpb.GetLocationByPincodeRequest{
+		Pincode:     cleanPincode,
+		CountryCode: countryCode,
+	})
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return nil, appErrors.BadRequest(st.Message())
+			case codes.NotFound:
+				return nil, appErrors.NotFound(st.Message())
+			case codes.Unavailable, codes.DeadlineExceeded:
+				return nil, appErrors.ServiceUnavailable("location provider unavailable")
+			}
+		}
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if res == nil || res.Location == nil {
+		return nil, appErrors.NotFound("location details not found")
+	}
+
+	return toModelLocationDetails(res.Location), nil
 }

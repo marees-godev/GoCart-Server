@@ -558,6 +558,14 @@ type InventoryItem struct {
 	CreatedAt         *string `json:"createdAt,omitempty"`
 }
 
+type LocationDetails struct {
+	Pincode     string        `json:"pincode"`
+	Country     string        `json:"country"`
+	State       string        `json:"state"`
+	District    string        `json:"district"`
+	PostOffices []*PostOffice `json:"postOffices"`
+}
+
 type LockExchangeQuoteInput struct {
 	ProductID    string                     `json:"productId"`
 	CategoryCode *string                    `json:"categoryCode,omitempty"`
@@ -716,6 +724,19 @@ type Payment struct {
 	FailureReason        *string `json:"failureReason,omitempty"`
 	CreatedAt            *string `json:"createdAt,omitempty"`
 	UpdatedAt            *string `json:"updatedAt,omitempty"`
+}
+
+type PostOffice struct {
+	Name           string  `json:"name"`
+	BranchType     *string `json:"branchType,omitempty"`
+	DeliveryStatus *string `json:"deliveryStatus,omitempty"`
+	Circle         *string `json:"circle,omitempty"`
+	District       *string `json:"district,omitempty"`
+	Division       *string `json:"division,omitempty"`
+	Region         *string `json:"region,omitempty"`
+	State          *string `json:"state,omitempty"`
+	Country        *string `json:"country,omitempty"`
+	Pincode        string  `json:"pincode"`
 }
 
 type ProcessPaymentInput struct {
