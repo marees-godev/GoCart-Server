@@ -380,5 +380,70 @@ func resolveDeliveryPartnerID(ctx context.Context, inputPartnerID *string) (stri
 	return strings.TrimSpace(targetPartnerID), nil
 }
 
+func toModelLocationDetails(loc *userpb.LocationInfo) *model.LocationDetails {
+	if loc == nil {
+		return nil
+	}
+	postOffices := make([]*model.PostOffice, 0, len(loc.PostOffices))
+	for _, po := range loc.PostOffices {
+		if po == nil {
+			continue
+		}
+		var branchType, deliveryStatus, circle, district, division, region, state, country *string
+		if po.BranchType != "" {
+			bt := po.BranchType
+			branchType = &bt
+		}
+		if po.DeliveryStatus != "" {
+			ds := po.DeliveryStatus
+			deliveryStatus = &ds
+		}
+		if po.Circle != "" {
+			c := po.Circle
+			circle = &c
+		}
+		if po.District != "" {
+			d := po.District
+			district = &d
+		}
+		if po.Division != "" {
+			div := po.Division
+			division = &div
+		}
+		if po.Region != "" {
+			r := po.Region
+			region = &r
+		}
+		if po.State != "" {
+			s := po.State
+			state = &s
+		}
+		if po.Country != "" {
+			ct := po.Country
+			country = &ct
+		}
+		postOffices = append(postOffices, &model.PostOffice{
+			Name:           po.Name,
+			BranchType:     branchType,
+			DeliveryStatus: deliveryStatus,
+			Circle:         circle,
+			District:       district,
+			Division:       division,
+			Region:         region,
+			State:          state,
+			Country:        country,
+			Pincode:        po.Pincode,
+		})
+	}
+
+	return &model.LocationDetails{
+		Pincode:     loc.Pincode,
+		Country:     loc.Country,
+		State:       loc.State,
+		District:    loc.District,
+		PostOffices: postOffices,
+	}
+}
+
 
 

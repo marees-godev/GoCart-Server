@@ -21,6 +21,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/config"
 	userGRPC "github.com/marees-godev/GoCart-Server/services/user-service/internal/grpc"
+	"github.com/marees-godev/GoCart-Server/services/user-service/internal/provider"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/repository"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/service"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/worker"
@@ -107,11 +108,14 @@ func main() {
 	userService := service.NewUserService(userRepo, imageProcessor)
 	addressRepo := repository.NewAddressRepository(db.Pool)
 	addressService := service.NewAddressService(addressRepo, userRepo)
+	locationRepo := repository.NewLocationRepository(db.Pool)
+	pincodeProvider := provider.NewIndiaPostProvider(cfg.Provider.IndiaPostBaseURL, cfg.Provider.Timeout)
+	locationService := service.NewLocationService(locationRepo, pincodeProvider)
 
 	retentionWorker := worker.NewRetentionWorker(userService, cfg.Retention.Interval, cfg.Retention.Period)
 	retentionWorker.Start(ctx)
 
-	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService)
+	userGRPCServer := userGRPC.NewUserGRPCServer(userService, addressService, locationService)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),

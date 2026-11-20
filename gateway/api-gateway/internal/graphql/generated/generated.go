@@ -378,6 +378,14 @@ type ComplexityRoot struct {
 		WarehouseID       func(childComplexity int) int
 	}
 
+	LocationDetails struct {
+		Country     func(childComplexity int) int
+		District    func(childComplexity int) int
+		Pincode     func(childComplexity int) int
+		PostOffices func(childComplexity int) int
+		State       func(childComplexity int) int
+	}
+
 	LogoutPayload struct {
 		Message func(childComplexity int) int
 		Success func(childComplexity int) int
@@ -610,6 +618,19 @@ type ComplexityRoot struct {
 		UserID               func(childComplexity int) int
 	}
 
+	PostOffice struct {
+		BranchType     func(childComplexity int) int
+		Circle         func(childComplexity int) int
+		Country        func(childComplexity int) int
+		DeliveryStatus func(childComplexity int) int
+		District       func(childComplexity int) int
+		Division       func(childComplexity int) int
+		Name           func(childComplexity int) int
+		Pincode        func(childComplexity int) int
+		Region         func(childComplexity int) int
+		State          func(childComplexity int) int
+	}
+
 	Product struct {
 		AvgRating           func(childComplexity int) int
 		CategoryID          func(childComplexity int) int
@@ -716,6 +737,7 @@ type ComplexityRoot struct {
 		Inventory                     func(childComplexity int, productID *string, variantID *string, inventoryID *string, warehouseID *string) int
 		ListMyOrders                  func(childComplexity int, limit *int, offset *int) int
 		ListReturns                   func(childComplexity int, limit *int, offset *int, status *string) int
+		LocationByPincode             func(childComplexity int, pincode string, country *string) int
 		Me                            func(childComplexity int) int
 		Merchant                      func(childComplexity int, id string) int
 		MerchantAppeals               func(childComplexity int, merchantID string) int
@@ -1103,6 +1125,7 @@ type QueryResolver interface {
 	User(ctx context.Context, id string) (*model.User, error)
 	UserAddresses(ctx context.Context, userID string) ([]*model.Address, error)
 	UserAddress(ctx context.Context, id string) (*model.Address, error)
+	LocationByPincode(ctx context.Context, pincode string, country *string) (*model.LocationDetails, error)
 }
 
 type executableSchema struct {
@@ -2663,6 +2686,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.InventoryItem.WarehouseID(childComplexity), true
+
+	case "LocationDetails.country":
+		if e.complexity.LocationDetails.Country == nil {
+			break
+		}
+
+		return e.complexity.LocationDetails.Country(childComplexity), true
+
+	case "LocationDetails.district":
+		if e.complexity.LocationDetails.District == nil {
+			break
+		}
+
+		return e.complexity.LocationDetails.District(childComplexity), true
+
+	case "LocationDetails.pincode":
+		if e.complexity.LocationDetails.Pincode == nil {
+			break
+		}
+
+		return e.complexity.LocationDetails.Pincode(childComplexity), true
+
+	case "LocationDetails.postOffices":
+		if e.complexity.LocationDetails.PostOffices == nil {
+			break
+		}
+
+		return e.complexity.LocationDetails.PostOffices(childComplexity), true
+
+	case "LocationDetails.state":
+		if e.complexity.LocationDetails.State == nil {
+			break
+		}
+
+		return e.complexity.LocationDetails.State(childComplexity), true
 
 	case "LogoutPayload.message":
 		if e.complexity.LogoutPayload.Message == nil {
@@ -4490,6 +4548,76 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.UserID(childComplexity), true
 
+	case "PostOffice.branchType":
+		if e.complexity.PostOffice.BranchType == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.BranchType(childComplexity), true
+
+	case "PostOffice.circle":
+		if e.complexity.PostOffice.Circle == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Circle(childComplexity), true
+
+	case "PostOffice.country":
+		if e.complexity.PostOffice.Country == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Country(childComplexity), true
+
+	case "PostOffice.deliveryStatus":
+		if e.complexity.PostOffice.DeliveryStatus == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.DeliveryStatus(childComplexity), true
+
+	case "PostOffice.district":
+		if e.complexity.PostOffice.District == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.District(childComplexity), true
+
+	case "PostOffice.division":
+		if e.complexity.PostOffice.Division == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Division(childComplexity), true
+
+	case "PostOffice.name":
+		if e.complexity.PostOffice.Name == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Name(childComplexity), true
+
+	case "PostOffice.pincode":
+		if e.complexity.PostOffice.Pincode == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Pincode(childComplexity), true
+
+	case "PostOffice.region":
+		if e.complexity.PostOffice.Region == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.Region(childComplexity), true
+
+	case "PostOffice.state":
+		if e.complexity.PostOffice.State == nil {
+			break
+		}
+
+		return e.complexity.PostOffice.State(childComplexity), true
+
 	case "Product.avgRating":
 		if e.complexity.Product.AvgRating == nil {
 			break
@@ -5177,6 +5305,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.ListReturns(childComplexity, args["limit"].(*int), args["offset"].(*int), args["status"].(*string)), true
+
+	case "Query.locationByPincode":
+		if e.complexity.Query.LocationByPincode == nil {
+			break
+		}
+
+		args, err := ec.field_Query_locationByPincode_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.LocationByPincode(childComplexity, args["pincode"].(string), args["country"].(*string)), true
 
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
@@ -8180,11 +8320,33 @@ input UpdateAddressInput {
   isDefault: Boolean
 }
 
+type PostOffice {
+  name: String!
+  branchType: String
+  deliveryStatus: String
+  circle: String
+  district: String
+  division: String
+  region: String
+  state: String
+  country: String
+  pincode: String!
+}
+
+type LocationDetails {
+  pincode: String!
+  country: String!
+  state: String!
+  district: String!
+  postOffices: [PostOffice!]!
+}
+
 extend type Query {
   me: User @auth
   user(id: ID!): User @auth(requires: [ADMIN])
   userAddresses(userId: ID!): [Address!]! @auth
   userAddress(id: ID!): Address @auth
+  locationByPincode(pincode: String!, country: String): LocationDetails
 }
 
 extend type Mutation {
@@ -10462,6 +10624,30 @@ func (ec *executionContext) field_Query_listReturns_args(ctx context.Context, ra
 		}
 	}
 	args["status"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_locationByPincode_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["pincode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pincode"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["pincode"] = arg0
+	var arg1 *string
+	if tmp, ok := rawArgs["country"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("country"))
+		arg1, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["country"] = arg1
 	return args, nil
 }
 
@@ -20709,6 +20895,248 @@ func (ec *executionContext) fieldContext_InventoryItem_createdAt(_ context.Conte
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LocationDetails_pincode(ctx context.Context, field graphql.CollectedField, obj *model.LocationDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LocationDetails_pincode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Pincode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LocationDetails_pincode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LocationDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LocationDetails_country(ctx context.Context, field graphql.CollectedField, obj *model.LocationDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LocationDetails_country(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Country, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LocationDetails_country(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LocationDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LocationDetails_state(ctx context.Context, field graphql.CollectedField, obj *model.LocationDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LocationDetails_state(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.State, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LocationDetails_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LocationDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LocationDetails_district(ctx context.Context, field graphql.CollectedField, obj *model.LocationDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LocationDetails_district(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.District, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LocationDetails_district(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LocationDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _LocationDetails_postOffices(ctx context.Context, field graphql.CollectedField, obj *model.LocationDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_LocationDetails_postOffices(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PostOffices, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PostOffice)
+	fc.Result = res
+	return ec.marshalNPostOffice2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPostOfficeᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_LocationDetails_postOffices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "LocationDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_PostOffice_name(ctx, field)
+			case "branchType":
+				return ec.fieldContext_PostOffice_branchType(ctx, field)
+			case "deliveryStatus":
+				return ec.fieldContext_PostOffice_deliveryStatus(ctx, field)
+			case "circle":
+				return ec.fieldContext_PostOffice_circle(ctx, field)
+			case "district":
+				return ec.fieldContext_PostOffice_district(ctx, field)
+			case "division":
+				return ec.fieldContext_PostOffice_division(ctx, field)
+			case "region":
+				return ec.fieldContext_PostOffice_region(ctx, field)
+			case "state":
+				return ec.fieldContext_PostOffice_state(ctx, field)
+			case "country":
+				return ec.fieldContext_PostOffice_country(ctx, field)
+			case "pincode":
+				return ec.fieldContext_PostOffice_pincode(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PostOffice", field.Name)
 		},
 	}
 	return fc, nil
@@ -34179,6 +34607,422 @@ func (ec *executionContext) fieldContext_Payment_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _PostOffice_name(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_branchType(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_branchType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BranchType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_branchType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_deliveryStatus(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_deliveryStatus(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeliveryStatus, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_deliveryStatus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_circle(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_circle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Circle, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_circle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_district(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_district(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.District, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_district(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_division(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_division(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Division, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_division(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_region(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_region(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Region, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_region(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_state(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_state(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.State, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_country(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_country(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Country, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_country(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PostOffice_pincode(ctx context.Context, field graphql.CollectedField, obj *model.PostOffice) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PostOffice_pincode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Pincode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PostOffice_pincode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PostOffice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Product_id(ctx, field)
 	if err != nil {
@@ -41486,6 +42330,70 @@ func (ec *executionContext) fieldContext_Query_userAddress(ctx context.Context, 
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_userAddress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_locationByPincode(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_locationByPincode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().LocationByPincode(rctx, fc.Args["pincode"].(string), fc.Args["country"].(*string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.LocationDetails)
+	fc.Result = res
+	return ec.marshalOLocationDetails2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐLocationDetails(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_locationByPincode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "pincode":
+				return ec.fieldContext_LocationDetails_pincode(ctx, field)
+			case "country":
+				return ec.fieldContext_LocationDetails_country(ctx, field)
+			case "state":
+				return ec.fieldContext_LocationDetails_state(ctx, field)
+			case "district":
+				return ec.fieldContext_LocationDetails_district(ctx, field)
+			case "postOffices":
+				return ec.fieldContext_LocationDetails_postOffices(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type LocationDetails", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_locationByPincode_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -54727,6 +55635,65 @@ func (ec *executionContext) _InventoryItem(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var locationDetailsImplementors = []string{"LocationDetails"}
+
+func (ec *executionContext) _LocationDetails(ctx context.Context, sel ast.SelectionSet, obj *model.LocationDetails) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, locationDetailsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("LocationDetails")
+		case "pincode":
+			out.Values[i] = ec._LocationDetails_pincode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "country":
+			out.Values[i] = ec._LocationDetails_country(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._LocationDetails_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "district":
+			out.Values[i] = ec._LocationDetails_district(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "postOffices":
+			out.Values[i] = ec._LocationDetails_postOffices(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var logoutPayloadImplementors = []string{"LogoutPayload"}
 
 func (ec *executionContext) _LogoutPayload(ctx context.Context, sel ast.SelectionSet, obj *model.LogoutPayload) graphql.Marshaler {
@@ -56051,6 +57018,66 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._Payment_createdAt(ctx, field, obj)
 		case "updatedAt":
 			out.Values[i] = ec._Payment_updatedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var postOfficeImplementors = []string{"PostOffice"}
+
+func (ec *executionContext) _PostOffice(ctx context.Context, sel ast.SelectionSet, obj *model.PostOffice) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, postOfficeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PostOffice")
+		case "name":
+			out.Values[i] = ec._PostOffice_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "branchType":
+			out.Values[i] = ec._PostOffice_branchType(ctx, field, obj)
+		case "deliveryStatus":
+			out.Values[i] = ec._PostOffice_deliveryStatus(ctx, field, obj)
+		case "circle":
+			out.Values[i] = ec._PostOffice_circle(ctx, field, obj)
+		case "district":
+			out.Values[i] = ec._PostOffice_district(ctx, field, obj)
+		case "division":
+			out.Values[i] = ec._PostOffice_division(ctx, field, obj)
+		case "region":
+			out.Values[i] = ec._PostOffice_region(ctx, field, obj)
+		case "state":
+			out.Values[i] = ec._PostOffice_state(ctx, field, obj)
+		case "country":
+			out.Values[i] = ec._PostOffice_country(ctx, field, obj)
+		case "pincode":
+			out.Values[i] = ec._PostOffice_pincode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -57632,6 +58659,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_userAddress(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "locationByPincode":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_locationByPincode(ctx, field)
 				return res
 			}
 
@@ -60714,6 +61760,60 @@ func (ec *executionContext) marshalNPartnerApprovalStatus2githubᚗcomᚋmarees�
 	return v
 }
 
+func (ec *executionContext) marshalNPostOffice2ᚕᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPostOfficeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.PostOffice) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPostOffice2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPostOffice(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPostOffice2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐPostOffice(ctx context.Context, sel ast.SelectionSet, v *model.PostOffice) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PostOffice(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNProcessPaymentInput2githubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐProcessPaymentInput(ctx context.Context, v interface{}) (model.ProcessPaymentInput, error) {
 	res, err := ec.unmarshalInputProcessPaymentInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -62301,6 +63401,13 @@ func (ec *executionContext) marshalOInventoryItem2ᚖgithubᚗcomᚋmareesᚑgod
 		return graphql.Null
 	}
 	return ec._InventoryItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOLocationDetails2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐLocationDetails(ctx context.Context, sel ast.SelectionSet, v *model.LocationDetails) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._LocationDetails(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMerchant2ᚖgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐMerchant(ctx context.Context, sel ast.SelectionSet, v *model.Merchant) graphql.Marshaler {
