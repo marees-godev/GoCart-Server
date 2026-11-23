@@ -29,9 +29,10 @@ func NewAuthGRPCHandler(authService service.AuthService, log *slog.Logger) *Auth
 
 func (h *AuthGRPCHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.AuthResponse, error) {
 	resp, err := h.authService.Login(ctx, &dto.LoginRequest{
-		Email:    req.GetEmail(),
-		Password: req.GetPassword(),
-		Role:     fromPBRole(req.GetRole()),
+		Email:      req.GetEmail(),
+		Password:   req.GetPassword(),
+		Role:       fromPBRole(req.GetRole()),
+		RememberMe: req.GetRememberMe(),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -81,6 +82,48 @@ func (h *AuthGRPCHandler) GoogleRegister(ctx context.Context, req *pb.GoogleAuth
 	resp, err := h.authService.GoogleRegister(ctx, &dto.GoogleAuthRequest{
 		IDToken: req.GetIdToken(),
 		Role:    fromPBRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) FacebookAuth(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookAuth(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) FacebookLogin(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookLogin(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, appErrors.MapAppErrorToGRPC(err)
+	}
+
+	return toPBAuthResponse(resp), nil
+}
+
+func (h *AuthGRPCHandler) FacebookRegister(ctx context.Context, req *pb.FacebookAuthRequest) (*pb.AuthResponse, error) {
+	resp, err := h.authService.FacebookRegister(ctx, &dto.FacebookAuthRequest{
+		AccessToken: req.GetAccessToken(),
+		Role:        fromPBRole(req.GetRole()),
+		Code:        req.GetCode(),
+		RedirectURI: req.GetRedirectUri(),
 	})
 	if err != nil {
 		return nil, appErrors.MapAppErrorToGRPC(err)
@@ -297,4 +340,3 @@ func fromPBRole(r pb.Role) string {
 		return ""
 	}
 }
-

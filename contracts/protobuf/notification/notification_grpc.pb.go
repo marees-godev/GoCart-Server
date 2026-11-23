@@ -19,8 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationService_SendNotification_FullMethodName = "/gocart.notification.v1.NotificationService/SendNotification"
-	NotificationService_GetNotifications_FullMethodName = "/gocart.notification.v1.NotificationService/GetNotifications"
+	NotificationService_SendNotification_FullMethodName           = "/gocart.notification.v1.NotificationService/SendNotification"
+	NotificationService_GetNotifications_FullMethodName           = "/gocart.notification.v1.NotificationService/GetNotifications"
+	NotificationService_MarkNotificationAsRead_FullMethodName     = "/gocart.notification.v1.NotificationService/MarkNotificationAsRead"
+	NotificationService_MarkAllNotificationsAsRead_FullMethodName = "/gocart.notification.v1.NotificationService/MarkAllNotificationsAsRead"
+	NotificationService_GetUnreadCount_FullMethodName             = "/gocart.notification.v1.NotificationService/GetUnreadCount"
+	NotificationService_RegisterPushSubscription_FullMethodName   = "/gocart.notification.v1.NotificationService/RegisterPushSubscription"
+	NotificationService_GetPushSubscriptions_FullMethodName       = "/gocart.notification.v1.NotificationService/GetPushSubscriptions"
+	NotificationService_UpdatePushSubscription_FullMethodName     = "/gocart.notification.v1.NotificationService/UpdatePushSubscription"
+	NotificationService_DeactivatePushSubscription_FullMethodName = "/gocart.notification.v1.NotificationService/DeactivatePushSubscription"
+	NotificationService_GetVAPIDPublicKey_FullMethodName          = "/gocart.notification.v1.NotificationService/GetVAPIDPublicKey"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -29,6 +37,14 @@ const (
 type NotificationServiceClient interface {
 	SendNotification(ctx context.Context, in *SendNotificationRequest, opts ...grpc.CallOption) (*SendNotificationResponse, error)
 	GetNotifications(ctx context.Context, in *GetNotificationsRequest, opts ...grpc.CallOption) (*GetNotificationsResponse, error)
+	MarkNotificationAsRead(ctx context.Context, in *MarkNotificationAsReadRequest, opts ...grpc.CallOption) (*MarkNotificationAsReadResponse, error)
+	MarkAllNotificationsAsRead(ctx context.Context, in *MarkAllNotificationsAsReadRequest, opts ...grpc.CallOption) (*MarkAllNotificationsAsReadResponse, error)
+	GetUnreadCount(ctx context.Context, in *GetUnreadCountRequest, opts ...grpc.CallOption) (*GetUnreadCountResponse, error)
+	RegisterPushSubscription(ctx context.Context, in *RegisterPushSubscriptionRequest, opts ...grpc.CallOption) (*PushSubscriptionResponse, error)
+	GetPushSubscriptions(ctx context.Context, in *GetPushSubscriptionsRequest, opts ...grpc.CallOption) (*GetPushSubscriptionsResponse, error)
+	UpdatePushSubscription(ctx context.Context, in *UpdatePushSubscriptionRequest, opts ...grpc.CallOption) (*PushSubscriptionResponse, error)
+	DeactivatePushSubscription(ctx context.Context, in *DeactivatePushSubscriptionRequest, opts ...grpc.CallOption) (*DeactivatePushSubscriptionResponse, error)
+	GetVAPIDPublicKey(ctx context.Context, in *GetVAPIDPublicKeyRequest, opts ...grpc.CallOption) (*GetVAPIDPublicKeyResponse, error)
 }
 
 type notificationServiceClient struct {
@@ -59,12 +75,100 @@ func (c *notificationServiceClient) GetNotifications(ctx context.Context, in *Ge
 	return out, nil
 }
 
+func (c *notificationServiceClient) MarkNotificationAsRead(ctx context.Context, in *MarkNotificationAsReadRequest, opts ...grpc.CallOption) (*MarkNotificationAsReadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkNotificationAsReadResponse)
+	err := c.cc.Invoke(ctx, NotificationService_MarkNotificationAsRead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) MarkAllNotificationsAsRead(ctx context.Context, in *MarkAllNotificationsAsReadRequest, opts ...grpc.CallOption) (*MarkAllNotificationsAsReadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkAllNotificationsAsReadResponse)
+	err := c.cc.Invoke(ctx, NotificationService_MarkAllNotificationsAsRead_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) GetUnreadCount(ctx context.Context, in *GetUnreadCountRequest, opts ...grpc.CallOption) (*GetUnreadCountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUnreadCountResponse)
+	err := c.cc.Invoke(ctx, NotificationService_GetUnreadCount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) RegisterPushSubscription(ctx context.Context, in *RegisterPushSubscriptionRequest, opts ...grpc.CallOption) (*PushSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PushSubscriptionResponse)
+	err := c.cc.Invoke(ctx, NotificationService_RegisterPushSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) GetPushSubscriptions(ctx context.Context, in *GetPushSubscriptionsRequest, opts ...grpc.CallOption) (*GetPushSubscriptionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPushSubscriptionsResponse)
+	err := c.cc.Invoke(ctx, NotificationService_GetPushSubscriptions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) UpdatePushSubscription(ctx context.Context, in *UpdatePushSubscriptionRequest, opts ...grpc.CallOption) (*PushSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PushSubscriptionResponse)
+	err := c.cc.Invoke(ctx, NotificationService_UpdatePushSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) DeactivatePushSubscription(ctx context.Context, in *DeactivatePushSubscriptionRequest, opts ...grpc.CallOption) (*DeactivatePushSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeactivatePushSubscriptionResponse)
+	err := c.cc.Invoke(ctx, NotificationService_DeactivatePushSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) GetVAPIDPublicKey(ctx context.Context, in *GetVAPIDPublicKeyRequest, opts ...grpc.CallOption) (*GetVAPIDPublicKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetVAPIDPublicKeyResponse)
+	err := c.cc.Invoke(ctx, NotificationService_GetVAPIDPublicKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
 type NotificationServiceServer interface {
 	SendNotification(context.Context, *SendNotificationRequest) (*SendNotificationResponse, error)
 	GetNotifications(context.Context, *GetNotificationsRequest) (*GetNotificationsResponse, error)
+	MarkNotificationAsRead(context.Context, *MarkNotificationAsReadRequest) (*MarkNotificationAsReadResponse, error)
+	MarkAllNotificationsAsRead(context.Context, *MarkAllNotificationsAsReadRequest) (*MarkAllNotificationsAsReadResponse, error)
+	GetUnreadCount(context.Context, *GetUnreadCountRequest) (*GetUnreadCountResponse, error)
+	RegisterPushSubscription(context.Context, *RegisterPushSubscriptionRequest) (*PushSubscriptionResponse, error)
+	GetPushSubscriptions(context.Context, *GetPushSubscriptionsRequest) (*GetPushSubscriptionsResponse, error)
+	UpdatePushSubscription(context.Context, *UpdatePushSubscriptionRequest) (*PushSubscriptionResponse, error)
+	DeactivatePushSubscription(context.Context, *DeactivatePushSubscriptionRequest) (*DeactivatePushSubscriptionResponse, error)
+	GetVAPIDPublicKey(context.Context, *GetVAPIDPublicKeyRequest) (*GetVAPIDPublicKeyResponse, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -80,6 +184,30 @@ func (UnimplementedNotificationServiceServer) SendNotification(context.Context, 
 }
 func (UnimplementedNotificationServiceServer) GetNotifications(context.Context, *GetNotificationsRequest) (*GetNotificationsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetNotifications not implemented")
+}
+func (UnimplementedNotificationServiceServer) MarkNotificationAsRead(context.Context, *MarkNotificationAsReadRequest) (*MarkNotificationAsReadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkNotificationAsRead not implemented")
+}
+func (UnimplementedNotificationServiceServer) MarkAllNotificationsAsRead(context.Context, *MarkAllNotificationsAsReadRequest) (*MarkAllNotificationsAsReadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkAllNotificationsAsRead not implemented")
+}
+func (UnimplementedNotificationServiceServer) GetUnreadCount(context.Context, *GetUnreadCountRequest) (*GetUnreadCountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUnreadCount not implemented")
+}
+func (UnimplementedNotificationServiceServer) RegisterPushSubscription(context.Context, *RegisterPushSubscriptionRequest) (*PushSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterPushSubscription not implemented")
+}
+func (UnimplementedNotificationServiceServer) GetPushSubscriptions(context.Context, *GetPushSubscriptionsRequest) (*GetPushSubscriptionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPushSubscriptions not implemented")
+}
+func (UnimplementedNotificationServiceServer) UpdatePushSubscription(context.Context, *UpdatePushSubscriptionRequest) (*PushSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdatePushSubscription not implemented")
+}
+func (UnimplementedNotificationServiceServer) DeactivatePushSubscription(context.Context, *DeactivatePushSubscriptionRequest) (*DeactivatePushSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeactivatePushSubscription not implemented")
+}
+func (UnimplementedNotificationServiceServer) GetVAPIDPublicKey(context.Context, *GetVAPIDPublicKeyRequest) (*GetVAPIDPublicKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetVAPIDPublicKey not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -138,6 +266,150 @@ func _NotificationService_GetNotifications_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_MarkNotificationAsRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkNotificationAsReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).MarkNotificationAsRead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_MarkNotificationAsRead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).MarkNotificationAsRead(ctx, req.(*MarkNotificationAsReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_MarkAllNotificationsAsRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkAllNotificationsAsReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).MarkAllNotificationsAsRead(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_MarkAllNotificationsAsRead_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).MarkAllNotificationsAsRead(ctx, req.(*MarkAllNotificationsAsReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_GetUnreadCount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUnreadCountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).GetUnreadCount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_GetUnreadCount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).GetUnreadCount(ctx, req.(*GetUnreadCountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_RegisterPushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterPushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).RegisterPushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_RegisterPushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).RegisterPushSubscription(ctx, req.(*RegisterPushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_GetPushSubscriptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPushSubscriptionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).GetPushSubscriptions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_GetPushSubscriptions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).GetPushSubscriptions(ctx, req.(*GetPushSubscriptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_UpdatePushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).UpdatePushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_UpdatePushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).UpdatePushSubscription(ctx, req.(*UpdatePushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_DeactivatePushSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeactivatePushSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).DeactivatePushSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_DeactivatePushSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).DeactivatePushSubscription(ctx, req.(*DeactivatePushSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_GetVAPIDPublicKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetVAPIDPublicKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).GetVAPIDPublicKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_GetVAPIDPublicKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).GetVAPIDPublicKey(ctx, req.(*GetVAPIDPublicKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +424,38 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetNotifications",
 			Handler:    _NotificationService_GetNotifications_Handler,
+		},
+		{
+			MethodName: "MarkNotificationAsRead",
+			Handler:    _NotificationService_MarkNotificationAsRead_Handler,
+		},
+		{
+			MethodName: "MarkAllNotificationsAsRead",
+			Handler:    _NotificationService_MarkAllNotificationsAsRead_Handler,
+		},
+		{
+			MethodName: "GetUnreadCount",
+			Handler:    _NotificationService_GetUnreadCount_Handler,
+		},
+		{
+			MethodName: "RegisterPushSubscription",
+			Handler:    _NotificationService_RegisterPushSubscription_Handler,
+		},
+		{
+			MethodName: "GetPushSubscriptions",
+			Handler:    _NotificationService_GetPushSubscriptions_Handler,
+		},
+		{
+			MethodName: "UpdatePushSubscription",
+			Handler:    _NotificationService_UpdatePushSubscription_Handler,
+		},
+		{
+			MethodName: "DeactivatePushSubscription",
+			Handler:    _NotificationService_DeactivatePushSubscription_Handler,
+		},
+		{
+			MethodName: "GetVAPIDPublicKey",
+			Handler:    _NotificationService_GetVAPIDPublicKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -27,12 +27,19 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		return nil, err
 	}
 
-	userID := getAuthUserIDFromCtx(ctx)
-	if userID == "" && input.UserID != nil {
-		userID = *input.UserID
-	}
-	if userID == "" {
+	authUID := getAuthUserIDFromCtx(ctx)
+	if authUID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	userID := authUID
+	if input.UserID != nil && *input.UserID != "" {
+		if !isAdmin && *input.UserID != authUID {
+			return nil, appErrors.Forbidden("cannot create order for another user")
+		}
+		userID = *input.UserID
 	}
 
 	cartID := ""
@@ -114,6 +121,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 		cartClient, cErr := r.getCartClient()
 		catalogClient, pErr := r.getProductClient()
+		var cartSubtotal float64
 		if cErr == nil && cartClient != nil && cartID != "" {
 			cResp, errCart := cartClient.GetCart(ctx, &cartpb.GetCartRequest{UserId: userID})
 			if errCart == nil && cResp != nil && cResp.Cart != nil {
@@ -129,6 +137,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 							if w > 0 && w <= 50 {
 								w = w * 1000.0
 							}
+							cartSubtotal += pResp.Product.Price * float64(item.Quantity)
 						}
 					}
 					feeReq.Items = append(feeReq.Items, &deliverypb.ShippingItem{
@@ -140,9 +149,13 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			}
 		}
 
-		feeResp, feeErr := deliveryClient.CalculateShippingFee(ctx, feeReq)
-		if feeErr == nil && feeResp != nil {
-			shipFee = feeResp.ShippingFee
+		if deliveryClient != nil {
+			_, _ = deliveryClient.CalculateShippingFee(ctx, feeReq)
+		}
+		if cartSubtotal >= 500.0 {
+			shipFee = 0.0
+		} else {
+			shipFee = 40.0
 		}
 	}
 
@@ -156,12 +169,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		IdempotencyKey:    idempKey,
 		ShippingFee:       shipFee,
 		DiscountAmount:    discAmt,
+		PlatformFee:       7.00,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderCreated(ctx, ord)
+	return ord, nil
 }
 
 // Checkout is the resolver for the checkout field.
@@ -207,7 +223,9 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 		})
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderCancelled(ctx, ord, reasonStr)
+	return ord, nil
 }
 
 // UpdateOrderStatus is the resolver for the updateOrderStatus field.
@@ -225,7 +243,9 @@ func (r *mutationResolver) UpdateOrderStatus(ctx context.Context, id string, sta
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderStatusUpdated(ctx, ord, status)
+	return ord, nil
 }
 
 // Order is the resolver for the order field.
@@ -305,14 +325,14 @@ func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, o
 	}
 
 	authUserID := getAuthUserIDFromCtx(ctx)
-	userCtx, _ := auth.UserFromContext(ctx)
-	if userCtx == nil || (userCtx.Role != auth.RoleAdmin && userCtx.Role != "ADMIN") {
-		if authUserID != "" {
-			userID = authUserID
-		}
-	}
-	if userID == "" {
+	if authUserID == "" {
 		return nil, appErrors.Unauthorized("unauthenticated: user_id is required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == auth.RoleAdmin || strings.EqualFold(userCtx.Role, "ADMIN"))
+	if !isAdmin && userID != authUserID {
+		return nil, appErrors.Forbidden("cannot access orders of another user")
 	}
 
 	var l, o int32
@@ -443,6 +463,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 
 	subtotal := o.GetSubtotal()
 	taxAmount := o.GetTaxAmount()
+	platformFee := o.GetPlatformFee()
 	shippingFee := o.GetShippingFee()
 	discountAmount := o.GetDiscountAmount()
 
@@ -456,6 +477,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		Items:             items,
 		Subtotal:          &subtotal,
 		TaxAmount:         &taxAmount,
+		PlatformFee:       &platformFee,
 		ShippingFee:       &shippingFee,
 		DiscountAmount:    &discountAmount,
 		TotalAmount:       o.GetTotalAmount(),

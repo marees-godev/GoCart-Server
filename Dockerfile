@@ -22,7 +22,7 @@ ENV CGO_ENABLED=0 \
     GOARCH=amd64 \
     GOTOOLCHAIN=auto
 
-# Build all 14 microservices and API Gateway
+# Build all 15 microservices and API Gateway
 RUN go build -ldflags="-w -s" -o /app/bin/auth-service ./services/auth-service/cmd/server && \
     go build -ldflags="-w -s" -o /app/bin/user-service ./services/user-service/cmd/server && \
     go build -ldflags="-w -s" -o /app/bin/product-service ./services/product-service/cmd/server && \
@@ -37,6 +37,7 @@ RUN go build -ldflags="-w -s" -o /app/bin/auth-service ./services/auth-service/c
     go build -ldflags="-w -s" -o /app/bin/notification-service ./services/notification-service/cmd/server && \
     go build -ldflags="-w -s" -o /app/bin/return-service ./services/return-service/cmd/server && \
     go build -ldflags="-w -s" -o /app/bin/rating-service ./services/rating-service/cmd/server && \
+    go build -ldflags="-w -s" -o /app/bin/personalization-service ./services/personalization-service/cmd/server && \
     go build -ldflags="-w -s" -o /app/bin/api-gateway ./gateway/api-gateway/cmd/server
 
 # ------------------------------------------------------------------------------

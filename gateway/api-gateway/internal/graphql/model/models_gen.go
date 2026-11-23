@@ -124,6 +124,11 @@ type CategoryList struct {
 	Total      int         `json:"total"`
 }
 
+type CategoryPreference struct {
+	CategoryID string  `json:"categoryId"`
+	Score      float64 `json:"score"`
+}
+
 type ChangePasswordInput struct {
 	OldPassword string `json:"oldPassword"`
 	NewPassword string `json:"newPassword"`
@@ -222,11 +227,13 @@ type CreateProductVariantInput struct {
 }
 
 type CreateRatingInput struct {
-	ProductID   string  `json:"productId"`
-	OrderID     string  `json:"orderId"`
-	OrderItemID string  `json:"orderItemId"`
-	Rating      int     `json:"rating"`
-	Review      *string `json:"review,omitempty"`
+	ProductID    string            `json:"productId"`
+	OrderID      string            `json:"orderId"`
+	OrderItemID  string            `json:"orderItemId"`
+	Rating       int               `json:"rating"`
+	Review       *string           `json:"review,omitempty"`
+	Images       []string          `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
 }
 
 type CreateStoreInput struct {
@@ -250,6 +257,16 @@ type CreateWarehouseInput struct {
 	State             string `json:"state"`
 	PostalCode        string `json:"postalCode"`
 	IsActive          *bool  `json:"isActive,omitempty"`
+}
+
+type CustomerActivity struct {
+	ID         string            `json:"id"`
+	UserID     *string           `json:"userId,omitempty"`
+	SessionID  *string           `json:"sessionId,omitempty"`
+	EventType  ActivityEventType `json:"eventType"`
+	ProductID  *string           `json:"productId,omitempty"`
+	CategoryID *string           `json:"categoryId,omitempty"`
+	CreatedAt  string            `json:"createdAt"`
 }
 
 type DeactivateAccountInput struct {
@@ -277,6 +294,11 @@ type DeleteProductResponse struct {
 }
 
 type DeleteProductVariantResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type DeleteRatingImageResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
@@ -473,6 +495,12 @@ type ExchangeVerification struct {
 	UpdatedAt        *string  `json:"updatedAt,omitempty"`
 }
 
+type FacebookAuthInput struct {
+	Code        string    `json:"code"`
+	RedirectURI *string   `json:"redirectUri,omitempty"`
+	Role        *AuthRole `json:"role,omitempty"`
+}
+
 type FlagRatingInput struct {
 	RatingID string       `json:"ratingId"`
 	Category FlagCategory `json:"category"`
@@ -530,6 +558,14 @@ type InventoryItem struct {
 	CreatedAt         *string `json:"createdAt,omitempty"`
 }
 
+type LocationDetails struct {
+	Pincode     string        `json:"pincode"`
+	Country     string        `json:"country"`
+	State       string        `json:"state"`
+	District    string        `json:"district"`
+	PostOffices []*PostOffice `json:"postOffices"`
+}
+
 type LockExchangeQuoteInput struct {
 	ProductID    string                     `json:"productId"`
 	CategoryCode *string                    `json:"categoryCode,omitempty"`
@@ -541,14 +577,20 @@ type LockExchangeQuoteInput struct {
 }
 
 type LoginInput struct {
-	Email    string   `json:"email"`
-	Password string   `json:"password"`
-	Role     AuthRole `json:"role"`
+	Email      string   `json:"email"`
+	Password   string   `json:"password"`
+	Role       AuthRole `json:"role"`
+	RememberMe *bool    `json:"rememberMe,omitempty"`
 }
 
 type LogoutPayload struct {
 	Success bool    `json:"success"`
 	Message *string `json:"message,omitempty"`
+}
+
+type MarkAllNotificationsReadPayload struct {
+	UpdatedCount int  `json:"updatedCount"`
+	Success      bool `json:"success"`
 }
 
 type Merchant struct {
@@ -596,18 +638,35 @@ type Mutation struct {
 }
 
 type Notification struct {
-	ID        string  `json:"id"`
-	UserID    string  `json:"userId"`
-	Channel   string  `json:"channel"`
-	Subject   string  `json:"subject"`
-	Content   string  `json:"content"`
-	Status    string  `json:"status"`
-	CreatedAt *string `json:"createdAt,omitempty"`
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	Channel       string  `json:"channel"`
+	EventType     *string `json:"eventType,omitempty"`
+	EventID       *string `json:"eventId,omitempty"`
+	Recipient     *string `json:"recipient,omitempty"`
+	Subject       string  `json:"subject"`
+	Content       string  `json:"content"`
+	Status        string  `json:"status"`
+	ErrorMessage  *string `json:"errorMessage,omitempty"`
+	IsRead        bool    `json:"isRead"`
+	ReadAt        *string `json:"readAt,omitempty"`
+	SentAt        *string `json:"sentAt,omitempty"`
+	CorrelationID *string `json:"correlationId,omitempty"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type NotificationFilterInput struct {
+	Status    *string `json:"status,omitempty"`
+	Channel   *string `json:"channel,omitempty"`
+	EventType *string `json:"eventType,omitempty"`
+	IsRead    *bool   `json:"isRead,omitempty"`
 }
 
 type NotificationList struct {
 	Notifications []*Notification `json:"notifications"`
 	Total         int             `json:"total"`
+	UnreadCount   int             `json:"unreadCount"`
 }
 
 type Order struct {
@@ -620,6 +679,7 @@ type Order struct {
 	Items             []*OrderItem `json:"items"`
 	Subtotal          *float64     `json:"subtotal,omitempty"`
 	TaxAmount         *float64     `json:"taxAmount,omitempty"`
+	PlatformFee       *float64     `json:"platformFee,omitempty"`
 	ShippingFee       *float64     `json:"shippingFee,omitempty"`
 	DiscountAmount    *float64     `json:"discountAmount,omitempty"`
 	TotalAmount       float64      `json:"totalAmount"`
@@ -665,6 +725,19 @@ type Payment struct {
 	FailureReason        *string `json:"failureReason,omitempty"`
 	CreatedAt            *string `json:"createdAt,omitempty"`
 	UpdatedAt            *string `json:"updatedAt,omitempty"`
+}
+
+type PostOffice struct {
+	Name           string  `json:"name"`
+	BranchType     *string `json:"branchType,omitempty"`
+	DeliveryStatus *string `json:"deliveryStatus,omitempty"`
+	Circle         *string `json:"circle,omitempty"`
+	District       *string `json:"district,omitempty"`
+	Division       *string `json:"division,omitempty"`
+	Region         *string `json:"region,omitempty"`
+	State          *string `json:"state,omitempty"`
+	Country        *string `json:"country,omitempty"`
+	Pincode        string  `json:"pincode"`
 }
 
 type ProcessPaymentInput struct {
@@ -738,21 +811,42 @@ type ProductVerification struct {
 	UpdatedAt   *string  `json:"updatedAt,omitempty"`
 }
 
+type PushSubscription struct {
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	Endpoint      string  `json:"endpoint"`
+	UserAgent     *string `json:"userAgent,omitempty"`
+	DeviceName    *string `json:"deviceName,omitempty"`
+	IsActive      bool    `json:"isActive"`
+	FailureCount  int     `json:"failureCount"`
+	LastError     *string `json:"lastError,omitempty"`
+	LastUsedAt    *string `json:"lastUsedAt,omitempty"`
+	DeactivatedAt *string `json:"deactivatedAt,omitempty"`
+	CreatedAt     *string `json:"createdAt,omitempty"`
+	UpdatedAt     *string `json:"updatedAt,omitempty"`
+}
+
+type PushSubscriptionList struct {
+	Subscriptions []*PushSubscription `json:"subscriptions"`
+	Total         int                 `json:"total"`
+}
+
 type Query struct {
 }
 
 type Rating struct {
-	ID          string  `json:"id"`
-	ProductID   string  `json:"productId"`
-	UserID      string  `json:"userId"`
-	OrderID     string  `json:"orderId"`
-	OrderItemID string  `json:"orderItemId"`
-	Rating      int     `json:"rating"`
-	Review      string  `json:"review"`
-	IsFlagged   bool    `json:"isFlagged"`
-	IsHidden    bool    `json:"isHidden"`
-	CreatedAt   *string `json:"createdAt,omitempty"`
-	UpdatedAt   *string `json:"updatedAt,omitempty"`
+	ID          string         `json:"id"`
+	ProductID   string         `json:"productId"`
+	UserID      string         `json:"userId"`
+	OrderID     string         `json:"orderId"`
+	OrderItemID string         `json:"orderItemId"`
+	Rating      int            `json:"rating"`
+	Review      string         `json:"review"`
+	IsFlagged   bool           `json:"isFlagged"`
+	IsHidden    bool           `json:"isHidden"`
+	Images      []*RatingImage `json:"images,omitempty"`
+	CreatedAt   *string        `json:"createdAt,omitempty"`
+	UpdatedAt   *string        `json:"updatedAt,omitempty"`
 }
 
 type RatingFlagInfo struct {
@@ -761,6 +855,23 @@ type RatingFlagInfo struct {
 	Category  FlagCategory `json:"category"`
 	Reason    *string      `json:"reason,omitempty"`
 	CreatedAt string       `json:"createdAt"`
+}
+
+type RatingImage struct {
+	ID        string `json:"id"`
+	RatingID  string `json:"ratingId"`
+	URL       string `json:"url"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type RecentlyViewedProduct struct {
+	ProductID    string `json:"productId"`
+	LastViewedAt string `json:"lastViewedAt"`
+}
+
+type RecentlyViewedProductList struct {
+	Products []*RecentlyViewedProduct `json:"products"`
+	Total    int                      `json:"total"`
 }
 
 type RefreshTokenInput struct {
@@ -781,6 +892,14 @@ type RegisterInput struct {
 	Role      AuthRole `json:"role"`
 	FirstName *string  `json:"firstName,omitempty"`
 	LastName  *string  `json:"lastName,omitempty"`
+}
+
+type RegisterPushSubscriptionInput struct {
+	Endpoint   string  `json:"endpoint"`
+	P256dh     string  `json:"p256dh"`
+	Auth       string  `json:"auth"`
+	UserAgent  *string `json:"userAgent,omitempty"`
+	DeviceName *string `json:"deviceName,omitempty"`
 }
 
 type RequestReplacementInput struct {
@@ -869,15 +988,17 @@ type SendNotificationInput struct {
 	Subject    string  `json:"subject"`
 	Content    string  `json:"content"`
 	TemplateID *string `json:"templateId,omitempty"`
+	EventType  *string `json:"eventType,omitempty"`
 }
 
 type ShippingFeeCalculation struct {
-	ShippingFee      float64 `json:"shippingFee"`
-	Currency         string  `json:"currency"`
-	Zone             string  `json:"zone"`
-	TotalWeightGrams float64 `json:"totalWeightGrams"`
-	CalculationModel string  `json:"calculationModel"`
-	BreakdownDetails *string `json:"breakdownDetails,omitempty"`
+	ShippingFee      float64  `json:"shippingFee"`
+	PlatformFee      *float64 `json:"platformFee,omitempty"`
+	Currency         string   `json:"currency"`
+	Zone             string   `json:"zone"`
+	TotalWeightGrams float64  `json:"totalWeightGrams"`
+	CalculationModel string   `json:"calculationModel"`
+	BreakdownDetails *string  `json:"breakdownDetails,omitempty"`
 }
 
 type ShippingItemInput struct {
@@ -1019,6 +1140,16 @@ type UpdateProductVariantInput struct {
 	Status         *ProductStatus `json:"status,omitempty"`
 }
 
+type UpdatePushSubscriptionInput struct {
+	ID         *string `json:"id,omitempty"`
+	Endpoint   *string `json:"endpoint,omitempty"`
+	P256dh     *string `json:"p256dh,omitempty"`
+	Auth       *string `json:"auth,omitempty"`
+	UserAgent  *string `json:"userAgent,omitempty"`
+	DeviceName *string `json:"deviceName,omitempty"`
+	IsActive   *bool   `json:"isActive,omitempty"`
+}
+
 type UpdateRatingInput struct {
 	ID     string  `json:"id"`
 	Rating int     `json:"rating"`
@@ -1064,6 +1195,16 @@ type UpdateWarehouseInput struct {
 	IsActive          *bool   `json:"isActive,omitempty"`
 }
 
+type UploadRatingImagesInput struct {
+	RatingID     string            `json:"ratingId"`
+	Images       []string          `json:"images,omitempty"`
+	ImagesUpload []*graphql.Upload `json:"imagesUpload,omitempty"`
+}
+
+type UploadRatingImagesResponse struct {
+	Images []*RatingImage `json:"images"`
+}
+
 type User struct {
 	ID             string  `json:"id"`
 	Email          string  `json:"email"`
@@ -1080,6 +1221,11 @@ type User struct {
 	Status         *string `json:"status,omitempty"`
 	CreatedAt      *string `json:"createdAt,omitempty"`
 	UpdatedAt      *string `json:"updatedAt,omitempty"`
+}
+
+type VAPIDPublicKeyPayload struct {
+	PublicKey string `json:"publicKey"`
+	Subject   string `json:"subject"`
 }
 
 type ValidateCategoryResponse struct {
@@ -1120,6 +1266,57 @@ type Warehouse struct {
 	IsActive          bool    `json:"isActive"`
 	CreatedAt         *string `json:"createdAt,omitempty"`
 	UpdatedAt         *string `json:"updatedAt,omitempty"`
+}
+
+type ActivityEventType string
+
+const (
+	ActivityEventTypeProductViewed          ActivityEventType = "PRODUCT_VIEWED"
+	ActivityEventTypeProductSearched        ActivityEventType = "PRODUCT_SEARCHED"
+	ActivityEventTypeCategoryViewed         ActivityEventType = "CATEGORY_VIEWED"
+	ActivityEventTypeProductAddedToCart     ActivityEventType = "PRODUCT_ADDED_TO_CART"
+	ActivityEventTypeProductRemovedFromCart ActivityEventType = "PRODUCT_REMOVED_FROM_CART"
+	ActivityEventTypeProductWishlisted      ActivityEventType = "PRODUCT_WISHLISTED"
+	ActivityEventTypeProductPurchased       ActivityEventType = "PRODUCT_PURCHASED"
+)
+
+var AllActivityEventType = []ActivityEventType{
+	ActivityEventTypeProductViewed,
+	ActivityEventTypeProductSearched,
+	ActivityEventTypeCategoryViewed,
+	ActivityEventTypeProductAddedToCart,
+	ActivityEventTypeProductRemovedFromCart,
+	ActivityEventTypeProductWishlisted,
+	ActivityEventTypeProductPurchased,
+}
+
+func (e ActivityEventType) IsValid() bool {
+	switch e {
+	case ActivityEventTypeProductViewed, ActivityEventTypeProductSearched, ActivityEventTypeCategoryViewed, ActivityEventTypeProductAddedToCart, ActivityEventTypeProductRemovedFromCart, ActivityEventTypeProductWishlisted, ActivityEventTypeProductPurchased:
+		return true
+	}
+	return false
+}
+
+func (e ActivityEventType) String() string {
+	return string(e)
+}
+
+func (e *ActivityEventType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ActivityEventType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ActivityEventType", str)
+	}
+	return nil
+}
+
+func (e ActivityEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type AuthRole string

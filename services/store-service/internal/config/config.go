@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,23 @@ type Config struct {
 	Tracing  TracingConfig
 	Storage  StorageConfig
 	GSTIN    GSTINConfig
+	Kafka    KafkaConfig
+	Outbox   OutboxConfig
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 type AppConfig struct {
@@ -118,6 +136,19 @@ func LoadEnv() *Config {
 			Enabled: GetEnvAsBool("GSTIN_VERIFICATION_ENABLED", true),
 			Timeout: time.Duration(timeoutSec) * time.Second,
 		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"127.0.0.1:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "store-service"),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   time.Duration(GetEnvAsInt("OUTBOX_POLL_INTERVAL_MS", 2000)) * time.Millisecond,
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 10),
+			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 2000)) * time.Millisecond,
+			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.store.dlq"),
+		},
 	}
 }
 
@@ -150,4 +181,22 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return val
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			result = append(result, t)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
 }

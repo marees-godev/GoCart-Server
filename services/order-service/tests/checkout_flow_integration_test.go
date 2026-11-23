@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -268,5 +269,163 @@ func TestCheckoutFlow_PaymentFailed_EndToEnd(t *testing.T) {
 	}
 	if afterDupOrder.Status != model.OrderStatusPaymentFailed {
 		t.Errorf("expected order status to remain PAYMENT_FAILED, got: %s", afterDupOrder.Status)
+	}
+}
+
+func TestCheckoutFlow_InStock_Success(t *testing.T) {
+	grpcClient, _, repo, userID, storeID, prodID, cleanup := setupCheckoutIntegration(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	resp, err := grpcClient.CreateOrder(ctx, &orderpb.CreateOrderRequest{
+		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
+		CartId:          "cart-" + userID,
+		ShippingAddress: "100 Pine St, Seattle, WA 98101",
+		ShippingFee:     10.00,
+	})
+	if err != nil {
+		t.Fatalf("expected successful order creation for in-stock product, got error: %v", err)
+	}
+
+	if len(resp.GetOrders()) != 1 {
+		t.Fatalf("expected 1 order created, got %d", len(resp.GetOrders()))
+	}
+	ord := resp.GetOrders()[0]
+	if ord.GetOrderStatus() != "CREATED" {
+		t.Errorf("expected order status CREATED, got %s", ord.GetOrderStatus())
+	}
+	if ord.GetStoreId() != storeID {
+		t.Errorf("expected store ID %s, got %s", storeID, ord.GetStoreId())
+	}
+
+	// Verify order has items matching the in-stock product
+	if len(ord.GetItems()) != 1 {
+		t.Fatalf("expected 1 order item, got %d", len(ord.GetItems()))
+	}
+	if ord.GetItems()[0].GetProductId() != prodID {
+		t.Errorf("expected product ID %s, got %s", prodID, ord.GetItems()[0].GetProductId())
+	}
+
+	// Verify outbox has OrderCreated event
+	repo.mu.RLock()
+	defer repo.mu.RUnlock()
+	var foundEvent bool
+	for _, env := range repo.outbox {
+		if env.EventType == events.EventTypeOrderCreated {
+			foundEvent = true
+			break
+		}
+	}
+	if !foundEvent {
+		t.Errorf("expected OrderCreated event in outbox for in-stock order")
+	}
+}
+
+func TestCheckoutFlow_InsufficientStock_Rejected(t *testing.T) {
+	repo := newInMemOrderRepo()
+	userID := uuid.New().String()
+	storeID := uuid.New().String()
+	prodID := uuid.New().String()
+
+	cartClient := &inMemCartClient{
+		carts: map[string]*cartpb.Cart{
+			userID: {
+				Id:     "cart-" + userID,
+				UserId: userID,
+				Items: []*cartpb.CartItem{
+					{ProductId: prodID, StoreId: storeID, Quantity: 10, UnitPrice: 50.0},
+				},
+			},
+		},
+	}
+	prodClient := &inMemProductClient{
+		products: map[string]*productpb.Product{
+			prodID: {
+				Id:      prodID,
+				StoreId: storeID,
+				Sku:     "SKU-TEST-LOW",
+				Name:    "Low Stock Item",
+				Price:   50.00,
+				Status:  "PUBLISHED",
+			},
+		},
+	}
+	// Available stock is only 3, but cart requests 10
+	invClient := &inMemInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{
+			prodID: {ProductId: prodID, AvailableQuantity: 3},
+		},
+	}
+
+	grpcClient, cleanup := setupInProcessGRPC(t, repo, cartClient, prodClient, invClient)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := grpcClient.CreateOrder(ctx, &orderpb.CreateOrderRequest{
+		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
+		CartId:          "cart-" + userID,
+		ShippingAddress: "100 Pine St, Seattle, WA 98101",
+		ShippingFee:     10.00,
+	})
+	if err == nil {
+		t.Fatalf("expected order creation to fail due to insufficient stock, got success")
+	}
+	if !strings.Contains(err.Error(), "insufficient stock") {
+		t.Errorf("expected error to mention 'insufficient stock', got: %v", err)
+	}
+}
+
+func TestCheckoutFlow_MissingInventory_Rejected(t *testing.T) {
+	repo := newInMemOrderRepo()
+	userID := uuid.New().String()
+	storeID := uuid.New().String()
+	missingProdID := uuid.New().String()
+
+	cartClient := &inMemCartClient{
+		carts: map[string]*cartpb.Cart{
+			userID: {
+				Id:     "cart-" + userID,
+				UserId: userID,
+				Items: []*cartpb.CartItem{
+					{ProductId: missingProdID, StoreId: storeID, Quantity: 1, UnitPrice: 50.0},
+				},
+			},
+		},
+	}
+	prodClient := &inMemProductClient{
+		products: map[string]*productpb.Product{
+			missingProdID: {
+				Id:      missingProdID,
+				StoreId: storeID,
+				Sku:     "SKU-MISSING",
+				Name:    "Missing Stock Item",
+				Price:   50.00,
+				Status:  "PUBLISHED",
+			},
+		},
+	}
+	// Inventory client has no stock record for this product
+	invClient := &inMemInventoryClient{
+		stocks: map[string]*inventorypb.StockItem{},
+	}
+
+	grpcClient, cleanup := setupInProcessGRPC(t, repo, cartClient, prodClient, invClient)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := grpcClient.CreateOrder(ctx, &orderpb.CreateOrderRequest{
+		UserId:          userID,
+		IdempotencyKey:  uuid.New().String(),
+		CartId:          "cart-" + userID,
+		ShippingAddress: "100 Pine St, Seattle, WA 98101",
+		ShippingFee:     10.00,
+	})
+	if err == nil {
+		t.Fatalf("expected order creation to fail due to missing inventory, got success")
+	}
+	if !strings.Contains(err.Error(), "out of stock (not found in inventory)") {
+		t.Errorf("expected error to mention 'out of stock (not found in inventory)', got: %v", err)
 	}
 }

@@ -17,9 +17,11 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/redis"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/auth-service/internal/config"
@@ -95,6 +97,35 @@ func main() {
 		}
 	}
 
+	// 5.1 Initialize Kafka producer and Outbox publisher if enabled
+	var kafkaProducer *kafka.Producer
+	if cfg.Outbox.Enabled {
+		kafkaProducer = kafka.NewProducer(kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       cfg.Kafka.ClientID,
+			ConnectTimeout: 10 * time.Second,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			RetryInterval:  500 * time.Millisecond,
+		})
+		defer func() {
+			if err := kafkaProducer.Close(); err != nil {
+				log.Error("Failed to close Kafka producer", "error", err)
+			}
+		}()
+
+		outboxStore := outbox.NewStore()
+		outboxPublisher := outbox.NewPublisher(db.Pool, kafkaProducer, outboxStore, outbox.Config{
+			PollInterval:   cfg.Outbox.PollInterval,
+			BatchSize:      cfg.Outbox.BatchSize,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			BaseRetryDelay: cfg.Outbox.BaseRetryDelay,
+			MaxRetryDelay:  cfg.Outbox.MaxRetryDelay,
+			DLQTopic:       cfg.Outbox.DLQTopic,
+			ServiceName:    cfg.App.Name,
+		})
+		go outboxPublisher.Start(ctx)
+	}
+
 	// 6. Setup Fiber HTTP server with observability middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
@@ -156,7 +187,7 @@ func main() {
 	}
 
 	authRepo := repository.NewAuthRepository(db.Pool, log)
-	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, deliveryClient, otpStore, redisClient)
+	authSvc := service.NewAuthService(authRepo, cfg, log, userClient, merchantClient, deliveryClient, otpStore, redisClient, kafkaProducer)
 
 	// 8. Initialize gRPC server for all Auth operations
 	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()))

@@ -21,6 +21,7 @@ type Order {
   items: [OrderItem!]!
   subtotal: Float
   taxAmount: Float
+  platformFee: Float
   shippingFee: Float
   discountAmount: Float
   totalAmount: Float!

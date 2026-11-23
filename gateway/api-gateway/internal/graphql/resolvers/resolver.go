@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -16,6 +17,16 @@ func (r *Resolver) getUserClient() userpb.UserServiceClient {
 	}
 	if r.ClientMgr != nil && r.ClientMgr.UserClient != nil {
 		return r.ClientMgr.UserClient
+	}
+	return nil
+}
+
+func (r *Resolver) getMerchantClient() merchantpb.MerchantServiceClient {
+	if r.Clients != nil && r.Clients.MerchantClient != nil {
+		return r.Clients.MerchantClient
+	}
+	if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
+		return r.ClientMgr.MerchantClient
 	}
 	return nil
 }

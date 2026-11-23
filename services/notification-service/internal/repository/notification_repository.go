@@ -182,7 +182,7 @@ func (r *notificationRepository) CreateJob(ctx context.Context, job *model.Notif
 	).Scan(&job.ID, &job.CreatedAt, &job.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // Unique violation
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return fmt.Errorf("job already exists for event_id %s: %w", job.EventID, err)
 		}
 		return fmt.Errorf("failed to create notification job: %w", err)
@@ -193,7 +193,7 @@ func (r *notificationRepository) CreateJob(ctx context.Context, job *model.Notif
 func (r *notificationRepository) GetJobByEventID(ctx context.Context, eventID string) (*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
-		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       COALESCE(j.template_id::text, ''), j.event_type, j.recipient, j.subject, j.content, j.status::text,
 		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
 		       j.created_at, j.updated_at, j.processed_at
 		FROM notification_jobs j
@@ -231,7 +231,7 @@ func (r *notificationRepository) GetJobByEventID(ctx context.Context, eventID st
 func (r *notificationRepository) GetJobByID(ctx context.Context, id string) (*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
-		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       COALESCE(j.template_id::text, ''), j.event_type, j.recipient, j.subject, j.content, j.status::text,
 		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
 		       j.created_at, j.updated_at, j.processed_at
 		FROM notification_jobs j
@@ -299,7 +299,7 @@ func (r *notificationRepository) IncrementRetry(ctx context.Context, id string, 
 func (r *notificationRepository) ListPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
 		SELECT j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
-		       j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
+		       COALESCE(j.template_id::text, ''), j.event_type, j.recipient, j.subject, j.content, j.status::text,
 		       j.retry_count, j.max_retries, j.correlation_id, j.error_message,
 		       j.created_at, j.updated_at, j.processed_at
 		FROM notification_jobs j
@@ -344,22 +344,29 @@ func (r *notificationRepository) ListPendingJobs(ctx context.Context, limit int)
 func (r *notificationRepository) ClaimPendingJobs(ctx context.Context, limit int) ([]*model.NotificationJob, error) {
 	query := `
 		WITH claimable AS (
-			SELECT id, channel_id
+			SELECT id
 			FROM notification_jobs
 			WHERE status = 'PENDING'::notification_job_status AND retry_count < max_retries
 			ORDER BY created_at ASC
 			LIMIT $1
 			FOR UPDATE SKIP LOCKED
+		),
+		updated AS (
+			UPDATE notification_jobs j
+			SET status = 'PROCESSING'::notification_job_status, updated_at = NOW()
+			FROM claimable
+			WHERE j.id = claimable.id
+			RETURNING j.id, j.event_id, j.user_id, j.channel_id,
+			          j.template_id, j.event_type, j.recipient, j.subject, j.content, j.status,
+			          j.retry_count, j.max_retries, j.correlation_id, j.error_message,
+			          j.created_at, j.updated_at, j.processed_at
 		)
-		UPDATE notification_jobs j
-		SET status = 'PROCESSING'::notification_job_status, updated_at = NOW()
-		FROM claimable
-		LEFT JOIN notification_channels c ON claimable.channel_id = c.id
-		WHERE j.id = claimable.id
-		RETURNING j.id, j.event_id, j.user_id::text, j.channel_id::text, COALESCE(c.code::text, ''),
-		          j.template_id::text, j.event_type, j.recipient, j.subject, j.content, j.status,
-		          j.retry_count, j.max_retries, j.correlation_id, j.error_message,
-		          j.created_at, j.updated_at, j.processed_at
+		SELECT u.id, u.event_id, u.user_id::text, u.channel_id::text, COALESCE(c.code::text, ''),
+		       COALESCE(u.template_id::text, ''), u.event_type, u.recipient, u.subject, u.content, u.status::text,
+		       u.retry_count, u.max_retries, u.correlation_id, u.error_message,
+		       u.created_at, u.updated_at, u.processed_at
+		FROM updated u
+		LEFT JOIN notification_channels c ON u.channel_id = c.id
 	`
 	rows, err := r.pool.Query(ctx, query, limit)
 	if err != nil {

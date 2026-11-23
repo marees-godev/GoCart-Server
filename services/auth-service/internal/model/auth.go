@@ -61,13 +61,14 @@ type AuthCredential struct {
 }
 
 type RefreshToken struct {
-	ID        uuid.UUID  `json:"id" db:"id"`
-	UserID    uuid.UUID  `json:"user_id" db:"user_id"`
-	TokenHash string     `json:"-" db:"token_hash"`
-	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
-	Revoked   bool       `json:"revoked" db:"revoked"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	ID         uuid.UUID  `json:"id" db:"id"`
+	UserID     uuid.UUID  `json:"user_id" db:"user_id"`
+	TokenHash  string     `json:"-" db:"token_hash"`
+	ExpiresAt  time.Time  `json:"expires_at" db:"expires_at"`
+	Revoked    bool       `json:"revoked" db:"revoked"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	RememberMe bool       `json:"remember_me" db:"remember_me"`
 }
 
 type PasswordResetToken struct {
@@ -83,8 +84,9 @@ type PasswordResetToken struct {
 type AuthProviderType string
 
 const (
-	AuthProviderLocal  AuthProviderType = "LOCAL"
-	AuthProviderGoogle AuthProviderType = "GOOGLE"
+	AuthProviderLocal    AuthProviderType = "LOCAL"
+	AuthProviderGoogle   AuthProviderType = "GOOGLE"
+	AuthProviderFacebook AuthProviderType = "FACEBOOK"
 )
 
 func (p AuthProviderType) String() string {

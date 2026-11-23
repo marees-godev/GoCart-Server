@@ -142,6 +142,9 @@ func (s *deliveryService) HandleOrderConfirmed(ctx context.Context, payload *dto
 			if strings.TrimSpace(addr.ContactNumber) == "" && strings.TrimSpace(ord.ShippingAddress.ContactNumber) != "" {
 				addr.ContactNumber = ord.ShippingAddress.ContactNumber
 			}
+			if strings.TrimSpace(addr.UserID) == "" && strings.TrimSpace(ord.UserID) != "" {
+				addr.UserID = strings.TrimSpace(ord.UserID)
+			}
 		}
 	}
 

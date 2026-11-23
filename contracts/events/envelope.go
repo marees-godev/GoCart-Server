@@ -46,6 +46,8 @@ const (
 
 	// Merchant Service Events
 	EventTypeMerchantRegistered = "MerchantRegistered"
+	EventTypeMerchantApproved   = "MerchantApproved"
+	EventTypeMerchantRejected   = "MerchantRejected"
 	EventTypeMerchantActivated  = "MerchantActivated"
 	EventTypeMerchantSuspended  = "MerchantSuspended"
 
@@ -72,6 +74,15 @@ const (
 	EventTypeExchangeOfferApplied = "ExchangeOfferApplied"
 	EventTypeExchangeVerified     = "ExchangeVerified"
 	EventTypeExchangeCompleted    = "ExchangeCompleted"
+
+	// Personalization Service Events
+	EventTypeProductViewed          = "ProductViewed"
+	EventTypeProductSearched        = "ProductSearched"
+	EventTypeCategoryViewed         = "CategoryViewed"
+	EventTypeProductAddedToCart     = "ProductAddedToCart"
+	EventTypeProductRemovedFromCart = "ProductRemovedFromCart"
+	EventTypeProductWishlisted      = "ProductWishlisted"
+	EventTypeProductPurchased       = "ProductPurchased"
 )
 
 // Standard Topic Constants
@@ -110,6 +121,8 @@ const (
 
 	// Merchant Service Topics
 	TopicMerchantRegistered = "gocart.merchant.merchant-registered"
+	TopicMerchantApproved   = "gocart.merchant.merchant-approved"
+	TopicMerchantRejected   = "gocart.merchant.merchant-rejected"
 	TopicMerchantActivated  = "gocart.merchant.merchant-activated"
 	TopicMerchantSuspended  = "gocart.merchant.merchant-suspended"
 
@@ -137,6 +150,9 @@ const (
 	TopicExchangeOfferApplied = "gocart.return.exchange-offer-applied"
 	TopicExchangeVerified     = "gocart.return.exchange-verified"
 	TopicExchangeCompleted    = "gocart.return.exchange-completed"
+
+	// Personalization Service Topics
+	TopicCustomerActivity = "gocart.activity.customer-interactions"
 )
 
 // EventEnvelope is the standard CloudEvents-compliant envelope for all domain events across GoCart.

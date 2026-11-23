@@ -27,10 +27,16 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 		return nil, appErrors.BadRequest("email and password are required")
 	}
 
+	rememberMe := false
+	if input.RememberMe != nil {
+		rememberMe = *input.RememberMe
+	}
+
 	res, err := authClient.Login(ctx, &authpb.LoginRequest{
-		Email:    input.Email,
-		Password: input.Password,
-		Role:     authRoleToAuthPBRole(input.Role),
+		Email:      input.Email,
+		Password:   input.Password,
+		Role:       authRoleToAuthPBRole(input.Role),
+		RememberMe: rememberMe,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -105,6 +111,78 @@ func (r *mutationResolver) LoginWithGoogle(ctx context.Context, input model.Goog
 	res, err := authClient.GoogleLogin(ctx, &authpb.GoogleAuthRequest{
 		IdToken: idToken,
 		Role:    role,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	resRole := model.RoleUser
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		Role:  &resRole,
+	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
+
+	return payload, nil
+}
+
+// LoginWithFacebook is the resolver for the loginWithFacebook field.
+func (r *mutationResolver) LoginWithFacebook(ctx context.Context, input model.FacebookAuthInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
+	code := strings.TrimSpace(input.Code)
+	if code == "" {
+		return nil, appErrors.BadRequest("code is required")
+	}
+
+	appID := ""
+	appSecret := ""
+	redirectURI := ""
+	if r.Resolver != nil && r.Resolver.Config != nil {
+		appID = strings.TrimSpace(r.Resolver.Config.Facebook.AppID)
+		appSecret = strings.TrimSpace(r.Resolver.Config.Facebook.AppSecret)
+		redirectURI = strings.TrimSpace(r.Resolver.Config.Facebook.RedirectURL)
+	}
+	if input.RedirectURI != nil && strings.TrimSpace(*input.RedirectURI) != "" {
+		redirectURI = strings.TrimSpace(*input.RedirectURI)
+	}
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8080/api/v1/auth/facebook/callback"
+	}
+
+	accessToken, exErr := exchangeFacebookAuthCode(ctx, appID, appSecret, redirectURI, code)
+	if exErr != nil {
+		return nil, appErrors.BadRequest(exErr.Error())
+	}
+
+	role := authpb.Role_USER
+	if input.Role != nil {
+		role = authRoleToAuthPBRole(*input.Role)
+	}
+
+	res, err := authClient.FacebookLogin(ctx, &authpb.FacebookAuthRequest{
+		AccessToken: accessToken,
+		Role:        role,
+		Code:        code,
+		RedirectUri: redirectURI,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -254,6 +332,78 @@ func (r *mutationResolver) RegisterWithGoogle(ctx context.Context, input model.G
 	res, err := authClient.GoogleRegister(ctx, &authpb.GoogleAuthRequest{
 		IdToken: idToken,
 		Role:    role,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	resRole := model.RoleUser
+	if res.Role != authpb.Role_ROLE_UNSPECIFIED {
+		resRole = fromAuthPBRole(res.Role)
+	}
+
+	payload := &model.AuthPayload{
+		Token: res.AccessToken,
+		Role:  &resRole,
+	}
+	if res.RefreshToken != "" {
+		refToken := res.RefreshToken
+		payload.RefreshToken = &refToken
+	}
+	if res.TokenType != "" {
+		tt := res.TokenType
+		payload.TokenType = &tt
+	}
+	if res.ExpiresIn > 0 {
+		exp := int(res.ExpiresIn)
+		payload.ExpiresIn = &exp
+	}
+
+	return payload, nil
+}
+
+// RegisterWithFacebook is the resolver for the registerWithFacebook field.
+func (r *mutationResolver) RegisterWithFacebook(ctx context.Context, input model.FacebookAuthInput) (*model.AuthPayload, error) {
+	authClient, err := r.getAuthClient()
+	if err != nil {
+		return nil, err
+	}
+
+	code := strings.TrimSpace(input.Code)
+	if code == "" {
+		return nil, appErrors.BadRequest("code is required")
+	}
+
+	appID := ""
+	appSecret := ""
+	redirectURI := ""
+	if r.Resolver != nil && r.Resolver.Config != nil {
+		appID = strings.TrimSpace(r.Resolver.Config.Facebook.AppID)
+		appSecret = strings.TrimSpace(r.Resolver.Config.Facebook.AppSecret)
+		redirectURI = strings.TrimSpace(r.Resolver.Config.Facebook.RedirectURL)
+	}
+	if input.RedirectURI != nil && strings.TrimSpace(*input.RedirectURI) != "" {
+		redirectURI = strings.TrimSpace(*input.RedirectURI)
+	}
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8080/api/v1/auth/facebook/callback"
+	}
+
+	accessToken, exErr := exchangeFacebookAuthCode(ctx, appID, appSecret, redirectURI, code)
+	if exErr != nil {
+		return nil, appErrors.BadRequest(exErr.Error())
+	}
+
+	role := authpb.Role_USER
+	if input.Role != nil {
+		role = authRoleToAuthPBRole(*input.Role)
+	}
+
+	res, err := authClient.FacebookRegister(ctx, &authpb.FacebookAuthRequest{
+		AccessToken: accessToken,
+		Role:        role,
+		Code:        code,
+		RedirectUri: redirectURI,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

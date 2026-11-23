@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package personalization;
+
+option go_package = "github.com/marees-godev/GoCart-Server/contracts/protobuf/personalization;personalization";
+
+service PersonalizationService {
+    rpc TrackActivity (TrackActivityRequest) returns (TrackActivityResponse);
+    rpc GetCustomerActivities (GetCustomerActivitiesRequest) returns (GetCustomerActivitiesResponse);
+    rpc GetRecentlyViewedProducts (GetRecentlyViewedProductsRequest) returns (GetRecentlyViewedProductsResponse);
+    rpc GetCategoryPreferences (GetCategoryPreferenceRequest) returns (GetCategoryPreferenceResponse);
+}
+
+enum ActivityEventType {
+    ACTIVITY_EVENT_TYPE_UNSPECIFIED = 0;
+    ACTIVITY_EVENT_TYPE_PRODUCT_VIEWED = 1;
+    ACTIVITY_EVENT_TYPE_PRODUCT_SEARCHED = 2;
+    ACTIVITY_EVENT_TYPE_CATEGORY_VIEWED = 3;
+    ACTIVITY_EVENT_TYPE_PRODUCT_ADDED_TO_CART = 4;
+    ACTIVITY_EVENT_TYPE_PRODUCT_REMOVED_FROM_CART = 5;
+    ACTIVITY_EVENT_TYPE_PRODUCT_WISHLISTED = 6;
+    ACTIVITY_EVENT_TYPE_PRODUCT_PURCHASED = 7;
+}
+
+message TrackActivityRequest {
+    string user_id = 1;
+    string session_id = 2;
+    ActivityEventType event_type = 3;
+    string product_id = 4;
+    string category_id = 5;
+}
+
+message TrackActivityResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message CustomerActivity {
+    string id = 1;
+    string user_id = 2;
+    string session_id = 3;
+    ActivityEventType event_type = 4;
+    string product_id = 5;
+    string category_id = 6;
+    string created_at = 7;
+}
+
+message GetCustomerActivitiesRequest {
+    string user_id = 1;
+    string session_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message GetCustomerActivitiesResponse {
+    repeated CustomerActivity activities = 1;
+    int32 total = 2;
+}
+
+message GetRecentlyViewedProductsRequest {
+    string user_id = 1;
+    string session_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message RecentlyViewedProduct {
+    string product_id = 1;
+    string last_viewed_at = 2;
+}
+
+message GetRecentlyViewedProductsResponse {
+    repeated RecentlyViewedProduct products = 1;
+    int32 total = 2;
+}
+
+message CategoryPreference {
+    string category_id = 1;
+    double score = 2;
+}
+
+message GetCategoryPreferenceRequest {
+    string user_id = 1;
+    string session_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message GetCategoryPreferenceResponse {
+    repeated CategoryPreference preferences = 1;
+}

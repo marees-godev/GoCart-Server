@@ -13,6 +13,8 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
+replace github.com/marees-godev/GoCart-Server => ../..
+
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.47.0 // indirect

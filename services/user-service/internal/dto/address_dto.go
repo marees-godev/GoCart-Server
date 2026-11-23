@@ -6,14 +6,18 @@ import (
 	"time"
 
 	"github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/validation"
 	"github.com/marees-godev/GoCart-Server/services/user-service/internal/model"
 )
 
 var (
-	postalCodeRegex   = regexp.MustCompile(`^[a-zA-Z0-9\s\-]{3,20}$`)
 	addressPhoneRegex = regexp.MustCompile(`^\+?[0-9\s\-\(\)]{7,25}$`)
 	addressEmailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 )
+
+func ValidatePostalCode(postalCode string, country string) error {
+	return validation.ValidatePostalCode(postalCode, country)
+}
 
 type CreateAddressRequest struct {
 	Label        *string `json:"label,omitempty"`
@@ -76,12 +80,8 @@ func (r *CreateAddressRequest) Validate() error {
 		return errors.BadRequest("state must not exceed 100 characters")
 	}
 
-	postalCode := strings.TrimSpace(r.PostalCode)
-	if postalCode == "" {
-		return errors.BadRequest("postal_code is required")
-	}
-	if !postalCodeRegex.MatchString(postalCode) {
-		return errors.BadRequest("invalid postal_code format")
+	if err := ValidatePostalCode(r.PostalCode, r.Country); err != nil {
+		return err
 	}
 
 	country := strings.TrimSpace(r.Country)
@@ -168,9 +168,12 @@ func (r *UpdateAddressRequest) Validate() error {
 	}
 
 	if r.PostalCode != nil {
-		postalCode := strings.TrimSpace(*r.PostalCode)
-		if postalCode == "" || !postalCodeRegex.MatchString(postalCode) {
-			return errors.BadRequest("invalid postal_code format")
+		country := ""
+		if r.Country != nil {
+			country = *r.Country
+		}
+		if err := ValidatePostalCode(*r.PostalCode, country); err != nil {
+			return err
 		}
 	}
 

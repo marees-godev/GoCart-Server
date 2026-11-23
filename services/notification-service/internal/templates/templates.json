@@ -3,67 +3,201 @@
     "event_type": "UserRegistered",
     "channel": "EMAIL",
     "subject_template": "Welcome to GoCart, {{.Email}}!",
-    "body_template": "Hello {{.Email}}, your account has been registered successfully on GoCart. Welcome aboard!"
+    "body_template": "Hello {{.Email}}, your account has been registered successfully on GoCart. Welcome aboard!",
+    "template_file": "emails/user_registered.html"
   },
   {
     "event_type": "StoreApproved",
     "channel": "EMAIL",
     "subject_template": "Store Approved: Store #{{.StoreID}}",
-    "body_template": "Congratulations! Your store application for Store #{{.StoreID}} has been approved. You may now start listing products."
+    "body_template": "Congratulations! Your store application for Store #{{.StoreID}} has been approved. You may now start listing products.",
+    "template_file": "emails/store_notification.html"
   },
   {
     "event_type": "StoreRejected",
     "channel": "EMAIL",
     "subject_template": "Store Application Update: Store #{{.StoreID}}",
-    "body_template": "Your store application for Store #{{.StoreID}} was rejected. Reason: {{.Reason}}. Please contact support if you have questions."
+    "body_template": "Your store application for Store #{{.StoreID}} was rejected. Reason: {{.Reason}}. Please contact support if you have questions.",
+    "template_file": "emails/store_notification.html"
+  },
+  {
+    "event_type": "MerchantApproved",
+    "channel": "EMAIL",
+    "subject_template": "Merchant Account Approved - {{.MerchantID}}",
+    "body_template": "Congratulations! Your merchant account #{{.MerchantID}} has been approved.",
+    "template_file": "emails/merchant_notification.html"
+  },
+  {
+    "event_type": "MerchantActivated",
+    "channel": "EMAIL",
+    "subject_template": "Merchant Account Activated - {{.MerchantID}}",
+    "body_template": "Great news! Your merchant account #{{.MerchantID}} is now {{.NewStatus}}.",
+    "template_file": "emails/merchant_notification.html"
+  },
+  {
+    "event_type": "MerchantRejected",
+    "channel": "EMAIL",
+    "subject_template": "Merchant Application Rejected - {{.MerchantID}}",
+    "body_template": "Your merchant application #{{.MerchantID}} was rejected. Reason: {{.Reason}}.",
+    "template_file": "emails/merchant_notification.html"
+  },
+  {
+    "event_type": "MerchantSuspended",
+    "channel": "EMAIL",
+    "subject_template": "Merchant Account Suspended - {{.MerchantID}}",
+    "body_template": "Your merchant account #{{.MerchantID}} has been suspended. Reason: {{.Reason}}.",
+    "template_file": "emails/merchant_notification.html"
   },
   {
     "event_type": "OrderCreated",
     "channel": "EMAIL",
     "subject_template": "Order Confirmation - Order #{{.OrderID}}",
-    "body_template": "Thank you for your order! Your order #{{.OrderID}} has been placed with total amount {{.TotalAmount}} {{.Currency}}."
+    "body_template": "Thank you for your order! Your order #{{.OrderID}} has been placed with total amount {{.TotalAmount}} {{.Currency}}.",
+    "template_file": "emails/order_notification.html"
   },
   {
-    "event_type": "PaymentSuccessful",
-    "channel": "EMAIL",
-    "subject_template": "Payment Receipt - Order #{{.OrderID}}",
-    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} was successful. Reference Payment ID: {{.PaymentID}}."
+    "event_type": "OrderCreated",
+    "channel": "PUSH",
+    "subject_template": "Order Placed - #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} ({{.TotalAmount}} {{.Currency}}) has been placed."
   },
   {
-    "event_type": "PaymentFailed",
+    "event_type": "OrderConfirmed",
     "channel": "EMAIL",
-    "subject_template": "Payment Failed - Order #{{.OrderID}}",
-    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} failed. Reason: {{.Reason}}. Please update your payment method."
+    "subject_template": "Order Confirmed - Order #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} is confirmed and being prepared for shipment.",
+    "template_file": "emails/order_notification.html"
+  },
+  {
+    "event_type": "OrderConfirmed",
+    "channel": "PUSH",
+    "subject_template": "Order Confirmed - #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} is confirmed and being prepared for shipment."
   },
   {
     "event_type": "OrderShipped",
     "channel": "EMAIL",
     "subject_template": "Your Order #{{.OrderID}} has Shipped!",
-    "body_template": "Great news! Your order #{{.OrderID}} has been shipped via {{.DeliveryPartner}} with tracking number: {{.TrackingNumber}}."
+    "body_template": "Great news! Your order #{{.OrderID}} has been shipped{{if .DeliveryPartner}} via {{.DeliveryPartner}}{{end}}{{if .TrackingNumber}} with tracking number: {{.TrackingNumber}}{{end}}.",
+    "template_file": "emails/order_notification.html"
+  },
+  {
+    "event_type": "OrderShipped",
+    "channel": "PUSH",
+    "subject_template": "Order Shipped - #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} has shipped{{if .TrackingNumber}} (Tracking: {{.TrackingNumber}}){{end}}."
   },
   {
     "event_type": "OrderDelivered",
     "channel": "EMAIL",
     "subject_template": "Order #{{.OrderID}} Delivered",
+    "body_template": "Your order #{{.OrderID}} has been delivered successfully. Thank you for shopping with GoCart!",
+    "template_file": "emails/order_notification.html"
+  },
+  {
+    "event_type": "OrderDelivered",
+    "channel": "PUSH",
+    "subject_template": "Order Delivered - #{{.OrderID}}",
     "body_template": "Your order #{{.OrderID}} has been delivered successfully. Thank you for shopping with GoCart!"
+  },
+  {
+    "event_type": "OrderCancelled",
+    "channel": "EMAIL",
+    "subject_template": "Order Cancelled - Order #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} has been cancelled.{{if .Reason}} Reason: {{.Reason}}.{{end}}",
+    "template_file": "emails/order_notification.html"
+  },
+  {
+    "event_type": "OrderCancelled",
+    "channel": "PUSH",
+    "subject_template": "Order Cancelled - #{{.OrderID}}",
+    "body_template": "Your order #{{.OrderID}} has been cancelled.{{if .Reason}} Reason: {{.Reason}}.{{end}}"
+  },
+  {
+    "event_type": "OrderPaymentFailed",
+    "channel": "EMAIL",
+    "subject_template": "Order Payment Failed - Order #{{.OrderID}}",
+    "body_template": "Payment for order #{{.OrderID}} failed. Reason: {{.Reason}}. Please retry payment.",
+    "template_file": "emails/payment_notification.html"
+  },
+  {
+    "event_type": "OrderPaymentFailed",
+    "channel": "PUSH",
+    "subject_template": "Payment Failed - Order #{{.OrderID}}",
+    "body_template": "Payment failed for order #{{.OrderID}}. Please retry payment."
+  },
+  {
+    "event_type": "PaymentSuccessful",
+    "channel": "EMAIL",
+    "subject_template": "Payment Receipt - Order #{{.OrderID}}",
+    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} was successful. Reference Payment ID: {{.PaymentID}}.",
+    "template_file": "emails/payment_notification.html"
+  },
+  {
+    "event_type": "PaymentFailed",
+    "channel": "EMAIL",
+    "subject_template": "Payment Failed - Order #{{.OrderID}}",
+    "body_template": "Payment of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} failed. Reason: {{.Reason}}. Please update your payment method.",
+    "template_file": "emails/payment_notification.html"
+  },
+  {
+    "event_type": "DeliveryCreated",
+    "channel": "EMAIL",
+    "subject_template": "Delivery Partner Assigned - Order #{{.OrderID}}",
+    "body_template": "A delivery partner ({{.DeliveryPartner}}) has been assigned to your order #{{.OrderID}}. Tracking number: {{.TrackingNumber}}.",
+    "template_file": "emails/delivery_notification.html"
+  },
+  {
+    "event_type": "DeliveryCreated",
+    "channel": "PUSH",
+    "subject_template": "Delivery Created - Order #{{.OrderID}}",
+    "body_template": "Delivery for order #{{.OrderID}} has been created via {{.DeliveryPartner}}. Tracking: {{.TrackingNumber}}"
+  },
+  {
+    "event_type": "DeliveryStatusUpdated",
+    "channel": "EMAIL",
+    "subject_template": "Delivery Update - Order #{{.OrderID}}",
+    "body_template": "Delivery status for order #{{.OrderID}} (Tracking: {{.TrackingNumber}}) updated from {{.PreviousStatus}} to {{.NewStatus}}.",
+    "template_file": "emails/delivery_notification.html"
+  },
+  {
+    "event_type": "DeliveryStatusUpdated",
+    "channel": "PUSH",
+    "subject_template": "Delivery Update - Order #{{.OrderID}}",
+    "body_template": "Delivery status for order #{{.OrderID}} updated to {{.NewStatus}}."
+  },
+  {
+    "event_type": "DeliveryStatusChanged",
+    "channel": "EMAIL",
+    "subject_template": "Delivery Update - Order #{{.OrderID}}",
+    "body_template": "Delivery status for order #{{.OrderID}} (Tracking: {{.TrackingNumber}}) changed to {{.NewStatus}}.",
+    "template_file": "emails/delivery_notification.html"
+  },
+  {
+    "event_type": "DeliveryStatusChanged",
+    "channel": "PUSH",
+    "subject_template": "Delivery Update - Order #{{.OrderID}}",
+    "body_template": "Delivery status for order #{{.OrderID}} changed to {{.NewStatus}}."
   },
   {
     "event_type": "ReturnApproved",
     "channel": "EMAIL",
     "subject_template": "Return Request Approved - Return #{{.ReturnID}}",
-    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been approved. Refund amount: {{.RefundAmount}}."
+    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been approved. Refund amount: {{.RefundAmount}}.",
+    "template_file": "emails/return_notification.html"
   },
   {
     "event_type": "ReturnRejected",
     "channel": "EMAIL",
     "subject_template": "Return Request Rejected - Return #{{.ReturnID}}",
-    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been rejected. Reason: {{.RejectionReason}}."
+    "body_template": "Your return request for Order #{{.OrderID}} (Return ID: {{.ReturnID}}) has been rejected. Reason: {{.RejectionReason}}.",
+    "template_file": "emails/return_notification.html"
   },
   {
     "event_type": "RefundCompleted",
     "channel": "EMAIL",
     "subject_template": "Refund Completed - Order #{{.OrderID}}",
-    "body_template": "Your refund of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} (Refund ID: {{.RefundID}}) has been processed successfully."
+    "body_template": "Your refund of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} (Refund ID: {{.RefundID}}) has been processed successfully.",
+    "template_file": "emails/payment_notification.html"
   }
 ]
-

@@ -69,7 +69,14 @@ func (r *RetryHandler) PublishToDLQ(ctx context.Context, originalTopic, key stri
 		return fmt.Errorf("producer unavailable for DLQ publishing")
 	}
 
-	dlqTopic := fmt.Sprintf("%s%s", originalTopic, r.cfg.DLQSuffix)
+	dlqSuffix := r.cfg.DLQSuffix
+	if dlqSuffix == "" {
+		dlqSuffix = ".dlq"
+	}
+	dlqTopic := fmt.Sprintf("%s%s", originalTopic, dlqSuffix)
+	if dlqTopic == originalTopic {
+		dlqTopic = fmt.Sprintf("%s.dlq", originalTopic)
+	}
 	attemptCount := IntHeaderValue(originalHeaders, "x-attempt-count", r.cfg.MaxRetries) + 1
 
 	headers := []segmentio.Header{

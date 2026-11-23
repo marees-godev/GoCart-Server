@@ -508,6 +508,27 @@ func (r *pgMerchantRepository) UpdateStatusWithAudit(ctx context.Context, id uui
 				})
 			}
 		}
+	case model.MerchantStatusRejected:
+		rejPayload := events.MerchantRejectedEvent{
+			MerchantID:     id.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(newStatus),
+			RejectedBy:     updatedBy,
+			Reason:         reason,
+			RejectedAt:     time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantRejected, "merchant-service", id.String(), rejPayload)
+		if err == nil {
+			if pBytes, err := env.Marshal(); err == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "merchant",
+					AggregateID:   id.String(),
+					EventType:     events.EventTypeMerchantRejected,
+					Payload:       pBytes,
+					Topic:         events.TopicMerchantRejected,
+				})
+			}
+		}
 	case model.MerchantStatusSuspended:
 		suspPayload := events.MerchantSuspendedEvent{
 			MerchantID:     id.String(),
@@ -734,6 +755,27 @@ func (r *pgMerchantRepository) ExecuteLifecycleTransition(
 		if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
 			r.logger.Error("Repository: failed to write MerchantActivated event to outbox", slog.Any("error", err))
 			return nil, currentStatus, appErrors.Internal(err, "failed to record outbox event")
+		}
+	case model.MerchantStatusRejected:
+		rejPayload := events.MerchantRejectedEvent{
+			MerchantID:     merchantID.String(),
+			PreviousStatus: string(currentStatus),
+			NewStatus:      string(targetStatus),
+			RejectedBy:     adminID,
+			Reason:         reason,
+			RejectedAt:     time.Now().UTC(),
+		}
+		env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeMerchantRejected, "merchant-service", merchantID.String(), rejPayload)
+		if err == nil {
+			if pBytes, err := env.Marshal(); err == nil {
+				_ = r.outboxStore.Insert(ctx, tx, &outbox.Event{
+					AggregateType: "merchant",
+					AggregateID:   merchantID.String(),
+					EventType:     events.EventTypeMerchantRejected,
+					Payload:       pBytes,
+					Topic:         events.TopicMerchantRejected,
+				})
+			}
 		}
 	case model.MerchantStatusSuspended:
 		suspPayload := events.MerchantSuspendedEvent{

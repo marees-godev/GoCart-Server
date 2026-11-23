@@ -36,7 +36,7 @@ services:
         value: "1"
 
       # ==============================================================================
-      # 14 Microservice Databases (PostgreSQL / Aiven)
+      # 15 Microservice Databases (PostgreSQL / Aiven)
       # ==============================================================================
       - key: DATABASE_URL
         sync: false
@@ -67,6 +67,8 @@ services:
       - key: RATINGS_SERVICE_DATABASE_URL
         sync: false
       - key: NOTIFICATIONS_SERVICE_DATABASE_URL
+        sync: false
+      - key: PERSONALIZATION_SERVICE_DATABASE_URL
         sync: false
 
       # ==============================================================================
@@ -113,6 +115,20 @@ services:
         value: products-bucket
       - key: PRODUCT_S3_PUBLIC_URL_PREFIX
         value: https://evgotinlxjijpglixpmn.supabase.co/storage/v1/object/public/products-bucket
+
+      # 4. Rating Service S3 Storage (Review images/photos)
+      - key: RATINGS_S3_ENDPOINT
+        value: https://ponexftxwksqepxddyrd.storage.supabase.co/storage/v1/s3
+      - key: RATINGS_S3_REGION
+        value: ap-south-1
+      - key: RATINGS_S3_ACCESS_KEY_ID
+        sync: false
+      - key: RATINGS_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: RATINGS_S3_BUCKET
+        value: rating_bucket
+      - key: RATINGS_S3_PUBLIC_URL_PREFIX
+        value: https://ponexftxwksqepxddyrd.supabase.co/storage/v1/object/public/rating_bucket
 
       # ==============================================================================
       # Email & OTP Providers (Auth Service)
@@ -277,6 +293,16 @@ services:
         sync: false
       - key: GOOGLE_SCOPES
         value: openid email profile
+
+      # ==============================================================================
+      # Facebook OAuth Configuration
+      # ==============================================================================
+      - key: FACEBOOK_APP_ID
+        sync: false
+      - key: FACEBOOK_APP_SECRET
+        sync: false
+      - key: FACEBOOK_REDIRECT_URL
+        sync: false
       - key: CORS_ALLOWED_ORIGINS
         value: "*"
       - key: CORS_ALLOWED_METHODS
@@ -339,6 +365,8 @@ services:
         value: localhost:50063
       - key: NOTIFICATION_SERVICE_GRPC_ADDR
         value: localhost:50064
+      - key: PERSONALIZATION_SERVICE_GRPC_ADDR
+        value: localhost:50065
       - key: MERCHANT_SERVICE_GRPC_URL
         value: localhost:50056
       - key: DELIVERY_SERVICE_GRPC_URL

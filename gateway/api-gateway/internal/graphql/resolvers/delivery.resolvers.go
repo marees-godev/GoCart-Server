@@ -105,6 +105,7 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 			ua := addrResp.Address
 			if ua.City != "" || ua.State != "" {
 				addrMap := map[string]string{
+					"user_id":     customerID,
 					"street":      ua.AddressLine,
 					"city":        ua.City,
 					"state":       ua.State,
@@ -167,7 +168,17 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return toModelDelivery(res.Delivery), nil
+	del := toModelDelivery(res.Delivery)
+	targetUserID := ""
+	if ord != nil && strings.TrimSpace(ord.UserId) != "" {
+		targetUserID = strings.TrimSpace(ord.UserId)
+	}
+	if targetUserID == "" {
+		targetUserID = authID
+	}
+	r.notifyDeliveryCreated(ctx, del, targetUserID)
+
+	return del, nil
 }
 
 // UpdateDeliveryStatus is the resolver for the updateDeliveryStatus field.
@@ -190,10 +201,15 @@ func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, 
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
+	targetUserID := ""
+
 	// As delivery proceeds, synchronously synchronize order status with order-service
 	if res != nil && res.Delivery != nil && strings.TrimSpace(res.Delivery.OrderId) != "" {
 		if orderClient, oErr := r.getOrderClient(); oErr == nil && orderClient != nil {
 			delivOrderID := strings.TrimSpace(res.Delivery.OrderId)
+			if ordResp, ordErr := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: delivOrderID}); ordErr == nil && ordResp != nil && ordResp.Order != nil {
+				targetUserID = ordResp.Order.UserId
+			}
 			var targetOrderStatus string
 			switch strings.ToUpper(strings.TrimSpace(string(status))) {
 			case "PICKED_UP", "IN_TRANSIT":
@@ -214,7 +230,10 @@ func (r *mutationResolver) UpdateDeliveryStatus(ctx context.Context, id string, 
 		}
 	}
 
-	return toModelDelivery(res.Delivery), nil
+	del := toModelDelivery(res.Delivery)
+	r.notifyDeliveryStatusUpdated(ctx, del, targetUserID, string(status))
+
+	return del, nil
 }
 
 // CancelDelivery is the resolver for the cancelDelivery field.
@@ -301,20 +320,20 @@ func (r *mutationResolver) CancelDelivery(ctx context.Context, id string, reason
 	}
 
 	// Synchronously update order status in order-service so orders table immediately reflects CANCELLED
-	if orderClient != nil {
-		if _, cErr := orderClient.CancelOrder(ctx, &orderpb.CancelOrderRequest{
+	if _, cErr := orderClient.CancelOrder(ctx, &orderpb.CancelOrderRequest{
+		Id:     orderID,
+		UserId: authID,
+		Reason: cancelReason,
+	}); cErr != nil {
+		_, _ = orderClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
 			Id:     orderID,
-			UserId: authID,
-			Reason: cancelReason,
-		}); cErr != nil {
-			_, _ = orderClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
-				Id:     orderID,
-				Status: "CANCELLED",
-			})
-		}
+			Status: "CANCELLED",
+		})
 	}
 
-	return toModelDelivery(res.Delivery), nil
+	del := toModelDelivery(res.Delivery)
+	r.notifyDeliveryStatusUpdated(ctx, del, orderUserID, "CANCELLED")
+	return del, nil
 }
 
 // UpdateDeliveryPartnerProfile is the resolver for the updateDeliveryPartnerProfile field.
@@ -777,6 +796,7 @@ func (r *queryResolver) CalculateShippingFee(ctx context.Context, input model.Ca
 			}
 			if req.ShippingAddress == "" {
 				addrMap := map[string]string{
+					"user_id":     customerID,
 					"street":      ua.AddressLine,
 					"city":        ua.City,
 					"state":       ua.State,
@@ -849,8 +869,46 @@ func (r *queryResolver) CalculateShippingFee(ctx context.Context, input model.Ca
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
+	platFee := 7.00
+	shipFee := res.ShippingFee
+	var calculatedSubtotal float64
+	hasSubtotal := false
+	if input.OrderID != nil && *input.OrderID != "" {
+		if orderClient, oErr := r.getOrderClient(); oErr == nil && orderClient != nil {
+			if ordResp, ordErr := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: *input.OrderID}); ordErr == nil && ordResp != nil && ordResp.Order != nil {
+				calculatedSubtotal = ordResp.Order.Subtotal
+				hasSubtotal = true
+			}
+		}
+	} else if len(input.Items) > 0 {
+		if prodClient, pErr := r.getProductClient(); pErr == nil && prodClient != nil {
+			allFound := true
+			for _, it := range input.Items {
+				pResp, pErr := prodClient.GetProduct(ctx, &productpb.GetProductRequest{Id: it.ProductID})
+				if pErr == nil && pResp != nil && pResp.Product != nil {
+					calculatedSubtotal += pResp.Product.Price * float64(it.Quantity)
+				} else {
+					allFound = false
+					break
+				}
+			}
+			if allFound {
+				hasSubtotal = true
+			}
+		}
+	}
+
+	if hasSubtotal {
+		if calculatedSubtotal >= 500.0 {
+			shipFee = 0.00
+		} else {
+			shipFee = 40.00
+		}
+	}
+
 	result := &model.ShippingFeeCalculation{
-		ShippingFee:      res.ShippingFee,
+		ShippingFee:      shipFee,
+		PlatformFee:      &platFee,
 		Currency:         res.Currency,
 		Zone:             res.Zone,
 		TotalWeightGrams: res.TotalWeightGrams,

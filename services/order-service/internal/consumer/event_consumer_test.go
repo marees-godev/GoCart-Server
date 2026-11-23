@@ -334,3 +334,42 @@ func TestOrderEventConsumer_DeliveryStatusChanged_Progression(t *testing.T) {
 		t.Errorf("expected DELIVERED, got %s", repo.orders[orderID].Status)
 	}
 }
+
+func TestOrderEventConsumer_PaymentEvents_NonRetryableNotFoundAcknowledged(t *testing.T) {
+	c, _, _ := setupConsumerTest()
+	ctx := context.Background()
+
+	// 1. PaymentSuccessful for nonexistent order
+	paySuccPayload := events.PaymentSuccessfulEvent{
+		PaymentID: "pay-nf-1",
+		OrderID:   "nonexistent-order-1",
+		UserID:    "usr-1",
+		Amount:    100.0,
+		Currency:  "USD",
+	}
+	succEnv, err := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentSuccessful, "payment-service", "pay-nf-1", paySuccPayload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, succEnv); err != nil {
+		t.Errorf("expected missing order on PaymentSuccessful to be acknowledged without error, got: %v", err)
+	}
+
+	// 2. PaymentFailed for nonexistent order
+	payFailPayload := events.PaymentFailedEvent{
+		PaymentID: "pay-nf-2",
+		OrderID:   "nonexistent-order-2",
+		UserID:    "usr-2",
+		Amount:    100.0,
+		Reason:    "insufficient funds",
+	}
+	failEnv, err := events.NewEventEnvelopeWithAggregate(events.EventTypePaymentFailed, "payment-service", "pay-nf-2", payFailPayload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	if err := c.HandleEvent(ctx, failEnv); err != nil {
+		t.Errorf("expected missing order on PaymentFailed to be acknowledged without error, got: %v", err)
+	}
+}

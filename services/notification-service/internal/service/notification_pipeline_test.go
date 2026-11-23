@@ -316,6 +316,7 @@ func TestNotificationPipeline_CorrelationIDAndJobStructure(t *testing.T) {
 
 	if job == nil {
 		t.Fatalf("expected non-nil job")
+		return
 	}
 	if job.CorrelationID != "req-correlation-999" {
 		t.Errorf("expected correlation ID 'req-correlation-999', got: %s", job.CorrelationID)
@@ -328,5 +329,110 @@ func TestNotificationPipeline_CorrelationIDAndJobStructure(t *testing.T) {
 	}
 	if job.TemplateID != templateID {
 		t.Errorf("expected template ID %s, got: %s", templateID, job.TemplateID)
+	}
+}
+
+func TestIsPushSupportedEvent(t *testing.T) {
+	tests := []struct {
+		eventType string
+		expected  bool
+	}{
+		{"OrderCreated", true},
+		{"order.created", true},
+		{"order_created", true},
+		{"OrderPlaced", true},
+		{"OrderCancelled", true},
+		{"order.cancelled", true},
+		{"order_cancelled", true},
+		{"OrderConfirmed", true},
+		{"order.confirmed", true},
+		{"OrderShipped", true},
+		{"order.shipped", true},
+		{"OrderDelivered", true},
+		{"order.delivered", true},
+		{"DeliveryCreated", true},
+		{"delivery.created", true},
+		{"UserRegistered", false},
+		{"StoreApproved", false},
+		{"MerchantApproved", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.eventType, func(t *testing.T) {
+			if got := service.IsPushSupportedEvent(tt.eventType); got != tt.expected {
+				t.Errorf("IsPushSupportedEvent(%q) = %v, want %v", tt.eventType, got, tt.expected)
+			}
+		})
+	}
+}
+
+type mockUserEmailLookup struct {
+	email string
+	err   error
+}
+
+func (m *mockUserEmailLookup) LookupUserEmail(ctx context.Context, userID string) (string, error) {
+	return m.email, m.err
+}
+
+func TestNotificationPipeline_UserEmailLookup(t *testing.T) {
+	channelID := uuid.New().String()
+	templateID := uuid.New().String()
+
+	tmplRepo := &mockTemplateRepo{
+		templates: map[string]*model.Template{
+			events.EventTypeOrderCreated: {
+				ID:              templateID,
+				EventType:       events.EventTypeOrderCreated,
+				ChannelID:       channelID,
+				SubjectTemplate: "Order #{{.OrderID}} Confirmed",
+				BodyTemplate:    "Hello {{.Email}}, your order {{.OrderID}} is confirmed.",
+				IsActive:        true,
+			},
+		},
+	}
+	channelRepo := &mockChannelRepo{
+		channels: map[string]*model.Channel{
+			"EMAIL": {ID: channelID, Code: "EMAIL", Name: "Email", IsActive: true},
+		},
+	}
+	prefRepo := &mockPreferenceRepo{preferences: make(map[string]*model.Preference)}
+	jobRepo := &mockJobRepo{
+		jobs:          make(map[string]*model.NotificationJob),
+		jobsByEventID: make(map[string]*model.NotificationJob),
+	}
+	idempotencyRepo := &mockIdempotencyRepo{processed: make(map[string]*model.ProcessedEvent)}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	tmplSvc := service.NewTemplateService(tmplRepo)
+	prefSvc := service.NewPreferenceService(channelRepo, prefRepo)
+	userLookup := &mockUserEmailLookup{email: "customer@example.com"}
+
+	pipeline := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, jobRepo, idempotencyRepo, nil, nil, logger, userLookup)
+
+	ctx := context.Background()
+	payload := events.OrderCreatedEvent{
+		OrderID:     "ORD-12345",
+		UserID:      uuid.New().String(),
+		TotalAmount: 250.00,
+	}
+	env, err := events.NewEventEnvelope(events.EventTypeOrderCreated, "order-service", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	job, err := pipeline.ProcessEvent(ctx, env)
+	if err != nil {
+		t.Fatalf("failed to process event: %v", err)
+	}
+
+	if job == nil {
+		t.Fatalf("expected non-nil job")
+	}
+	if job.Recipient != "customer@example.com" {
+		t.Errorf("expected recipient 'customer@example.com', got: %s", job.Recipient)
+	}
+	if job.Status != model.JobStatusPending {
+		t.Errorf("expected status PENDING, got: %s", job.Status)
 	}
 }

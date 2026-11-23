@@ -18,6 +18,9 @@ service AuthService {
   rpc GoogleAuth (GoogleAuthRequest) returns (AuthResponse);
   rpc GoogleLogin (GoogleAuthRequest) returns (AuthResponse);
   rpc GoogleRegister (GoogleAuthRequest) returns (AuthResponse);
+  rpc FacebookAuth (FacebookAuthRequest) returns (AuthResponse);
+  rpc FacebookLogin (FacebookAuthRequest) returns (AuthResponse);
+  rpc FacebookRegister (FacebookAuthRequest) returns (AuthResponse);
 }
 
 enum Role {
@@ -34,6 +37,7 @@ message LoginRequest {
   reserved 3;
   reserved "is_merchant";
   Role role = 4;
+  bool remember_me = 5;
 }
 
 message RegisterRequest {
@@ -49,6 +53,15 @@ message RegisterRequest {
 message GoogleAuthRequest {
   string id_token = 1;
   Role role = 2;
+}
+
+message FacebookAuthRequest {
+  string access_token = 1;
+  Role role = 2;
+  reserved 3;
+  reserved "email";
+  string code = 4;
+  string redirect_uri = 5;
 }
 
 message ValidateTokenRequest {

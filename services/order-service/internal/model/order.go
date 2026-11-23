@@ -171,6 +171,7 @@ type Order struct {
 	StoreID           string        `json:"store_id" db:"store_id"`
 	Subtotal          float64       `json:"subtotal" db:"subtotal"`
 	TaxAmount         float64       `json:"tax_amount" db:"tax_amount"`
+	PlatformFee       float64       `json:"platform_fee" db:"platform_fee"`
 	ShippingFee       float64       `json:"shipping_fee" db:"shipping_fee"`
 	DiscountAmount    float64       `json:"discount_amount" db:"discount_amount"`
 	TotalAmount       float64       `json:"total_amount" db:"total_amount"`

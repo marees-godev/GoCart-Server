@@ -13,6 +13,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -213,7 +214,7 @@ func (m *mockAuthRepository) RotateRefreshToken(ctx context.Context, oldTokenID 
 	return nil
 }
 
-func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
 	for _, cred := range m.byEmail {
 		if cred.UserID == userID {
 			cred.EmailVerified = true
@@ -223,6 +224,9 @@ func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.
 		if cred.UserID == userID {
 			cred.EmailVerified = true
 		}
+	}
+	if len(evt) > 0 && evt[0] != nil {
+		m.outboxEvents = append(m.outboxEvents, evt[0])
 	}
 	return nil
 }
@@ -721,16 +725,9 @@ func TestRegister_Customer_Success(t *testing.T) {
 		t.Errorf("expected role %s or %s, got %s", model.RoleCustomer, model.RoleUser, cred.Role)
 	}
 
-	// Verify outbox event
-	if len(mockRepo.outboxEvents) != 1 {
-		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
-	}
-	evt := mockRepo.outboxEvents[0]
-	if evt.EventType != "UserRegistered" {
-		t.Errorf("expected EventType UserRegistered, got %s", evt.EventType)
-	}
-	if evt.Topic != "auth.user.registered" {
-		t.Errorf("expected Topic auth.user.registered, got %s", evt.Topic)
+	// Verify no outbox event is sent before email verification
+	if len(mockRepo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(mockRepo.outboxEvents))
 	}
 }
 
@@ -763,16 +760,9 @@ func TestRegister_Merchant_Success(t *testing.T) {
 		t.Errorf("expected role %s, got %s", model.RoleMerchant, cred.Role)
 	}
 
-	// Verify outbox event
-	if len(mockRepo.outboxEvents) != 1 {
-		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
-	}
-	evt := mockRepo.outboxEvents[0]
-	if evt.EventType != "MerchantRegistered" {
-		t.Errorf("expected EventType MerchantRegistered, got %s", evt.EventType)
-	}
-	if evt.Topic != "auth.merchant.registered" {
-		t.Errorf("expected Topic auth.merchant.registered, got %s", evt.Topic)
+	// Verify no outbox event is sent before email verification
+	if len(mockRepo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(mockRepo.outboxEvents))
 	}
 }
 
@@ -860,6 +850,17 @@ func TestVerifyEmail_Flow(t *testing.T) {
 	cred := mockRepo.byEmail["unverified@example.com"]
 	if !cred.EmailVerified {
 		t.Error("expected credential EmailVerified to be true after verification")
+	}
+
+	// Verify outbox event was generated for registration email notification
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event on verify email, got %d", len(mockRepo.outboxEvents))
+	}
+	if mockRepo.outboxEvents[0].EventType != events.EventTypeUserRegistered {
+		t.Errorf("expected EventType %s, got %s", events.EventTypeUserRegistered, mockRepo.outboxEvents[0].EventType)
+	}
+	if mockRepo.outboxEvents[0].Topic != events.TopicUserRegistered {
+		t.Errorf("expected Topic %s, got %s", events.TopicUserRegistered, mockRepo.outboxEvents[0].Topic)
 	}
 
 	// OTP should be deleted from store after successful verification (one-time use)
@@ -1557,8 +1558,8 @@ func TestRefreshToken_Success_And_Rotation(t *testing.T) {
 			if rt.Revoked {
 				t.Error("expected new rotated token to be active, not revoked")
 			}
-			if rt.ExpiresAt.Before(time.Now().Add(6 * 24 * time.Hour)) {
-				t.Error("expected new rotated token to have 7-day expiration")
+			if rt.ExpiresAt.Before(time.Now().Add(23 * time.Hour)) {
+				t.Error("expected new rotated token to have valid default session expiration")
 			}
 		}
 	}
@@ -3136,6 +3137,362 @@ func TestGoogleRegister_CompensatesUserProfileOnCredentialFailure(t *testing.T) 
 	}
 	if mockUserClient.deletedUsers[0].Id != mockUserClient.createdUsers[0].Id {
 		t.Errorf("expected DeleteUser ID %s, got %s", mockUserClient.createdUsers[0].Id, mockUserClient.deletedUsers[0].Id)
+	}
+}
+
+func TestLogin_RememberMe_True_Sets30DayExpiry(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	credID := uuid.Must(uuid.NewV7())
+	rawPassword := "StrongPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	mockRepo.byEmail["remember.true@example.com"] = &model.AuthCredential{
+		ID:               credID,
+		UserID:           userID,
+		Email:            "remember.true@example.com",
+		PasswordHash:     string(hashedPassword),
+		Role:             model.RoleCustomer,
+		EmailVerified:    true,
+		IsActive:         true,
+		FailedLoginCount: 0,
+	}
+
+	req := &dto.LoginRequest{
+		Email:      "remember.true@example.com",
+		Password:   rawPassword,
+		RememberMe: true,
+	}
+
+	resp, err := svc.Login(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful login, got: %v", err)
+	}
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected both access and refresh tokens returned")
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected both access and refresh tokens returned")
+	}
+
+	// Access token has shorter expiration (15 minutes)
+	if resp.ExpiresIn != 15*60 {
+		t.Errorf("expected access token expiresIn 900 seconds, got %d", resp.ExpiresIn)
+	}
+
+	// Verify refresh token in repo has 30-day lifetime
+	if len(mockRepo.refreshTokens) != 1 {
+		t.Fatalf("expected 1 refresh token in repo, got %d", len(mockRepo.refreshTokens))
+	}
+	rt := mockRepo.refreshTokens[0]
+	if !rt.RememberMe {
+		t.Errorf("expected refresh token RememberMe to be true")
+	}
+
+	expectedMin := time.Now().Add(29 * 24 * time.Hour)
+	expectedMax := time.Now().Add(31 * 24 * time.Hour)
+	if rt.ExpiresAt.Before(expectedMin) || rt.ExpiresAt.After(expectedMax) {
+		t.Errorf("expected refresh token ExpiresAt to be ~30 days (between %v and %v), got %v", expectedMin, expectedMax, rt.ExpiresAt)
+	}
+}
+
+func TestLogin_RememberMe_False_SetsDefaultSessionExpiry(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	credID := uuid.Must(uuid.NewV7())
+	rawPassword := "StrongPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	mockRepo.byEmail["remember.false@example.com"] = &model.AuthCredential{
+		ID:               credID,
+		UserID:           userID,
+		Email:            "remember.false@example.com",
+		PasswordHash:     string(hashedPassword),
+		Role:             model.RoleCustomer,
+		EmailVerified:    true,
+		IsActive:         true,
+		FailedLoginCount: 0,
+	}
+
+	req := &dto.LoginRequest{
+		Email:      "remember.false@example.com",
+		Password:   rawPassword,
+		RememberMe: false,
+	}
+
+	resp, err := svc.Login(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful login, got: %v", err)
+	}
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected both access and refresh tokens returned")
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected both access and refresh tokens returned")
+	}
+
+	if len(mockRepo.refreshTokens) != 1 {
+		t.Fatalf("expected 1 refresh token in repo, got %d", len(mockRepo.refreshTokens))
+	}
+	rt := mockRepo.refreshTokens[0]
+	if rt.RememberMe {
+		t.Errorf("expected refresh token RememberMe to be false")
+	}
+
+	expectedMin := time.Now().Add(23 * time.Hour)
+	expectedMax := time.Now().Add(25 * time.Hour)
+	if rt.ExpiresAt.Before(expectedMin) || rt.ExpiresAt.After(expectedMax) {
+		t.Errorf("expected refresh token ExpiresAt to be ~24 hours (between %v and %v), got %v", expectedMin, expectedMax, rt.ExpiresAt)
+	}
+}
+
+func TestLogin_RememberMe_Omitted_DefaultsToFalse(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	credID := uuid.Must(uuid.NewV7())
+	rawPassword := "StrongPassword123!"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+
+	mockRepo.byEmail["remember.omitted@example.com"] = &model.AuthCredential{
+		ID:               credID,
+		UserID:           userID,
+		Email:            "remember.omitted@example.com",
+		PasswordHash:     string(hashedPassword),
+		Role:             model.RoleCustomer,
+		EmailVerified:    true,
+		IsActive:         true,
+		FailedLoginCount: 0,
+	}
+
+	// RememberMe omitted (zero value false)
+	req := &dto.LoginRequest{
+		Email:    "remember.omitted@example.com",
+		Password: rawPassword,
+	}
+
+	resp, err := svc.Login(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected successful login, got: %v", err)
+	}
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected both access and refresh tokens returned")
+	}
+
+	if len(mockRepo.refreshTokens) != 1 {
+		t.Fatalf("expected 1 refresh token in repo, got %d", len(mockRepo.refreshTokens))
+	}
+	rt := mockRepo.refreshTokens[0]
+	if rt.RememberMe {
+		t.Errorf("expected RememberMe to default to false when omitted")
+	}
+	if rt.ExpiresAt.After(time.Now().Add(25 * time.Hour)) {
+		t.Errorf("expected default session expiration (~24h), got %v", rt.ExpiresAt)
+	}
+}
+
+func TestRefreshToken_InheritsRememberMeDuration(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["refresh.inherit@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "refresh.inherit@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+
+	// 1. Initial token was created with RememberMe: true
+	rawToken := "initial-remember-me-token"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  hashToken(rawToken),
+		ExpiresAt:  time.Now().Add(30 * 24 * time.Hour),
+		Revoked:    false,
+		RememberMe: true,
+	})
+
+	resp, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawToken,
+	})
+	if err != nil {
+		t.Fatalf("expected refresh to succeed, got: %v", err)
+	}
+
+	rotatedHash := hashToken(resp.RefreshToken)
+	var rotatedToken *model.RefreshToken
+	for _, rt := range mockRepo.refreshTokens {
+		if rt.TokenHash == rotatedHash {
+			rotatedToken = rt
+			break
+		}
+	}
+	if rotatedToken == nil {
+		t.Fatal("expected rotated token stored in repo")
+	}
+
+	if !rotatedToken.RememberMe {
+		t.Errorf("expected rotated token to preserve RememberMe = true")
+	}
+	if rotatedToken.ExpiresAt.Before(time.Now().Add(29 * 24 * time.Hour)) {
+		t.Errorf("expected rotated token to have ~30-day expiration, got %v", rotatedToken.ExpiresAt)
+	}
+}
+
+func TestRefreshToken_ExpiredAccessToken_RefreshedSuccessfully(t *testing.T) {
+	svc, mockRepo, cfg := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["expired.jwt@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "expired.jwt@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+
+	rawRefreshToken := "valid-refresh-for-expired-jwt"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  hashToken(rawRefreshToken),
+		ExpiresAt:  time.Now().Add(24 * time.Hour),
+		Revoked:    false,
+		RememberMe: false,
+	})
+
+	// Generate an already expired access token (-10 minutes)
+	expiredAccessToken, _ := auth.GenerateToken(auth.UserContext{
+		UserID: userID.String(),
+		Email:  "expired.jwt@example.com",
+		Role:   "CUSTOMER",
+	}, cfg.JWT.Secret, -10*time.Minute)
+
+	// Validating the expired access token fails
+	_, vErr := auth.ValidateToken(expiredAccessToken, cfg.JWT.Secret)
+	if vErr == nil {
+		t.Fatal("expected expired access token validation to fail")
+	}
+
+	// But refreshing with the valid refresh token (and the expired access token) succeeds
+	resp, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawRefreshToken,
+		AccessToken:  expiredAccessToken,
+	})
+	if err != nil {
+		t.Fatalf("expected refresh to succeed with expired access token and valid refresh token, got: %v", err)
+	}
+
+	if resp.AccessToken == "" || resp.RefreshToken == "" {
+		t.Fatal("expected new access and refresh tokens")
+	}
+
+	// New access token is valid
+	newCtx, err := auth.ValidateToken(resp.AccessToken, cfg.JWT.Secret)
+	if err != nil || newCtx == nil {
+		t.Fatalf("expected new access token to be valid, got: %v", err)
+	}
+}
+
+func TestRefreshToken_ReuseDetection_InvalidatesUserSessions(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["reuse.detect@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "reuse.detect@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+
+	// Token was already revoked during previous rotation
+	rawRevokedToken := "previously-rotated-and-revoked-token"
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, &model.RefreshToken{
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  hashToken(rawRevokedToken),
+		ExpiresAt:  time.Now().Add(30 * 24 * time.Hour),
+		Revoked:    true,
+		RememberMe: true,
+	})
+
+	// Also simulate an active token from that user
+	rawActiveToken := "currently-active-token"
+	activeToken := &model.RefreshToken{
+		ID:         uuid.Must(uuid.NewV7()),
+		UserID:     userID,
+		TokenHash:  hashToken(rawActiveToken),
+		ExpiresAt:  time.Now().Add(30 * 24 * time.Hour),
+		Revoked:    false,
+		RememberMe: true,
+	}
+	mockRepo.refreshTokens = append(mockRepo.refreshTokens, activeToken)
+
+	// Reusing the revoked token must fail with Unauthorized
+	_, err := svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: rawRevokedToken,
+	})
+	if err == nil {
+		t.Fatal("expected reuse of revoked refresh token to be rejected")
+	}
+
+	// And reuse detection must revoke all other sessions for that user
+	if !activeToken.Revoked {
+		t.Error("expected reuse detection to revoke all active tokens for the user")
+	}
+}
+
+func TestLogout_InvalidatesSession_SubsequentRefreshFails(t *testing.T) {
+	svc, mockRepo, _ := setupTestService()
+
+	userID := uuid.Must(uuid.NewV7())
+	mockRepo.byEmail["logout.session@example.com"] = &model.AuthCredential{
+		ID:            uuid.Must(uuid.NewV7()),
+		UserID:        userID,
+		Email:         "logout.session@example.com",
+		Role:          model.RoleCustomer,
+		EmailVerified: true,
+		IsActive:      true,
+	}
+
+	// 1. User logs in with RememberMe: true
+	rawPassword := "Password123!"
+	hashed, _ := bcrypt.GenerateFromPassword([]byte(rawPassword), bcrypt.DefaultCost)
+	mockRepo.byEmail["logout.session@example.com"].PasswordHash = string(hashed)
+
+	loginResp, err := svc.Login(context.Background(), &dto.LoginRequest{
+		Email:      "logout.session@example.com",
+		Password:   rawPassword,
+		RememberMe: true,
+	})
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+
+	// 2. User logs out
+	logoutResp, err := svc.Logout(context.Background(), &dto.LogoutRequest{
+		AccessToken: loginResp.AccessToken,
+	})
+	if err != nil || !logoutResp.Success {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	// 3. Attempting to refresh the session using the refresh token MUST fail
+	_, err = svc.RefreshToken(context.Background(), &dto.RefreshTokenRequest{
+		RefreshToken: loginResp.RefreshToken,
+	})
+	if err == nil {
+		t.Fatal("expected RefreshToken to fail after logout, but it succeeded")
 	}
 }
 

@@ -31,7 +31,7 @@ type AuthRepository interface {
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
 	RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error
 	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
-	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error
 	GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error)
 	CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error
@@ -182,9 +182,9 @@ func (r *postgresAuthRepository) CreateLoginSession(ctx context.Context, refresh
 		refreshToken.ID = uuid.Must(uuid.NewV7())
 	}
 	_, err = tx.Exec(ctx, `
-		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`, refreshToken.ID, refreshToken.UserID, refreshToken.TokenHash, refreshToken.ExpiresAt, refreshToken.Revoked)
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, remember_me, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`, refreshToken.ID, refreshToken.UserID, refreshToken.TokenHash, refreshToken.ExpiresAt, refreshToken.Revoked, refreshToken.RememberMe)
 	if err != nil {
 		r.logger.Error("Failed to insert refresh token", "user_id", refreshToken.UserID, "error", err)
 		return fmt.Errorf("repository: insert refresh token failed: %w", err)
@@ -240,7 +240,7 @@ func (r *postgresAuthRepository) DeleteCredential(ctx context.Context, id uuid.U
 
 func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash string, userIDOrEmail string) (*model.RefreshToken, error) {
 	query := `
-		SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at
+		SELECT rt.id, rt.user_id, rt.token_hash, rt.expires_at, rt.revoked, rt.created_at, COALESCE(rt.remember_me, false)
 		FROM refresh_tokens rt
 		LEFT JOIN auth_credentials ac ON ac.user_id = rt.user_id
 		WHERE rt.token_hash = $1
@@ -255,6 +255,7 @@ func (r *postgresAuthRepository) GetRefreshToken(ctx context.Context, tokenHash 
 		&tok.ExpiresAt,
 		&tok.Revoked,
 		&tok.CreatedAt,
+		&tok.RememberMe,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -365,9 +366,9 @@ func (r *postgresAuthRepository) RotateRefreshToken(ctx context.Context, oldToke
 		newToken.ID = uuid.Must(uuid.NewV7())
 	}
 	_, err = tx.Exec(ctx, `
-		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`, newToken.ID, newToken.UserID, newToken.TokenHash, newToken.ExpiresAt, newToken.Revoked)
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, remember_me, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`, newToken.ID, newToken.UserID, newToken.TokenHash, newToken.ExpiresAt, newToken.Revoked, newToken.RememberMe)
 	if err != nil {
 		r.logger.Error("Failed to insert new refresh token in tx", "user_id", newToken.UserID, "error", err)
 		return fmt.Errorf("repository: insert new refresh token failed: %w", err)
@@ -380,17 +381,52 @@ func (r *postgresAuthRepository) RotateRefreshToken(ctx context.Context, oldToke
 	return nil
 }
 
-func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
+	var outboxEvt *outbox.Event
+	if len(evt) > 0 && evt[0] != nil {
+		outboxEvt = evt[0]
+	}
+
+	if outboxEvt == nil {
+		query := `
+			UPDATE auth_credentials
+			SET email_verified = true, updated_at = NOW()
+			WHERE user_id = $1
+		`
+		_, err := r.pool.Exec(ctx, query, userID)
+		if err != nil {
+			r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+			return fmt.Errorf("repository: mark email verified failed: %w", err)
+		}
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		UPDATE auth_credentials
 		SET email_verified = true, updated_at = NOW()
 		WHERE user_id = $1
 	`
-	_, err := r.pool.Exec(ctx, query, userID)
-	if err != nil {
-		r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+	if _, err := tx.Exec(ctx, query, userID); err != nil {
+		r.logger.Error("Failed to mark email verified in tx", "user_id", userID, "error", err)
 		return fmt.Errorf("repository: mark email verified failed: %w", err)
 	}
+
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		r.logger.Error("Failed to insert outbox event on email verified", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: insert outbox event failed: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit email verified tx", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: commit email verified tx failed: %w", err)
+	}
+
 	return nil
 }
 

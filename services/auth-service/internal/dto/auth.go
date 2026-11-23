@@ -5,6 +5,7 @@ type LoginRequest struct {
 	Password   string `json:"password"`
 	IsMerchant bool   `json:"is_merchant,omitempty"`
 	Role       string `json:"role,omitempty"`
+	RememberMe bool   `json:"remember_me,omitempty"`
 }
 
 type LoginResponse struct {
@@ -120,5 +121,12 @@ type ChangePasswordResponse struct {
 type GoogleAuthRequest struct {
 	IDToken string `json:"id_token"`
 	Role    string `json:"role,omitempty"`
+}
+
+type FacebookAuthRequest struct {
+	AccessToken string `json:"access_token"`
+	Role        string `json:"role,omitempty"`
+	Code        string `json:"code,omitempty"`
+	RedirectURI string `json:"redirect_uri,omitempty"`
 }
 

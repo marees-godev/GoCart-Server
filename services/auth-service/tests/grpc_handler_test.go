@@ -40,6 +40,14 @@ func (m *mockUserServiceClient) CreateUser(ctx context.Context, req *userpb.Crea
 	}, nil
 }
 
+func (m *mockUserServiceClient) GetUser(ctx context.Context, req *userpb.GetUserRequest, opts ...grpc.CallOption) (*userpb.GetUserResponse, error) {
+	return &userpb.GetUserResponse{
+		User: &userpb.User{
+			Id: req.Id,
+		},
+	}, nil
+}
+
 type mockMerchantClient struct {
 	merchantpb.MerchantServiceClient
 	createdMerchants []*merchantpb.CreateMerchantRequest
@@ -69,14 +77,16 @@ func (m *mockMerchantClient) GetMerchant(ctx context.Context, in *merchantpb.Get
 }
 
 type inMemoryAuthRepo struct {
-	byEmailRole  map[string]*model.AuthCredential
-	outboxEvents []*outbox.Event
+	byEmailRole   map[string]*model.AuthCredential
+	oauthAccounts map[string]*model.OAuthAccount
+	outboxEvents  []*outbox.Event
 }
 
 func newInMemoryAuthRepo() *inMemoryAuthRepo {
 	return &inMemoryAuthRepo{
-		byEmailRole:  make(map[string]*model.AuthCredential),
-		outboxEvents: make([]*outbox.Event, 0),
+		byEmailRole:   make(map[string]*model.AuthCredential),
+		oauthAccounts: make(map[string]*model.OAuthAccount),
+		outboxEvents:  make([]*outbox.Event, 0),
 	}
 }
 
@@ -123,15 +133,35 @@ func (r *inMemoryAuthRepo) DeleteCredential(ctx context.Context, id uuid.UUID) e
 }
 
 func (r *inMemoryAuthRepo) GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error) {
-	return nil, repository.ErrNotFound
+	if r.oauthAccounts == nil {
+		return nil, repository.ErrNotFound
+	}
+	key := provider.String() + ":" + providerUserID
+	acc, ok := r.oauthAccounts[key]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return acc, nil
 }
 
 func (r *inMemoryAuthRepo) CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error {
+	if r.oauthAccounts == nil {
+		r.oauthAccounts = make(map[string]*model.OAuthAccount)
+	}
+	key := oauthAcc.Provider.String() + ":" + oauthAcc.ProviderUserID
+	if existing, exists := r.oauthAccounts[key]; exists && existing.UserID != oauthAcc.UserID {
+		return repository.ErrOAuthConflict
+	}
+	r.oauthAccounts[key] = oauthAcc
 	return nil
 }
 
 func (r *inMemoryAuthRepo) CreateCredentialWithOAuth(ctx context.Context, cred *model.AuthCredential, oauthAcc *model.OAuthAccount) error {
-	return r.CreateCredential(ctx, cred)
+	if err := r.CreateCredential(ctx, cred); err != nil {
+		return err
+	}
+	oauthAcc.UserID = cred.UserID
+	return r.CreateOAuthAccount(ctx, oauthAcc)
 }
 
 func (r *inMemoryAuthRepo) UpdateFailedLogin(ctx context.Context, id uuid.UUID, failedCount int, lockedUntil *time.Time) error {
@@ -178,7 +208,15 @@ func (r *inMemoryAuthRepo) RotateRefreshToken(ctx context.Context, oldTokenID uu
 	return nil
 }
 
-func (r *inMemoryAuthRepo) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (r *inMemoryAuthRepo) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
+	for _, c := range r.byEmailRole {
+		if c.UserID == userID {
+			c.EmailVerified = true
+		}
+	}
+	if len(evt) > 0 && evt[0] != nil {
+		r.outboxEvents = append(r.outboxEvents, evt[0])
+	}
 	return nil
 }
 
@@ -300,15 +338,9 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		t.Errorf("expected HTTP 409 Conflict, got %d (err: %v)", appErr.HTTPStatus, err)
 	}
 
-	// 5. Verify outbox events: exactly 2 events created (1 customer, 1 merchant)
-	if len(repo.outboxEvents) != 2 {
-		t.Fatalf("expected 2 outbox events, got %d", len(repo.outboxEvents))
-	}
-	if repo.outboxEvents[0].Topic != "auth.user.registered" || repo.outboxEvents[0].EventType != "UserRegistered" {
-		t.Errorf("expected first event to be auth.user.registered, got %s / %s", repo.outboxEvents[0].Topic, repo.outboxEvents[0].EventType)
-	}
-	if repo.outboxEvents[1].Topic != "auth.merchant.registered" || repo.outboxEvents[1].EventType != "MerchantRegistered" {
-		t.Errorf("expected second event to be auth.merchant.registered, got %s / %s", repo.outboxEvents[1].Topic, repo.outboxEvents[1].EventType)
+	// 5. Verify outbox events: 0 events created on register (events emit after email verification)
+	if len(repo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(repo.outboxEvents))
 	}
 }
 

@@ -18,6 +18,7 @@ service UserService {
   rpc UpdateUserAddress (UpdateUserAddressRequest) returns (UpdateUserAddressResponse);
   rpc DeleteUserAddress (DeleteUserAddressRequest) returns (DeleteUserAddressResponse);
   rpc SetDefaultUserAddress (SetDefaultUserAddressRequest) returns (SetDefaultUserAddressResponse);
+  rpc GetLocationByPincode (GetLocationByPincodeRequest) returns (GetLocationByPincodeResponse);
 }
 
 message User {
@@ -205,3 +206,34 @@ message ProcessExpiredDeactivationsResponse {
   int32 processed_count = 1;
   string message = 2;
 }
+
+message GetLocationByPincodeRequest {
+  string pincode = 1;
+  string country_code = 2;
+}
+
+message LocationPostOffice {
+  string name = 1;
+  string branch_type = 2;
+  string delivery_status = 3;
+  string circle = 4;
+  string district = 5;
+  string division = 6;
+  string region = 7;
+  string state = 8;
+  string country = 9;
+  string pincode = 10;
+}
+
+message LocationInfo {
+  string pincode = 1;
+  string country = 2;
+  string state = 3;
+  string district = 4;
+  repeated LocationPostOffice post_offices = 5;
+}
+
+message GetLocationByPincodeResponse {
+  LocationInfo location = 1;
+}
+

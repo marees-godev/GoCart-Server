@@ -33,9 +33,15 @@ func TestRatingDatabasePersistenceAndModeration(t *testing.T) {
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		t.Fatalf("failed to connect to postgres database: %v", err)
+		t.Skipf("skipping db integration test: failed to connect to postgres: %v", err)
+		return
 	}
 	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		t.Skipf("skipping db integration test: database unreachable: %v", err)
+		return
+	}
 
 	if migrator, mErr := database.NewMigrator(pool, "../migrations"); mErr == nil {
 		if runErr := migrator.Run(ctx); runErr != nil {
@@ -175,6 +181,29 @@ func TestRatingDatabasePersistenceAndModeration(t *testing.T) {
 	}
 	if ratingAfterUnhide.IsFlagged {
 		t.Errorf("expected IsFlagged to be reset to false after unhide, got true")
+	}
+
+	// Test Rating Images Persistence & Soft delete
+	savedImages, err := repo.AddRatingImages(ctx, createdRating.ID, []string{
+		"https://cdn.gocart.local/ratings/test1.jpg",
+		"https://cdn.gocart.local/ratings/test2.jpg",
+	})
+	if err != nil || len(savedImages) != 2 {
+		t.Fatalf("failed to persist rating images: err = %v len = %d", err, len(savedImages))
+	}
+
+	ratingWithImgs, err := repo.GetRatingByID(ctx, createdRating.ID)
+	if err != nil || len(ratingWithImgs.Images) != 2 {
+		t.Errorf("expected 2 images on GetRatingByID, got len=%d err=%v", len(ratingWithImgs.Images), err)
+	}
+
+	if err := repo.DeleteRatingImage(ctx, savedImages[0].ID); err != nil {
+		t.Fatalf("failed to soft delete rating image: %v", err)
+	}
+
+	ratingAfterImgDel, err := repo.GetRatingByID(ctx, createdRating.ID)
+	if err != nil || len(ratingAfterImgDel.Images) != 1 {
+		t.Errorf("expected 1 remaining image after soft delete, got len=%d err=%v", len(ratingAfterImgDel.Images), err)
 	}
 
 	// 6. Test Soft Delete

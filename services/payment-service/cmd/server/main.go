@@ -140,7 +140,6 @@ func main() {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "payment-service-group",
 			Topics: []string{
-				events.TopicOrderCreated,
 				events.TopicReturnRefundEligible,
 			},
 		}
@@ -150,6 +149,8 @@ func main() {
 			MaxRetries:     3,
 			RetryInterval:  1 * time.Second,
 			ConnectTimeout: 10 * time.Second,
+			DLQSuffix:      ".dlq",
+			RetrySuffix:    ".retry",
 		}, consumerCfg, kafkaProducer)
 
 		paymentEvtConsumer := consumer.NewPaymentEventConsumer(paymentService)

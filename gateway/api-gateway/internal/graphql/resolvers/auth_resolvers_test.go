@@ -21,11 +21,12 @@ import (
 
 type mockAuthClient struct {
 	authpb.AuthServiceClient
-	lastRegisterReq    *authpb.RegisterRequest
-	lastLoginReq       *authpb.LoginRequest
-	lastVerifyEmailReq *authpb.VerifyEmailRequest
-	lastResendReq      *authpb.ResendVerificationEmailRequest
-	lastGoogleAuthReq  *authpb.GoogleAuthRequest
+	lastRegisterReq      *authpb.RegisterRequest
+	lastLoginReq         *authpb.LoginRequest
+	lastVerifyEmailReq   *authpb.VerifyEmailRequest
+	lastResendReq        *authpb.ResendVerificationEmailRequest
+	lastGoogleAuthReq    *authpb.GoogleAuthRequest
+	lastFacebookAuthReq  *authpb.FacebookAuthRequest
 }
 
 func (m *mockAuthClient) Register(ctx context.Context, in *authpb.RegisterRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
@@ -90,6 +91,30 @@ func (m *mockAuthClient) GoogleLogin(ctx context.Context, in *authpb.GoogleAuthR
 
 func (m *mockAuthClient) GoogleRegister(ctx context.Context, in *authpb.GoogleAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
 	return m.GoogleAuth(ctx, in, opts...)
+}
+
+func (m *mockAuthClient) FacebookAuth(ctx context.Context, in *authpb.FacebookAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	m.lastFacebookAuthReq = in
+	role := in.Role
+	if role == authpb.Role_ROLE_UNSPECIFIED {
+		role = authpb.Role_USER
+	}
+	return &authpb.AuthResponse{
+		AccessToken:  "facebook-access-token",
+		RefreshToken: "facebook-refresh-token",
+		TokenType:    "Bearer",
+		ExpiresIn:    900,
+		UserId:       "fb-user-uuid-123",
+		Role:         role,
+	}, nil
+}
+
+func (m *mockAuthClient) FacebookLogin(ctx context.Context, in *authpb.FacebookAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	return m.FacebookAuth(ctx, in, opts...)
+}
+
+func (m *mockAuthClient) FacebookRegister(ctx context.Context, in *authpb.FacebookAuthRequest, opts ...grpcPkg.CallOption) (*authpb.AuthResponse, error) {
+	return m.FacebookAuth(ctx, in, opts...)
 }
 
 func (m *mockAuthClient) Logout(ctx context.Context, in *authpb.LogoutRequest, opts ...grpcPkg.CallOption) (*authpb.LogoutResponse, error) {
@@ -296,6 +321,68 @@ func TestLoginResolver_Merchant(t *testing.T) {
 	}
 	if authMock.lastLoginReq.Role != authpb.Role_MERCHANT {
 		t.Errorf("expected Role to be MERCHANT, got %v", authMock.lastLoginReq.Role)
+	}
+	if authMock.lastLoginReq.RememberMe {
+		t.Errorf("expected RememberMe to default to false, got %v", authMock.lastLoginReq.RememberMe)
+	}
+}
+
+func TestLoginResolver_RememberMeStates(t *testing.T) {
+	authMock := &mockAuthClient{}
+	clients := &grpc.Clients{
+		AuthClient: authMock,
+	}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: clients,
+		},
+	}
+
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name               string
+		rememberMe         *bool
+		expectedRememberMe bool
+	}{
+		{
+			name:               "rememberMe enabled explicitly",
+			rememberMe:         &trueVal,
+			expectedRememberMe: true,
+		},
+		{
+			name:               "rememberMe disabled explicitly",
+			rememberMe:         &falseVal,
+			expectedRememberMe: false,
+		},
+		{
+			name:               "rememberMe omitted (defaults to false)",
+			rememberMe:         nil,
+			expectedRememberMe: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			input := model.LoginInput{
+				Email:      "user@example.com",
+				Password:   "Password123!",
+				Role:       model.AuthRoleUser,
+				RememberMe: tc.rememberMe,
+			}
+
+			_, err := r.Login(context.Background(), input)
+			if err != nil {
+				t.Fatalf("unexpected login error: %v", err)
+			}
+			if authMock.lastLoginReq == nil {
+				t.Fatal("expected AuthClient.Login to be called")
+			}
+			if authMock.lastLoginReq.RememberMe != tc.expectedRememberMe {
+				t.Errorf("expected RememberMe to be %v, got %v", tc.expectedRememberMe, authMock.lastLoginReq.RememberMe)
+			}
+		})
 	}
 }
 
@@ -939,5 +1026,138 @@ func TestRegisterWithGoogleResolver_Success(t *testing.T) {
 	}
 	if authCli.lastGoogleAuthReq.IdToken != "valid-google-id-token" {
 		t.Errorf("expected id_token 'valid-google-id-token', got '%s'", authCli.lastGoogleAuthReq.IdToken)
+	}
+}
+
+func TestLoginWithFacebookResolver_Success(t *testing.T) {
+	origClient := facebookHTTPClient
+	facebookHTTPClient = &http.Client{
+		Transport: mockTransport(func(req *http.Request) (*http.Response, error) {
+			body, _ := json.Marshal(map[string]any{
+				"access_token": "valid-fb-access-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	t.Cleanup(func() {
+		facebookHTTPClient = origClient
+	})
+
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+			Config: &config.Config{
+				Facebook: config.FacebookConfig{
+					AppID:       "fb-app-id",
+					AppSecret:   "fb-app-secret",
+					RedirectURL: "http://localhost:8080/api/v1/auth/facebook/callback",
+				},
+			},
+		},
+	}
+
+	role := model.AuthRoleUser
+	res, err := r.LoginWithFacebook(context.Background(), model.FacebookAuthInput{
+		Code: "valid-fb-code",
+		Role: &role,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Token != "facebook-access-token" {
+		t.Errorf("expected token 'facebook-access-token', got '%s'", res.Token)
+	}
+	if authCli.lastFacebookAuthReq == nil {
+		t.Fatal("expected lastFacebookAuthReq to not be nil")
+	}
+	if authCli.lastFacebookAuthReq.AccessToken != "valid-fb-access-token" {
+		t.Errorf("expected access_token 'valid-fb-access-token', got '%s'", authCli.lastFacebookAuthReq.AccessToken)
+	}
+}
+
+func TestLoginWithFacebookResolver_EmptyCode(t *testing.T) {
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: &mockAuthClient{},
+			},
+		},
+	}
+
+	_, err := r.LoginWithFacebook(context.Background(), model.FacebookAuthInput{
+		Code: "   ",
+	})
+	if err == nil {
+		t.Fatal("expected error for empty code, got nil")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr.HTTPStatus != 400 {
+		t.Errorf("expected 400 status, got %d", appErr.HTTPStatus)
+	}
+}
+
+func TestRegisterWithFacebookResolver_Success(t *testing.T) {
+	origClient := facebookHTTPClient
+	facebookHTTPClient = &http.Client{
+		Transport: mockTransport(func(req *http.Request) (*http.Response, error) {
+			body, _ := json.Marshal(map[string]any{
+				"access_token": "valid-fb-register-token",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+	t.Cleanup(func() {
+		facebookHTTPClient = origClient
+	})
+
+	authCli := &mockAuthClient{}
+	r := &mutationResolver{
+		Resolver: &Resolver{
+			Clients: &grpc.Clients{
+				AuthClient: authCli,
+			},
+			Config: &config.Config{
+				Facebook: config.FacebookConfig{
+					AppID:       "fb-app-id",
+					AppSecret:   "fb-app-secret",
+					RedirectURL: "http://localhost:8080/api/v1/auth/facebook/callback",
+				},
+			},
+		},
+	}
+
+	role := model.AuthRoleMerchant
+	res, err := r.RegisterWithFacebook(context.Background(), model.FacebookAuthInput{
+		Code: "valid-fb-code",
+		Role: &role,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Token != "facebook-access-token" {
+		t.Errorf("expected token 'facebook-access-token', got '%s'", res.Token)
+	}
+	if authCli.lastFacebookAuthReq == nil {
+		t.Fatal("expected lastFacebookAuthReq to not be nil")
+	}
+	if authCli.lastFacebookAuthReq.AccessToken != "valid-fb-register-token" {
+		t.Errorf("expected access_token 'valid-fb-register-token', got '%s'", authCli.lastFacebookAuthReq.AccessToken)
 	}
 }

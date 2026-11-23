@@ -7,12 +7,21 @@ package resolvers
 import (
 	"context"
 	"io"
+	"log/slog"
+	"strings"
+	"time"
 
+	authpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/auth"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
+	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/validation"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // UpdateUser is the resolver for the updateUser field.
@@ -84,6 +93,10 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 		AvatarFilename:    avatarFilename,
 	}
 	res, err := r.Clients.UserClient.UpdateUser(ctx, req)
+	if err != nil && status.Code(err) == codes.NotFound {
+		r.ensureUserProfileExists(ctx, id)
+		res, err = r.Clients.UserClient.UpdateUser(ctx, req)
+	}
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
@@ -184,7 +197,7 @@ func (r *mutationResolver) DeleteAccount(ctx context.Context, input *model.Delet
 }
 
 // CreateUserAddress is the resolver for the createUserAddress field.
-func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string, input model.CreateAddressInput) (*model.Address, error) {
+func (r *mutationResolver) CreateUserAddress(ctx context.Context, input model.CreateAddressInput) (*model.Address, error) {
 	if r.Clients == nil || r.Clients.UserClient == nil {
 		return nil, appErrors.Internal(nil, "user client unavailable")
 	}
@@ -192,9 +205,6 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	authID := getAuthUserIDFromCtx(ctx)
 	if authID == "" {
 		return nil, appErrors.Unauthorized("authentication required")
-	}
-	if authID != userID {
-		return nil, appErrors.BadRequest("user_id does not match the expected value")
 	}
 
 	label := ""
@@ -211,7 +221,7 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 	}
 
 	req := &userpb.CreateUserAddressRequest{
-		UserId:       userID,
+		UserId:       authID,
 		Label:        label,
 		FullName:     input.FullName,
 		PhoneNumber:  input.PhoneNumber,
@@ -226,7 +236,21 @@ func (r *mutationResolver) CreateUserAddress(ctx context.Context, userID string,
 
 	res, err := r.Clients.UserClient.CreateUserAddress(ctx, req)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && (st.Code() == codes.NotFound || strings.Contains(st.Message(), "not found")) {
+			r.ensureUserProfileExists(ctx, authID)
+			res, err = r.Clients.UserClient.CreateUserAddress(ctx, req)
+		}
+	}
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to create user address via user service",
+			"user_id", authID,
+			"error", err,
+		)
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+	if res == nil || res.Address == nil {
+		slog.ErrorContext(ctx, "empty address returned from user service in CreateUserAddress", "user_id", authID)
+		return nil, appErrors.Internal(nil, "failed to create user address: empty response from user service")
 	}
 	return toModelAddress(res.Address), nil
 }
@@ -312,25 +336,164 @@ func (r *mutationResolver) SetDefaultUserAddress(ctx context.Context, id string)
 
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	if r.Clients == nil || r.Clients.UserClient == nil {
-		return nil, appErrors.Internal(nil, "user client unavailable")
-	}
-
 	userId := getAuthUserIDFromCtx(ctx)
 	if userId == "" {
 		return nil, appErrors.Unauthorized("authentication required")
 	}
 
-	res, err := r.Clients.UserClient.GetUser(ctx, &userpb.GetUserRequest{Id: userId})
-	if err != nil {
-		return nil, grpcclient.TranslateGRPCError(err)
+	userCtx, ok := auth.UserFromContext(ctx)
+	if !ok || userCtx == nil {
+		userCtx, _ = auth.FromContext(ctx)
 	}
-	user := toModelUser(res.User)
-	if userCtx, ok := auth.UserFromContext(ctx); ok && userCtx != nil && user != nil && userCtx.Role != "" {
-		rStr := userCtx.Role
-		user.Role = &rStr
+
+	userRole := ""
+	if userCtx != nil && userCtx.Role != "" {
+		userRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	}
-	return user, nil
+
+	userClient := r.getUserClient()
+	if (userRole == "CUSTOMER" || userRole == "USER" || userRole == auth.RoleCustomer || userRole == auth.RoleUser) && userClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	if userClient != nil {
+		res, err := userClient.GetUser(ctx, &userpb.GetUserRequest{Id: userId})
+		if err == nil && res != nil && res.User != nil {
+			user := toModelUser(res.User)
+			if user != nil {
+				if userRole != "" {
+					user.Role = &userRole
+				}
+				return user, nil
+			}
+		} else if err != nil && status.Code(err) != codes.NotFound {
+			if userRole == "CUSTOMER" || userRole == "USER" || userRole == auth.RoleCustomer || userRole == auth.RoleUser || userRole == "" {
+				return nil, grpcclient.TranslateGRPCError(err)
+			}
+		}
+	}
+
+	merchantID := userId
+	if userCtx != nil && userCtx.MerchantID != "" {
+		merchantID = userCtx.MerchantID
+	}
+	if merchantClient := r.getMerchantClient(); merchantClient != nil {
+		mResp, err := merchantClient.GetMerchant(ctx, &merchantpb.GetMerchantRequest{Id: merchantID})
+		if err == nil && mResp != nil && mResp.Merchant != nil {
+			m := mResp.Merchant
+			statusStr := m.Status.String()
+			var createdAtStr, updatedAtStr *string
+			if m.CreatedAt != nil {
+				s := m.CreatedAt.AsTime().Format(time.RFC3339)
+				createdAtStr = &s
+			}
+			if m.UpdatedAt != nil {
+				s := m.UpdatedAt.AsTime().Format(time.RFC3339)
+				updatedAtStr = &s
+			}
+			roleStr := "MERCHANT"
+			if userRole != "" {
+				roleStr = userRole
+			}
+			email := m.BusinessEmail
+			if email == "" && userCtx != nil {
+				email = userCtx.Email
+			}
+			return &model.User{
+				ID:        m.Id,
+				Email:     email,
+				FirstName: &m.FirstName,
+				LastName:  &m.LastName,
+				Phone:     &m.BusinessPhone,
+				Role:      &roleStr,
+				Status:    &statusStr,
+				CreatedAt: createdAtStr,
+				UpdatedAt: updatedAtStr,
+			}, nil
+		} else if err != nil && status.Code(err) != codes.NotFound && (userRole == "MERCHANT" || userRole == auth.RoleMerchant) {
+			return nil, grpcclient.TranslateGRPCError(err)
+		}
+	}
+
+	partnerID := userId
+	if userCtx != nil && userCtx.PartnerID != "" {
+		partnerID = userCtx.PartnerID
+	}
+	if deliveryClient, dErr := r.getDeliveryClient(); dErr == nil && deliveryClient != nil {
+		pResp, err := deliveryClient.GetPartnerProfile(ctx, &deliverypb.GetPartnerProfileRequest{PartnerId: partnerID})
+		if err == nil && pResp != nil && pResp.Profile != nil {
+			p := pResp.Profile
+			roleStr := "DELIVERY_PARTNER"
+			if userRole != "" {
+				roleStr = userRole
+			}
+			email := p.Email
+			if email == "" && userCtx != nil {
+				email = userCtx.Email
+			}
+			statusStr := p.ApprovalStatus
+			if statusStr == "" {
+				if p.IsActive {
+					statusStr = "ACTIVE"
+				} else {
+					statusStr = "INACTIVE"
+				}
+			}
+			user := &model.User{
+				ID:     p.PartnerId,
+				Email:  email,
+				Role:   &roleStr,
+				Status: &statusStr,
+			}
+			if user.ID == "" && p.Id != "" {
+				user.ID = p.Id
+			}
+			if p.ContactNumber != "" {
+				user.Phone = &p.ContactNumber
+			}
+			if p.CreatedAt != "" {
+				user.CreatedAt = &p.CreatedAt
+			}
+			if p.UpdatedAt != "" {
+				user.UpdatedAt = &p.UpdatedAt
+			}
+			if p.CompanyName != "" {
+				user.Username = &p.CompanyName
+			}
+			return user, nil
+		} else if err != nil && status.Code(err) != codes.NotFound && (userRole == "DELIVERY_PARTNER" || userRole == auth.RoleDeliveryPartner) {
+			return nil, grpcclient.TranslateGRPCError(err)
+		}
+	}
+
+	if userRole == "ADMIN" || userRole == auth.RoleAdmin {
+		if userCtx != nil && userCtx.RawToken != "" {
+			if authClient, aErr := r.getAuthClient(); aErr == nil && authClient != nil {
+				vResp, err := authClient.ValidateToken(ctx, &authpb.ValidateTokenRequest{Token: userCtx.RawToken})
+				if err != nil || vResp == nil || !vResp.Valid {
+					return nil, appErrors.NotFound("user not found")
+				}
+			}
+		}
+
+		email := "admin@gocart.com"
+		if userCtx != nil && userCtx.Email != "" {
+			email = userCtx.Email
+		}
+		statusStr := "ACTIVE"
+		adminFirstName := "System"
+		adminLastName := "Admin"
+		return &model.User{
+			ID:        userId,
+			Email:     email,
+			FirstName: &adminFirstName,
+			LastName:  &adminLastName,
+			Role:      &userRole,
+			Status:    &statusStr,
+		}, nil
+	}
+
+	return nil, appErrors.NotFound("user not found")
 }
 
 // User is the resolver for the user field.
@@ -356,6 +519,17 @@ func (r *queryResolver) UserAddresses(ctx context.Context, userID string) ([]*mo
 	}
 	if userID == "" {
 		return nil, appErrors.BadRequest("user id is required")
+	}
+
+	authID := getAuthUserIDFromCtx(ctx)
+	if authID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	userCtx, _ := auth.UserFromContext(ctx)
+	isAdmin := userCtx != nil && (userCtx.Role == "ADMIN" || userCtx.Role == auth.RoleAdmin)
+	if !isAdmin && authID != userID {
+		return nil, appErrors.Forbidden("cannot access addresses of another user")
 	}
 
 	res, err := r.Clients.UserClient.ListUserAddresses(ctx, &userpb.ListUserAddressesRequest{UserId: userID})
@@ -387,4 +561,54 @@ func (r *queryResolver) UserAddress(ctx context.Context, id string) (*model.Addr
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 	return toModelAddress(res.Address), nil
+}
+
+// LocationByPincode is the resolver for the locationByPincode field.
+func (r *queryResolver) LocationByPincode(ctx context.Context, pincode string, country *string) (*model.LocationDetails, error) {
+	cleanPincode := strings.TrimSpace(pincode)
+	countryCode := "IN"
+	if country != nil && strings.TrimSpace(*country) != "" {
+		countryCode = strings.TrimSpace(*country)
+	}
+
+	normCountry := strings.ToUpper(countryCode)
+	if normCountry == "IN" || normCountry == "IND" || normCountry == "INDIA" {
+		if err := validation.ValidateIndianPincode(cleanPincode); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := validation.ValidatePostalCode(cleanPincode, normCountry); err != nil {
+			return nil, err
+		}
+	}
+
+	userClient := r.getUserClient()
+	if userClient == nil {
+		return nil, appErrors.Internal(nil, "user client unavailable")
+	}
+
+	res, err := userClient.GetLocationByPincode(ctx, &userpb.GetLocationByPincodeRequest{
+		Pincode:     cleanPincode,
+		CountryCode: countryCode,
+	})
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return nil, appErrors.BadRequest(st.Message())
+			case codes.NotFound:
+				return nil, appErrors.NotFound(st.Message())
+			case codes.Unavailable, codes.DeadlineExceeded:
+				return nil, appErrors.ServiceUnavailable("location provider unavailable")
+			}
+		}
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if res == nil || res.Location == nil {
+		return nil, appErrors.NotFound("location details not found")
+	}
+
+	return toModelLocationDetails(res.Location), nil
 }

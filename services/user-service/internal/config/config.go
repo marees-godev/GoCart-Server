@@ -17,6 +17,12 @@ type Config struct {
 	Tracing   TracingConfig
 	Retention RetentionConfig
 	Storage   StorageConfig
+	Provider  ProviderConfig
+}
+
+type ProviderConfig struct {
+	IndiaPostBaseURL string
+	Timeout          time.Duration
 }
 
 type StorageConfig struct {
@@ -111,6 +117,10 @@ func LoadEnv() *Config {
 			SecretAccessKey: GetEnv("USER_S3_SECRET_ACCESS_KEY", GetEnv("S3_SECRET_ACCESS_KEY", "")),
 			Bucket:          GetEnv("USER_S3_BUCKET", GetEnv("S3_BUCKET", "avatars")),
 			PublicURLPrefix: GetEnv("USER_S3_PUBLIC_URL_PREFIX", GetEnv("S3_PUBLIC_URL_PREFIX", "")),
+		},
+		Provider: ProviderConfig{
+			IndiaPostBaseURL: GetEnv("INDIA_POST_API_BASE_URL", "https://api.postalpincode.in/pincode/"),
+			Timeout:          time.Duration(GetEnvAsInt("EXTERNAL_API_TIMEOUT_SECONDS", 5)) * time.Second,
 		},
 	}
 }

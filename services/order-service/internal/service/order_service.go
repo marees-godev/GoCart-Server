@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"encoding/json"
+
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
-	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
+	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
@@ -32,6 +33,8 @@ const (
 	OrderCreatedTopic       = events.TopicOrderCreated
 	OrderCancelledTopic     = events.TopicOrderCancelled
 	OrderConfirmedTopic     = events.TopicOrderConfirmed
+	OrderShippedTopic       = events.TopicOrderShipped
+	OrderDeliveredTopic     = events.TopicOrderDelivered
 	OrderPaymentFailedTopic = events.TopicOrderPaymentFailed
 )
 
@@ -164,11 +167,14 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 	storeMap := make(map[string][]enrichedItem)
 
-	for _, item := range rawItems {
+	for i := range rawItems {
+		item := &rawItems[i]
+		item.ProductID = strings.TrimSpace(item.ProductID)
+		item.StoreID = strings.TrimSpace(item.StoreID)
 		if item.Quantity <= 0 {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid quantity %d for product %s", item.Quantity, item.ProductID))
 		}
-		if _, err := uuid.Parse(strings.TrimSpace(item.ProductID)); err != nil {
+		if _, err := uuid.Parse(item.ProductID); err != nil {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid product_id format: %s", item.ProductID))
 		}
 
@@ -185,9 +191,15 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 					if st.Code() == codes.NotFound {
 						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", item.ProductID))
 					}
-					if st.Code() == codes.Unavailable {
+					if st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded {
 						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
 					}
+					if st.Code() == codes.InvalidArgument {
+						return nil, appErrors.BadRequest(fmt.Sprintf("invalid inventory request for product %s: %s", item.ProductID, st.Message()))
+					}
+				}
+				if errors.Is(invErr, context.DeadlineExceeded) {
+					return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
 				}
 				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", item.ProductID, invErr))
 			}
@@ -306,11 +318,30 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		}
 	}
 
-	// Split store shipping fee and discount evenly if provided at order level
+	// 1. Compute overall order subtotal across all store items
+	var overallSubtotal float64
+	for _, items := range storeMap {
+		for _, it := range items {
+			overallSubtotal += it.unitPrice * float64(it.quantity)
+		}
+	}
+	overallSubtotal = math.Round(overallSubtotal*100) / 100
+
+	// 2. Fixed platform fee is ₹7.00 for all orders across the platform
+	orderPlatformFee := 7.00
+	if input.PlatformFee > 0 {
+		orderPlatformFee = input.PlatformFee
+	}
+
+	// 3. Split store shipping fee and discount evenly if provided at order level
 	numStores := float64(len(storeMap))
 	baseStoreShippingFee := 0.0
-	if input.ShippingFee > 0 {
+	if overallSubtotal >= 500.0 {
+		baseStoreShippingFee = 0.0
+	} else if input.ShippingFee > 0 {
 		baseStoreShippingFee = math.Round((input.ShippingFee/numStores)*100) / 100
+	} else {
+		baseStoreShippingFee = math.Round((40.0/numStores)*100) / 100
 	}
 	storeDiscount := 0.0
 	if input.DiscountAmount > 0 {
@@ -325,51 +356,57 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	}
 
 	firstStore := true
+	idempKeyFirst := true
 	for storeID, items := range storeMap {
 		storeShippingFee := baseStoreShippingFee
 		if needsShippingCalculation {
-			var shipItems []*deliverypb.ShippingItem
-			for _, it := range items {
-				w := it.weight
-				if w > 0 && w <= 50 {
-					w = w * 1000.0
+			if overallSubtotal >= 500.0 {
+				storeShippingFee = 0.0
+			} else {
+				var shipItems []*deliverypb.ShippingItem
+				for _, it := range items {
+					w := it.weight
+					if w > 0 && w <= 50 {
+						w = w * 1000.0
+					}
+					shipItems = append(shipItems, &deliverypb.ShippingItem{
+						ProductId:   it.productID,
+						WeightGrams: w,
+						Quantity:    int32(it.quantity),
+					})
 				}
-				shipItems = append(shipItems, &deliverypb.ShippingItem{
-					ProductId:   it.productID,
-					WeightGrams: w,
-					Quantity:    int32(it.quantity),
+				calcCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+				feeResp, feeErr := s.deliveryClient.CalculateShippingFee(calcCtx, &deliverypb.CalculateShippingFeeRequest{
+					Items:                 shipItems,
+					DestinationPostalCode: destPostalCode,
+					DestinationCity:       destCity,
+					DestinationState:      destState,
+					ShippingAddress:       input.ShippingAddress,
 				})
-			}
-			calcCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			feeResp, feeErr := s.deliveryClient.CalculateShippingFee(calcCtx, &deliverypb.CalculateShippingFeeRequest{
-				Items:                 shipItems,
-				DestinationPostalCode: destPostalCode,
-				DestinationCity:       destCity,
-				DestinationState:      destState,
-				ShippingAddress:       input.ShippingAddress,
-			})
-			cancel()
-			if feeErr != nil {
-				s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
-				var appErr *appErrors.AppError
-				if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
-					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				cancel()
+				if feeErr != nil {
+					s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
+					var appErr *appErrors.AppError
+					if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
+						return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+					}
+					st, ok := status.FromError(feeErr)
+					if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
+						return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+					}
+					return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
 				}
-				st, ok := status.FromError(feeErr)
-				if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
-					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				if feeResp == nil {
+					s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
+					return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
 				}
-				return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
+				if feeResp.ShippingFee < 0 {
+					s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
+					return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
+				}
+				// Platform policy strictly charges ₹40 (split across stores) for orders below ₹500
+				storeShippingFee = baseStoreShippingFee
 			}
-			if feeResp == nil {
-				s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
-				return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
-			}
-			if feeResp.ShippingFee < 0 {
-				s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
-				return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
-			}
-			storeShippingFee = feeResp.ShippingFee
 		}
 		orderID := uuid.New().String()
 		orderNumber := generateOrderNumber()
@@ -412,7 +449,15 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 		subtotal = math.Round(subtotal*100) / 100
 		taxAmount = math.Round(taxAmount*100) / 100
-		totalAmount := math.Round((subtotal+taxAmount+storeShippingFee-storeDiscount)*100) / 100
+
+		// Apply platform fee once at the primary order level for multi-store orders
+		storePlatformFee := 0.0
+		if firstStore {
+			storePlatformFee = orderPlatformFee
+			firstStore = false
+		}
+
+		totalAmount := math.Round((subtotal+taxAmount+storePlatformFee+storeShippingFee-storeDiscount)*100) / 100
 		if totalAmount < 0 {
 			totalAmount = 0
 		}
@@ -427,10 +472,10 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			billAddrIDPtr = &input.BillingAddressID
 		}
 		var idempKeyPtr *string
-		if firstStore && strings.TrimSpace(input.IdempotencyKey) != "" {
+		if idempKeyFirst && strings.TrimSpace(input.IdempotencyKey) != "" {
 			k := strings.TrimSpace(input.IdempotencyKey)
 			idempKeyPtr = &k
-			firstStore = false
+			idempKeyFirst = false
 		}
 
 		ord := &model.Order{
@@ -441,6 +486,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			StoreID:           storeID,
 			Subtotal:          subtotal,
 			TaxAmount:         taxAmount,
+			PlatformFee:       storePlatformFee,
 			ShippingFee:       storeShippingFee,
 			DiscountAmount:    storeDiscount,
 			TotalAmount:       totalAmount,
@@ -463,6 +509,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			UserID:            ord.UserID,
 			Subtotal:          ord.Subtotal,
 			TaxAmount:         ord.TaxAmount,
+			PlatformFee:       ord.PlatformFee,
 			ShippingFee:       ord.ShippingFee,
 			DiscountAmount:    ord.DiscountAmount,
 			TotalAmount:       ord.TotalAmount,
@@ -534,8 +581,8 @@ func (s *orderService) fetchCheckoutItems(ctx context.Context, input dto.CreateO
 		items := make([]checkoutItem, len(input.Items))
 		for i, it := range input.Items {
 			items[i] = checkoutItem{
-				ProductID: it.ProductID,
-				StoreID:   it.StoreID,
+				ProductID: strings.TrimSpace(it.ProductID),
+				StoreID:   strings.TrimSpace(it.StoreID),
 				Quantity:  it.Quantity,
 			}
 		}
@@ -562,8 +609,8 @@ func (s *orderService) fetchCheckoutItems(ctx context.Context, input dto.CreateO
 		items := make([]checkoutItem, 0, len(cart.GetItems()))
 		for _, it := range cart.GetItems() {
 			items = append(items, checkoutItem{
-				ProductID: it.GetProductId(),
-				StoreID:   it.GetStoreId(),
+				ProductID: strings.TrimSpace(it.GetProductId()),
+				StoreID:   strings.TrimSpace(it.GetStoreId()),
 				Quantity:  int(it.GetQuantity()),
 			})
 		}
@@ -595,16 +642,37 @@ func (s *orderService) GetOrder(ctx context.Context, id string, userID ...string
 		if callerUserID == "" {
 			callerUserID = userCtx.UserID
 		}
-		callerRole = userCtx.Role
+		callerRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	}
 
-	if callerRole != "ADMIN" && callerRole != auth.RoleAdmin && callerRole != "DELIVERY_PARTNER" && callerRole != auth.RoleDeliveryPartner && callerRole != "MERCHANT" && callerRole != auth.RoleMerchant {
-		if callerUserID != "" && order.UserID != callerUserID {
-			return nil, appErrors.Forbidden("you do not have permission to view this order")
+	// If no caller identity context is provided, allow internal service query.
+	if callerUserID == "" && callerRole == "" {
+		return order, nil
+	}
+
+	// 1. If caller is the user who placed the order, allow access regardless of role (CUSTOMER, MERCHANT, DELIVERY_PARTNER).
+	if callerUserID != "" && order.UserID == callerUserID {
+		return order, nil
+	}
+
+	// 2. If caller is an ADMIN, allow viewing any order.
+	if callerRole == auth.RoleAdmin {
+		return order, nil
+	}
+
+	// 3. If caller is a MERCHANT, only allow if this order belongs to one of the merchant's stores / items.
+	if callerRole == auth.RoleMerchant {
+		if order.StoreID != "" && order.StoreID == callerUserID {
+			return order, nil
+		}
+		for _, it := range order.Items {
+			if it.StoreID != "" && it.StoreID == callerUserID {
+				return order, nil
+			}
 		}
 	}
 
-	return order, nil
+	return nil, appErrors.Forbidden("you do not have permission to view this order")
 }
 
 func (s *orderService) ListOrders(ctx context.Context, input dto.ListOrdersInput) (*dto.ListOrdersResult, error) {
@@ -645,7 +713,61 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", order.Status, orderStatus))
 	}
 
-	updatedOrder, err := s.repo.UpdateOrderStatus(ctx, id, orderStatus, reason...)
+	now := time.Now().UTC()
+	var envelope *events.EventEnvelope
+	var topic string
+	reasonStr := ""
+	if len(reason) > 0 {
+		reasonStr = reason[0]
+	}
+
+	switch orderStatus {
+	case model.OrderStatusConfirmed, model.OrderStatusPaid:
+		topic = OrderConfirmedTopic
+		payload := events.OrderConfirmedEvent{
+			OrderID:       order.ID,
+			UserID:        order.UserID,
+			PaymentStatus: string(model.PaymentStatusPaid),
+			ConfirmedAt:   now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderConfirmed, "order-service", order.ID, payload)
+	case model.OrderStatusShipped, model.OrderStatusOutForDelivery:
+		topic = OrderShippedTopic
+		payload := events.OrderShippedEvent{
+			OrderID:   order.ID,
+			UserID:    order.UserID,
+			ShippedAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderShipped, "order-service", order.ID, payload)
+	case model.OrderStatusDelivered:
+		topic = OrderDeliveredTopic
+		payload := events.OrderDeliveredEvent{
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			DeliveredAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderDelivered, "order-service", order.ID, payload)
+	case model.OrderStatusCancelled:
+		topic = OrderCancelledTopic
+		payload := events.OrderCancelledEvent{
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			Reason:      reasonStr,
+			CancelledAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderCancelled, "order-service", order.ID, payload)
+	case model.OrderStatusPaymentFailed:
+		topic = OrderPaymentFailedTopic
+		payload := events.OrderPaymentFailedEvent{
+			OrderID:  order.ID,
+			UserID:   order.UserID,
+			Reason:   reasonStr,
+			FailedAt: now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", order.ID, payload)
+	}
+
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, id, orderStatus, envelope, topic, reason...)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
@@ -680,9 +802,10 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 
 	now := time.Now().UTC()
 	confirmedEvt := events.OrderConfirmedEvent{
-		OrderID:     order.ID,
-		PaymentStatus:   string(model.OrderStatusPaid),
-		ConfirmedAt: now,
+		OrderID:       order.ID,
+		UserID:        order.UserID,
+		PaymentStatus: string(model.OrderStatusPaid),
+		ConfirmedAt:   now,
 	}
 
 	envelope, err := events.NewEventEnvelopeWithAggregate(
@@ -750,6 +873,7 @@ func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.Pa
 	now := time.Now().UTC()
 	paymentFailedEvt := events.OrderPaymentFailedEvent{
 		OrderID:   order.ID,
+		UserID:    order.UserID,
 		PaymentID: event.PaymentID,
 		Reason:    reason,
 		FailedAt:  now,
@@ -835,6 +959,7 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 	var envelope *events.EventEnvelope
 	eventPayload := events.OrderCancelledEvent{
 		OrderID:     order.ID,
+		UserID:      order.UserID,
 		Reason:      reason,
 		CancelledAt: now,
 	}

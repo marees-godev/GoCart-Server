@@ -6,17 +6,328 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"strings"
 
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
+	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
+	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
 
 // SendNotification is the resolver for the sendNotification field.
 func (r *mutationResolver) SendNotification(ctx context.Context, input model.SendNotificationInput) (bool, error) {
-	panic(fmt.Errorf("not implemented: SendNotification - sendNotification"))
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return false, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	userCtx, _ := auth.UserFromContext(ctx)
+	if authUserID == "" {
+		return false, appErrors.Unauthorized("authentication required")
+	}
+
+	targetUserID := strings.TrimSpace(input.UserID)
+	isAdmin := userCtx != nil && (strings.EqualFold(userCtx.Role, auth.RoleAdmin) || strings.EqualFold(userCtx.Role, "ADMIN"))
+	if !isAdmin && targetUserID != "" && targetUserID != authUserID {
+		return false, appErrors.Forbidden("access denied: cannot send notifications to another user")
+	}
+	if targetUserID == "" {
+		targetUserID = authUserID
+	}
+
+	resp, err := client.SendNotification(ctx, &notificationpb.SendNotificationRequest{
+		UserId:     targetUserID,
+		Channel:    input.Channel,
+		Subject:    input.Subject,
+		Content:    input.Content,
+		TemplateId: stringValueOrEmpty(input.TemplateID),
+		EventType:  stringValueOrEmpty(input.EventType),
+	})
+	if err != nil {
+		return false, grpcclient.TranslateGRPCError(err)
+	}
+
+	return resp.GetSuccess(), nil
+}
+
+// MarkNotificationAsRead is the resolver for the markNotificationAsRead field.
+func (r *mutationResolver) MarkNotificationAsRead(ctx context.Context, notificationID string, isRead *bool) (*model.Notification, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.MarkNotificationAsRead(ctx, &notificationpb.MarkNotificationAsReadRequest{
+		NotificationId: notificationID,
+		UserId:         authUserID,
+		IsRead:         isRead,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProtoNotificationToGraphQL(resp.GetNotification()), nil
+}
+
+// MarkAllNotificationsAsRead is the resolver for the markAllNotificationsAsRead field.
+func (r *mutationResolver) MarkAllNotificationsAsRead(ctx context.Context) (*model.MarkAllNotificationsReadPayload, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.MarkAllNotificationsAsRead(ctx, &notificationpb.MarkAllNotificationsAsReadRequest{
+		UserId: authUserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.MarkAllNotificationsReadPayload{
+		UpdatedCount: int(resp.GetUpdatedCount()),
+		Success:      resp.GetSuccess(),
+	}, nil
+}
+
+// RegisterPushSubscription is the resolver for the registerPushSubscription field.
+func (r *mutationResolver) RegisterPushSubscription(ctx context.Context, input model.RegisterPushSubscriptionInput) (*model.PushSubscription, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.RegisterPushSubscription(ctx, &notificationpb.RegisterPushSubscriptionRequest{
+		UserId:     authUserID,
+		Endpoint:   input.Endpoint,
+		P256Dh:     input.P256dh,
+		Auth:       input.Auth,
+		UserAgent:  stringValueOrEmpty(input.UserAgent),
+		DeviceName: stringValueOrEmpty(input.DeviceName),
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProtoPushSubscriptionToGraphQL(resp.GetSubscription()), nil
+}
+
+// UpdatePushSubscription is the resolver for the updatePushSubscription field.
+func (r *mutationResolver) UpdatePushSubscription(ctx context.Context, input model.UpdatePushSubscriptionInput) (*model.PushSubscription, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	var idStr, endStr string
+	if input.ID != nil {
+		idStr = *input.ID
+	}
+	if input.Endpoint != nil {
+		endStr = *input.Endpoint
+	}
+
+	resp, err := client.UpdatePushSubscription(ctx, &notificationpb.UpdatePushSubscriptionRequest{
+		Id:         idStr,
+		UserId:     authUserID,
+		Endpoint:   endStr,
+		P256Dh:     stringValueOrEmpty(input.P256dh),
+		Auth:       stringValueOrEmpty(input.Auth),
+		UserAgent:  stringValueOrEmpty(input.UserAgent),
+		DeviceName: stringValueOrEmpty(input.DeviceName),
+		IsActive:   input.IsActive,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return maps.MapProtoPushSubscriptionToGraphQL(resp.GetSubscription()), nil
+}
+
+// DeactivatePushSubscription is the resolver for the deactivatePushSubscription field.
+func (r *mutationResolver) DeactivatePushSubscription(ctx context.Context, id *string, endpoint *string) (bool, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return false, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return false, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.DeactivatePushSubscription(ctx, &notificationpb.DeactivatePushSubscriptionRequest{
+		Id:       stringValueOrEmpty(id),
+		UserId:   authUserID,
+		Endpoint: stringValueOrEmpty(endpoint),
+	})
+	if err != nil {
+		return false, grpcclient.TranslateGRPCError(err)
+	}
+
+	return resp.GetSuccess(), nil
 }
 
 // Notifications is the resolver for the notifications field.
-func (r *queryResolver) Notifications(ctx context.Context, userID string, limit *int, offset *int) (*model.NotificationList, error) {
-	panic(fmt.Errorf("not implemented: Notifications - notifications"))
+func (r *queryResolver) Notifications(ctx context.Context, userID *string, filter *model.NotificationFilterInput, limit *int, offset *int) (*model.NotificationList, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	userCtx, _ := auth.UserFromContext(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	targetUserID := authUserID
+	if userID != nil && strings.TrimSpace(*userID) != "" {
+		reqUID := strings.TrimSpace(*userID)
+		isAdmin := userCtx != nil && (strings.EqualFold(userCtx.Role, auth.RoleAdmin) || strings.EqualFold(userCtx.Role, "ADMIN"))
+		if !isAdmin && reqUID != authUserID {
+			return nil, appErrors.Forbidden("access denied: cannot view another user's notifications")
+		}
+		targetUserID = reqUID
+	}
+
+	var l int32 = 20
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	req := &notificationpb.GetNotificationsRequest{
+		UserId: targetUserID,
+		Limit:  l,
+		Offset: o,
+	}
+	if filter != nil {
+		req.Status = stringValueOrEmpty(filter.Status)
+		req.Channel = stringValueOrEmpty(filter.Channel)
+		req.EventType = stringValueOrEmpty(filter.EventType)
+		req.IsRead = filter.IsRead
+	}
+
+	resp, err := client.GetNotifications(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	items := make([]*model.Notification, 0, len(resp.GetNotifications()))
+	for _, n := range resp.GetNotifications() {
+		items = append(items, maps.MapProtoNotificationToGraphQL(n))
+	}
+
+	return &model.NotificationList{
+		Notifications: items,
+		Total:         int(resp.GetTotal()),
+		UnreadCount:   int(resp.GetUnreadCount()),
+	}, nil
+}
+
+// UnreadNotificationCount is the resolver for the unreadNotificationCount field.
+func (r *queryResolver) UnreadNotificationCount(ctx context.Context) (int, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return 0, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return 0, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.GetUnreadCount(ctx, &notificationpb.GetUnreadCountRequest{
+		UserId: authUserID,
+	})
+	if err != nil {
+		return 0, grpcclient.TranslateGRPCError(err)
+	}
+
+	return int(resp.GetUnreadCount()), nil
+}
+
+// PushSubscriptions is the resolver for the pushSubscriptions field.
+func (r *queryResolver) PushSubscriptions(ctx context.Context, activeOnly *bool) (*model.PushSubscriptionList, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	activeOnlyVal := false
+	if activeOnly != nil {
+		activeOnlyVal = *activeOnly
+	}
+
+	resp, err := client.GetPushSubscriptions(ctx, &notificationpb.GetPushSubscriptionsRequest{
+		UserId:     authUserID,
+		ActiveOnly: activeOnlyVal,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	subs := make([]*model.PushSubscription, 0, len(resp.GetSubscriptions()))
+	for _, sub := range resp.GetSubscriptions() {
+		subs = append(subs, maps.MapProtoPushSubscriptionToGraphQL(sub))
+	}
+
+	return &model.PushSubscriptionList{
+		Subscriptions: subs,
+		Total:         int(resp.GetTotal()),
+	}, nil
+}
+
+// VapidPublicKey is the resolver for the vapidPublicKey field.
+func (r *queryResolver) VapidPublicKey(ctx context.Context) (*model.VAPIDPublicKeyPayload, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.GetVAPIDPublicKey(ctx, &notificationpb.GetVAPIDPublicKeyRequest{})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.VAPIDPublicKeyPayload{
+		PublicKey: resp.GetPublicKey(),
+		Subject:   resp.GetSubject(),
+	}, nil
 }

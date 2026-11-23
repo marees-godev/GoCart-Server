@@ -24,6 +24,7 @@ type Config struct {
 	RateLimit                   RateLimitConfig
 	CORS                        middleware.CORSConfig
 	Google                      GoogleConfig
+	Facebook                    FacebookConfig
 	UserServiceAddr             string
 	ProductServiceAddr          string
 	CartServiceAddr             string
@@ -84,6 +85,7 @@ type GRPCConfig struct {
 	ReturnServiceAddr       string
 	RatingServiceAddr       string
 	NotificationServiceAddr string
+	PersonalizationServiceAddr string
 }
 
 type JWTConfig struct {
@@ -102,6 +104,13 @@ type GoogleConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       string
+}
+
+type FacebookConfig struct {
+	AppID       string
+	AppSecret   string
+	RedirectURL string
+	Scopes      string
 }
 
 func LoadEnv() *Config {
@@ -162,6 +171,7 @@ func LoadEnv() *Config {
 			ReturnServiceAddr:       GetEnv("RETURN_SERVICE_GRPC_ADDR", "localhost:50062"),
 			RatingServiceAddr:       GetEnv("RATING_SERVICE_GRPC_ADDR", "localhost:50063"),
 			NotificationServiceAddr: GetEnv("NOTIFICATION_SERVICE_GRPC_ADDR", "localhost:50064"),
+			PersonalizationServiceAddr: GetEnv("PERSONALIZATION_SERVICE_GRPC_ADDR", "localhost:50065"),
 		},
 		JWT: JWTConfig{
 			Secret: GetEnv("JWT_SECRET", "gocart-secret-key-change-in-production"),
@@ -213,6 +223,12 @@ func LoadEnv() *Config {
 			ClientSecret: GetEnv("GOOGLE_CLIENT_SECRET", ""),
 			RedirectURL:  GetEnv("GOOGLE_REDIRECT_URL", fmt.Sprintf("http://localhost:%s/api/v1/auth/google/callback", GetEnv("PORT", "8080"))),
 			Scopes:       GetEnv("GOOGLE_SCOPES", "openid email profile"),
+		},
+		Facebook: FacebookConfig{
+			AppID:       GetEnv("FACEBOOK_APP_ID", GetEnv("FACEBOOK_CLIENT_ID", "")),
+			AppSecret:   GetEnv("FACEBOOK_APP_SECRET", GetEnv("FACEBOOK_CLIENT_SECRET", "")),
+			RedirectURL:  GetEnv("FACEBOOK_REDIRECT_URL", fmt.Sprintf("http://localhost:%s/api/v1/auth/facebook/callback", GetEnv("PORT", "8080"))),
+			Scopes:      GetEnv("FACEBOOK_SCOPES", "email,public_profile"),
 		},
 	}
 }

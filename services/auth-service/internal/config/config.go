@@ -26,16 +26,41 @@ type Config struct {
 	UserServiceAddr string
 	Services        ServicesConfig
 	Google          GoogleConfig
+	Facebook        FacebookConfig
+	Kafka           KafkaConfig
+	Outbox          OutboxConfig
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 type GoogleConfig struct {
 	ClientID string
 }
 
+type FacebookConfig struct {
+	AppID     string
+	AppSecret string
+}
+
 type SecurityConfig struct {
 	MaxLoginAttempts             int
 	LoginAttemptWindow           time.Duration
 	AccountLockDuration          time.Duration
+	DefaultSessionDuration       time.Duration
+	RememberMeSessionDuration    time.Duration
 	PasswordResetOTPTTLMinutes   int
 	PasswordResetMaxRequests     int
 	PasswordResetRequestWindow   time.Duration
@@ -171,6 +196,8 @@ func LoadEnv() *Config {
 			MaxLoginAttempts:             GetEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 			LoginAttemptWindow:           GetEnvAsDuration("LOGIN_ATTEMPT_WINDOW", 15*time.Minute),
 			AccountLockDuration:          GetEnvAsDuration("ACCOUNT_LOCK_DURATION", 15*time.Minute),
+			DefaultSessionDuration:       GetEnvAsDuration("DEFAULT_SESSION_DURATION", GetEnvAsDuration("REFRESH_TOKEN_DEFAULT_TTL", 24*time.Hour)),
+			RememberMeSessionDuration:    GetEnvAsDuration("REMEMBER_ME_SESSION_DURATION", GetEnvAsDuration("REFRESH_TOKEN_REMEMBER_ME_TTL", 30*24*time.Hour)),
 			PasswordResetOTPTTLMinutes:   GetEnvAsInt("PASSWORD_RESET_OTP_TTL_MINUTES", 15),
 			PasswordResetMaxRequests:     GetEnvAsInt("PASSWORD_RESET_MAX_REQUESTS", 3),
 			PasswordResetRequestWindow:   GetEnvAsDuration("PASSWORD_RESET_REQUEST_WINDOW", 15*time.Minute),
@@ -185,6 +212,23 @@ func LoadEnv() *Config {
 		},
 		Google: GoogleConfig{
 			ClientID: GetEnv("GOOGLE_CLIENT_ID", ""),
+		},
+		Facebook: FacebookConfig{
+			AppID:     GetEnv("FACEBOOK_APP_ID", GetEnv("FACEBOOK_CLIENT_ID", "")),
+			AppSecret: GetEnv("FACEBOOK_APP_SECRET", GetEnv("FACEBOOK_CLIENT_SECRET", "")),
+		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "auth-service"),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   GetEnvAsDuration("OUTBOX_POLL_INTERVAL", 1*time.Second),
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			BaseRetryDelay: GetEnvAsDuration("OUTBOX_BASE_RETRY_DELAY", 1*time.Second),
+			MaxRetryDelay:  GetEnvAsDuration("OUTBOX_MAX_RETRY_DELAY", 60*time.Second),
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.auth.dlq"),
 		},
 	}
 }
@@ -256,4 +300,22 @@ func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 		return time.Duration(secs) * time.Second
 	}
 	return defaultValue
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	res := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	if len(res) == 0 {
+		return defaultValue
+	}
+	return res
 }

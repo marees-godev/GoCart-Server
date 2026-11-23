@@ -45,7 +45,18 @@ func (c *PaymentEventConsumer) HandleEvent(ctx context.Context, envelope *events
 			payload.OrderID = envelope.AggregateID
 		}
 		_, err := c.paymentService.HandleOrderCreated(ctx, &payload, envelope.CorrelationID, envelope.TraceID)
-		return err
+		if err != nil {
+			var appErr *appErrors.AppError
+			if errors.As(err, &appErr) && (appErr.Code == appErrors.CodeBadRequest || appErr.Code == appErrors.CodeConflict || appErr.Code == appErrors.CodeNotFound) {
+				slog.WarnContext(ctx, "non-retryable error in HandleOrderCreated, acknowledging event",
+					"order_id", payload.OrderID,
+					"error", err,
+				)
+				return nil
+			}
+			return err
+		}
+		return nil
 
 	case events.EventTypeReturnRefundEligible:
 		return c.handleReturnRefundEligible(ctx, envelope)

@@ -14,6 +14,7 @@ import (
 
 type TemplateService interface {
 	ResolveTemplate(ctx context.Context, eventType, channelID string) (*model.Template, error)
+	ResolveTemplateForChannel(ctx context.Context, eventType, channelID, channelCode string) (*model.Template, error)
 	Render(tmpl *model.Template, data map[string]interface{}) (subject, body string, err error)
 }
 
@@ -40,17 +41,27 @@ func NewTemplateService(templateRepo ...repository.TemplateRepository) TemplateS
 }
 
 func (s *templateService) ResolveTemplate(ctx context.Context, eventType, channelID string) (*model.Template, error) {
-	if s.templateRepo != nil {
-		if channelID != "" {
-			tmpl, err := s.templateRepo.GetByEventTypeAndChannel(ctx, eventType, channelID)
-			if err != nil {
-				return nil, err
-			}
-			if tmpl != nil {
-				return tmpl, nil
-			}
-		}
+	return s.ResolveTemplateForChannel(ctx, eventType, channelID, "")
+}
 
+func (s *templateService) ResolveTemplateForChannel(ctx context.Context, eventType, channelID, channelCode string) (*model.Template, error) {
+	if s.templateRepo != nil && channelID != "" {
+		tmpl, err := s.templateRepo.GetByEventTypeAndChannel(ctx, eventType, channelID)
+		if err != nil {
+			return nil, err
+		}
+		if tmpl != nil {
+			return tmpl, nil
+		}
+	}
+
+	if channelCode != "" {
+		if fileTmpl, ok := templates.GetTemplate(eventType, channelCode); ok {
+			return fileTmpl, nil
+		}
+	}
+
+	if s.templateRepo != nil {
 		tmpl, err := s.templateRepo.GetByEventType(ctx, eventType)
 		if err != nil {
 			return nil, err

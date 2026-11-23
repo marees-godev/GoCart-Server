@@ -2,15 +2,55 @@ type Notification {
   id: ID!
   userId: String!
   channel: String!
+  eventType: String
+  eventId: String
+  recipient: String
   subject: String!
   content: String!
   status: String!
+  errorMessage: String
+  isRead: Boolean!
+  readAt: String
+  sentAt: String
+  correlationId: String
   createdAt: String
+  updatedAt: String
 }
 
 type NotificationList {
   notifications: [Notification!]!
   total: Int!
+  unreadCount: Int!
+}
+
+type PushSubscription {
+  id: ID!
+  userId: String!
+  endpoint: String!
+  userAgent: String
+  deviceName: String
+  isActive: Boolean!
+  failureCount: Int!
+  lastError: String
+  lastUsedAt: String
+  deactivatedAt: String
+  createdAt: String
+  updatedAt: String
+}
+
+type PushSubscriptionList {
+  subscriptions: [PushSubscription!]!
+  total: Int!
+}
+
+type VAPIDPublicKeyPayload {
+  publicKey: String!
+  subject: String!
+}
+
+type MarkAllNotificationsReadPayload {
+  updatedCount: Int!
+  success: Boolean!
 }
 
 input SendNotificationInput {
@@ -19,12 +59,46 @@ input SendNotificationInput {
   subject: String!
   content: String!
   templateId: String
+  eventType: String
+}
+
+input NotificationFilterInput {
+  status: String
+  channel: String
+  eventType: String
+  isRead: Boolean
+}
+
+input RegisterPushSubscriptionInput {
+  endpoint: String!
+  p256dh: String!
+  auth: String!
+  userAgent: String
+  deviceName: String
+}
+
+input UpdatePushSubscriptionInput {
+  id: ID
+  endpoint: String
+  p256dh: String
+  auth: String
+  userAgent: String
+  deviceName: String
+  isActive: Boolean
 }
 
 extend type Query {
-  notifications(userId: ID!, limit: Int, offset: Int): NotificationList! @auth
+  notifications(userId: ID, filter: NotificationFilterInput, limit: Int, offset: Int): NotificationList! @auth
+  unreadNotificationCount: Int! @auth
+  pushSubscriptions(activeOnly: Boolean): PushSubscriptionList! @auth
+  vapidPublicKey: VAPIDPublicKeyPayload! @auth
 }
 
 extend type Mutation {
   sendNotification(input: SendNotificationInput!): Boolean! @auth
+  markNotificationAsRead(notificationId: ID!, isRead: Boolean): Notification! @auth
+  markAllNotificationsAsRead: MarkAllNotificationsReadPayload! @auth
+  registerPushSubscription(input: RegisterPushSubscriptionInput!): PushSubscription! @auth
+  updatePushSubscription(input: UpdatePushSubscriptionInput!): PushSubscription! @auth
+  deactivatePushSubscription(id: ID, endpoint: String): Boolean! @auth
 }
