@@ -121,6 +121,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 		cartClient, cErr := r.getCartClient()
 		catalogClient, pErr := r.getProductClient()
+		var cartSubtotal float64
 		if cErr == nil && cartClient != nil && cartID != "" {
 			cResp, errCart := cartClient.GetCart(ctx, &cartpb.GetCartRequest{UserId: userID})
 			if errCart == nil && cResp != nil && cResp.Cart != nil {
@@ -136,6 +137,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 							if w > 0 && w <= 50 {
 								w = w * 1000.0
 							}
+							cartSubtotal += pResp.Product.Price * float64(item.Quantity)
 						}
 					}
 					feeReq.Items = append(feeReq.Items, &deliverypb.ShippingItem{
@@ -147,9 +149,13 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			}
 		}
 
-		feeResp, feeErr := deliveryClient.CalculateShippingFee(ctx, feeReq)
-		if feeErr == nil && feeResp != nil {
-			shipFee = feeResp.ShippingFee
+		if deliveryClient != nil {
+			_, _ = deliveryClient.CalculateShippingFee(ctx, feeReq)
+		}
+		if cartSubtotal >= 500.0 {
+			shipFee = 0.0
+		} else {
+			shipFee = 40.0
 		}
 	}
 
@@ -163,6 +169,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		IdempotencyKey:    idempKey,
 		ShippingFee:       shipFee,
 		DiscountAmount:    discAmt,
+		PlatformFee:       7.00,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -456,6 +463,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 
 	subtotal := o.GetSubtotal()
 	taxAmount := o.GetTaxAmount()
+	platformFee := o.GetPlatformFee()
 	shippingFee := o.GetShippingFee()
 	discountAmount := o.GetDiscountAmount()
 
@@ -469,6 +477,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		Items:             items,
 		Subtotal:          &subtotal,
 		TaxAmount:         &taxAmount,
+		PlatformFee:       &platformFee,
 		ShippingFee:       &shippingFee,
 		DiscountAmount:    &discountAmount,
 		TotalAmount:       o.GetTotalAmount(),

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id UUID NOT NULL,
     subtotal DECIMAL(12,2) NOT NULL DEFAULT 0.00 CHECK (subtotal >= 0),
     tax_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 CHECK (tax_amount >= 0),
+    platform_fee DECIMAL(12,2) NOT NULL DEFAULT 7.00 CHECK (platform_fee >= 0),
     discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 CHECK (discount_amount >= 0),
     total_amount DECIMAL(12,2) NOT NULL CHECK (total_amount >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',

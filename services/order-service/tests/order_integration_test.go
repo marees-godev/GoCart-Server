@@ -459,8 +459,8 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 	if order1.GetTaxAmount() != 6.00 {
 		t.Errorf("expected store 1 tax 6.00, got %.2f", order1.GetTaxAmount())
 	}
-	if order1.GetTotalAmount() != 71.00 {
-		t.Errorf("expected store 1 total 71.00, got %.2f", order1.GetTotalAmount())
+	if order1.GetTotalAmount() != 78.00 {
+		t.Errorf("expected store 1 total 78.00, got %.2f", order1.GetTotalAmount())
 	}
 
 	// Verify store 2 order: 1 * 60.00 = 60.00 subtotal, 5% tax = 3.00, shipping = 5.00 -> total = 68.00

@@ -62,14 +62,14 @@ func (r *OrderRepo) CreateOrdersWithOutbox(
 			insertOrderQuery := `
 				INSERT INTO orders (
 					id, order_number, parent_order_id, user_id, store_id,
-					subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+					subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 					currency, payment_status, status, shipping_address, billing_address,
 					shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 				) VALUES (
 					$1, $2, $3, $4, $5,
-					$6, $7, $8, $9, $10,
-					$11, $12, $13, $14, $15,
-					$16, $17, $18, $19, $20
+					$6, $7, $8, $9, $10, $11,
+					$12, $13, $14, $15, $16,
+					$17, $18, $19, $20, $21
 				)`
 
 			var parentID any
@@ -106,7 +106,7 @@ func (r *OrderRepo) CreateOrdersWithOutbox(
 
 			_, err := tx.Exec(ctx, insertOrderQuery,
 				order.ID, order.OrderNumber, parentID, order.UserID, order.StoreID,
-				order.Subtotal, order.TaxAmount, order.ShippingFee, order.DiscountAmount, order.TotalAmount,
+				order.Subtotal, order.TaxAmount, order.PlatformFee, order.ShippingFee, order.DiscountAmount, order.TotalAmount,
 				order.Currency, string(order.PaymentStatus), string(order.Status), shippingJSON, billingJSON,
 				shipAddrID, billAddrID, idempKey, order.CreatedAt, order.UpdatedAt,
 			)
@@ -202,7 +202,7 @@ func (r *OrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, 
 	query := `
 		SELECT 
 			id, order_number, parent_order_id, user_id, store_id,
-			subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+			subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 			currency, payment_status, status, shipping_address::text, billing_address::text,
 			shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 		FROM orders
@@ -214,7 +214,7 @@ func (r *OrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, 
 
 	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
 		&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
-		&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+		&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 		&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 		&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 	)
@@ -266,7 +266,7 @@ func (r *OrderRepo) GetOrdersByIdempotencyKey(ctx context.Context, idempotencyKe
 		ordersQuery := `
 			SELECT 
 				id, order_number, parent_order_id, user_id, store_id,
-				subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+				subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 				currency, payment_status, status, shipping_address::text, billing_address::text,
 				shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 			FROM orders
@@ -287,7 +287,7 @@ func (r *OrderRepo) GetOrdersByIdempotencyKey(ctx context.Context, idempotencyKe
 
 			if err := rows.Scan(
 				&o.ID, &o.OrderNumber, &pID, &o.UserID, &o.StoreID,
-				&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+				&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 				&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 				&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 			); err != nil {
@@ -344,7 +344,7 @@ func (r *OrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit
 	query := `
 		SELECT 
 			id, order_number, parent_order_id, user_id, store_id,
-			subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+			subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 			currency, payment_status, status, shipping_address::text, billing_address::text,
 			shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 		FROM orders
@@ -366,7 +366,7 @@ func (r *OrderRepo) ListOrdersByUserID(ctx context.Context, userID string, limit
 
 		if err := rows.Scan(
 			&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
-			&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+			&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 			&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 			&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
@@ -438,13 +438,13 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			var shipAddrStr, billAddrStr *string
 			readQuery := `
 				SELECT id, order_number, parent_order_id, user_id, store_id,
-					subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+					subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 					currency, payment_status, status, shipping_address::text, billing_address::text,
 					shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 				FROM orders WHERE id = $1`
 			err = tx.QueryRow(ctx, readQuery, id).Scan(
 				&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
-				&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+				&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 				&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 				&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 			)
@@ -487,7 +487,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			WHERE id = $3
 			RETURNING 
 				id, order_number, parent_order_id, user_id, store_id,
-				subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+				subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 				currency, payment_status, status, shipping_address::text, billing_address::text,
 				shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at`
 
@@ -497,7 +497,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 
 		err = tx.QueryRow(ctx, query, string(status), string(newPaymentStatus), id).Scan(
 			&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
-			&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+			&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 			&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 			&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 		)
@@ -625,7 +625,7 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 			WHERE id = $2
 			RETURNING 
 				id, order_number, parent_order_id, user_id, store_id,
-				subtotal, tax_amount, shipping_fee, discount_amount, total_amount,
+				subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
 				currency, payment_status, status, shipping_address::text, billing_address::text,
 				shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at`
 
@@ -635,7 +635,7 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 
 		err = tx.QueryRow(ctx, query, string(model.OrderStatusCancelled), id).Scan(
 			&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
-			&o.Subtotal, &o.TaxAmount, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
+			&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 			&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
 			&shipAddrID, &billAddrID, &idempKey, &o.CreatedAt, &o.UpdatedAt,
 		)

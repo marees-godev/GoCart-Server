@@ -1,0 +1,2 @@
+ALTER TABLE orders 
+ADD COLUMN IF NOT EXISTS platform_fee DECIMAL(12, 2) NOT NULL DEFAULT 7.00 CHECK (platform_fee >= 0);

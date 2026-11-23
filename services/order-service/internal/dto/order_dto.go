@@ -19,6 +19,7 @@ type CreateOrderInput struct {
 	BillingAddressID  string                 `json:"billing_address_id"`
 	Currency          string                 `json:"currency"`
 	IdempotencyKey    string                 `json:"idempotency_key"`
+	PlatformFee       float64                `json:"platform_fee"`
 	ShippingFee       float64                `json:"shipping_fee"`
 	DiscountAmount    float64                `json:"discount_amount"`
 	Items             []CreateOrderItemInput `json:"items,omitempty"`
