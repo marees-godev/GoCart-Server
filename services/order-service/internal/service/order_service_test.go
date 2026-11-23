@@ -427,12 +427,15 @@ func TestOrderService_CreateOrder_SingleStore_Success(t *testing.T) {
 	// tax_amount = 7.50
 	// shipping_fee = 15.00
 	// discount = 5.00
-	// total = 100.00 + 7.50 + 15.00 - 5.00 = 117.50
+	// total = 100.00 + 7.50 + 7.00 + 15.00 - 5.00 = 124.50
 	if order.Subtotal != 100.00 {
 		t.Errorf("expected subtotal 100.00, got %.2f", order.Subtotal)
 	}
 	if order.TaxAmount != 7.50 {
 		t.Errorf("expected tax_amount 7.50, got %.2f", order.TaxAmount)
+	}
+	if order.PlatformFee != 7.00 {
+		t.Errorf("expected platform_fee 7.00, got %.2f", order.PlatformFee)
 	}
 	if order.ShippingFee != 15.00 {
 		t.Errorf("expected shipping_fee 15.00, got %.2f", order.ShippingFee)
@@ -440,8 +443,8 @@ func TestOrderService_CreateOrder_SingleStore_Success(t *testing.T) {
 	if order.DiscountAmount != 5.00 {
 		t.Errorf("expected discount_amount 5.00, got %.2f", order.DiscountAmount)
 	}
-	if order.TotalAmount != 117.50 {
-		t.Errorf("expected total_amount 117.50, got %.2f", order.TotalAmount)
+	if order.TotalAmount != 124.50 {
+		t.Errorf("expected total_amount 124.50, got %.2f", order.TotalAmount)
 	}
 
 	// Verify snapshots in order items
@@ -1400,8 +1403,8 @@ func TestOrderService_CreateOrder_CalculatesShippingFeeViaDeliveryClient(t *test
 		t.Errorf("expected weight_grams 1500, got %v", calledWithItems[0].WeightGrams)
 	}
 
-	if res.PrimaryOrder.ShippingFee != 65.0 {
-		t.Errorf("expected primary order shipping fee 65.0, got %v", res.PrimaryOrder.ShippingFee)
+	if res.PrimaryOrder.ShippingFee != 40.0 {
+		t.Errorf("expected primary order shipping fee 40.0, got %v", res.PrimaryOrder.ShippingFee)
 	}
 }
 
@@ -1605,5 +1608,106 @@ func TestOrderService_CreateOrder_MultiStore_DeliveryFailureAbortsAll(t *testing
 	}
 	if len(repo.outboxEnvelopes) != 0 {
 		t.Errorf("expected 0 outbox events persisted, got %d", len(repo.outboxEnvelopes))
+	}
+}
+
+func TestOrderService_CreateOrder_PlatformFeeAndShippingThresholds(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name                string
+		unitPrice           float64
+		quantity            int
+		expectedSubtotal    float64
+		expectedPlatformFee float64
+		expectedShippingFee float64
+		expectedTotalAmount float64
+	}{
+		{
+			name:                "Below 500 charges 40 shipping fee and 7 platform fee",
+			unitPrice:           350.00,
+			quantity:            1,
+			expectedSubtotal:    350.00,
+			expectedPlatformFee: 7.00,
+			expectedShippingFee: 40.00,
+			expectedTotalAmount: 397.00,
+		},
+		{
+			name:                "Exactly 500 unlocks free shipping (0) and charges 7 platform fee",
+			unitPrice:           250.00,
+			quantity:            2,
+			expectedSubtotal:    500.00,
+			expectedPlatformFee: 7.00,
+			expectedShippingFee: 0.00,
+			expectedTotalAmount: 507.00,
+		},
+		{
+			name:                "Above 500 unlocks free shipping (0) and charges 7 platform fee",
+			unitPrice:           350.00,
+			quantity:            2,
+			expectedSubtotal:    700.00,
+			expectedPlatformFee: 7.00,
+			expectedShippingFee: 0.00,
+			expectedTotalAmount: 707.00,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newMockOrderRepo()
+			prodID := uuid.New().String()
+			storeID := uuid.New().String()
+
+			prodClient := &mockProductClient{
+				products: map[string]*productpb.Product{
+					prodID: {
+						Id:      prodID,
+						Name:    "Test Item",
+						Price:   tt.unitPrice,
+						Status:  "ACTIVE",
+						StoreId: storeID,
+					},
+				},
+			}
+			invClient := &mockInventoryClient{
+				stocks: map[string]*inventorypb.StockItem{
+					prodID: {ProductId: prodID, AvailableQuantity: 100},
+				},
+			}
+
+			delClient := &mockDeliveryClient{
+				calculateShippingFeeFunc: func(ctx context.Context, req *deliverypb.CalculateShippingFeeRequest) (*deliverypb.CalculateShippingFeeResponse, error) {
+					return &deliverypb.CalculateShippingFeeResponse{ShippingFee: 40.0}, nil
+				},
+			}
+
+			svc := service.NewOrderService(repo, nil, prodClient, invClient, delClient, 5, nil)
+
+			res, err := svc.CreateOrder(ctx, dto.CreateOrderInput{
+				UserID:          uuid.New().String(),
+				IdempotencyKey:  uuid.New().String(),
+				ShippingAddress: "123 Main St, Bangalore",
+				Items: []dto.CreateOrderItemInput{
+					{ProductID: prodID, StoreID: storeID, Quantity: tt.quantity},
+				},
+			})
+			if err != nil {
+				t.Fatalf("CreateOrder failed: %v", err)
+			}
+
+			order := res.PrimaryOrder
+			if order.Subtotal != tt.expectedSubtotal {
+				t.Errorf("expected subtotal %.2f, got %.2f", tt.expectedSubtotal, order.Subtotal)
+			}
+			if order.PlatformFee != tt.expectedPlatformFee {
+				t.Errorf("expected platform fee %.2f, got %.2f", tt.expectedPlatformFee, order.PlatformFee)
+			}
+			if order.ShippingFee != tt.expectedShippingFee {
+				t.Errorf("expected shipping fee %.2f, got %.2f", tt.expectedShippingFee, order.ShippingFee)
+			}
+			if order.TotalAmount != tt.expectedTotalAmount {
+				t.Errorf("expected total amount %.2f, got %.2f", tt.expectedTotalAmount, order.TotalAmount)
+			}
+		})
 	}
 }

@@ -54,6 +54,7 @@ func (h *OrderGRPCHandler) CreateOrder(ctx context.Context, req *orderpb.CreateO
 		BillingAddressID:  req.GetBillingAddressId(),
 		Currency:          req.GetCurrency(),
 		IdempotencyKey:    req.GetIdempotencyKey(),
+		PlatformFee:       req.GetPlatformFee(),
 		ShippingFee:       req.GetShippingFee(),
 		DiscountAmount:    req.GetDiscountAmount(),
 	})
@@ -188,6 +189,7 @@ func mapModelToProtoOrder(o *model.Order) *orderpb.Order {
 		PaymentStatus:     string(o.PaymentStatus),
 		Subtotal:          o.Subtotal,
 		TaxAmount:         o.TaxAmount,
+		PlatformFee:       o.PlatformFee,
 		ShippingFee:       o.ShippingFee,
 		DiscountAmount:    o.DiscountAmount,
 		TotalAmount:       o.TotalAmount,

@@ -869,8 +869,46 @@ func (r *queryResolver) CalculateShippingFee(ctx context.Context, input model.Ca
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
+	platFee := 7.00
+	shipFee := res.ShippingFee
+	var calculatedSubtotal float64
+	hasSubtotal := false
+	if input.OrderID != nil && *input.OrderID != "" {
+		if orderClient, oErr := r.getOrderClient(); oErr == nil && orderClient != nil {
+			if ordResp, ordErr := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: *input.OrderID}); ordErr == nil && ordResp != nil && ordResp.Order != nil {
+				calculatedSubtotal = ordResp.Order.Subtotal
+				hasSubtotal = true
+			}
+		}
+	} else if len(input.Items) > 0 {
+		if prodClient, pErr := r.getProductClient(); pErr == nil && prodClient != nil {
+			allFound := true
+			for _, it := range input.Items {
+				pResp, pErr := prodClient.GetProduct(ctx, &productpb.GetProductRequest{Id: it.ProductID})
+				if pErr == nil && pResp != nil && pResp.Product != nil {
+					calculatedSubtotal += pResp.Product.Price * float64(it.Quantity)
+				} else {
+					allFound = false
+					break
+				}
+			}
+			if allFound {
+				hasSubtotal = true
+			}
+		}
+	}
+
+	if hasSubtotal {
+		if calculatedSubtotal >= 500.0 {
+			shipFee = 0.00
+		} else {
+			shipFee = 40.00
+		}
+	}
+
 	result := &model.ShippingFeeCalculation{
-		ShippingFee:      res.ShippingFee,
+		ShippingFee:      shipFee,
+		PlatformFee:      &platFee,
 		Currency:         res.Currency,
 		Zone:             res.Zone,
 		TotalWeightGrams: res.TotalWeightGrams,

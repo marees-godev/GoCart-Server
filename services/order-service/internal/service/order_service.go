@@ -318,11 +318,30 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		}
 	}
 
-	// Split store shipping fee and discount evenly if provided at order level
+	// 1. Compute overall order subtotal across all store items
+	var overallSubtotal float64
+	for _, items := range storeMap {
+		for _, it := range items {
+			overallSubtotal += it.unitPrice * float64(it.quantity)
+		}
+	}
+	overallSubtotal = math.Round(overallSubtotal*100) / 100
+
+	// 2. Fixed platform fee is ₹7.00 for all orders across the platform
+	orderPlatformFee := 7.00
+	if input.PlatformFee > 0 {
+		orderPlatformFee = input.PlatformFee
+	}
+
+	// 3. Split store shipping fee and discount evenly if provided at order level
 	numStores := float64(len(storeMap))
 	baseStoreShippingFee := 0.0
-	if input.ShippingFee > 0 {
+	if overallSubtotal >= 500.0 {
+		baseStoreShippingFee = 0.0
+	} else if input.ShippingFee > 0 {
 		baseStoreShippingFee = math.Round((input.ShippingFee/numStores)*100) / 100
+	} else {
+		baseStoreShippingFee = math.Round((40.0/numStores)*100) / 100
 	}
 	storeDiscount := 0.0
 	if input.DiscountAmount > 0 {
@@ -337,51 +356,57 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	}
 
 	firstStore := true
+	idempKeyFirst := true
 	for storeID, items := range storeMap {
 		storeShippingFee := baseStoreShippingFee
 		if needsShippingCalculation {
-			var shipItems []*deliverypb.ShippingItem
-			for _, it := range items {
-				w := it.weight
-				if w > 0 && w <= 50 {
-					w = w * 1000.0
+			if overallSubtotal >= 500.0 {
+				storeShippingFee = 0.0
+			} else {
+				var shipItems []*deliverypb.ShippingItem
+				for _, it := range items {
+					w := it.weight
+					if w > 0 && w <= 50 {
+						w = w * 1000.0
+					}
+					shipItems = append(shipItems, &deliverypb.ShippingItem{
+						ProductId:   it.productID,
+						WeightGrams: w,
+						Quantity:    int32(it.quantity),
+					})
 				}
-				shipItems = append(shipItems, &deliverypb.ShippingItem{
-					ProductId:   it.productID,
-					WeightGrams: w,
-					Quantity:    int32(it.quantity),
+				calcCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
+				feeResp, feeErr := s.deliveryClient.CalculateShippingFee(calcCtx, &deliverypb.CalculateShippingFeeRequest{
+					Items:                 shipItems,
+					DestinationPostalCode: destPostalCode,
+					DestinationCity:       destCity,
+					DestinationState:      destState,
+					ShippingAddress:       input.ShippingAddress,
 				})
-			}
-			calcCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			feeResp, feeErr := s.deliveryClient.CalculateShippingFee(calcCtx, &deliverypb.CalculateShippingFeeRequest{
-				Items:                 shipItems,
-				DestinationPostalCode: destPostalCode,
-				DestinationCity:       destCity,
-				DestinationState:      destState,
-				ShippingAddress:       input.ShippingAddress,
-			})
-			cancel()
-			if feeErr != nil {
-				s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
-				var appErr *appErrors.AppError
-				if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
-					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				cancel()
+				if feeErr != nil {
+					s.log.Error("Failed to calculate shipping fee from delivery service", "store_id", storeID, "error", feeErr)
+					var appErr *appErrors.AppError
+					if errors.As(feeErr, &appErr) && appErr.Code == appErrors.CodeServiceUnavailable {
+						return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+					}
+					st, ok := status.FromError(feeErr)
+					if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
+						return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+					}
+					return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
 				}
-				st, ok := status.FromError(feeErr)
-				if (ok && (st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded)) || errors.Is(feeErr, context.DeadlineExceeded) {
-					return nil, appErrors.ServiceUnavailable("delivery service unavailable while calculating shipping fee")
+				if feeResp == nil {
+					s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
+					return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
 				}
-				return nil, appErrors.Internal(feeErr, "failed to calculate shipping fee from delivery service")
+				if feeResp.ShippingFee < 0 {
+					s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
+					return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
+				}
+				// Platform policy strictly charges ₹40 (split across stores) for orders below ₹500
+				storeShippingFee = baseStoreShippingFee
 			}
-			if feeResp == nil {
-				s.log.Error("Delivery service returned empty shipping fee response", "store_id", storeID)
-				return nil, appErrors.Internal(nil, "delivery service returned an empty shipping fee response")
-			}
-			if feeResp.ShippingFee < 0 {
-				s.log.Error("Delivery service returned negative shipping fee", "store_id", storeID, "shipping_fee", feeResp.ShippingFee)
-				return nil, appErrors.Internal(nil, "delivery service returned an invalid negative shipping fee")
-			}
-			storeShippingFee = feeResp.ShippingFee
 		}
 		orderID := uuid.New().String()
 		orderNumber := generateOrderNumber()
@@ -424,7 +449,15 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 		subtotal = math.Round(subtotal*100) / 100
 		taxAmount = math.Round(taxAmount*100) / 100
-		totalAmount := math.Round((subtotal+taxAmount+storeShippingFee-storeDiscount)*100) / 100
+
+		// Apply platform fee once at the primary order level for multi-store orders
+		storePlatformFee := 0.0
+		if firstStore {
+			storePlatformFee = orderPlatformFee
+			firstStore = false
+		}
+
+		totalAmount := math.Round((subtotal+taxAmount+storePlatformFee+storeShippingFee-storeDiscount)*100) / 100
 		if totalAmount < 0 {
 			totalAmount = 0
 		}
@@ -439,10 +472,10 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			billAddrIDPtr = &input.BillingAddressID
 		}
 		var idempKeyPtr *string
-		if firstStore && strings.TrimSpace(input.IdempotencyKey) != "" {
+		if idempKeyFirst && strings.TrimSpace(input.IdempotencyKey) != "" {
 			k := strings.TrimSpace(input.IdempotencyKey)
 			idempKeyPtr = &k
-			firstStore = false
+			idempKeyFirst = false
 		}
 
 		ord := &model.Order{
@@ -453,6 +486,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			StoreID:           storeID,
 			Subtotal:          subtotal,
 			TaxAmount:         taxAmount,
+			PlatformFee:       storePlatformFee,
 			ShippingFee:       storeShippingFee,
 			DiscountAmount:    storeDiscount,
 			TotalAmount:       totalAmount,
@@ -475,6 +509,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 			UserID:            ord.UserID,
 			Subtotal:          ord.Subtotal,
 			TaxAmount:         ord.TaxAmount,
+			PlatformFee:       ord.PlatformFee,
 			ShippingFee:       ord.ShippingFee,
 			DiscountAmount:    ord.DiscountAmount,
 			TotalAmount:       ord.TotalAmount,

@@ -54,6 +54,7 @@ input CalculateShippingFeeInput {
 
 type ShippingFeeCalculation {
   shippingFee: Float!
+  platformFee: Float
   currency: String!
   zone: String!
   totalWeightGrams: Float!

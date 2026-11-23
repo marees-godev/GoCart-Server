@@ -46,6 +46,7 @@ message Order {
   string billing_address_id = 18;
   string updated_at = 19;
   string order_number = 20;
+  double platform_fee = 21;
 }
 
 message CreateOrderRequest {
@@ -58,6 +59,7 @@ message CreateOrderRequest {
   string idempotency_key = 7;
   double shipping_fee = 8;
   double discount_amount = 9;
+  double platform_fee = 10;
 }
 
 message CreateOrderResponse {

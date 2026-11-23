@@ -247,8 +247,8 @@ func TestOrderResolvers_CreateOrder_CalculatesShippingFeeWithAddressAndPartner(t
 	if mockOrder.lastCreateReq == nil {
 		t.Fatal("expected orderClient.CreateOrder to have been called")
 	}
-	if mockOrder.lastCreateReq.ShippingFee != 55.0 {
-		t.Errorf("expected CreateOrder to be called with shippingFee 55.0, got %f", mockOrder.lastCreateReq.ShippingFee)
+	if mockOrder.lastCreateReq.ShippingFee != 40.0 {
+		t.Errorf("expected CreateOrder to be called with shippingFee 40.0, got %f", mockOrder.lastCreateReq.ShippingFee)
 	}
 }
 

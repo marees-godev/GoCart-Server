@@ -10,6 +10,7 @@ type OrderCreatedEvent struct {
 	UserID            string             `json:"user_id"`
 	Subtotal          float64            `json:"subtotal,omitempty"`
 	TaxAmount         float64            `json:"tax_amount,omitempty"`
+	PlatformFee       float64            `json:"platform_fee,omitempty"`
 	ShippingFee       float64            `json:"shipping_fee,omitempty"`
 	DiscountAmount    float64            `json:"discount_amount,omitempty"`
 	TotalAmount       float64            `json:"total_amount"`

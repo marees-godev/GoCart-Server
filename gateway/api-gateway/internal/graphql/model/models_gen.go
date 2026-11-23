@@ -679,6 +679,7 @@ type Order struct {
 	Items             []*OrderItem `json:"items"`
 	Subtotal          *float64     `json:"subtotal,omitempty"`
 	TaxAmount         *float64     `json:"taxAmount,omitempty"`
+	PlatformFee       *float64     `json:"platformFee,omitempty"`
 	ShippingFee       *float64     `json:"shippingFee,omitempty"`
 	DiscountAmount    *float64     `json:"discountAmount,omitempty"`
 	TotalAmount       float64      `json:"totalAmount"`
@@ -991,12 +992,13 @@ type SendNotificationInput struct {
 }
 
 type ShippingFeeCalculation struct {
-	ShippingFee      float64 `json:"shippingFee"`
-	Currency         string  `json:"currency"`
-	Zone             string  `json:"zone"`
-	TotalWeightGrams float64 `json:"totalWeightGrams"`
-	CalculationModel string  `json:"calculationModel"`
-	BreakdownDetails *string `json:"breakdownDetails,omitempty"`
+	ShippingFee      float64  `json:"shippingFee"`
+	PlatformFee      *float64 `json:"platformFee,omitempty"`
+	Currency         string   `json:"currency"`
+	Zone             string   `json:"zone"`
+	TotalWeightGrams float64  `json:"totalWeightGrams"`
+	CalculationModel string   `json:"calculationModel"`
+	BreakdownDetails *string  `json:"breakdownDetails,omitempty"`
 }
 
 type ShippingItemInput struct {

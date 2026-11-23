@@ -572,6 +572,7 @@ type ComplexityRoot struct {
 		OrderStatus       func(childComplexity int) int
 		ParentOrderID     func(childComplexity int) int
 		PaymentStatus     func(childComplexity int) int
+		PlatformFee       func(childComplexity int) int
 		ShippingAddress   func(childComplexity int) int
 		ShippingAddressID func(childComplexity int) int
 		ShippingFee       func(childComplexity int) int
@@ -856,6 +857,7 @@ type ComplexityRoot struct {
 		BreakdownDetails func(childComplexity int) int
 		CalculationModel func(childComplexity int) int
 		Currency         func(childComplexity int) int
+		PlatformFee      func(childComplexity int) int
 		ShippingFee      func(childComplexity int) int
 		TotalWeightGrams func(childComplexity int) int
 		Zone             func(childComplexity int) int
@@ -4303,6 +4305,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Order.PaymentStatus(childComplexity), true
 
+	case "Order.platformFee":
+		if e.complexity.Order.PlatformFee == nil {
+			break
+		}
+
+		return e.complexity.Order.PlatformFee(childComplexity), true
+
 	case "Order.shippingAddress":
 		if e.complexity.Order.ShippingAddress == nil {
 			break
@@ -6038,6 +6047,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ShippingFeeCalculation.Currency(childComplexity), true
 
+	case "ShippingFeeCalculation.platformFee":
+		if e.complexity.ShippingFeeCalculation.PlatformFee == nil {
+			break
+		}
+
+		return e.complexity.ShippingFeeCalculation.PlatformFee(childComplexity), true
+
 	case "ShippingFeeCalculation.shippingFee":
 		if e.complexity.ShippingFeeCalculation.ShippingFee == nil {
 			break
@@ -7003,6 +7019,7 @@ input CalculateShippingFeeInput {
 
 type ShippingFeeCalculation {
   shippingFee: Float!
+  platformFee: Float
   currency: String!
   zone: String!
   totalWeightGrams: Float!
@@ -7390,6 +7407,7 @@ type Order {
   items: [OrderItem!]!
   subtotal: Float
   taxAmount: Float
+  platformFee: Float
   shippingFee: Float
   discountAmount: Float
   totalAmount: Float!
@@ -26628,6 +26646,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -26742,6 +26762,8 @@ func (ec *executionContext) fieldContext_Mutation_checkout(ctx context.Context, 
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -26856,6 +26878,8 @@ func (ec *executionContext) fieldContext_Mutation_cancelOrder(ctx context.Contex
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -26974,6 +26998,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderStatus(ctx context.
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -33047,6 +33073,47 @@ func (ec *executionContext) fieldContext_Order_taxAmount(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Order_platformFee(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Order_platformFee(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PlatformFee, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Order_platformFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Order_shippingFee(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Order_shippingFee(ctx, field)
 	if err != nil {
@@ -33983,6 +34050,8 @@ func (ec *executionContext) fieldContext_OrderList_orders(_ context.Context, fie
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -38591,6 +38660,8 @@ func (ec *executionContext) fieldContext_Query_calculateShippingFee(ctx context.
 			switch field.Name {
 			case "shippingFee":
 				return ec.fieldContext_ShippingFeeCalculation_shippingFee(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_ShippingFeeCalculation_platformFee(ctx, field)
 			case "currency":
 				return ec.fieldContext_ShippingFeeCalculation_currency(ctx, field)
 			case "zone":
@@ -39856,6 +39927,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -39970,6 +40043,8 @@ func (ec *executionContext) fieldContext_Query_getOrder(ctx context.Context, fie
 				return ec.fieldContext_Order_subtotal(ctx, field)
 			case "taxAmount":
 				return ec.fieldContext_Order_taxAmount(ctx, field)
+			case "platformFee":
+				return ec.fieldContext_Order_platformFee(ctx, field)
 			case "shippingFee":
 				return ec.fieldContext_Order_shippingFee(ctx, field)
 			case "discountAmount":
@@ -44864,6 +44939,47 @@ func (ec *executionContext) _ShippingFeeCalculation_shippingFee(ctx context.Cont
 }
 
 func (ec *executionContext) fieldContext_ShippingFeeCalculation_shippingFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ShippingFeeCalculation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ShippingFeeCalculation_platformFee(ctx context.Context, field graphql.CollectedField, obj *model.ShippingFeeCalculation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ShippingFeeCalculation_platformFee(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PlatformFee, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ShippingFeeCalculation_platformFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ShippingFeeCalculation",
 		Field:      field,
@@ -56802,6 +56918,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Order_subtotal(ctx, field, obj)
 		case "taxAmount":
 			out.Values[i] = ec._Order_taxAmount(ctx, field, obj)
+		case "platformFee":
+			out.Values[i] = ec._Order_platformFee(ctx, field, obj)
 		case "shippingFee":
 			out.Values[i] = ec._Order_shippingFee(ctx, field, obj)
 		case "discountAmount":
@@ -59289,6 +59407,8 @@ func (ec *executionContext) _ShippingFeeCalculation(ctx context.Context, sel ast
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "platformFee":
+			out.Values[i] = ec._ShippingFeeCalculation_platformFee(ctx, field, obj)
 		case "currency":
 			out.Values[i] = ec._ShippingFeeCalculation_currency(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
