@@ -15,6 +15,7 @@ import (
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
@@ -104,6 +105,20 @@ func main() {
 		}
 	}
 
+	var userLookup service.UserEmailLookup
+	if cfg.GRPC.UserServiceAddr != "" {
+		userConn, uErr := grpc.NewClient(
+			cfg.GRPC.UserServiceAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if uErr == nil {
+			defer userConn.Close()
+			userLookup = service.NewGRPCUserEmailLookup(userpb.NewUserServiceClient(userConn), cfg.GRPC.LookupTimeout)
+		} else {
+			log.Warn("Failed to dial User Service for user email lookup", "error", uErr)
+		}
+	}
+
 	pushClient := push.NewWebPushClient(cfg.VAPID, cfg.Push, nil, log)
 	if !pushClient.IsConfigured() {
 		log.Warn("VAPID keys are not configured; Web Push delivery will be marked FAILED when attempted")
@@ -115,7 +130,7 @@ func main() {
 	prefSvc := service.NewPreferenceService(repo, repo)
 	subSvc := service.NewPushSubscriptionService(repo, cfg.VAPID, log)
 	notifSvc := service.NewNotificationService(repo, repo, repo, repo, tmplSvc, pushClient, log, localNotifier)
-	pipelineSvc := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, repo, repo, notifSvc, orderLookup, log)
+	pipelineSvc := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, repo, repo, notifSvc, orderLookup, log, userLookup)
 	eventConsumer := consumer.NewNotificationEventConsumer(pipelineSvc, log)
 	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc)
 

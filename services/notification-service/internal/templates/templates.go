@@ -1,7 +1,7 @@
 package templates
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"strings"
 	"sync"
@@ -13,11 +13,15 @@ import (
 //go:embed templates.json
 var embeddedTemplatesJSON []byte
 
+//go:embed emails/*.html
+var emailFS embed.FS
+
 type FileTemplate struct {
 	EventType       string `json:"event_type"`
 	Channel         string `json:"channel"`
 	SubjectTemplate string `json:"subject_template"`
 	BodyTemplate    string `json:"body_template"`
+	TemplateFile    string `json:"template_file,omitempty"`
 }
 
 var (
@@ -33,11 +37,18 @@ func initRegistry() {
 	}
 	now := time.Now()
 	for _, item := range list {
+		body := item.BodyTemplate
+		if item.TemplateFile != "" {
+			if content, err := emailFS.ReadFile(item.TemplateFile); err == nil {
+				body = string(content)
+			}
+		}
+
 		tmpl := &model.Template{
 			ID:              "",
 			EventType:       item.EventType,
 			SubjectTemplate: item.SubjectTemplate,
-			BodyTemplate:    item.BodyTemplate,
+			BodyTemplate:    body,
 			IsActive:        true,
 			CreatedAt:       now,
 			UpdatedAt:       now,

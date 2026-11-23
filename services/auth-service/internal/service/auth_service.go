@@ -545,9 +545,7 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 	var businessEmail string
 	var partnerID string
 	var customerID string
-	var eventType string
-	var topic string
-	var eventPayload []byte
+	var outboxEvt *outbox.Event
 
 	// Create base user record in user service for ALL roles so that common platform functionality
 	// (profile management, address management, checkout, orders) is available without separate customer accounts.
@@ -637,15 +635,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		if merchantID == "" {
 			merchantID = userID.String()
 		}
-		eventType = "MerchantRegistered"
-		topic = "auth.merchant.registered"
-		eventPayload, _ = json.Marshal(map[string]any{
-			"merchant_id":   merchantID,
-			"user_id":       userID.String(),
-			"email":         cred.Email,
-			"role":          cred.Role.String(),
-			"registered_at": time.Now().UTC(),
-		})
 
 	case model.RoleDeliveryPartner:
 		partnerID = userID.String()
@@ -680,30 +669,26 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 			Email:         cred.Email,
 			ContactNumber: contactNumber,
 		}
-		eventPayload, _ = json.Marshal(partnerEvt)
-		eventType = events.EventTypePartnerRegistered
-		topic = events.TopicPartnerRegistered
-
-		// Publish to Kafka message broker if available
-		if s.kafkaProducer != nil {
-			if env, err := events.NewEventEnvelopeWithAggregate(events.EventTypePartnerRegistered, "auth-service", partnerID, partnerEvt); err == nil {
-				_ = s.kafkaProducer.Publish(ctx, topic, partnerID, env)
+		var envPayload []byte
+		if env, err := events.NewEventEnvelopeWithAggregate(events.EventTypePartnerRegistered, "auth-service", partnerID, partnerEvt); err == nil {
+			envPayload, _ = env.Marshal()
+			if s.kafkaProducer != nil {
+				_ = s.kafkaProducer.Publish(ctx, events.TopicPartnerRegistered, partnerID, env)
 			}
+		} else {
+			envPayload, _ = json.Marshal(partnerEvt)
 		}
-		if s.eventPublisher != nil {
-			_ = s.eventPublisher.Publish(ctx, topic, eventType, partnerID, partnerEvt)
+
+		outboxEvt = &outbox.Event{
+			ID:            uuid.Must(uuid.NewV7()),
+			AggregateType: "auth",
+			AggregateID:   partnerID,
+			EventType:     events.EventTypePartnerRegistered,
+			Topic:         events.TopicPartnerRegistered,
+			Payload:       envPayload,
 		}
 
 	default: // RoleUser / CUSTOMER
-		eventType = "UserRegistered"
-		topic = "auth.user.registered"
-		eventPayload, _ = json.Marshal(map[string]any{
-			"customer_id":   customerID,
-			"user_id":       userID.String(),
-			"email":         cred.Email,
-			"role":          cred.Role.String(),
-			"registered_at": time.Now().UTC(),
-		})
 	}
 
 	ttlMinutes := s.cfg.JWT.ExpiryMinutes
@@ -740,15 +725,6 @@ func (s *authService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		ExpiresAt:  time.Now().Add(sessionTTL),
 		Revoked:    false,
 		RememberMe: false,
-	}
-
-	outboxEvt := &outbox.Event{
-		ID:            uuid.Must(uuid.NewV7()),
-		AggregateType: "auth",
-		AggregateID:   userID.String(),
-		EventType:     eventType,
-		Topic:         topic,
-		Payload:       eventPayload,
 	}
 
 	if err := s.repo.CreateLoginSession(ctx, refreshTokenModel, outboxEvt); err != nil {
@@ -1226,39 +1202,47 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 
 	var outboxEvt *outbox.Event
 	if isNewUser {
-		eventPayload, _ := json.Marshal(map[string]any{
-			"customer_id":   customerID,
-			"merchant_id":   merchantID,
-			"partner_id":    partnerID,
-			"user_id":       userID.String(),
-			"email":         cred.Email,
-			"role":          cred.Role.String(),
-			"registered_at": time.Now().UTC(),
-			"provider":      providerName,
-		})
+		userEvt := events.UserRegisteredEvent{
+			UserID:       userID.String(),
+			Email:        cred.Email,
+			Role:         cred.Role.String(),
+			RegisteredAt: time.Now().UTC(),
+		}
+		var envPayload []byte
+		if env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeUserRegistered, "auth-service", userID.String(), userEvt); err == nil {
+			envPayload, _ = env.Marshal()
+		} else {
+			envPayload, _ = json.Marshal(userEvt)
+		}
 		outboxEvt = &outbox.Event{
 			ID:            uuid.Must(uuid.NewV7()),
 			AggregateType: "auth",
 			AggregateID:   userID.String(),
-			EventType:     "UserRegistered",
-			Topic:         "auth.user.registered",
-			Payload:       eventPayload,
+			EventType:     events.EventTypeUserRegistered,
+			Topic:         events.TopicUserRegistered,
+			Payload:       envPayload,
 		}
 	} else {
-		eventPayload, _ := json.Marshal(map[string]any{
+		loginEvt := map[string]any{
 			"user_id":      userID.String(),
 			"email":        cred.Email,
 			"role":         cred.Role.String(),
 			"logged_in_at": time.Now().UTC(),
 			"provider":     providerName,
-		})
+		}
+		var envPayload []byte
+		if env, err := events.NewEventEnvelopeWithAggregate("UserLoggedIn", "auth-service", userID.String(), loginEvt); err == nil {
+			envPayload, _ = env.Marshal()
+		} else {
+			envPayload, _ = json.Marshal(loginEvt)
+		}
 		outboxEvt = &outbox.Event{
 			ID:            uuid.Must(uuid.NewV7()),
 			AggregateType: "auth",
 			AggregateID:   userID.String(),
 			EventType:     "UserLoggedIn",
-			Topic:         "auth.user.logged_in",
-			Payload:       eventPayload,
+			Topic:         "gocart.auth.user-logged-in",
+			Payload:       envPayload,
 		}
 	}
 
@@ -1492,8 +1476,39 @@ func (s *authService) VerifyEmail(ctx context.Context, req *dto.VerifyEmailReque
 	// Delete from Redis so OTP cannot be reused
 	_ = s.otpStore.DeleteOTP(ctx, otpKey)
 
-	// Update user in PostgreSQL
-	if err := s.repo.MarkEmailVerified(ctx, cred.UserID); err != nil {
+	// Construct registration domain event now that email is verified
+	userEvt := events.UserRegisteredEvent{
+		UserID:       cred.UserID.String(),
+		Email:        cred.Email,
+		Role:         cred.Role.String(),
+		RegisteredAt: time.Now().UTC(),
+	}
+	var eventPayload []byte
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeUserRegistered, "auth-service", cred.UserID.String(), userEvt)
+	if err == nil {
+		eventPayload, _ = env.Marshal()
+		if s.kafkaProducer != nil {
+			_ = s.kafkaProducer.Publish(ctx, events.TopicUserRegistered, cred.UserID.String(), env)
+		}
+	} else {
+		eventPayload, _ = json.Marshal(userEvt)
+	}
+
+	outboxEvt := &outbox.Event{
+		ID:            uuid.Must(uuid.NewV7()),
+		AggregateType: "auth",
+		AggregateID:   cred.UserID.String(),
+		EventType:     events.EventTypeUserRegistered,
+		Topic:         events.TopicUserRegistered,
+		Payload:       eventPayload,
+	}
+
+	if s.eventPublisher != nil {
+		_ = s.eventPublisher.Publish(ctx, events.TopicUserRegistered, events.EventTypeUserRegistered, cred.UserID.String(), userEvt)
+	}
+
+	// Update user in PostgreSQL and save outbox event atomically
+	if err := s.repo.MarkEmailVerified(ctx, cred.UserID, outboxEvt); err != nil {
 		return nil, appErrors.Internal(err, "failed to update email verification status")
 	}
 

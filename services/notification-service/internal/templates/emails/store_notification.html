@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoCart Store Notification</title>
+</head>
+<body style="margin: 0; padding: 32px 16px; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9;">
+    <tr>
+      <td align="center">
+        <!-- Main Email Container -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Top Accent Bar -->
+          <tr>
+            {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+            <td style="height: 4px; background-color: #EF4444; line-height: 4px; font-size: 1px;">&nbsp;</td>
+            {{else}}
+            <td style="height: 4px; background-color: #00A651; line-height: 4px; font-size: 1px;">&nbsp;</td>
+            {{end}}
+          </tr>
+
+          <!-- Header with GoCart Logo and Status Pill -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 24px 32px; border-bottom: 1px solid #F1F5F9;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <table border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                        <td style="width: 40px; height: 40px; background-color: #FEF2F2; border: 1.5px solid #EF4444; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">🚫</span>
+                        </td>
+                        {{else}}
+                        <td style="width: 40px; height: 40px; background-color: #E8F8F0; border: 1.5px solid #00A651; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">🏬</span>
+                        </td>
+                        {{end}}
+                        <td style="padding-left: 12px; vertical-align: middle;">
+                          <div style="font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px;">
+                            <span style="color: #00A651;">go</span><span style="color: #1E293B;">cart</span><span style="color: #00A651;">.</span>
+                          </div>
+                          <div style="font-size: 12px; color: #64748B; font-weight: 500; margin-top: 2px;">
+                            Store Management
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● STORE REJECTED
+                    </span>
+                    {{else}}
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #E8F8F0; border: 1px solid #A7F3D0; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #00A651; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● STORE APPROVED
+                    </span>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content Area -->
+          <tr>
+            <td style="padding: 32px 32px 28px 32px;">
+              
+              <!-- Hero Status Header -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="text-align: center; border-bottom: 1px solid #F1F5F9; padding-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #FEF2F2; border: 2px solid #EF4444; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      ❌
+                    </div>
+                    {{else}}
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #E8F8F0; border: 2px solid #00A651; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      🎉
+                    </div>
+                    {{end}}
+                    <h2 style="font-size: 22px; font-weight: 700; color: #1E293B; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                      {{if .Headline}}{{.Headline}}{{else if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}Store Application Update{{else}}Store Application Approved!{{end}}
+                    </h2>
+                    <p style="font-size: 14px; color: #475569; margin: 0; line-height: 1.6;">
+                      {{if .Message}}{{.Message}}{{else if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}We reviewed your store application for Store #{{.StoreID}} and unfortunately could not approve it at this time.{{else}}Congratulations! Your store application for Store #{{.StoreID}} has been approved. You can now start listing products and selling on GoCart.{{end}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Reason Alert Box (for Rejection) -->
+              {{if .Reason}}
+              <div style="margin-top: 24px; background-color: #FEF2F2; border: 1px solid #FECACA; border-left: 4px solid #EF4444; border-radius: 8px; padding: 16px 20px; text-align: left;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #DC2626; margin-bottom: 4px;">
+                  Reason for Decision
+                </div>
+                <div style="font-size: 14px; color: #991B1B; font-weight: 500; line-height: 1.5;">
+                  {{.Reason}}
+                </div>
+              </div>
+              {{end}}
+
+              <!-- Store Details Summary Card -->
+              <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #00A651; border-radius: 12px; padding: 20px; margin-top: 24px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #00A651; margin-bottom: 14px;">
+                  Store &amp; Application Details
+                </div>
+
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 13px; line-height: 1.8;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0; width: 40%;">Store ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.StoreID}}</td>
+                  </tr>
+                  {{if .MerchantID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Merchant ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.MerchantID}}</td>
+                  </tr>
+                  {{end}}
+                  {{if .Email}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Account Email</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.Email}}</td>
+                  </tr>
+                  {{end}}
+                  <tr>
+                    <td style="padding: 10px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Review Status</td>
+                    <td align="right" style="padding: 10px 0; border-bottom: 1px solid #E2E8F0;">
+                      {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                      <span style="background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">
+                        REJECTED
+                      </span>
+                      {{else}}
+                      <span style="background-color: #E8F8F0; color: #00A651; border: 1px solid #A7F3D0; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">
+                        APPROVED
+                      </span>
+                      {{end}}
+                    </td>
+                  </tr>
+                  {{if or .ApprovedAt .RejectedAt}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Review Date</td>
+                    <td align="right" style="padding: 8px 0; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">
+                      {{if .ApprovedAt}}{{.ApprovedAt}}{{else}}{{.RejectedAt}}{{end}}
+                    </td>
+                  </tr>
+                  {{end}}
+                  {{if .AdminID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B;">Reviewed By</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; color: #475569;">
+                      {{.AdminID}}
+                    </td>
+                  </tr>
+                  {{end}}
+                </table>
+              </div>
+
+              <!-- Action Call to Action Button -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 28px; text-align: center;">
+                <tr>
+                  <td align="center">
+                    {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                    <a href="mailto:merchant-support@gocart.com" style="display: inline-block; background-color: #1E293B; color: #FFFFFF; font-weight: 700; font-size: 14px; text-decoration: none; padding: 13px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);">
+                      Contact Partner Support &rarr;
+                    </a>
+                    {{else}}
+                    <a href="https://gocart.com/merchant/stores" style="display: inline-block; background-color: #00A651; color: #FFFFFF; font-weight: 700; font-size: 14px; text-decoration: none; padding: 13px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 166, 81, 0.25);">
+                      Manage Store &amp; Add Products &rarr;
+                    </a>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- What You Can Do Next Cards -->
+              <div style="margin-top: 32px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; margin-bottom: 12px;">
+                  What You Can Do Next
+                </div>
+
+                {{if or (eq .Status "REJECTED") (eq .NewStatus "REJECTED")}}
+                <!-- Rejection Step 1 -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 10px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
+                  <tr>
+                    <td style="width: 44px; padding: 12px 0 12px 14px; vertical-align: top;">
+                      <div style="width: 32px; height: 32px; line-height: 32px; background-color: #FEF2F2; border-radius: 8px; text-align: center; font-size: 16px;">
+                        📝
+                      </div>
+                    </td>
+                    <td style="padding: 12px 14px 12px 10px; vertical-align: top;">
+                      <div style="font-size: 13px; font-weight: 600; color: #1E293B;">Review Feedback &amp; Correct Details</div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 2px; line-height: 1.4;">Check your store profile, business address, and compliance requirements outlined in the rejection note.</div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Rejection Step 2 -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
+                  <tr>
+                    <td style="width: 44px; padding: 12px 0 12px 14px; vertical-align: top;">
+                      <div style="width: 32px; height: 32px; line-height: 32px; background-color: #EFF6FF; border-radius: 8px; text-align: center; font-size: 16px;">
+                        🔄
+                      </div>
+                    </td>
+                    <td style="padding: 12px 14px 12px 10px; vertical-align: top;">
+                      <div style="font-size: 13px; font-weight: 600; color: #1E293B;">Submit a Store Appeal / Re-apply</div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 2px; line-height: 1.4;">Once updated, re-submit your store through the merchant portal or reply to this email for assistance.</div>
+                    </td>
+                  </tr>
+                </table>
+                {{else}}
+                <!-- Approved Step 1 -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 10px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
+                  <tr>
+                    <td style="width: 44px; padding: 12px 0 12px 14px; vertical-align: top;">
+                      <div style="width: 32px; height: 32px; line-height: 32px; background-color: #E8F8F0; border-radius: 8px; text-align: center; font-size: 16px;">
+                        📦
+                      </div>
+                    </td>
+                    <td style="padding: 12px 14px 12px 10px; vertical-align: top;">
+                      <div style="font-size: 13px; font-weight: 600; color: #1E293B;">Add Products to Catalog</div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 2px; line-height: 1.4;">Upload product titles, high-resolution photos, SKUs, inventory counts, and competitive prices.</div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Approved Step 2 -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 10px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
+                  <tr>
+                    <td style="width: 44px; padding: 12px 0 12px 14px; vertical-align: top;">
+                      <div style="width: 32px; height: 32px; line-height: 32px; background-color: #E8F8F0; border-radius: 8px; text-align: center; font-size: 16px;">
+                        ⏰
+                      </div>
+                    </td>
+                    <td style="padding: 12px 14px 12px 10px; vertical-align: top;">
+                      <div style="font-size: 13px; font-weight: 600; color: #1E293B;">Configure Operating Hours</div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 2px; line-height: 1.4;">Set your store open/close schedule and pickup windows for local GoCart delivery partners.</div>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Approved Step 3 -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px;">
+                  <tr>
+                    <td style="width: 44px; padding: 12px 0 12px 14px; vertical-align: top;">
+                      <div style="width: 32px; height: 32px; line-height: 32px; background-color: #E8F8F0; border-radius: 8px; text-align: center; font-size: 16px;">
+                        🚀
+                      </div>
+                    </td>
+                    <td style="padding: 12px 14px 12px 10px; vertical-align: top;">
+                      <div style="font-size: 13px; font-weight: 600; color: #1E293B;">Publish &amp; Go Live</div>
+                      <div style="font-size: 12px; color: #64748B; margin-top: 2px; line-height: 1.4;">Switch your store status to Published to make your catalog searchable and start receiving orders.</div>
+                    </td>
+                  </tr>
+                </table>
+                {{end}}
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 20px 32px; text-align: center; font-size: 12px; color: #94A3B8; line-height: 1.6;">
+              &copy; 2026 <span style="color: #00A651; font-weight: 700;">go</span><span style="color: #1E293B; font-weight: 700;">cart</span><span style="color: #00A651; font-weight: 700;">.</span> Inc. All rights reserved.<br>
+              {{if .Email}}This is an automated notification for merchant account <span style="color: #475569;">{{.Email}}</span>.{{else}}This is an automated notification from GoCart Store Services.{{end}}<br>
+              Questions? Contact merchant partner support at <a href="mailto:merchant-support@gocart.com" style="color: #00A651; text-decoration: none; font-weight: 600;">merchant-support@gocart.com</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

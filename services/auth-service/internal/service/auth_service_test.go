@@ -13,6 +13,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -213,7 +214,7 @@ func (m *mockAuthRepository) RotateRefreshToken(ctx context.Context, oldTokenID 
 	return nil
 }
 
-func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
 	for _, cred := range m.byEmail {
 		if cred.UserID == userID {
 			cred.EmailVerified = true
@@ -223,6 +224,9 @@ func (m *mockAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.
 		if cred.UserID == userID {
 			cred.EmailVerified = true
 		}
+	}
+	if len(evt) > 0 && evt[0] != nil {
+		m.outboxEvents = append(m.outboxEvents, evt[0])
 	}
 	return nil
 }
@@ -721,16 +725,9 @@ func TestRegister_Customer_Success(t *testing.T) {
 		t.Errorf("expected role %s or %s, got %s", model.RoleCustomer, model.RoleUser, cred.Role)
 	}
 
-	// Verify outbox event
-	if len(mockRepo.outboxEvents) != 1 {
-		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
-	}
-	evt := mockRepo.outboxEvents[0]
-	if evt.EventType != "UserRegistered" {
-		t.Errorf("expected EventType UserRegistered, got %s", evt.EventType)
-	}
-	if evt.Topic != "auth.user.registered" {
-		t.Errorf("expected Topic auth.user.registered, got %s", evt.Topic)
+	// Verify no outbox event is sent before email verification
+	if len(mockRepo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(mockRepo.outboxEvents))
 	}
 }
 
@@ -763,16 +760,9 @@ func TestRegister_Merchant_Success(t *testing.T) {
 		t.Errorf("expected role %s, got %s", model.RoleMerchant, cred.Role)
 	}
 
-	// Verify outbox event
-	if len(mockRepo.outboxEvents) != 1 {
-		t.Fatalf("expected 1 outbox event, got %d", len(mockRepo.outboxEvents))
-	}
-	evt := mockRepo.outboxEvents[0]
-	if evt.EventType != "MerchantRegistered" {
-		t.Errorf("expected EventType MerchantRegistered, got %s", evt.EventType)
-	}
-	if evt.Topic != "auth.merchant.registered" {
-		t.Errorf("expected Topic auth.merchant.registered, got %s", evt.Topic)
+	// Verify no outbox event is sent before email verification
+	if len(mockRepo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(mockRepo.outboxEvents))
 	}
 }
 
@@ -860,6 +850,17 @@ func TestVerifyEmail_Flow(t *testing.T) {
 	cred := mockRepo.byEmail["unverified@example.com"]
 	if !cred.EmailVerified {
 		t.Error("expected credential EmailVerified to be true after verification")
+	}
+
+	// Verify outbox event was generated for registration email notification
+	if len(mockRepo.outboxEvents) != 1 {
+		t.Fatalf("expected 1 outbox event on verify email, got %d", len(mockRepo.outboxEvents))
+	}
+	if mockRepo.outboxEvents[0].EventType != events.EventTypeUserRegistered {
+		t.Errorf("expected EventType %s, got %s", events.EventTypeUserRegistered, mockRepo.outboxEvents[0].EventType)
+	}
+	if mockRepo.outboxEvents[0].Topic != events.TopicUserRegistered {
+		t.Errorf("expected Topic %s, got %s", events.TopicUserRegistered, mockRepo.outboxEvents[0].Topic)
 	}
 
 	// OTP should be deleted from store after successful verification (one-time use)

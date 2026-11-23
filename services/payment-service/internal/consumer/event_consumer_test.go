@@ -529,6 +529,7 @@ type mockPaymentServiceForConsumer struct {
 	lastDTO                  *service.ProcessReturnRefundDTO
 	processReturnRefundErr   error
 	refundToReturn           *model.Refund
+	handleOrderCreatedErr    error
 }
 
 func (m *mockPaymentServiceForConsumer) ProcessPayment(ctx context.Context, dto *service.ProcessPaymentDTO) (*model.Payment, error) {
@@ -553,6 +554,9 @@ func (m *mockPaymentServiceForConsumer) HandleRazorpayWebhook(ctx context.Contex
 	return nil
 }
 func (m *mockPaymentServiceForConsumer) HandleOrderCreated(ctx context.Context, event *events.OrderCreatedEvent, correlationID, traceID string) (*model.Payment, error) {
+	if m.handleOrderCreatedErr != nil {
+		return nil, m.handleOrderCreatedErr
+	}
 	return nil, nil
 }
 func (m *mockPaymentServiceForConsumer) ProcessReturnRefund(ctx context.Context, dto *service.ProcessReturnRefundDTO) (*model.Refund, error) {
@@ -713,6 +717,29 @@ func TestPaymentEventConsumer_HandleReturnRefundEligible_NonRetryableNotFoundAck
 		t.Fatalf("failed to create envelope: %v", err)
 	}
 
+	if err := c.HandleEvent(ctx, env); err != nil {
+		t.Errorf("expected not found error to be safely acknowledged without error, got: %v", err)
+	}
+}
+
+func TestPaymentEventConsumer_HandleOrderCreated_NonRetryableNotFoundAcknowledged(t *testing.T) {
+	ctx := context.Background()
+	mockSvc := &mockPaymentServiceForConsumer{
+		handleOrderCreatedErr: appErrors.NotFound("authoritative order not found"),
+	}
+	c := consumer.NewPaymentEventConsumer(mockSvc)
+
+	payload := events.OrderCreatedEvent{
+		OrderID: "ord-notfound-1",
+		UserID:  "usr-1",
+	}
+
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeOrderCreated, "order-service", "ord-notfound-1", payload)
+	if err != nil {
+		t.Fatalf("failed to create envelope: %v", err)
+	}
+
+	// Should safely acknowledge NotFound error so it does not loop infinitely
 	if err := c.HandleEvent(ctx, env); err != nil {
 		t.Errorf("expected not found error to be safely acknowledged without error, got: %v", err)
 	}

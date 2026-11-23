@@ -16,9 +16,11 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/database"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/health"
+	"github.com/marees-godev/GoCart-Server/pkg/kafka"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/pkg/metrics"
 	"github.com/marees-godev/GoCart-Server/pkg/middleware"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/pkg/tracing"
 	"github.com/marees-godev/GoCart-Server/services/store-service/internal/client/gstin"
@@ -89,7 +91,38 @@ func main() {
 		}
 	}
 
-	// 5. Initialize application layers
+	// 5. Initialize Kafka producer
+	producer := kafka.NewProducer(kafka.Config{
+		Brokers:        cfg.Kafka.Brokers,
+		ClientID:       cfg.Kafka.ClientID,
+		ConnectTimeout: 10 * time.Second,
+		MaxRetries:     cfg.Outbox.MaxRetries,
+		RetryInterval:  500 * time.Millisecond,
+	})
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Error("Failed to close Kafka producer", "error", err)
+		}
+	}()
+
+	// 6. Initialize outbox store, repository & publisher
+	outboxStore := outbox.NewStore()
+	if cfg.Outbox.Enabled {
+		outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
+			ServiceName:    cfg.App.Name,
+			PollInterval:   cfg.Outbox.PollInterval,
+			BatchSize:      cfg.Outbox.BatchSize,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			BaseRetryDelay: cfg.Outbox.BaseRetryDelay,
+			MaxRetryDelay:  cfg.Outbox.MaxRetryDelay,
+			DLQTopic:       cfg.Outbox.DLQTopic,
+		})
+		go outboxPublisher.Start(ctx)
+	} else {
+		log.Info("Outbox publisher is disabled via OUTBOX_ENABLED=false")
+	}
+
+	// 7. Initialize application layers
 	s3Client, err := storage.NewS3Client(ctx, storage.Config{
 		Endpoint:        cfg.Storage.Endpoint,
 		Region:          cfg.Storage.Region,
@@ -103,7 +136,7 @@ func main() {
 	}
 
 	gstinClient := gstin.NewGSTINClient(cfg.GSTIN)
-	storeRepo := repository.NewStoreRepository(db.Pool)
+	storeRepo := repository.NewStoreRepository(db.Pool, outboxStore)
 	storeService := service.NewStoreService(storeRepo, s3Client, gstinClient)
 	storeGRPCHandler := handler.NewStoreGRPCHandler(storeService, log)
 

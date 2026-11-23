@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoCart Payment Notification</title>
+</head>
+<body style="margin: 0; padding: 32px 16px; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9;">
+    <tr>
+      <td align="center">
+        <!-- Main Email Container -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Top Accent Bar -->
+          <tr>
+            {{if .Reason}}
+            <td style="height: 4px; background-color: #EF4444; line-height: 4px; font-size: 1px;">&nbsp;</td>
+            {{else if .RefundID}}
+            <td style="height: 4px; background-color: #3B82F6; line-height: 4px; font-size: 1px;">&nbsp;</td>
+            {{else}}
+            <td style="height: 4px; background-color: #00A651; line-height: 4px; font-size: 1px;">&nbsp;</td>
+            {{end}}
+          </tr>
+
+          <!-- Header with GoCart Logo and Status Pill -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 24px 32px; border-bottom: 1px solid #F1F5F9;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <table border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        {{if .Reason}}
+                        <td style="width: 40px; height: 40px; background-color: #FEF2F2; border: 1.5px solid #EF4444; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">⚠️</span>
+                        </td>
+                        {{else if .RefundID}}
+                        <td style="width: 40px; height: 40px; background-color: #EFF6FF; border: 1.5px solid #3B82F6; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">💸</span>
+                        </td>
+                        {{else}}
+                        <td style="width: 40px; height: 40px; background-color: #E8F8F0; border: 1.5px solid #00A651; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">💳</span>
+                        </td>
+                        {{end}}
+                        <td style="padding-left: 12px; vertical-align: middle;">
+                          <div style="font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px;">
+                            <span style="color: #00A651;">go</span><span style="color: #1E293B;">cart</span><span style="color: #00A651;">.</span>
+                          </div>
+                          <div style="font-size: 12px; color: #64748B; font-weight: 500; margin-top: 2px;">
+                            {{if .Reason}}Payment Alert{{else if .RefundID}}Refund Receipt{{else}}Payment Receipt{{end}}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    {{if .Reason}}
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● PAYMENT FAILED
+                    </span>
+                    {{else if .RefundID}}
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #2563EB; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● REFUNDED
+                    </span>
+                    {{else}}
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #E8F8F0; border: 1px solid #A7F3D0; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #00A651; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● PAID
+                    </span>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content Area -->
+          <tr>
+            <td style="padding: 32px 32px 28px 32px;">
+              
+              <!-- Hero Status Header -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="text-align: center; border-bottom: 1px solid #F1F5F9; padding-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    {{if .Reason}}
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #FEF2F2; border: 2px solid #EF4444; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      ❌
+                    </div>
+                    {{else if .RefundID}}
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #EFF6FF; border: 2px solid #3B82F6; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      ↩️
+                    </div>
+                    {{else}}
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #E8F8F0; border: 2px solid #00A651; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      ✅
+                    </div>
+                    {{end}}
+                    <h2 style="font-size: 22px; font-weight: 700; color: #1E293B; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                      {{if .Headline}}{{.Headline}}{{else if .Reason}}Payment Failed{{else if .RefundID}}Refund Completed{{else}}Payment Successful!{{end}}
+                    </h2>
+                    <p style="font-size: 14px; color: #475569; margin: 0; line-height: 1.6;">
+                      {{if .Message}}{{.Message}}{{else if .Reason}}We were unable to process your payment for Order #{{.OrderID}}. Please review the details below.{{else if .RefundID}}Your refund for Order #{{.OrderID}} has been processed successfully.{{else}}Thank you! Your payment for Order #{{.OrderID}} has been confirmed.{{end}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Amount Highlight Card -->
+              {{if .Reason}}
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 24px; background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; text-align: center; padding: 20px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; margin-bottom: 4px;">
+                      Total Amount
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: #DC2626;">
+                      {{if .Amount}}{{.Amount}} {{if .Currency}}{{.Currency}}{{else}}USD{{end}}{{else}}--{{end}}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              {{else if .RefundID}}
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 24px; background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; text-align: center; padding: 20px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; margin-bottom: 4px;">
+                      Refunded Amount
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: #2563EB;">
+                      {{if .Amount}}{{.Amount}} {{if .Currency}}{{.Currency}}{{else}}USD{{end}}{{else}}--{{end}}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              {{else}}
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 24px; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; text-align: center; padding: 20px;">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; margin-bottom: 4px;">
+                      Total Amount
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: #00A651;">
+                      {{if .Amount}}{{.Amount}} {{if .Currency}}{{.Currency}}{{else}}USD{{end}}{{else}}--{{end}}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              {{end}}
+
+              <!-- Transaction Details Card -->
+              <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin-top: 20px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #00A651; margin-bottom: 14px;">
+                  Transaction Details
+                </div>
+                
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 13px;">
+                  {{if .OrderID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #F1F5F9;">Order ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #F1F5F9;">{{.OrderID}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .PaymentID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #F1F5F9;">Payment ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #F1F5F9;">{{.PaymentID}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .RefundID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #F1F5F9;">Refund ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #2563EB; border-bottom: 1px solid #F1F5F9;">{{.RefundID}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .PaymentMethod}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #F1F5F9;">Payment Method</td>
+                    <td align="right" style="padding: 8px 0; font-weight: 600; color: #0F172A; border-bottom: 1px solid #F1F5F9;">{{.PaymentMethod}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .GatewayRefundID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #F1F5F9;">Gateway Reference</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #F1F5F9;">{{.GatewayRefundID}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .Reason}}
+                  <tr>
+                    <td style="padding: 10px 0; color: #DC2626; font-weight: 600; border-bottom: 1px solid #F1F5F9;">Failure Reason</td>
+                    <td align="right" style="padding: 10px 0; font-weight: 600; color: #DC2626; border-bottom: 1px solid #F1F5F9;">{{.Reason}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .Email}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B;">Billing Email</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A;">{{.Email}}</td>
+                  </tr>
+                  {{end}}
+                </table>
+              </div>
+
+              <!-- Contextual Notice Box -->
+              {{if .Reason}}
+              <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 14px 16px; margin-top: 18px; font-size: 12.5px; color: #92400E; line-height: 1.5;">
+                <strong>Note:</strong> No funds were deducted from your account. You can retry with the same payment method or choose a different one to complete your order.
+              </div>
+              {{else if .RefundID}}
+              <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 14px 16px; margin-top: 18px; font-size: 12.5px; color: #1E40AF; line-height: 1.5;">
+                <strong>Bank Processing:</strong> Refunds typically reflect in your original payment account within 3 to 5 business days, depending on your card issuer or bank.
+              </div>
+              {{end}}
+
+              <!-- Action Button -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 28px;">
+                <tr>
+                  <td align="center">
+                    {{if .Reason}}
+                    <a href="https://gocart.dev/orders/{{.OrderID}}/pay" style="display: inline-block; background-color: #00A651; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 166, 81, 0.25);">
+                      Retry Payment
+                    </a>
+                    {{else}}
+                    <a href="https://gocart.dev/orders/{{.OrderID}}" style="display: inline-block; background-color: #00A651; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 166, 81, 0.25);">
+                      View Order Details
+                    </a>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Clean Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; padding: 24px 32px; border-top: 1px solid #E2E8F0; text-align: center;">
+              <p style="font-size: 12px; color: #64748B; margin: 0 0 8px 0;">
+                Questions about your payment? Contact us at <a href="mailto:support@gocart.dev" style="color: #00A651; text-decoration: none; font-weight: 600;">support@gocart.dev</a>
+              </p>
+              <p style="font-size: 11px; color: #94A3B8; margin: 0;">
+                &copy; 2026 GoCart Inc. All rights reserved. &bull; Secure Payments
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
