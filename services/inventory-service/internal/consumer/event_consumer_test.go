@@ -65,6 +65,7 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var fallback *model.Inventory
 	for _, inv := range r.inventories {
 		if inv.ProductID == productID {
 			if variantID == nil || *variantID == "" {
@@ -72,13 +73,43 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 					copyInv := *inv
 					return &copyInv, nil
 				}
+				if fallback == nil || inv.AvailableQuantity > fallback.AvailableQuantity {
+					copyInv := *inv
+					fallback = &copyInv
+				}
 			} else if inv.VariantID != nil && *inv.VariantID == *variantID {
 				copyInv := *inv
 				return &copyInv, nil
 			}
 		}
 	}
+	if fallback != nil {
+		return fallback, nil
+	}
 	return nil, appErrors.NotFound("inventory not found for product/variant")
+}
+
+func (r *memoryInventoryRepo) GetStock(ctx context.Context, productID string) (*model.Inventory, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var totalAvailable, totalReserved int
+	var found bool
+	for _, inv := range r.inventories {
+		if inv.ProductID == productID {
+			found = true
+			totalAvailable += inv.AvailableQuantity
+			totalReserved += inv.ReservedQuantity
+		}
+	}
+	if !found {
+		return nil, appErrors.NotFound(fmt.Sprintf("product %s not found in inventory", productID))
+	}
+	return &model.Inventory{
+		ProductID:         productID,
+		AvailableQuantity: totalAvailable,
+		ReservedQuantity:  totalReserved,
+	}, nil
 }
 
 func (r *memoryInventoryRepo) Restock(ctx context.Context, id string, quantity int, refID, notes *string) (*model.Inventory, error) {

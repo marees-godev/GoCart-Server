@@ -171,28 +171,35 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		if item.Quantity <= 0 {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid quantity %d for product %s", item.Quantity, item.ProductID))
 		}
-		if _, err := uuid.Parse(strings.TrimSpace(item.ProductID)); err != nil {
+		productID := strings.TrimSpace(item.ProductID)
+		if _, err := uuid.Parse(productID); err != nil {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid product_id format: %s", item.ProductID))
 		}
 
 		// 2a. Revalidate stock availability with Inventory Service
 		if s.inventoryClient != nil {
 			callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			stock, invErr := s.inventoryClient.GetStock(callCtx, item.ProductID)
+			stock, invErr := s.inventoryClient.GetStock(callCtx, productID)
 			cancel()
 
 			if invErr != nil {
-				s.log.Warn("Failed to verify stock with inventory service", "product_id", item.ProductID, "error", invErr)
+				s.log.Warn("Failed to verify stock with inventory service", "product_id", productID, "error", invErr)
 				st, ok := status.FromError(invErr)
 				if ok {
 					if st.Code() == codes.NotFound {
-						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", item.ProductID))
+						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", productID))
 					}
-					if st.Code() == codes.Unavailable {
-						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
+					if st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded {
+						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", productID))
+					}
+					if st.Code() == codes.InvalidArgument {
+						return nil, appErrors.BadRequest(fmt.Sprintf("invalid inventory request for product %s: %s", productID, st.Message()))
 					}
 				}
-				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", item.ProductID, invErr))
+				if errors.Is(invErr, context.DeadlineExceeded) {
+					return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", productID))
+				}
+				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", productID, invErr))
 			}
 
 			if stock == nil || stock.GetAvailableQuantity() < int32(item.Quantity) {
@@ -200,7 +207,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 				if stock != nil {
 					avail = stock.GetAvailableQuantity()
 				}
-				return nil, appErrors.Conflict(fmt.Sprintf("insufficient stock for product %s: available %d, requested %d", item.ProductID, avail, item.Quantity))
+				return nil, appErrors.Conflict(fmt.Sprintf("insufficient stock for product %s: available %d, requested %d", productID, avail, item.Quantity))
 			}
 		}
 

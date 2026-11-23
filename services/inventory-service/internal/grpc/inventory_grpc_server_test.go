@@ -90,6 +90,7 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var fallback *model.Inventory
 	for _, inv := range r.inventories {
 		if inv.ProductID == productID {
 			if variantID == nil || *variantID == "" {
@@ -97,13 +98,43 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 					copyInv := *inv
 					return &copyInv, nil
 				}
+				if fallback == nil || inv.AvailableQuantity > fallback.AvailableQuantity {
+					copyInv := *inv
+					fallback = &copyInv
+				}
 			} else if inv.VariantID != nil && *inv.VariantID == *variantID {
 				copyInv := *inv
 				return &copyInv, nil
 			}
 		}
 	}
+	if fallback != nil {
+		return fallback, nil
+	}
 	return nil, appErrors.NotFound("inventory not found for product/variant")
+}
+
+func (r *memoryInventoryRepo) GetStock(ctx context.Context, productID string) (*model.Inventory, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var totalAvailable, totalReserved int
+	var found bool
+	for _, inv := range r.inventories {
+		if inv.ProductID == productID {
+			found = true
+			totalAvailable += inv.AvailableQuantity
+			totalReserved += inv.ReservedQuantity
+		}
+	}
+	if !found {
+		return nil, appErrors.NotFound(fmt.Sprintf("product %s not found in inventory", productID))
+	}
+	return &model.Inventory{
+		ProductID:         productID,
+		AvailableQuantity: totalAvailable,
+		ReservedQuantity:  totalReserved,
+	}, nil
 }
 
 func (r *memoryInventoryRepo) Restock(ctx context.Context, id string, quantity int, refID, notes *string) (*model.Inventory, error) {
@@ -183,8 +214,15 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 		var found *model.Inventory
 		for _, inv := range r.inventories {
 			if inv.ProductID == item.ProductID {
-				if (item.VariantID == nil && inv.VariantID == nil) ||
-					(item.VariantID != nil && inv.VariantID != nil && *item.VariantID == *inv.VariantID) {
+				if item.VariantID == nil || *item.VariantID == "" {
+					if inv.VariantID == nil {
+						found = inv
+						break
+					}
+					if found == nil || inv.AvailableQuantity > found.AvailableQuantity {
+						found = inv
+					}
+				} else if inv.VariantID != nil && *item.VariantID == *inv.VariantID {
 					found = inv
 					break
 				}
@@ -1201,5 +1239,61 @@ func TestInventoryGRPCServer_ConcurrentReservation_PreventsOverselling(t *testin
 	}
 	if stockResp.Stock.ReservedQuantity != totalStock {
 		t.Errorf("expected reserved quantity %d, got %d", totalStock, stockResp.Stock.ReservedQuantity)
+	}
+}
+
+func TestInventoryGRPCServer_GetStock_VariantsAndWarehousesAggregation(t *testing.T) {
+	repo := newMemoryInventoryRepo()
+	svc := service.NewInventoryService(repo, nil)
+	server := inventoryGRPC.NewInventoryGRPCServer(svc)
+
+	prodID := uuid.NewString()
+	var1ID := uuid.NewString()
+	var2ID := uuid.NewString()
+
+	// Inventory 1: variant 1 in warehouse A (20 items)
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		ProductId:       prodID,
+		VariantId:       var1ID,
+		Sku:             "SKU-VAR-1",
+		InitialQuantity: 20,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory variant 1 failed: %v", err)
+	}
+
+	// Inventory 2: variant 2 in warehouse B (30 items)
+	_, err = server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		ProductId:       prodID,
+		VariantId:       var2ID,
+		Sku:             "SKU-VAR-2",
+		InitialQuantity: 30,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory variant 2 failed: %v", err)
+	}
+
+	// GetStock for the parent product should return total aggregated stock (50 items)
+	resp, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: prodID})
+	if err != nil {
+		t.Fatalf("GetStock failed: %v", err)
+	}
+	if resp.Stock.AvailableQuantity != 50 {
+		t.Errorf("expected total available quantity 50, got %d", resp.Stock.AvailableQuantity)
+	}
+	if resp.Stock.ProductId != prodID {
+		t.Errorf("expected product ID %s, got %s", prodID, resp.Stock.ProductId)
+	}
+}
+
+func TestInventoryGRPCServer_GetStock_MissingProduct(t *testing.T) {
+	repo := newMemoryInventoryRepo()
+	svc := service.NewInventoryService(repo, nil)
+	server := inventoryGRPC.NewInventoryGRPCServer(svc)
+
+	missingProdID := uuid.NewString()
+	_, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: missingProdID})
+	if err == nil {
+		t.Fatalf("expected error for missing product stock, got nil")
 	}
 }
