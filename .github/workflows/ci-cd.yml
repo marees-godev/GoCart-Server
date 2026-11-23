@@ -159,9 +159,10 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.64
+          version: latest
+          install-mode: goinstall
           working-directory: ${{ matrix.service == 'api-gateway' && 'gateway/api-gateway' || format('services/{0}', matrix.service) }}
-          args: --go=1.24 --timeout=5m --issues-exit-code=1 ./...
+          args: --go=1.26 --timeout=5m --issues-exit-code=1 ./...
 
   # ----------------------------------------------------------------------------
   # Step 3: Run Unit Tests & Verify Independent Build
