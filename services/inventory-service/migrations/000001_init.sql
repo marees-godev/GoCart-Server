@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS inventories (
 
 CREATE TABLE IF NOT EXISTS inventory_reservations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inventory_id UUID REFERENCES inventories(id) ON DELETE CASCADE,
     order_id UUID NOT NULL,
     product_id UUID NOT NULL,
     variant_id UUID,
@@ -67,6 +68,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_inventories_product_null_variant ON invent
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inventories_product_variant ON inventories(product_id, variant_id) WHERE variant_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inventories_sku ON inventories(sku);
 CREATE INDEX IF NOT EXISTS idx_inv_res_order_id ON inventory_reservations(order_id);
+CREATE INDEX IF NOT EXISTS idx_inv_res_inventory_id ON inventory_reservations(inventory_id);
 CREATE INDEX IF NOT EXISTS idx_inv_res_product_id ON inventory_reservations(product_id);
 CREATE INDEX IF NOT EXISTS idx_inv_res_variant_id ON inventory_reservations(variant_id);
 CREATE INDEX IF NOT EXISTS idx_inv_res_status ON inventory_reservations(status);

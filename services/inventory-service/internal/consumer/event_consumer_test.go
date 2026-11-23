@@ -81,6 +81,29 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 	return nil, appErrors.NotFound("inventory not found for product/variant")
 }
 
+func (r *memoryInventoryRepo) GetStock(ctx context.Context, productID string) (*model.Inventory, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var totalAvailable, totalReserved int
+	var found bool
+	for _, inv := range r.inventories {
+		if inv.ProductID == productID {
+			found = true
+			totalAvailable += inv.AvailableQuantity
+			totalReserved += inv.ReservedQuantity
+		}
+	}
+	if !found {
+		return nil, appErrors.NotFound(fmt.Sprintf("product %s not found in inventory", productID))
+	}
+	return &model.Inventory{
+		ProductID:         productID,
+		AvailableQuantity: totalAvailable,
+		ReservedQuantity:  totalReserved,
+	}, nil
+}
+
 func (r *memoryInventoryRepo) Restock(ctx context.Context, id string, quantity int, refID, notes *string) (*model.Inventory, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -142,15 +165,16 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 		found.UpdatedAt = now
 
 		r.reservations[resID] = &model.InventoryReservation{
-			ID:        resID,
-			OrderID:   orderID,
-			ProductID: item.ProductID,
-			VariantID: item.VariantID,
-			Quantity:  item.Quantity,
-			Status:    model.ReservationStatusReserved,
-			ExpiresAt: expiresAt,
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:          resID,
+			InventoryID: &found.ID,
+			OrderID:     orderID,
+			ProductID:   item.ProductID,
+			VariantID:   item.VariantID,
+			Quantity:    item.Quantity,
+			Status:      model.ReservationStatusReserved,
+			ExpiresAt:   expiresAt,
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 	}
 	return resID, nil
@@ -180,17 +204,30 @@ func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, input dto.Releas
 	now := time.Now().UTC()
 	for _, res := range matching {
 		if res.Status == model.ReservationStatusReserved {
+			var targetInv *model.Inventory
 			for _, inv := range r.inventories {
-				if inv.ProductID == res.ProductID {
-					inv.AvailableQuantity += res.Quantity
-					inv.ReservedQuantity -= res.Quantity
-					if inv.ReservedQuantity < 0 {
-						inv.ReservedQuantity = 0
+				if res.InventoryID != nil && *res.InventoryID != "" {
+					if inv.ID == *res.InventoryID {
+						targetInv = inv
+						break
 					}
-					inv.UpdatedAt = now
-					break
+				} else if inv.ProductID == res.ProductID {
+					if (res.VariantID == nil && inv.VariantID == nil) ||
+						(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
+						targetInv = inv
+						break
+					}
 				}
 			}
+			if targetInv == nil {
+				return appErrors.Conflict("inventory record not found for reservation")
+			}
+			if targetInv.ReservedQuantity < res.Quantity {
+				return appErrors.Conflict("reserved quantity insufficient to release")
+			}
+			targetInv.AvailableQuantity += res.Quantity
+			targetInv.ReservedQuantity -= res.Quantity
+			targetInv.UpdatedAt = now
 			res.Status = targetStatus
 			res.UpdatedAt = now
 		}
@@ -241,16 +278,29 @@ func (r *memoryInventoryRepo) CommitStock(ctx context.Context, input dto.CommitS
 
 	now := time.Now().UTC()
 	for _, res := range active {
+		var targetInv *model.Inventory
 		for _, inv := range r.inventories {
-			if inv.ProductID == res.ProductID {
-				inv.ReservedQuantity -= res.Quantity
-				if inv.ReservedQuantity < 0 {
-					inv.ReservedQuantity = 0
+			if res.InventoryID != nil && *res.InventoryID != "" {
+				if inv.ID == *res.InventoryID {
+					targetInv = inv
+					break
 				}
-				inv.UpdatedAt = now
-				break
+			} else if inv.ProductID == res.ProductID {
+				if (res.VariantID == nil && inv.VariantID == nil) ||
+					(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
+					targetInv = inv
+					break
+				}
 			}
 		}
+		if targetInv == nil {
+			return appErrors.Conflict("inventory record not found for reservation commit")
+		}
+		if targetInv.ReservedQuantity < res.Quantity {
+			return appErrors.Conflict("reserved quantity insufficient to commit")
+		}
+		targetInv.ReservedQuantity -= res.Quantity
+		targetInv.UpdatedAt = now
 		res.Status = model.ReservationStatusConfirmed
 		res.UpdatedAt = now
 	}
