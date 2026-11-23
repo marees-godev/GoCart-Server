@@ -250,7 +250,7 @@ func (s *inventoryService) GetStock(ctx context.Context, productID string) (*mod
 	if !isValidUUID(productID) {
 		return nil, appErrors.BadRequest("invalid product id: must be a valid UUID")
 	}
-	return s.repo.GetByProductAndVariant(ctx, productID, nil)
+	return s.repo.GetStock(ctx, productID)
 }
 
 func (s *inventoryService) UpdateStock(ctx context.Context, input dto.UpdateStockInput) (*model.Inventory, error) {
