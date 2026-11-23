@@ -167,39 +167,41 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 	storeMap := make(map[string][]enrichedItem)
 
-	for _, item := range rawItems {
+	for i := range rawItems {
+		item := &rawItems[i]
+		item.ProductID = strings.TrimSpace(item.ProductID)
+		item.StoreID = strings.TrimSpace(item.StoreID)
 		if item.Quantity <= 0 {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid quantity %d for product %s", item.Quantity, item.ProductID))
 		}
-		productID := strings.TrimSpace(item.ProductID)
-		if _, err := uuid.Parse(productID); err != nil {
+		if _, err := uuid.Parse(item.ProductID); err != nil {
 			return nil, appErrors.BadRequest(fmt.Sprintf("invalid product_id format: %s", item.ProductID))
 		}
 
 		// 2a. Revalidate stock availability with Inventory Service
 		if s.inventoryClient != nil {
 			callCtx, cancel := context.WithTimeout(ctx, s.clientTimeout)
-			stock, invErr := s.inventoryClient.GetStock(callCtx, productID)
+			stock, invErr := s.inventoryClient.GetStock(callCtx, item.ProductID)
 			cancel()
 
 			if invErr != nil {
-				s.log.Warn("Failed to verify stock with inventory service", "product_id", productID, "error", invErr)
+				s.log.Warn("Failed to verify stock with inventory service", "product_id", item.ProductID, "error", invErr)
 				st, ok := status.FromError(invErr)
 				if ok {
 					if st.Code() == codes.NotFound {
-						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", productID))
+						return nil, appErrors.Conflict(fmt.Sprintf("product %s is out of stock (not found in inventory)", item.ProductID))
 					}
 					if st.Code() == codes.Unavailable || st.Code() == codes.DeadlineExceeded {
-						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", productID))
+						return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
 					}
 					if st.Code() == codes.InvalidArgument {
-						return nil, appErrors.BadRequest(fmt.Sprintf("invalid inventory request for product %s: %s", productID, st.Message()))
+						return nil, appErrors.BadRequest(fmt.Sprintf("invalid inventory request for product %s: %s", item.ProductID, st.Message()))
 					}
 				}
 				if errors.Is(invErr, context.DeadlineExceeded) {
-					return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", productID))
+					return nil, appErrors.ServiceUnavailable(fmt.Sprintf("inventory service unavailable while verifying stock for product %s", item.ProductID))
 				}
-				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", productID, invErr))
+				return nil, appErrors.Internal(invErr, fmt.Sprintf("failed to verify stock for product %s: %v", item.ProductID, invErr))
 			}
 
 			if stock == nil || stock.GetAvailableQuantity() < int32(item.Quantity) {
@@ -207,7 +209,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 				if stock != nil {
 					avail = stock.GetAvailableQuantity()
 				}
-				return nil, appErrors.Conflict(fmt.Sprintf("insufficient stock for product %s: available %d, requested %d", productID, avail, item.Quantity))
+				return nil, appErrors.Conflict(fmt.Sprintf("insufficient stock for product %s: available %d, requested %d", item.ProductID, avail, item.Quantity))
 			}
 		}
 
@@ -544,8 +546,8 @@ func (s *orderService) fetchCheckoutItems(ctx context.Context, input dto.CreateO
 		items := make([]checkoutItem, len(input.Items))
 		for i, it := range input.Items {
 			items[i] = checkoutItem{
-				ProductID: it.ProductID,
-				StoreID:   it.StoreID,
+				ProductID: strings.TrimSpace(it.ProductID),
+				StoreID:   strings.TrimSpace(it.StoreID),
 				Quantity:  it.Quantity,
 			}
 		}
@@ -572,8 +574,8 @@ func (s *orderService) fetchCheckoutItems(ctx context.Context, input dto.CreateO
 		items := make([]checkoutItem, 0, len(cart.GetItems()))
 		for _, it := range cart.GetItems() {
 			items = append(items, checkoutItem{
-				ProductID: it.GetProductId(),
-				StoreID:   it.GetStoreId(),
+				ProductID: strings.TrimSpace(it.GetProductId()),
+				StoreID:   strings.TrimSpace(it.GetStoreId()),
 				Quantity:  int(it.GetQuantity()),
 			})
 		}

@@ -242,30 +242,6 @@ func (r *pgInventoryRepository) GetByProductAndVariant(ctx context.Context, prod
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			if variantID == nil || *variantID == "" {
-				fallbackQuery := `
-					SELECT id, warehouse_id, product_id, variant_id, sku, available_quantity, reserved_quantity, low_stock_threshold, created_at, updated_at
-					FROM inventories
-					WHERE product_id = $1
-					ORDER BY available_quantity DESC
-					LIMIT 1;
-				`
-				fallbackErr := r.pool.QueryRow(ctx, fallbackQuery, productID).Scan(
-					&inv.ID,
-					&inv.WarehouseID,
-					&inv.ProductID,
-					&inv.VariantID,
-					&inv.SKU,
-					&inv.AvailableQuantity,
-					&inv.ReservedQuantity,
-					&inv.LowStockThreshold,
-					&inv.CreatedAt,
-					&inv.UpdatedAt,
-				)
-				if fallbackErr == nil {
-					return &inv, nil
-				}
-			}
 			return nil, appErrors.NotFound("inventory not found for product/variant")
 		}
 		return nil, appErrors.Internal(err, "failed to get inventory by product and variant")
@@ -584,27 +560,10 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 		var available, reserved, lowStockThreshold int
 		err := tx.QueryRow(ctx, selectQuery, args...).Scan(&invID, &sku, &actualVariantID, &available, &reserved, &lowStockThreshold)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) && (item.VariantID == nil || *item.VariantID == "") {
-				fallbackSelect := `
-					SELECT id, sku, variant_id, available_quantity, reserved_quantity, low_stock_threshold
-					FROM inventories
-					WHERE product_id = $1
-					ORDER BY (available_quantity >= $2) DESC, available_quantity DESC
-					LIMIT 1
-					FOR UPDATE;
-				`
-				fallbackErr := tx.QueryRow(ctx, fallbackSelect, item.ProductID, item.Quantity).Scan(&invID, &sku, &actualVariantID, &available, &reserved, &lowStockThreshold)
-				if fallbackErr == nil {
-					err = nil
-					item.VariantID = actualVariantID
-				}
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", appErrors.NotFound(fmt.Sprintf("inventory not found for product %s", item.ProductID))
 			}
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return "", appErrors.NotFound(fmt.Sprintf("inventory not found for product %s", item.ProductID))
-				}
-				return "", appErrors.Internal(err, "failed to lock inventory row for reservation")
-			}
+			return "", appErrors.Internal(err, "failed to lock inventory row for reservation")
 		}
 
 		if available < item.Quantity {
@@ -628,12 +587,12 @@ func (r *pgInventoryRepository) ReserveStock(ctx context.Context, orderID string
 
 		resQuery := `
 			INSERT INTO inventory_reservations (
-				id, order_id, product_id, variant_id, quantity, status, expires_at, created_at, updated_at
+				id, inventory_id, order_id, product_id, variant_id, quantity, status, expires_at, created_at, updated_at
 			) VALUES (
-				$1, $2, $3, $4, $5, 'RESERVED', $6, $7, $8
+				$1, $2, $3, $4, $5, $6, 'RESERVED', $7, $8, $9
 			);
 		`
-		_, err = tx.Exec(ctx, resQuery, reservationID, orderID, item.ProductID, item.VariantID, item.Quantity, expiresAt, now, now)
+		_, err = tx.Exec(ctx, resQuery, reservationID, invID, orderID, item.ProductID, item.VariantID, item.Quantity, expiresAt, now, now)
 		if err != nil {
 			return "", appErrors.Internal(err, "failed to insert reservation record")
 		}
@@ -713,7 +672,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 
 	if strings.TrimSpace(input.ReservationID) != "" {
 		selectQuery = `
-			SELECT id, order_id, product_id, variant_id, quantity, status
+			SELECT id, inventory_id, order_id, product_id, variant_id, quantity, status
 			FROM inventory_reservations
 			WHERE id = $1
 			FOR UPDATE;
@@ -721,7 +680,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 		args = []interface{}{strings.TrimSpace(input.ReservationID)}
 	} else {
 		selectQuery = `
-			SELECT id, order_id, product_id, variant_id, quantity, status
+			SELECT id, inventory_id, order_id, product_id, variant_id, quantity, status
 			FROM inventory_reservations
 			WHERE order_id = $1
 			FOR UPDATE;
@@ -737,6 +696,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 
 	type resRow struct {
 		id, orderID, productID string
+		inventoryID            *string
 		variantID              *string
 		quantity               int
 		status                 model.ReservationStatus
@@ -746,7 +706,7 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 
 	for rows.Next() {
 		var row resRow
-		if err := rows.Scan(&row.id, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
+		if err := rows.Scan(&row.id, &row.inventoryID, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
 			return appErrors.Internal(err, "failed to scan reservation row")
 		}
 		allRows = append(allRows, row)
@@ -777,51 +737,51 @@ func (r *pgInventoryRepository) ReleaseStock(ctx context.Context, input dto.Rele
 	for _, row := range activeRows {
 		var updateInvQuery string
 		var invArgs []interface{}
-		if row.variantID == nil || *row.variantID == "" {
+		var invTarget string
+
+		if row.inventoryID != nil && *row.inventoryID != "" {
 			updateInvQuery = `
 				UPDATE inventories
 				SET available_quantity = available_quantity + $1,
-				    reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				    reserved_quantity = reserved_quantity - $1,
 				    updated_at = $2
-				WHERE product_id = $3 AND variant_id IS NULL
+				WHERE id = $3 AND reserved_quantity >= $1
+				RETURNING id, sku, available_quantity, reserved_quantity;
+			`
+			invArgs = []interface{}{row.quantity, now, *row.inventoryID}
+			invTarget = *row.inventoryID
+		} else if row.variantID == nil || *row.variantID == "" {
+			updateInvQuery = `
+				UPDATE inventories
+				SET available_quantity = available_quantity + $1,
+				    reserved_quantity = reserved_quantity - $1,
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id IS NULL AND reserved_quantity >= $1
 				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID}
+			invTarget = row.productID
 		} else {
 			updateInvQuery = `
 				UPDATE inventories
 				SET available_quantity = available_quantity + $1,
-				    reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				    reserved_quantity = reserved_quantity - $1,
 				    updated_at = $2
-				WHERE product_id = $3 AND variant_id = $4
+				WHERE product_id = $3 AND variant_id = $4 AND reserved_quantity >= $1
 				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID, *row.variantID}
+			invTarget = fmt.Sprintf("%s (variant %s)", row.productID, *row.variantID)
 		}
 
 		var invID, sku string
 		var newAvail, newRes int
 		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID, &sku, &newAvail, &newRes)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) && (row.variantID == nil || *row.variantID == "") {
-				fallbackUpdate := `
-					UPDATE inventories
-					SET available_quantity = available_quantity + $1,
-					    reserved_quantity = GREATEST(reserved_quantity - $1, 0),
-					    updated_at = $2
-					WHERE id = (
-						SELECT id FROM inventories
-						WHERE product_id = $3
-						ORDER BY reserved_quantity DESC
-						LIMIT 1
-					)
-					RETURNING id, sku, available_quantity, reserved_quantity;
-				`
-				err = tx.QueryRow(ctx, fallbackUpdate, row.quantity, now, row.productID).Scan(&invID, &sku, &newAvail, &newRes)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return appErrors.Conflict(fmt.Sprintf("cannot release stock: inventory record for %s not found or reserved quantity insufficient (expected at least %d)", invTarget, row.quantity))
 			}
-			if err != nil {
-				return appErrors.Internal(err, "failed to return stock to available inventory")
-			}
+			return appErrors.Internal(err, "failed to return stock to available inventory")
 		}
 
 		ref := row.orderID
@@ -895,7 +855,7 @@ func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.Commi
 
 	if resID != "" {
 		selectQuery = `
-			SELECT id, order_id, product_id, variant_id, quantity, status
+			SELECT id, inventory_id, order_id, product_id, variant_id, quantity, status
 			FROM inventory_reservations
 			WHERE id = $1
 			FOR UPDATE;
@@ -903,7 +863,7 @@ func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.Commi
 		args = []interface{}{resID}
 	} else {
 		selectQuery = `
-			SELECT id, order_id, product_id, variant_id, quantity, status
+			SELECT id, inventory_id, order_id, product_id, variant_id, quantity, status
 			FROM inventory_reservations
 			WHERE order_id = $1
 			FOR UPDATE;
@@ -919,6 +879,7 @@ func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.Commi
 
 	type resRow struct {
 		id, orderID, productID string
+		inventoryID            *string
 		variantID              *string
 		quantity               int
 		status                 model.ReservationStatus
@@ -930,7 +891,7 @@ func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.Commi
 
 	for rows.Next() {
 		var row resRow
-		if err := rows.Scan(&row.id, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
+		if err := rows.Scan(&row.id, &row.inventoryID, &row.orderID, &row.productID, &row.variantID, &row.quantity, &row.status); err != nil {
 			return appErrors.Internal(err, "failed to scan reservation row for commit")
 		}
 		allRows = append(allRows, row)
@@ -962,49 +923,48 @@ func (r *pgInventoryRepository) CommitStock(ctx context.Context, input dto.Commi
 	for _, row := range activeRows {
 		var updateInvQuery string
 		var invArgs []interface{}
+		var invTarget string
 
-		if row.variantID == nil || *row.variantID == "" {
+		if row.inventoryID != nil && *row.inventoryID != "" {
 			updateInvQuery = `
 				UPDATE inventories
-				SET reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				SET reserved_quantity = reserved_quantity - $1,
 				    updated_at = $2
-				WHERE product_id = $3 AND variant_id IS NULL
+				WHERE id = $3 AND reserved_quantity >= $1
+				RETURNING id, sku, available_quantity, reserved_quantity;
+			`
+			invArgs = []interface{}{row.quantity, now, *row.inventoryID}
+			invTarget = *row.inventoryID
+		} else if row.variantID == nil || *row.variantID == "" {
+			updateInvQuery = `
+				UPDATE inventories
+				SET reserved_quantity = reserved_quantity - $1,
+				    updated_at = $2
+				WHERE product_id = $3 AND variant_id IS NULL AND reserved_quantity >= $1
 				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID}
+			invTarget = row.productID
 		} else {
 			updateInvQuery = `
 				UPDATE inventories
-				SET reserved_quantity = GREATEST(reserved_quantity - $1, 0),
+				SET reserved_quantity = reserved_quantity - $1,
 				    updated_at = $2
-				WHERE product_id = $3 AND variant_id = $4
+				WHERE product_id = $3 AND variant_id = $4 AND reserved_quantity >= $1
 				RETURNING id, sku, available_quantity, reserved_quantity;
 			`
 			invArgs = []interface{}{row.quantity, now, row.productID, *row.variantID}
+			invTarget = fmt.Sprintf("%s (variant %s)", row.productID, *row.variantID)
 		}
 
 		var invID, sku string
 		var avail, newRes int
 		err := tx.QueryRow(ctx, updateInvQuery, invArgs...).Scan(&invID, &sku, &avail, &newRes)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) && (row.variantID == nil || *row.variantID == "") {
-				fallbackUpdate := `
-					UPDATE inventories
-					SET reserved_quantity = GREATEST(reserved_quantity - $1, 0),
-					    updated_at = $2
-					WHERE id = (
-						SELECT id FROM inventories
-						WHERE product_id = $3
-						ORDER BY reserved_quantity DESC
-						LIMIT 1
-					)
-					RETURNING id, sku, available_quantity, reserved_quantity;
-				`
-				err = tx.QueryRow(ctx, fallbackUpdate, row.quantity, now, row.productID).Scan(&invID, &sku, &avail, &newRes)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return appErrors.Conflict(fmt.Sprintf("cannot commit stock: inventory record for %s not found or reserved quantity insufficient (expected at least %d)", invTarget, row.quantity))
 			}
-			if err != nil {
-				return appErrors.Internal(err, "failed to deduct reserved stock for commit")
-			}
+			return appErrors.Internal(err, "failed to deduct reserved stock for commit")
 		}
 
 		ref := row.orderID

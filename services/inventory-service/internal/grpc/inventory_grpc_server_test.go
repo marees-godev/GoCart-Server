@@ -90,7 +90,6 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var fallback *model.Inventory
 	for _, inv := range r.inventories {
 		if inv.ProductID == productID {
 			if variantID == nil || *variantID == "" {
@@ -98,18 +97,11 @@ func (r *memoryInventoryRepo) GetByProductAndVariant(ctx context.Context, produc
 					copyInv := *inv
 					return &copyInv, nil
 				}
-				if fallback == nil || inv.AvailableQuantity > fallback.AvailableQuantity {
-					copyInv := *inv
-					fallback = &copyInv
-				}
 			} else if inv.VariantID != nil && *inv.VariantID == *variantID {
 				copyInv := *inv
 				return &copyInv, nil
 			}
 		}
-	}
-	if fallback != nil {
-		return fallback, nil
 	}
 	return nil, appErrors.NotFound("inventory not found for product/variant")
 }
@@ -219,9 +211,6 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 						found = inv
 						break
 					}
-					if found == nil || inv.AvailableQuantity > found.AvailableQuantity {
-						found = inv
-					}
 				} else if inv.VariantID != nil && *item.VariantID == *inv.VariantID {
 					found = inv
 					break
@@ -239,15 +228,16 @@ func (r *memoryInventoryRepo) ReserveStock(ctx context.Context, orderID string, 
 		found.UpdatedAt = now
 
 		r.reservations[resID] = &model.InventoryReservation{
-			ID:        resID,
-			OrderID:   orderID,
-			ProductID: item.ProductID,
-			VariantID: item.VariantID,
-			Quantity:  item.Quantity,
-			Status:    model.ReservationStatusReserved,
-			ExpiresAt: expiresAt,
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:          resID,
+			InventoryID: &found.ID,
+			OrderID:     orderID,
+			ProductID:   item.ProductID,
+			VariantID:   item.VariantID,
+			Quantity:    item.Quantity,
+			Status:      model.ReservationStatusReserved,
+			ExpiresAt:   expiresAt,
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 
 		ref := orderID
@@ -289,32 +279,42 @@ func (r *memoryInventoryRepo) ReleaseStock(ctx context.Context, input dto.Releas
 	now := time.Now().UTC()
 	for _, res := range matching {
 		if res.Status == model.ReservationStatusReserved {
+			var targetInv *model.Inventory
 			for _, inv := range r.inventories {
-				if inv.ProductID == res.ProductID {
+				if res.InventoryID != nil && *res.InventoryID != "" {
+					if inv.ID == *res.InventoryID {
+						targetInv = inv
+						break
+					}
+				} else if inv.ProductID == res.ProductID {
 					if (res.VariantID == nil && inv.VariantID == nil) ||
 						(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
-						inv.AvailableQuantity += res.Quantity
-						inv.ReservedQuantity -= res.Quantity
-						if inv.ReservedQuantity < 0 {
-							inv.ReservedQuantity = 0
-						}
-						inv.UpdatedAt = now
-
-						ref := res.OrderID
-						notes := fmt.Sprintf("Stock released (%s)", input.Reason)
-						r.transactions = append(r.transactions, &model.InventoryTransaction{
-							ID:          uuid.NewString(),
-							InventoryID: inv.ID,
-							Type:        model.TransactionTypeRelease,
-							Quantity:    res.Quantity,
-							ReferenceID: &ref,
-							Notes:       &notes,
-							CreatedAt:   now,
-						})
+						targetInv = inv
 						break
 					}
 				}
 			}
+			if targetInv == nil {
+				return appErrors.Conflict("inventory record not found for reservation")
+			}
+			if targetInv.ReservedQuantity < res.Quantity {
+				return appErrors.Conflict("reserved quantity insufficient to release")
+			}
+			targetInv.AvailableQuantity += res.Quantity
+			targetInv.ReservedQuantity -= res.Quantity
+			targetInv.UpdatedAt = now
+
+			ref := res.OrderID
+			notes := fmt.Sprintf("Stock released (%s)", input.Reason)
+			r.transactions = append(r.transactions, &model.InventoryTransaction{
+				ID:          uuid.NewString(),
+				InventoryID: targetInv.ID,
+				Type:        model.TransactionTypeRelease,
+				Quantity:    res.Quantity,
+				ReferenceID: &ref,
+				Notes:       &notes,
+				CreatedAt:   now,
+			})
 			res.Status = targetStatus
 			res.UpdatedAt = now
 		}
@@ -366,31 +366,41 @@ func (r *memoryInventoryRepo) CommitStock(ctx context.Context, input dto.CommitS
 
 	now := time.Now().UTC()
 	for _, res := range active {
+		var targetInv *model.Inventory
 		for _, inv := range r.inventories {
-			if inv.ProductID == res.ProductID {
+			if res.InventoryID != nil && *res.InventoryID != "" {
+				if inv.ID == *res.InventoryID {
+					targetInv = inv
+					break
+				}
+			} else if inv.ProductID == res.ProductID {
 				if (res.VariantID == nil && inv.VariantID == nil) ||
 					(res.VariantID != nil && inv.VariantID != nil && *res.VariantID == *inv.VariantID) {
-					inv.ReservedQuantity -= res.Quantity
-					if inv.ReservedQuantity < 0 {
-						inv.ReservedQuantity = 0
-					}
-					inv.UpdatedAt = now
-
-					ref := res.OrderID
-					notes := fmt.Sprintf("Stock committed for order %s", res.OrderID)
-					r.transactions = append(r.transactions, &model.InventoryTransaction{
-						ID:          uuid.NewString(),
-						InventoryID: inv.ID,
-						Type:        model.TransactionTypeCommit,
-						Quantity:    res.Quantity,
-						ReferenceID: &ref,
-						Notes:       &notes,
-						CreatedAt:   now,
-					})
+					targetInv = inv
 					break
 				}
 			}
 		}
+		if targetInv == nil {
+			return appErrors.Conflict("inventory record not found for reservation commit")
+		}
+		if targetInv.ReservedQuantity < res.Quantity {
+			return appErrors.Conflict("reserved quantity insufficient to commit")
+		}
+		targetInv.ReservedQuantity -= res.Quantity
+		targetInv.UpdatedAt = now
+
+		ref := res.OrderID
+		notes := fmt.Sprintf("Stock committed for order %s", res.OrderID)
+		r.transactions = append(r.transactions, &model.InventoryTransaction{
+			ID:          uuid.NewString(),
+			InventoryID: targetInv.ID,
+			Type:        model.TransactionTypeCommit,
+			Quantity:    res.Quantity,
+			ReferenceID: &ref,
+			Notes:       &notes,
+			CreatedAt:   now,
+		})
 		res.Status = model.ReservationStatusConfirmed
 		res.UpdatedAt = now
 	}
@@ -1295,5 +1305,56 @@ func TestInventoryGRPCServer_GetStock_MissingProduct(t *testing.T) {
 	_, err := server.GetStock(context.Background(), &inventorypb.GetStockRequest{ProductId: missingProdID})
 	if err == nil {
 		t.Fatalf("expected error for missing product stock, got nil")
+	}
+}
+
+func TestInventoryGRPCServer_StrictVariantIsolation_NoSilentFallback(t *testing.T) {
+	server, stubCli := setupTestServer()
+	prodID := uuid.NewString()
+	varID := uuid.NewString()
+	stubCli.AddProduct(prodID, "store-1", "SKU-VAR", "merch-1")
+
+	// Create inventory specifically for a variant
+	_, err := server.CreateInventory(context.Background(), &inventorypb.CreateInventoryRequest{
+		ProductId:       prodID,
+		VariantId:       varID,
+		Sku:             "SKU-VAR-ISOLATE",
+		InitialQuantity: 50,
+	})
+	if err != nil {
+		t.Fatalf("CreateInventory failed: %v", err)
+	}
+
+	// 1. GetInventory without variant ID should NOT return the variant-specific row
+	_, err = server.GetInventory(context.Background(), &inventorypb.GetInventoryRequest{
+		ProductId: prodID,
+	})
+	if err == nil {
+		t.Fatalf("expected GetInventory without variant to fail with not found, but it succeeded")
+	}
+
+	// 2. ReserveStock without variant ID should NOT reserve from the variant-specific row
+	_, err = server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: uuid.NewString(),
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, Quantity: 5},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected ReserveStock without variant to fail, but it succeeded")
+	}
+
+	// 3. Reserving with the explicit variant ID should succeed
+	resResp, err := server.ReserveStock(context.Background(), &inventorypb.ReserveStockRequest{
+		OrderId: uuid.NewString(),
+		Items: []*inventorypb.ReservationItem{
+			{ProductId: prodID, VariantId: varID, Quantity: 5},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected ReserveStock with explicit variant to succeed, got: %v", err)
+	}
+	if resResp.ReservationId == "" {
+		t.Fatalf("expected valid reservation ID, got empty")
 	}
 }

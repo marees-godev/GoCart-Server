@@ -47,15 +47,16 @@ type InventoryTransaction struct {
 }
 
 type InventoryReservation struct {
-	ID        string            `json:"id" db:"id"`
-	OrderID   string            `json:"order_id" db:"order_id"`
-	ProductID string            `json:"product_id" db:"product_id"`
-	VariantID *string           `json:"variant_id,omitempty" db:"variant_id"`
-	Quantity  int               `json:"quantity" db:"quantity"`
-	Status    ReservationStatus `json:"status" db:"status"`
-	ExpiresAt time.Time         `json:"expires_at" db:"expires_at"`
-	CreatedAt time.Time         `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at" db:"updated_at"`
+	ID          string            `json:"id" db:"id"`
+	InventoryID *string           `json:"inventory_id,omitempty" db:"inventory_id"`
+	OrderID     string            `json:"order_id" db:"order_id"`
+	ProductID   string            `json:"product_id" db:"product_id"`
+	VariantID   *string           `json:"variant_id,omitempty" db:"variant_id"`
+	Quantity    int               `json:"quantity" db:"quantity"`
+	Status      ReservationStatus `json:"status" db:"status"`
+	ExpiresAt   time.Time         `json:"expires_at" db:"expires_at"`
+	CreatedAt   time.Time         `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
 }
 
 type ReserveItem struct {
