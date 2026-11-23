@@ -208,7 +208,15 @@ func (r *inMemoryAuthRepo) RotateRefreshToken(ctx context.Context, oldTokenID uu
 	return nil
 }
 
-func (r *inMemoryAuthRepo) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (r *inMemoryAuthRepo) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
+	for _, c := range r.byEmailRole {
+		if c.UserID == userID {
+			c.EmailVerified = true
+		}
+	}
+	if len(evt) > 0 && evt[0] != nil {
+		r.outboxEvents = append(r.outboxEvents, evt[0])
+	}
 	return nil
 }
 
@@ -330,15 +338,9 @@ func TestGRPC_MultiRoleRegistrationAndUniqueness(t *testing.T) {
 		t.Errorf("expected HTTP 409 Conflict, got %d (err: %v)", appErr.HTTPStatus, err)
 	}
 
-	// 5. Verify outbox events: exactly 2 events created (1 customer, 1 merchant)
-	if len(repo.outboxEvents) != 2 {
-		t.Fatalf("expected 2 outbox events, got %d", len(repo.outboxEvents))
-	}
-	if repo.outboxEvents[0].Topic != "auth.user.registered" || repo.outboxEvents[0].EventType != "UserRegistered" {
-		t.Errorf("expected first event to be auth.user.registered, got %s / %s", repo.outboxEvents[0].Topic, repo.outboxEvents[0].EventType)
-	}
-	if repo.outboxEvents[1].Topic != "auth.merchant.registered" || repo.outboxEvents[1].EventType != "MerchantRegistered" {
-		t.Errorf("expected second event to be auth.merchant.registered, got %s / %s", repo.outboxEvents[1].Topic, repo.outboxEvents[1].EventType)
+	// 5. Verify outbox events: 0 events created on register (events emit after email verification)
+	if len(repo.outboxEvents) != 0 {
+		t.Fatalf("expected 0 outbox events before email verification, got %d", len(repo.outboxEvents))
 	}
 }
 

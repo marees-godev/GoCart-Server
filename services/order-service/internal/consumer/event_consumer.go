@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/marees-godev/GoCart-Server/contracts/events"
@@ -44,7 +46,18 @@ func (c *OrderEventConsumer) HandleEvent(ctx context.Context, envelope *events.E
 			payload.OrderID = envelope.AggregateID
 		}
 		_, err := c.orderService.HandlePaymentSuccessful(ctx, &payload, envelope.CorrelationID, envelope.TraceID)
-		return err
+		if err != nil {
+			var appErr *appErrors.AppError
+			if errors.As(err, &appErr) && (appErr.Code == appErrors.CodeBadRequest || appErr.Code == appErrors.CodeConflict || appErr.Code == appErrors.CodeNotFound) {
+				slog.WarnContext(ctx, "non-retryable error in HandlePaymentSuccessful, acknowledging event",
+					"order_id", payload.OrderID,
+					"error", err,
+				)
+				return nil
+			}
+			return err
+		}
+		return nil
 
 	case events.EventTypePaymentFailed:
 		var payload events.PaymentFailedEvent
@@ -55,7 +68,18 @@ func (c *OrderEventConsumer) HandleEvent(ctx context.Context, envelope *events.E
 			payload.OrderID = envelope.AggregateID
 		}
 		_, err := c.orderService.HandlePaymentFailed(ctx, &payload, envelope.CorrelationID, envelope.TraceID)
-		return err
+		if err != nil {
+			var appErr *appErrors.AppError
+			if errors.As(err, &appErr) && (appErr.Code == appErrors.CodeBadRequest || appErr.Code == appErrors.CodeConflict || appErr.Code == appErrors.CodeNotFound) {
+				slog.WarnContext(ctx, "non-retryable error in HandlePaymentFailed, acknowledging event",
+					"order_id", payload.OrderID,
+					"error", err,
+				)
+				return nil
+			}
+			return err
+		}
+		return nil
 
 	case events.EventTypeOrderShipped:
 		var payload events.OrderShippedEvent

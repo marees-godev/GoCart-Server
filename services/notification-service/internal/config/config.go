@@ -37,6 +37,7 @@ type HTTPConfig struct {
 type GRPCConfig struct {
 	Port             string
 	OrderServiceAddr string
+	UserServiceAddr  string
 	LookupTimeout    time.Duration
 }
 
@@ -123,6 +124,7 @@ func LoadEnv() *Config {
 		GRPC: GRPCConfig{
 			Port:             GetEnv("GRPC_PORT", "50064"),
 			OrderServiceAddr: GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059"),
+			UserServiceAddr:  GetEnv("USER_SERVICE_GRPC_ADDR", "localhost:50052"),
 			LookupTimeout:    GetEnvAsDuration("GRPC_LOOKUP_TIMEOUT", 2*time.Second),
 		},
 		Database: DatabaseConfig{

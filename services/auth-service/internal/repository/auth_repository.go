@@ -31,7 +31,7 @@ type AuthRepository interface {
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) error
 	RevokeRefreshTokensByUserID(ctx context.Context, userID uuid.UUID) error
 	RotateRefreshToken(ctx context.Context, oldTokenID uuid.UUID, newToken *model.RefreshToken) error
-	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, evt *outbox.Event) error
 	GetOAuthAccount(ctx context.Context, provider model.AuthProviderType, providerUserID string) (*model.OAuthAccount, error)
 	CreateOAuthAccount(ctx context.Context, oauthAcc *model.OAuthAccount) error
@@ -381,17 +381,52 @@ func (r *postgresAuthRepository) RotateRefreshToken(ctx context.Context, oldToke
 	return nil
 }
 
-func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+func (r *postgresAuthRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID, evt ...*outbox.Event) error {
+	var outboxEvt *outbox.Event
+	if len(evt) > 0 && evt[0] != nil {
+		outboxEvt = evt[0]
+	}
+
+	if outboxEvt == nil {
+		query := `
+			UPDATE auth_credentials
+			SET email_verified = true, updated_at = NOW()
+			WHERE user_id = $1
+		`
+		_, err := r.pool.Exec(ctx, query, userID)
+		if err != nil {
+			r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+			return fmt.Errorf("repository: mark email verified failed: %w", err)
+		}
+		return nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("repository: begin tx failed: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		UPDATE auth_credentials
 		SET email_verified = true, updated_at = NOW()
 		WHERE user_id = $1
 	`
-	_, err := r.pool.Exec(ctx, query, userID)
-	if err != nil {
-		r.logger.Error("Failed to mark email verified", "user_id", userID, "error", err)
+	if _, err := tx.Exec(ctx, query, userID); err != nil {
+		r.logger.Error("Failed to mark email verified in tx", "user_id", userID, "error", err)
 		return fmt.Errorf("repository: mark email verified failed: %w", err)
 	}
+
+	if err := r.outboxStore.Insert(ctx, tx, outboxEvt); err != nil {
+		r.logger.Error("Failed to insert outbox event on email verified", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: insert outbox event failed: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		r.logger.Error("Failed to commit email verified tx", "user_id", userID, "error", err)
+		return fmt.Errorf("repository: commit email verified tx failed: %w", err)
+	}
+
 	return nil
 }
 

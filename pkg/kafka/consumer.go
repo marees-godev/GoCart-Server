@@ -36,6 +36,12 @@ type Consumer struct {
 
 // NewConsumer initializes a Kafka Consumer configured for consumer groups.
 func NewConsumer(cfg Config, consumerCfg ConsumerConfig, producer *Producer) *Consumer {
+	if cfg.DLQSuffix == "" {
+		cfg.DLQSuffix = ".dlq"
+	}
+	if cfg.RetrySuffix == "" {
+		cfg.RetrySuffix = ".retry"
+	}
 	if consumerCfg.MinBytes == 0 {
 		consumerCfg.MinBytes = 10e3 // 10KB
 	}

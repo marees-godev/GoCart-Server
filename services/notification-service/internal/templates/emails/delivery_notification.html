@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoCart Delivery Notification</title>
+</head>
+<body style="margin: 0; padding: 32px 16px; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9;">
+    <tr>
+      <td align="center">
+        <!-- Main Email Container -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+          
+          <!-- Green Accent Top Bar -->
+          <tr>
+            <td style="height: 4px; background-color: #00A651; line-height: 4px; font-size: 1px;">&nbsp;</td>
+          </tr>
+
+          <!-- Header with GoCart Logo and Status Pill -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 24px 32px; border-bottom: 1px solid #F1F5F9;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="left" style="vertical-align: middle;">
+                    <table border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="width: 40px; height: 40px; background-color: #E8F8F0; border: 1.5px solid #00A651; border-radius: 12px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 20px;">🚚</span>
+                        </td>
+                        <td style="padding-left: 12px; vertical-align: middle;">
+                          <div style="font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -0.5px;">
+                            <span style="color: #00A651;">go</span><span style="color: #1E293B;">cart</span><span style="color: #00A651;">.</span>
+                          </div>
+                          <div style="font-size: 12px; color: #64748B; font-weight: 500; margin-top: 2px;">
+                            Delivery Tracking
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td align="right" style="vertical-align: middle;">
+                    <span style="display: inline-block; padding: 5px 14px; background-color: #E8F8F0; border: 1px solid #A7F3D0; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #00A651; text-transform: uppercase; letter-spacing: 0.05em;">
+                      ● {{if .NewStatus}}{{.NewStatus}}{{else if .Status}}{{.Status}}{{else}}SHIPMENT UPDATE{{end}}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content Area -->
+          <tr>
+            <td style="padding: 32px 32px 28px 32px;">
+              
+              <!-- Hero Status Header -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="text-align: center; border-bottom: 1px solid #F1F5F9; padding-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <div style="width: 58px; height: 58px; line-height: 58px; background-color: #E8F8F0; border: 2px solid #00A651; border-radius: 29px; text-align: center; margin: 0 auto 12px auto; font-size: 26px;">
+                      📦
+                    </div>
+                    <h2 style="font-size: 22px; font-weight: 700; color: #1E293B; margin: 0 0 8px 0; letter-spacing: -0.5px;">
+                      {{if .Headline}}{{.Headline}}{{else}}Your Package is on the Move!{{end}}
+                    </h2>
+                    <p style="font-size: 14px; color: #475569; margin: 0; line-height: 1.6;">
+                      {{if .Message}}{{.Message}}{{else}}We are tracking your package every step of the way. Here is the latest update for Order #{{.OrderID}}.{{end}}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- 4-Stage Tracking Progress Tracker -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 24px; margin-bottom: 8px;">
+                <tr>
+                  <!-- Stage 1: Confirmed -->
+                  <td align="center" style="width: 25%;">
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #00A651; color: #ffffff; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">✓</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #0F172A;">Confirmed</div>
+                  </td>
+                  
+                  <!-- Stage 2: Dispatched / In Transit -->
+                  <td align="center" style="width: 25%;">
+                    {{if or (eq .NewStatus "IN_TRANSIT") (eq .NewStatus "OUT_FOR_DELIVERY") (eq .NewStatus "DELIVERED") (eq .Status "IN_TRANSIT") (eq .Status "SHIPPED")}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #00A651; color: #ffffff; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">✓</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #0F172A;">Dispatched</div>
+                    {{else}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #E2E8F0; color: #64748B; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">2</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #94A3B8;">Dispatched</div>
+                    {{end}}
+                  </td>
+
+                  <!-- Stage 3: Out for Delivery -->
+                  <td align="center" style="width: 25%;">
+                    {{if or (eq .NewStatus "OUT_FOR_DELIVERY") (eq .NewStatus "DELIVERED")}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #00A651; color: #ffffff; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">{{if eq .NewStatus "DELIVERED"}}✓{{else}}3{{end}}</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #0F172A;">Out for Delivery</div>
+                    {{else}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #E2E8F0; color: #64748B; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">3</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #94A3B8;">Out for Delivery</div>
+                    {{end}}
+                  </td>
+
+                  <!-- Stage 4: Delivered -->
+                  <td align="center" style="width: 25%;">
+                    {{if eq .NewStatus "DELIVERED"}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #00A651; color: #ffffff; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">✓</div>
+                    <div style="font-size: 11px; font-weight: 700; color: #00A651;">Delivered</div>
+                    {{else}}
+                    <div style="width: 28px; height: 28px; line-height: 28px; border-radius: 14px; background-color: #E2E8F0; color: #64748B; font-size: 12px; font-weight: 700; margin: 0 auto 6px auto;">4</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #94A3B8;">Delivered</div>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Shipment Details Card -->
+              <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 4px solid #00A651; border-radius: 12px; padding: 20px; margin-top: 24px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #00A651; margin-bottom: 14px;">
+                  Shipment & Tracking Information
+                </div>
+                
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size: 13px;">
+                  {{if .TrackingNumber}}
+                  <tr>
+                    <td style="padding: 10px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Tracking Number</td>
+                    <td align="right" style="padding: 10px 0; border-bottom: 1px solid #E2E8F0;">
+                      <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; font-weight: 700; color: #00A651; background-color: #FFFFFF; border: 1px solid #A7F3D0; padding: 3px 8px; border-radius: 6px;">
+                        {{.TrackingNumber}}
+                      </span>
+                    </td>
+                  </tr>
+                  {{end}}
+
+                  {{if .DeliveryPartner}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Courier Partner</td>
+                    <td align="right" style="padding: 8px 0; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.DeliveryPartner}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .OrderID}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Order ID</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.OrderID}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .EstimatedDelivery}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B; border-bottom: 1px solid #E2E8F0;">Estimated Arrival</td>
+                    <td align="right" style="padding: 8px 0; font-weight: 700; color: #0F172A; border-bottom: 1px solid #E2E8F0;">{{.EstimatedDelivery}}</td>
+                  </tr>
+                  {{end}}
+
+                  {{if .Email}}
+                  <tr>
+                    <td style="padding: 8px 0; color: #64748B;">Recipient Email</td>
+                    <td align="right" style="padding: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 600; color: #0F172A;">{{.Email}}</td>
+                  </tr>
+                  {{end}}
+                </table>
+              </div>
+
+              <!-- Action Button -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 28px;">
+                <tr>
+                  <td align="center">
+                    {{if .TrackingNumber}}
+                    <a href="https://gocart.dev/track/{{.TrackingNumber}}" style="display: inline-block; background-color: #00A651; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 166, 81, 0.25);">
+                      Track Your Package
+                    </a>
+                    {{else}}
+                    <a href="https://gocart.dev/orders/{{.OrderID}}" style="display: inline-block; background-color: #00A651; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 32px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 166, 81, 0.25);">
+                      View Order Details
+                    </a>
+                    {{end}}
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Clean Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; padding: 24px 32px; border-top: 1px solid #E2E8F0; text-align: center;">
+              <p style="font-size: 12px; color: #64748B; margin: 0 0 8px 0;">
+                Need help with your delivery? Contact our delivery support at <a href="mailto:delivery@gocart.dev" style="color: #00A651; text-decoration: none; font-weight: 600;">delivery@gocart.dev</a>
+              </p>
+              <p style="font-size: 11px; color: #94A3B8; margin: 0;">
+                &copy; 2026 GoCart Inc. All rights reserved. &bull; Fast, Reliable Delivery
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

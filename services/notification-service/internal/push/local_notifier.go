@@ -123,7 +123,7 @@ func buildWindowsNotificationCmd(ctx context.Context, content string) *exec.Cmd 
 	psScript := fmt.Sprintf(`
 Add-Type -AssemblyName PresentationFramework -ErrorAction SilentlyContinue
 $msg = '%s'
-$xaml = '<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="GoCart" Height="90" Width="380" WindowStyle="None" AllowsTransparency="True" Background="#1E1E2E" Topmost="True" ShowInTaskbar="False" WindowStartupLocation="Manual"><Border BorderBrush="#89B4FA" BorderThickness="1.5" CornerRadius="8" Padding="14"><TextBlock Text="%s" Foreground="#CDD6F4" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"/></Border></Window>'
+$xaml = '<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="GoCart" Height="105" Width="420" WindowStyle="None" AllowsTransparency="True" Background="Transparent" Topmost="True" ShowInTaskbar="False" WindowStartupLocation="Manual"><Border Background="#FFFFFF" BorderBrush="#00A651" BorderThickness="2" CornerRadius="12" Padding="14,12,14,12"><StackPanel VerticalAlignment="Center"><StackPanel Orientation="Horizontal" Margin="0,0,0,6"><TextBlock FontSize="14" FontWeight="Bold"><Run Text="go" Foreground="#00A651"/><Run Text="cart" Foreground="#1E293B"/><Run Text="." Foreground="#00A651"/></TextBlock><TextBlock Text=" • Notification" Foreground="#64748B" FontSize="11.5" VerticalAlignment="Center" Margin="6,0,0,0"/></StackPanel><TextBlock Text="%s" Foreground="#0F172A" FontSize="12.5" TextWrapping="Wrap" LineHeight="17"/></StackPanel></Border></Window>'
 try {
     $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($xaml))
     $window = [System.Windows.Markup.XamlReader]::Load($reader)

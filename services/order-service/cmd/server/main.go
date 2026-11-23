@@ -182,6 +182,8 @@ func main() {
 			ConnectTimeout: 10 * time.Second,
 			MaxRetries:     cfg.Outbox.MaxRetries,
 			RetryInterval:  500 * time.Millisecond,
+			DLQSuffix:      ".dlq",
+			RetrySuffix:    ".retry",
 		}, consumerCfg, producer)
 
 		orderEvtConsumer := consumer.NewOrderEventConsumer(orderService)
