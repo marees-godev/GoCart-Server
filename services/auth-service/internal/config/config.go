@@ -27,6 +27,23 @@ type Config struct {
 	Services        ServicesConfig
 	Google          GoogleConfig
 	Facebook        FacebookConfig
+	Kafka           KafkaConfig
+	Outbox          OutboxConfig
+}
+
+type KafkaConfig struct {
+	Brokers  []string
+	ClientID string
+}
+
+type OutboxConfig struct {
+	Enabled        bool
+	PollInterval   time.Duration
+	BatchSize      int
+	MaxRetries     int
+	BaseRetryDelay time.Duration
+	MaxRetryDelay  time.Duration
+	DLQTopic       string
 }
 
 type GoogleConfig struct {
@@ -200,6 +217,19 @@ func LoadEnv() *Config {
 			AppID:     GetEnv("FACEBOOK_APP_ID", GetEnv("FACEBOOK_CLIENT_ID", "")),
 			AppSecret: GetEnv("FACEBOOK_APP_SECRET", GetEnv("FACEBOOK_CLIENT_SECRET", "")),
 		},
+		Kafka: KafkaConfig{
+			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
+			ClientID: GetEnv("KAFKA_CLIENT_ID", "auth-service"),
+		},
+		Outbox: OutboxConfig{
+			Enabled:        GetEnvAsBool("OUTBOX_ENABLED", true),
+			PollInterval:   GetEnvAsDuration("OUTBOX_POLL_INTERVAL", 1*time.Second),
+			BatchSize:      GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
+			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			BaseRetryDelay: GetEnvAsDuration("OUTBOX_BASE_RETRY_DELAY", 1*time.Second),
+			MaxRetryDelay:  GetEnvAsDuration("OUTBOX_MAX_RETRY_DELAY", 60*time.Second),
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.auth.dlq"),
+		},
 	}
 }
 
@@ -270,4 +300,22 @@ func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 		return time.Duration(secs) * time.Second
 	}
 	return defaultValue
+}
+
+func GetEnvAsStringSlice(key string, defaultValue []string) []string {
+	valStr := os.Getenv(key)
+	if valStr == "" {
+		return defaultValue
+	}
+	parts := strings.Split(valStr, ",")
+	res := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	if len(res) == 0 {
+		return defaultValue
+	}
+	return res
 }
