@@ -555,7 +555,7 @@ func TestNotificationService_AllGoneRetriesIdempotencyAndOptOut(t *testing.T) {
 		_ = prefRepo.UpsertPreference(ctx, &model.Preference{
 			UserID:    userID,
 			ChannelID: pushChan.ID,
-			EventType: "OrderCancelled",
+			Category:  service.CategoryOrders,
 			IsEnabled: false,
 		})
 		optedOutRes, err := notifSvc.SendNotification(ctx, dto.SendNotificationInput{

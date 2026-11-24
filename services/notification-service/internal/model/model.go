@@ -52,7 +52,7 @@ type Preference struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
 	ChannelID string    `json:"channel_id"`
-	EventType string    `json:"event_type"`
+	Category  string    `json:"category"`
 	IsEnabled bool      `json:"is_enabled"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

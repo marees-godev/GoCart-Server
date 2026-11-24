@@ -16,6 +16,9 @@ service NotificationService {
   rpc UpdatePushSubscription (UpdatePushSubscriptionRequest) returns (PushSubscriptionResponse);
   rpc DeactivatePushSubscription (DeactivatePushSubscriptionRequest) returns (DeactivatePushSubscriptionResponse);
   rpc GetVAPIDPublicKey (GetVAPIDPublicKeyRequest) returns (GetVAPIDPublicKeyResponse);
+
+  rpc GetUserPreferences (GetUserPreferencesRequest) returns (GetUserPreferencesResponse);
+  rpc UpdateUserPreference (UpdateUserPreferenceRequest) returns (UpdateUserPreferenceResponse);
 }
 
 message Notification {
@@ -167,4 +170,30 @@ message GetVAPIDPublicKeyRequest {}
 message GetVAPIDPublicKeyResponse {
   string public_key = 1;
   string subject = 2;
+}
+
+message PreferenceItem {
+  string channel = 1;
+  string category = 2;
+  bool is_enabled = 3;
+}
+
+message GetUserPreferencesRequest {
+  string user_id = 1;
+}
+
+message GetUserPreferencesResponse {
+  repeated PreferenceItem preferences = 1;
+}
+
+message UpdateUserPreferenceRequest {
+  string user_id = 1;
+  string channel = 2;
+  string category = 3;
+  bool is_enabled = 4;
+}
+
+message UpdateUserPreferenceResponse {
+  bool success = 1;
+  PreferenceItem preference = 2;
 }

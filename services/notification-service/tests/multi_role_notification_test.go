@@ -85,7 +85,7 @@ func TestMultiRole_UserMerchantDeliveryPartner_Notifications(t *testing.T) {
 	srv := grpc.NewServer(
 		grpc.UnaryInterceptor(grpcclient.UnaryServerInterceptor()),
 	)
-	notificationpb.RegisterNotificationServiceServer(srv, handler.NewNotificationGRPCHandler(notifSvc, subSvc))
+	notificationpb.RegisterNotificationServiceServer(srv, handler.NewNotificationGRPCHandler(notifSvc, subSvc, prefSvc))
 	go func() { _ = srv.Serve(lis) }()
 	defer srv.Stop()
 

@@ -24,7 +24,6 @@ import (
 
 type mockGraphQLNotificationClient struct {
 	notificationpb.NotificationServiceClient
-	notificationpb.UnimplementedNotificationServiceServer
 	lastRegisterReq   *notificationpb.RegisterPushSubscriptionRequest
 	lastListSubsReq   *notificationpb.GetPushSubscriptionsRequest
 	lastUpdateSubReq  *notificationpb.UpdatePushSubscriptionRequest
@@ -34,6 +33,7 @@ type mockGraphQLNotificationClient struct {
 	lastMarkAllReq    *notificationpb.MarkAllNotificationsAsReadRequest
 	lastUnreadReq     *notificationpb.GetUnreadCountRequest
 	lastSendReq       *notificationpb.SendNotificationRequest
+	lastUpdatePrefReq *notificationpb.UpdateUserPreferenceRequest
 	lastCallerUserID  string
 	lastCallerRole    string
 }
@@ -148,6 +148,25 @@ func (m *mockGraphQLNotificationClient) MarkAllNotificationsAsRead(ctx context.C
 	}, nil
 }
 
+func (m *mockGraphQLNotificationClient) GetUserPreferences(ctx context.Context, in *notificationpb.GetUserPreferencesRequest, opts ...grpc.CallOption) (*notificationpb.GetUserPreferencesResponse, error) {
+	return &notificationpb.GetUserPreferencesResponse{
+		Preferences: []*notificationpb.PreferenceItem{
+			{
+				Channel:   "PUSH",
+				Category:  "ORDERS",
+				IsEnabled: true,
+			},
+		},
+	}, nil
+}
+
+func (m *mockGraphQLNotificationClient) UpdateUserPreference(ctx context.Context, in *notificationpb.UpdateUserPreferenceRequest, opts ...grpc.CallOption) (*notificationpb.UpdateUserPreferenceResponse, error) {
+	m.lastUpdatePrefReq = in
+	return &notificationpb.UpdateUserPreferenceResponse{
+		Success: true,
+	}, nil
+}
+
 type mockNotificationBufconnServer struct {
 	notificationpb.UnimplementedNotificationServiceServer
 	inner *mockGraphQLNotificationClient
@@ -191,6 +210,14 @@ func (s *mockNotificationBufconnServer) MarkNotificationAsRead(ctx context.Conte
 
 func (s *mockNotificationBufconnServer) MarkAllNotificationsAsRead(ctx context.Context, in *notificationpb.MarkAllNotificationsAsReadRequest) (*notificationpb.MarkAllNotificationsAsReadResponse, error) {
 	return s.inner.MarkAllNotificationsAsRead(ctx, in)
+}
+
+func (s *mockNotificationBufconnServer) GetUserPreferences(ctx context.Context, in *notificationpb.GetUserPreferencesRequest) (*notificationpb.GetUserPreferencesResponse, error) {
+	return s.inner.GetUserPreferences(ctx, in)
+}
+
+func (s *mockNotificationBufconnServer) UpdateUserPreference(ctx context.Context, in *notificationpb.UpdateUserPreferenceRequest) (*notificationpb.UpdateUserPreferenceResponse, error) {
+	return s.inner.UpdateUserPreference(ctx, in)
 }
 
 func setupNotificationGraphQLApp() (*fiber.App, *mockGraphQLNotificationClient) {
@@ -345,6 +372,22 @@ func TestGraphQL_NotificationsAndPushSubscriptions(t *testing.T) {
 	markAllRes := execGraphQL(t, app, token, `mutation { markAllNotificationsAsRead { updatedCount success } }`)
 	if markAllRes["errors"] != nil || mockNotif.lastMarkAllReq.GetUserId() != "user-gql-1" {
 		t.Fatalf("markAllNotificationsAsRead failed: %v", markAllRes)
+	}
+
+	// Category preference query and mutation
+	prefQueryRes := execGraphQL(t, app, token, `query { myNotificationPreferences { channel category isEnabled } }`)
+	if prefQueryRes["errors"] != nil {
+		t.Fatalf("myNotificationPreferences failed: %v", prefQueryRes["errors"])
+	}
+
+	prefMutRes := execGraphQL(t, app, token, `mutation { updateNotificationPreference(input: { channel: "PUSH", category: ORDERS, isEnabled: false }) { channel category isEnabled } }`)
+	if prefMutRes["errors"] != nil {
+		t.Fatalf("updateNotificationPreference failed: %v", prefMutRes["errors"])
+	}
+	if mockNotif.lastUpdatePrefReq.GetChannel() != "PUSH" ||
+		mockNotif.lastUpdatePrefReq.GetCategory() != "ORDERS" ||
+		mockNotif.lastUpdatePrefReq.GetIsEnabled() != false {
+		t.Errorf("preference update not forwarded correctly: %+v", mockNotif.lastUpdatePrefReq)
 	}
 
 	// Customer cannot view another user's notifications or send notification to another user

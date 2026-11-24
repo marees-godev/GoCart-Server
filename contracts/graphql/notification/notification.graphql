@@ -87,11 +87,31 @@ input UpdatePushSubscriptionInput {
   isActive: Boolean
 }
 
+enum NotificationCategory {
+  ORDERS
+  DELIVERIES
+  RETURNS
+  ACCOUNT
+}
+
+type NotificationPreference {
+  channel: String!
+  category: NotificationCategory!
+  isEnabled: Boolean!
+}
+
+input UpdateNotificationPreferenceInput {
+  channel: String!
+  category: NotificationCategory!
+  isEnabled: Boolean!
+}
+
 extend type Query {
   notifications(userId: ID, filter: NotificationFilterInput, limit: Int, offset: Int): NotificationList! @auth
   unreadNotificationCount: Int! @auth
   pushSubscriptions(activeOnly: Boolean): PushSubscriptionList! @auth
   vapidPublicKey: VAPIDPublicKeyPayload! @auth
+  myNotificationPreferences: [NotificationPreference!]! @auth
 }
 
 extend type Mutation {
@@ -101,4 +121,5 @@ extend type Mutation {
   registerPushSubscription(input: RegisterPushSubscriptionInput!): PushSubscription! @auth
   updatePushSubscription(input: UpdatePushSubscriptionInput!): PushSubscription! @auth
   deactivatePushSubscription(id: ID, endpoint: String): Boolean! @auth
+  updateNotificationPreference(input: UpdateNotificationPreferenceInput!): NotificationPreference! @auth
 }

@@ -52,17 +52,29 @@ type mockPreferenceRepo struct {
 	preferences map[string]*model.Preference
 }
 
-func (m *mockPreferenceRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (m *mockPreferenceRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.preferences[userID+":"+channelID+":"+eventType], nil
+	return m.preferences[userID+":"+channelID+":"+category], nil
 }
 
 func (m *mockPreferenceRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.preferences[pref.UserID+":"+pref.ChannelID+":"+pref.EventType] = pref
+	m.preferences[pref.UserID+":"+pref.ChannelID+":"+pref.Category] = pref
 	return nil
+}
+
+func (m *mockPreferenceRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var res []*model.Preference
+	for _, p := range m.preferences {
+		if p.UserID == userID {
+			res = append(res, p)
+		}
+	}
+	return res, nil
 }
 
 type mockJobRepo struct {
@@ -226,10 +238,10 @@ func TestPreferenceService_OptOut(t *testing.T) {
 	}
 	prefRepo := &mockPreferenceRepo{
 		preferences: map[string]*model.Preference{
-			"USR-OPTOUT:" + channelID + ":OrderCreated": {
+			"USR-OPTOUT:" + channelID + ":" + service.CategoryOrders: {
 				UserID:    "USR-OPTOUT",
 				ChannelID: channelID,
-				EventType: "OrderCreated",
+				Category:  service.CategoryOrders,
 				IsEnabled: false,
 			},
 		},

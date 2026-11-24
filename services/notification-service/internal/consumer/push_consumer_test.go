@@ -87,17 +87,29 @@ func (r *pushMemoryRepo) GetByEventTypeAndChannel(ctx context.Context, eventType
 	return nil, nil
 }
 
-func (r *pushMemoryRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *pushMemoryRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.preferences[userID+":"+channelID+":"+eventType], nil
+	return r.preferences[userID+":"+channelID+":"+category], nil
 }
 
 func (r *pushMemoryRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.preferences[pref.UserID+":"+pref.ChannelID+":"+pref.EventType] = pref
+	r.preferences[pref.UserID+":"+pref.ChannelID+":"+pref.Category] = pref
 	return nil
+}
+
+func (r *pushMemoryRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var res []*model.Preference
+	for _, p := range r.preferences {
+		if p.UserID == userID {
+			res = append(res, p)
+		}
+	}
+	return res, nil
 }
 
 func (r *pushMemoryRepo) CreateJob(ctx context.Context, job *model.NotificationJob) error {

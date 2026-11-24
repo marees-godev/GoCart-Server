@@ -369,16 +369,28 @@ func (r *demoMemRepo) GetByEventTypeAndChannel(ctx context.Context, eventType, c
 	return nil, nil
 }
 
-func (r *demoMemRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *demoMemRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.prefs[userID+":"+channelID+":"+eventType], nil
+	return r.prefs[userID+":"+channelID+":"+category], nil
+}
+
+func (r *demoMemRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var list []*model.Preference
+	for _, p := range r.prefs {
+		if p.UserID == userID {
+			list = append(list, p)
+		}
+	}
+	return list, nil
 }
 
 func (r *demoMemRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.prefs[pref.UserID+":"+pref.ChannelID+":"+pref.EventType] = pref
+	r.prefs[pref.UserID+":"+pref.ChannelID+":"+pref.Category] = pref
 	return nil
 }
 
@@ -813,7 +825,7 @@ func TestDemo_PushNotificationEndToEnd(t *testing.T) {
 
 	lis := bufconn.Listen(1024 * 1024)
 	grpcSrv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcclient.UnaryServerInterceptor()))
-	notificationpb.RegisterNotificationServiceServer(grpcSrv, handler.NewNotificationGRPCHandler(notifSvc, subSvc))
+	notificationpb.RegisterNotificationServiceServer(grpcSrv, handler.NewNotificationGRPCHandler(notifSvc, subSvc, prefSvc))
 	go func() { _ = grpcSrv.Serve(lis) }()
 	defer grpcSrv.GracefulStop()
 

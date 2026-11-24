@@ -109,16 +109,16 @@ func (r *notificationRepository) GetByEventTypeAndChannel(ctx context.Context, e
 }
 
 // PreferenceRepository implementation
-func (r *notificationRepository) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *notificationRepository) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
 	query := `
-		SELECT id, user_id, channel_id, event_type, is_enabled, created_at, updated_at
+		SELECT id, user_id, channel_id, category::text, is_enabled, created_at, updated_at
 		FROM user_notification_preferences
-		WHERE user_id = $1::uuid AND channel_id = $2::uuid AND event_type = $3
+		WHERE user_id = $1::uuid AND channel_id = $2::uuid AND category = $3::notification_category
 		LIMIT 1
 	`
 	var p model.Preference
-	err := r.pool.QueryRow(ctx, query, userID, channelID, eventType).Scan(
-		&p.ID, &p.UserID, &p.ChannelID, &p.EventType, &p.IsEnabled, &p.CreatedAt, &p.UpdatedAt,
+	err := r.pool.QueryRow(ctx, query, userID, channelID, category).Scan(
+		&p.ID, &p.UserID, &p.ChannelID, &p.Category, &p.IsEnabled, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -129,14 +129,40 @@ func (r *notificationRepository) GetPreference(ctx context.Context, userID, chan
 	return &p, nil
 }
 
+func (r *notificationRepository) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	query := `
+		SELECT p.id, p.user_id, c.code, p.category::text, p.is_enabled, p.created_at, p.updated_at
+		FROM user_notification_preferences p
+		JOIN notification_channels c ON c.id = p.channel_id
+		WHERE p.user_id = $1::uuid
+		ORDER BY p.created_at ASC
+	`
+
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list user preferences: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*model.Preference
+	for rows.Next() {
+		var p model.Preference
+		if err := rows.Scan(&p.ID, &p.UserID, &p.ChannelID, &p.Category, &p.IsEnabled, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan user preference: %w", err)
+		}
+		result = append(result, &p)
+	}
+	return result, nil
+}
+
 func (r *notificationRepository) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	query := `
-		INSERT INTO user_notification_preferences (user_id, channel_id, event_type, is_enabled, updated_at)
-		VALUES ($1::uuid, $2::uuid, $3, $4, NOW())
-		ON CONFLICT (user_id, channel_id, event_type)
+		INSERT INTO user_notification_preferences (user_id, channel_id, category, is_enabled, updated_at)
+		VALUES ($1::uuid, $2::uuid, $3::notification_category, $4, NOW())
+		ON CONFLICT (user_id, channel_id, category)
 		DO UPDATE SET is_enabled = EXCLUDED.is_enabled, updated_at = NOW()
 	`
-	_, err := r.pool.Exec(ctx, query, pref.UserID, pref.ChannelID, pref.EventType, pref.IsEnabled)
+	_, err := r.pool.Exec(ctx, query, pref.UserID, pref.ChannelID, pref.Category, pref.IsEnabled)
 	if err != nil {
 		return fmt.Errorf("failed to upsert preference: %w", err)
 	}
