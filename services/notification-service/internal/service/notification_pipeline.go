@@ -173,6 +173,7 @@ func IsPushSupportedEvent(eventType string) bool {
 	clean := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(eventType), ".", ""), "_", ""))
 	switch clean {
 	case "ordercreated", "orderplaced",
+		"orderpaymentconfirmed",
 		"orderconfirmed",
 		"ordershipped",
 		"orderdelivered",
@@ -589,6 +590,34 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["Headline"] = "Your Order is Confirmed!"
 		res.templateData["Message"] = "Your order and payment have been confirmed and the store is preparing your items."
 		res.pushMeta["order_id"] = payload.OrderID
+
+	case events.EventTypeOrderPaymentConfirmed, "order.payment_confirmed", "order_payment_confirmed":
+		var payload events.OrderPaymentConfirmedEvent
+		if err := envelope.UnmarshalData(&payload); err != nil {
+			s.logger.WarnContext(ctx, "malformed OrderPaymentConfirmedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
+			return nil, false, appErrors.BadRequest("malformed OrderPaymentConfirmedEvent payload")
+		}
+		merchantOrUserID := firstNonEmpty(payload.StoreID, payload.UserID)
+		res.userID = merchantOrUserID
+		res.recipient = merchantOrUserID
+		res.orderID = payload.OrderID
+		res.templateData["OrderID"] = payload.OrderID
+		res.templateData["OrderNumber"] = payload.OrderNumber
+		res.templateData["UserID"] = payload.UserID
+		res.templateData["StoreID"] = payload.StoreID
+		res.templateData["TotalAmount"] = payload.TotalAmount
+		res.templateData["Currency"] = payload.Currency
+		res.templateData["PaymentStatus"] = payload.PaymentStatus
+		res.templateData["PaidAt"] = payload.PaidAt
+		res.templateData["Headline"] = "Payment Successful - Order Confirmation Required"
+		res.templateData["Message"] = "Payment has been received successfully for order #" + firstNonEmpty(payload.OrderNumber, payload.OrderID) + ". Please review and confirm the order."
+		res.pushMeta["order_id"] = payload.OrderID
+		if payload.OrderNumber != "" {
+			res.pushMeta["order_number"] = payload.OrderNumber
+		}
+		if payload.StoreID != "" {
+			res.pushMeta["store_id"] = payload.StoreID
+		}
 
 	case events.EventTypeOrderCancelled, "order.cancelled", "order.canceled", "order_cancelled", "order_canceled", "OrderCanceled":
 		var payload events.OrderCancelledEvent

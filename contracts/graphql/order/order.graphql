@@ -63,5 +63,6 @@ extend type Mutation {
   createOrder(input: CreateOrderInput!): Order @auth
   checkout(input: CreateOrderInput!): Order @auth
   cancelOrder(id: ID!, reason: String): Order @auth
+  confirmOrder(id: ID!): Order @auth(requires: [ADMIN, MERCHANT])
   updateOrderStatus(id: ID!, status: String!): Order @auth(requires: [ADMIN, MERCHANT])
 }

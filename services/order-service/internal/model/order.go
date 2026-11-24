@@ -135,6 +135,17 @@ func CanCancel(current OrderStatus) bool {
 	}
 }
 
+func CanMerchantCancel(current OrderStatus) bool {
+	switch current {
+	case OrderStatusCreated,
+		OrderStatusPendingPayment,
+		OrderStatusPaid:
+		return true
+	default:
+		return false
+	}
+}
+
 type OrderStatusHistory struct {
 	ID         string       `json:"id" db:"id"`
 	OrderID    string       `json:"order_id" db:"order_id"`

@@ -199,7 +199,7 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 
 	userCtx := getAuthUser(ctx)
 	if userCtx != nil && (strings.EqualFold(userCtx.Role, "ADMIN") || userCtx.Role == auth.RoleAdmin) {
-		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the user who placed the order can cancel")
+		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the customer who placed the order or the merchant can cancel")
 	}
 
 	var reasonStr string
@@ -225,6 +225,26 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
 	r.notifyOrderCancelled(ctx, ord, reasonStr)
+	return ord, nil
+}
+
+// ConfirmOrder is the resolver for the confirmOrder field.
+func (r *mutationResolver) ConfirmOrder(ctx context.Context, id string) (*model.Order, error) {
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+		Id:     id,
+		Status: "CONFIRMED",
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderStatusUpdated(ctx, ord, "CONFIRMED")
 	return ord, nil
 }
 

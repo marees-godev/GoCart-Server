@@ -175,6 +175,7 @@ func main() {
 			events.TopicMerchantSuspended,
 			events.TopicOrderCreated,
 			events.TopicOrderConfirmed,
+			events.TopicOrderPaymentConfirmed,
 			events.TopicOrderShipped,
 			events.TopicOrderDelivered,
 			events.TopicOrderCancelled,
@@ -288,6 +289,8 @@ func topicForEventType(eventType string) string {
 		return events.TopicOrderCreated
 	case events.EventTypeOrderConfirmed:
 		return events.TopicOrderConfirmed
+	case events.EventTypeOrderPaymentConfirmed:
+		return events.TopicOrderPaymentConfirmed
 	case events.EventTypeOrderShipped:
 		return events.TopicOrderShipped
 	case events.EventTypeOrderDelivered:

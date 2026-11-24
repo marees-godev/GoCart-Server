@@ -469,6 +469,12 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			return appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", currentStatus, status))
 		}
 
+		if status == model.OrderStatusConfirmed {
+			if paymentStatus != model.PaymentStatusPaid {
+				return appErrors.FailedPrecondition(fmt.Sprintf("cannot confirm order: payment status must be PAID (current payment status: %s)", paymentStatus))
+			}
+		}
+
 		newPaymentStatus := paymentStatus
 		switch status {
 		case model.OrderStatusPaid, model.OrderStatusConfirmed:

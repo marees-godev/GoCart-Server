@@ -295,6 +295,18 @@ type ShippingAddressPayload struct {
 	ContactNumber string `json:"contact_number"`
 }
 
+// OrderPaymentConfirmedEvent represents the payload for OrderPaymentConfirmed domain event.
+type OrderPaymentConfirmedEvent struct {
+	OrderID       string    `json:"order_id"`
+	OrderNumber   string    `json:"order_number,omitempty"`
+	UserID        string    `json:"user_id,omitempty"`
+	StoreID       string    `json:"store_id,omitempty"`
+	TotalAmount   float64   `json:"total_amount,omitempty"`
+	Currency      string    `json:"currency,omitempty"`
+	PaymentStatus string    `json:"payment_status,omitempty"`
+	PaidAt        time.Time `json:"paid_at"`
+}
+
 // OrderConfirmedEvent represents the payload for OrderConfirmed domain event.
 type OrderConfirmedEvent struct {
 	OrderID           string                  `json:"order_id"`
