@@ -97,28 +97,38 @@ func main() {
 		}
 	}
 
-	// 5. Initialize Kafka producer
-	producer := kafka.NewProducer(kafka.Config{
-		Brokers:        cfg.Kafka.Brokers,
-		ClientID:       cfg.Kafka.ClientID,
-		ConnectTimeout: 10 * time.Second,
-		MaxRetries:     cfg.Outbox.MaxRetries,
-		RetryInterval:  500 * time.Millisecond,
-	})
-	defer func() {
-		if err := producer.Close(); err != nil {
-			log.Error("Failed to close Kafka producer", "error", err)
-		}
-	}()
-
-	// 6. Start the outbox publisher as a background goroutine.
+	// 5. Initialize Kafka producer and outbox publisher if enabled
 	outboxStore := outbox.NewStore()
-	outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
-		PollInterval: cfg.Outbox.PollInterval,
-		BatchSize:    cfg.Outbox.BatchSize,
-		MaxRetries:   cfg.Outbox.MaxRetries,
-	})
-	go outboxPublisher.Start(ctx)
+	var producer *kafka.Producer
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		producer = kafka.NewProducer(kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       cfg.Kafka.ClientID,
+			ConnectTimeout: 10 * time.Second,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			RetryInterval:  500 * time.Millisecond,
+		})
+		defer func() {
+			if err := producer.Close(); err != nil {
+				log.Error("Failed to close Kafka producer", "error", err)
+			}
+		}()
+
+		// 6. Start the outbox publisher as a background goroutine.
+		if cfg.Outbox.Enabled {
+			outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
+				PollInterval: cfg.Outbox.PollInterval,
+				BatchSize:    cfg.Outbox.BatchSize,
+				MaxRetries:   cfg.Outbox.MaxRetries,
+			})
+			go outboxPublisher.Start(ctx)
+		}
+	} else {
+		log.Info("Kafka or Outbox publisher disabled via configuration; order events will remain safely in the outbox table",
+			"kafka_enabled", cfg.Kafka.Enabled,
+			"outbox_enabled", cfg.Outbox.Enabled,
+		)
+	}
 
 	// 7. Initialize downstream service clients
 	var cartClient client.CartClient
@@ -163,7 +173,7 @@ func main() {
 	orderGRPCHandler := handler.NewOrderGRPCHandler(orderService, log)
 
 	// 8b. Start Kafka event consumer for order lifecycle events (PaymentSuccessful, PaymentFailed)
-	if len(cfg.Kafka.Brokers) > 0 {
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && producer != nil {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "order-service-group",
 			Topics: []string{
