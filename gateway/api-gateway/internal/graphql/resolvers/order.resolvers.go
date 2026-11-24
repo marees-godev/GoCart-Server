@@ -12,6 +12,7 @@ import (
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -293,7 +294,22 @@ func (r *queryResolver) GetOrder(ctx context.Context, id string) (*model.Order, 
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	protoOrder := resp.GetOrder()
+	if protoOrder != nil && (protoOrder.GetPaymentStatus() == "PENDING" || protoOrder.GetPaymentStatus() == "") {
+		if r.ClientMgr != nil && r.ClientMgr.PaymentClient != nil {
+			pResp, pErr := r.ClientMgr.PaymentClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: id})
+			if pErr == nil && pResp != nil && pResp.Payment != nil && (strings.EqualFold(pResp.Payment.Status, "SUCCESS") || strings.EqualFold(pResp.Payment.Status, "PAID")) {
+				if updResp, updErr := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+					Id:     id,
+					Status: "PAID",
+				}); updErr == nil && updResp != nil && updResp.GetOrder() != nil {
+					protoOrder = updResp.GetOrder()
+				}
+			}
+		}
+	}
+
+	return mapProtoOrderToGraphQL(protoOrder), nil
 }
 
 // ListMyOrders is the resolver for the listMyOrders field.
@@ -326,9 +342,21 @@ func (r *queryResolver) ListMyOrders(ctx context.Context, limit *int, offset *in
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	orders := make([]*model.Order, len(resp.GetOrders()))
-	for i, ord := range resp.GetOrders() {
-		orders[i] = mapProtoOrderToGraphQL(ord)
+	orders := make([]*model.Order, 0, len(resp.GetOrders()))
+	for _, ord := range resp.GetOrders() {
+		if ord != nil && (ord.GetPaymentStatus() == "PENDING" || ord.GetPaymentStatus() == "") {
+			if r.ClientMgr != nil && r.ClientMgr.PaymentClient != nil {
+				if pResp, pErr := r.ClientMgr.PaymentClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: ord.GetId()}); pErr == nil && pResp != nil && pResp.Payment != nil && (strings.EqualFold(pResp.Payment.Status, "SUCCESS") || strings.EqualFold(pResp.Payment.Status, "PAID")) {
+					if updResp, updErr := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+						Id:     ord.GetId(),
+						Status: "PAID",
+					}); updErr == nil && updResp != nil && updResp.GetOrder() != nil {
+						ord = updResp.GetOrder()
+					}
+				}
+			}
+		}
+		orders = append(orders, mapProtoOrderToGraphQL(ord))
 	}
 
 	return &model.OrderList{
@@ -372,9 +400,21 @@ func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, o
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	orders := make([]*model.Order, len(resp.GetOrders()))
-	for i, ord := range resp.GetOrders() {
-		orders[i] = mapProtoOrderToGraphQL(ord)
+	orders := make([]*model.Order, 0, len(resp.GetOrders()))
+	for _, ord := range resp.GetOrders() {
+		if ord != nil && (ord.GetPaymentStatus() == "PENDING" || ord.GetPaymentStatus() == "") {
+			if r.ClientMgr != nil && r.ClientMgr.PaymentClient != nil {
+				if pResp, pErr := r.ClientMgr.PaymentClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: ord.GetId()}); pErr == nil && pResp != nil && pResp.Payment != nil && (strings.EqualFold(pResp.Payment.Status, "SUCCESS") || strings.EqualFold(pResp.Payment.Status, "PAID")) {
+					if updResp, updErr := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+						Id:     ord.GetId(),
+						Status: "PAID",
+					}); updErr == nil && updResp != nil && updResp.GetOrder() != nil {
+						ord = updResp.GetOrder()
+					}
+				}
+			}
+		}
+		orders = append(orders, mapProtoOrderToGraphQL(ord))
 	}
 
 	return &model.OrderList{

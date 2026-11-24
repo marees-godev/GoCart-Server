@@ -368,6 +368,13 @@ func (m *mockOrderClient) GetOrder(ctx context.Context, orderID string) (*client
 	return ord, nil
 }
 
+func (m *mockOrderClient) UpdateOrderStatus(ctx context.Context, orderID string, status string) error {
+	if ord, ok := m.orders[orderID]; ok {
+		ord.Status = status
+	}
+	return nil
+}
+
 // --- Unit Tests ---
 
 func TestProcessPayment_AuthoritativeAmountEnforced(t *testing.T) {

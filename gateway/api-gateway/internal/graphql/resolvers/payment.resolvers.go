@@ -6,7 +6,9 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 
+	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
 	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -48,6 +50,15 @@ func (r *mutationResolver) ProcessPayment(ctx context.Context, input model.Proce
 	resp, err := r.ClientMgr.PaymentClient.ProcessPayment(ctx, req)
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	if resp != nil && resp.Payment != nil && (strings.EqualFold(resp.Payment.Status, "SUCCESS") || strings.EqualFold(resp.Payment.Status, "PAID")) {
+		if r.ClientMgr != nil && r.ClientMgr.OrderClient != nil {
+			_, _ = r.ClientMgr.OrderClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+				Id:     input.OrderID,
+				Status: "PAID",
+			})
+		}
 	}
 
 	return maps.MapPayment(resp.Payment), nil

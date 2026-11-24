@@ -232,6 +232,15 @@ func (m *mockOrderClient) GetOrder(ctx context.Context, orderID string) (*client
 	}, nil
 }
 
+func (m *mockOrderClient) UpdateOrderStatus(ctx context.Context, orderID string, status string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ord, ok := m.orders[orderID]; ok {
+		ord.Status = status
+	}
+	return nil
+}
+
 func setupConsumerTestWithGateway() (*consumer.PaymentEventConsumer, *mockPaymentRepo, *gateway.MockGateway, *mockOrderClient) {
 	repo := newMockPaymentRepo()
 	gw := gateway.NewMockGateway(10 * time.Millisecond)

@@ -205,6 +205,12 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 			return nil, err
 		}
 		slog.InfoContext(ctx, "payment successfully processed in service", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
+
+		if s.orderClient != nil {
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAID"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to synchronously update order status to PAID in order-service", "order_id", payment.OrderID, "error", ordErr)
+			}
+		}
 		return updated, nil
 	}
 
@@ -695,6 +701,12 @@ func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event 
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to update payment status to SUCCESS via webhook", "payment_id", payment.ID, "error", err)
 		return err
+	}
+
+	if s.orderClient != nil {
+		if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAID"); ordErr != nil {
+			slog.WarnContext(ctx, "failed to synchronously update order status to PAID via webhook in order-service", "order_id", payment.OrderID, "error", ordErr)
+		}
 	}
 
 	slog.InfoContext(ctx, "payment status updated to SUCCESS via razorpay webhook", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID, "payment_method", updated.PaymentMethod)

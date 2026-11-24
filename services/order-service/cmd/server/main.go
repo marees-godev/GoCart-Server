@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -98,6 +99,11 @@ func main() {
 	}
 
 	// 5. Initialize Kafka producer and outbox publisher if enabled
+	if strings.EqualFold(cfg.App.Environment, "production") && isLocalhostBrokers(cfg.Kafka.Brokers) && os.Getenv("KAFKA_BROKERS") == "" {
+		log.Warn("Kafka disabled: in production environment, KAFKA_BROKERS is unset or defaulting to localhost:9092 where no broker exists. To enable, configure KAFKA_BROKERS with a valid remote broker address.")
+		cfg.Kafka.Enabled = false
+	}
+
 	outboxStore := outbox.NewStore()
 	var producer *kafka.Producer
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
@@ -270,4 +276,18 @@ func main() {
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
+}
+
+func isLocalhostBrokers(brokers []string) bool {
+	for _, b := range brokers {
+		trimmed := strings.TrimSpace(b)
+		host, _, err := net.SplitHostPort(trimmed)
+		if err != nil {
+			host = trimmed
+		}
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
+			return true
+		}
+	}
+	return false
 }

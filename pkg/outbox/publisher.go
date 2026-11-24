@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -162,8 +163,11 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 				"error", err,
 			)
 
-			// If max retries exceeded, route to DLQ
-			if evt.RetryCount+1 >= p.cfg.MaxRetries {
+			connErr := isConnectionError(err)
+
+			// If max retries exceeded and broker connection is alive, route to DLQ.
+			// If broker is completely unreachable (connection refused/down), avoid hammering DLQ on the dead broker.
+			if evt.RetryCount+1 >= p.cfg.MaxRetries && !connErr {
 				dlqTopic := p.cfg.DLQTopic
 				if dlqTopic == "" && evt.Topic != "" {
 					dlqTopic = evt.Topic + ".dlq"
@@ -182,6 +186,11 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 
 			if mErr := p.store.MarkFailedWithBackoff(ctx, tx, evt.ID, p.cfg.MaxRetries, delay); mErr != nil {
 				slog.Error("outbox: could not mark event failed with backoff", "event_id", evt.ID, "error", mErr)
+			}
+
+			// If the broker is unreachable, stop attempting remaining events in this batch to prevent hammering.
+			if connErr {
+				break
 			}
 			continue
 		}
@@ -202,4 +211,15 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 	}
 
 	return tx.Commit(ctx)
+}
+
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "connection refused") ||
+		strings.Contains(s, "no such host") ||
+		strings.Contains(s, "network is unreachable") ||
+		strings.Contains(s, "i/o timeout")
 }
