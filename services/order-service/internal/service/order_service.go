@@ -167,6 +167,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	}
 
 	storeMap := make(map[string][]enrichedItem)
+	var storeOrder []string
 
 	for i := range rawItems {
 		item := &rawItems[i]
@@ -276,6 +277,9 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		itemDiscount := 0.00
 		itemTotal := math.Round((itemSubtotal+itemTax-itemDiscount)*100) / 100
 
+		if _, exists := storeMap[storeID]; !exists {
+			storeOrder = append(storeOrder, storeID)
+		}
 		storeMap[storeID] = append(storeMap[storeID], enrichedItem{
 			productID:   item.ProductID,
 			storeID:     storeID,
@@ -358,7 +362,8 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 	firstStore := true
 	idempKeyFirst := true
-	for storeID, items := range storeMap {
+	for _, storeID := range storeOrder {
+		items := storeMap[storeID]
 		storeShippingFee := baseStoreShippingFee
 		if needsShippingCalculation {
 			if overallSubtotal >= 500.0 {

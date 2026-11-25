@@ -439,7 +439,7 @@ func TestOrderIntegration_EndToEnd_CheckoutValidationAndSplitting(t *testing.T) 
 		}
 	}
 
-	// Verify store 1 order: 2 * 30.00 = 60.00 subtotal, 10% tax = 6.00, shipping = 5.00 -> total = 71.00
+	// Verify store 1 order: 2 * 30.00 = 60.00 subtotal, 10% tax = 6.00, shipping = 5.00, platform fee = 7.00 -> total = 78.00
 	var order1, order2 *orderpb.Order
 	for _, o := range resp.GetOrders() {
 		if o.GetStoreId() == store1 {
