@@ -693,6 +693,8 @@ type Order struct {
 	OrderNumber       *string      `json:"orderNumber,omitempty"`
 	CreatedAt         *string      `json:"createdAt,omitempty"`
 	UpdatedAt         *string      `json:"updatedAt,omitempty"`
+	CanCancel         *bool        `json:"canCancel,omitempty"`
+	MerchantCanCancel *bool        `json:"merchantCanCancel,omitempty"`
 }
 
 type OrderItem struct {

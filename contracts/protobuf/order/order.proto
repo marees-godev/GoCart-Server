@@ -47,6 +47,8 @@ message Order {
   string updated_at = 19;
   string order_number = 20;
   double platform_fee = 21;
+  bool can_cancel = 22;
+  bool merchant_can_cancel = 23;
 }
 
 message CreateOrderRequest {

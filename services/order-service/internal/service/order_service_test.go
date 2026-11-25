@@ -1798,4 +1798,14 @@ func TestOrderService_MerchantConfirmationAndCancellationLifecycle(t *testing.T)
 	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
 		t.Fatalf("expected FAILED_PRECONDITION for post-confirmation cancellation, got %v", err)
 	}
+
+	// 5. Merchant CANNOT cancel order if it is unpaid/pending (merchants can only cancel paid orders before confirmation)
+	_, err = svc.CancelOrder(merchantCtx, unpaidOrderID, merchantID, "Merchant wants to cancel unpaid order")
+	if err == nil {
+		t.Fatalf("expected merchant cancellation of unpaid order to fail")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION for unpaid order cancellation by merchant, got %v", err)
+	}
 }

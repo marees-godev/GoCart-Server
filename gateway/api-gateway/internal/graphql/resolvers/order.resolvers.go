@@ -212,6 +212,19 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the customer who placed the order or the merchant can cancel")
 	}
 
+	if userCtx != nil && (strings.EqualFold(userCtx.Role, "MERCHANT") || userCtx.Role == auth.RoleMerchant) {
+		ordResp, ordErr := client.GetOrder(ctx, &orderpb.GetOrderRequest{Id: id})
+		if ordErr == nil && ordResp != nil && ordResp.GetOrder() != nil {
+			ord := ordResp.GetOrder()
+			if strings.EqualFold(ord.GetStatus(), "CONFIRMED") {
+				return nil, appErrors.FailedPrecondition("cannot cancel or reject order: confirmed orders cannot be cancelled by the merchant")
+			}
+			if !strings.EqualFold(ord.GetPaymentStatus(), "PAID") && !strings.EqualFold(ord.GetStatus(), "PAID") {
+				return nil, appErrors.FailedPrecondition("cannot cancel order: merchants are allowed to cancel paid orders only before confirming them")
+			}
+		}
+	}
+
 	var reasonStr string
 	if reason != nil {
 		reasonStr = *reason
@@ -536,6 +549,22 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 	shippingFee := o.GetShippingFee()
 	discountAmount := o.GetDiscountAmount()
 
+	st := strings.ToUpper(strings.TrimSpace(o.GetStatus()))
+	ps := strings.ToUpper(strings.TrimSpace(o.GetPaymentStatus()))
+
+	canCancel := o.GetCanCancel()
+	if !canCancel && (st == "CREATED" || st == "PENDING_PAYMENT" || st == "PAID" || st == "CONFIRMED" || st == "PROCESSING") {
+		canCancel = true
+	}
+
+	merchantCanCancel := o.GetMerchantCanCancel()
+	if (ps == "PAID" || st == "PAID") && st != "CONFIRMED" && st != "PROCESSING" && st != "SHIPPED" && st != "OUT_FOR_DELIVERY" && st != "DELIVERED" && st != "CANCELLED" {
+		merchantCanCancel = true
+	}
+	if st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "CANCELLED" {
+		merchantCanCancel = false
+	}
+
 	return &model.Order{
 		ID:                o.GetId(),
 		UserID:            o.GetUserId(),
@@ -558,5 +587,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		OrderNumber:       orderNumber,
 		CreatedAt:         caPtr,
 		UpdatedAt:         uaPtr,
+		CanCancel:         &canCancel,
+		MerchantCanCancel: &merchantCanCancel,
 	}
 }

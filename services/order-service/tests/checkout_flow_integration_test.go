@@ -163,7 +163,6 @@ func TestCheckoutFlow_PaymentSuccessful_EndToEnd(t *testing.T) {
 	// Verify OrderPaymentConfirmed outbox event was generated
 	repo.mu.RLock()
 	var orderPaymentConfirmedEnv *events.EventEnvelope
-	outboxCountBeforeDup := len(repo.outbox)
 	for _, env := range repo.outbox {
 		if env.EventType == events.EventTypeOrderPaymentConfirmed {
 			orderPaymentConfirmedEnv = env
@@ -193,7 +192,7 @@ func TestCheckoutFlow_PaymentSuccessful_EndToEnd(t *testing.T) {
 
 	// 4. Test Idempotency: duplicate PaymentSuccessful event
 	repo.mu.RLock()
-	outboxCountBeforeDup = len(repo.outbox)
+	outboxCountBeforeDup := len(repo.outbox)
 	repo.mu.RUnlock()
 
 	if err := orderConsumer.HandleEvent(ctx, paySuccessEnv); err != nil {

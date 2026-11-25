@@ -969,13 +969,16 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 		return nil, appErrors.Forbidden("admins do not have permission to cancel orders; only the customer who placed the order or the merchant can cancel")
 	}
 
-	if callerRole == "MERCHANT" {
+	if callerRole == "MERCHANT" || callerRole == auth.RoleMerchant {
 		// Merchant cancellation rules:
 		// 1. Once order transitions to CONFIRMED (or beyond), merchant has NO permission to cancel/reject.
-		if !model.CanMerchantCancel(order.Status) {
+		if order.Status == model.OrderStatusConfirmed || !model.CanMerchantCancel(order.Status) {
 			return nil, appErrors.FailedPrecondition("cannot cancel or reject order: confirmed orders cannot be cancelled by the merchant")
 		}
-		// 2. Before confirmation: Merchant is allowed to cancel the order.
+		// 2. Before confirmation: Merchant is allowed to cancel paid orders only.
+		if !model.CanMerchantCancelOrder(order.Status, order.PaymentStatus) {
+			return nil, appErrors.FailedPrecondition("cannot cancel order: merchants are allowed to cancel paid orders only before confirming them")
+		}
 	} else {
 		if callerUserID == "" || order.UserID != callerUserID {
 			return nil, appErrors.Forbidden("you do not have permission to cancel this order")

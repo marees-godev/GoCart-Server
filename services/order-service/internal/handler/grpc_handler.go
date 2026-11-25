@@ -200,5 +200,7 @@ func mapModelToProtoOrder(o *model.Order) *orderpb.Order {
 		Items:             protoItems,
 		CreatedAt:         o.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:         o.UpdatedAt.Format(time.RFC3339),
+		CanCancel:         model.CanCancel(o.Status),
+		MerchantCanCancel: model.CanMerchantCancelOrder(o.Status, o.PaymentStatus),
 	}
 }

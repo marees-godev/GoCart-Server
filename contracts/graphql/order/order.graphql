@@ -33,6 +33,8 @@ type Order {
   orderNumber: String
   createdAt: String
   updatedAt: String
+  canCancel: Boolean
+  merchantCanCancel: Boolean
 }
 
 type OrderList {

@@ -567,3 +567,112 @@ func TestOrderResolvers_SendNotificationOnCreateCancelUpdate(t *testing.T) {
 	}
 	mockNotif.mu.Unlock()
 }
+
+func TestMerchantCancelOrder_Restrictions(t *testing.T) {
+	merchantID := "merchant-test-1"
+	customerID := "customer-test-1"
+	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: merchantID,
+		Role:   "MERCHANT",
+	})
+
+	mockOrder := &mockOrderServiceClient{
+		getResp: &orderpb.GetOrderResponse{
+			Order: &orderpb.Order{
+				Id:            "ord-conf-1",
+				UserId:        customerID,
+				Status:        "CONFIRMED",
+				PaymentStatus: "PAID",
+			},
+		},
+		cancelResp: &orderpb.CancelOrderResponse{
+			Order: &orderpb.Order{
+				Id:            "ord-conf-1",
+				UserId:        customerID,
+				Status:        "CANCELLED",
+				PaymentStatus: "PAID",
+			},
+		},
+	}
+
+	clients := &grpc.Clients{
+		OrderClient: mockOrder,
+	}
+	r := NewResolver(clients, "1.0.0")
+	mut := r.Mutation()
+
+	// 1. Merchant CANNOT cancel an already confirmed order (fails with FAILED_PRECONDITION)
+	reason := "Cannot fulfill"
+	_, err := mut.CancelOrder(merchantCtx, "ord-conf-1", &reason)
+	if err == nil {
+		t.Fatalf("expected cancelling confirmed order by merchant to fail")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION, got %v", err)
+	}
+
+	// 2. Merchant CANNOT cancel an unpaid order
+	mockOrder.getResp = &orderpb.GetOrderResponse{
+		Order: &orderpb.Order{
+			Id:            "ord-unpaid-1",
+			UserId:        customerID,
+			Status:        "PENDING_PAYMENT",
+			PaymentStatus: "PENDING",
+		},
+	}
+	_, err = mut.CancelOrder(merchantCtx, "ord-unpaid-1", &reason)
+	if err == nil {
+		t.Fatalf("expected cancelling unpaid order by merchant to fail")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION, got %v", err)
+	}
+
+	// 3. Merchant CAN cancel a paid order before confirmation
+	mockOrder.getResp = &orderpb.GetOrderResponse{
+		Order: &orderpb.Order{
+			Id:            "ord-paid-1",
+			UserId:        customerID,
+			Status:        "PAID",
+			PaymentStatus: "PAID",
+		},
+	}
+	mockOrder.cancelResp = &orderpb.CancelOrderResponse{
+		Order: &orderpb.Order{
+			Id:            "ord-paid-1",
+			UserId:        customerID,
+			Status:        "CANCELLED",
+			PaymentStatus: "PAID",
+		},
+	}
+	res, err := mut.CancelOrder(merchantCtx, "ord-paid-1", &reason)
+	if err != nil {
+		t.Fatalf("expected merchant cancellation of paid order to succeed, got %v", err)
+	}
+	if res.Status != "CANCELLED" {
+		t.Errorf("expected CANCELLED, got %s", res.Status)
+	}
+
+	// 4. Verify canCancel and merchantCanCancel flags in mapProtoOrderToGraphQL
+	confirmedProto := &orderpb.Order{
+		Id:            "ord-1",
+		Status:        "CONFIRMED",
+		PaymentStatus: "PAID",
+	}
+	mapped := mapProtoOrderToGraphQL(confirmedProto)
+	if mapped.MerchantCanCancel == nil || *mapped.MerchantCanCancel != false {
+		t.Errorf("expected MerchantCanCancel to be false for CONFIRMED order, got %v", mapped.MerchantCanCancel)
+	}
+
+	paidProto := &orderpb.Order{
+		Id:            "ord-2",
+		Status:        "PAID",
+		PaymentStatus: "PAID",
+	}
+	mappedPaid := mapProtoOrderToGraphQL(paidProto)
+	if mappedPaid.MerchantCanCancel == nil || *mappedPaid.MerchantCanCancel != true {
+		t.Errorf("expected MerchantCanCancel to be true for PAID unconfirmed order, got %v", mappedPaid.MerchantCanCancel)
+	}
+}

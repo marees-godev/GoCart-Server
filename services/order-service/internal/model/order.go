@@ -137,13 +137,23 @@ func CanCancel(current OrderStatus) bool {
 
 func CanMerchantCancel(current OrderStatus) bool {
 	switch current {
-	case OrderStatusCreated,
-		OrderStatusPendingPayment,
-		OrderStatusPaid:
+	case OrderStatusPaid:
 		return true
 	default:
 		return false
 	}
+}
+
+func CanMerchantCancelOrder(status OrderStatus, paymentStatus PaymentStatus) bool {
+	if status == OrderStatusConfirmed ||
+		status == OrderStatusProcessing ||
+		status == OrderStatusShipped ||
+		status == OrderStatusOutForDelivery ||
+		status == OrderStatusDelivered ||
+		status == OrderStatusCancelled {
+		return false
+	}
+	return paymentStatus == PaymentStatusPaid || status == OrderStatusPaid
 }
 
 type OrderStatusHistory struct {
