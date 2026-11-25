@@ -196,6 +196,8 @@ type CreateOrderInput struct {
 	Currency          *string  `json:"currency,omitempty"`
 	IdempotencyKey    *string  `json:"idempotencyKey,omitempty"`
 	DiscountAmount    *float64 `json:"discountAmount,omitempty"`
+	PlatformFee       *float64 `json:"platformFee,omitempty"`
+	ShippingFee       *float64 `json:"shippingFee,omitempty"`
 }
 
 type CreateProductInput struct {

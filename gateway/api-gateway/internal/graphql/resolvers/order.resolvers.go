@@ -160,6 +160,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	if input.ShippingFee != nil && *input.ShippingFee >= 0 {
+		shipFee = *input.ShippingFee
+	}
+
+	var platformFee float64 = 7.00
+	if input.PlatformFee != nil && *input.PlatformFee >= 0 {
+		platformFee = *input.PlatformFee
+	}
+
 	resp, err := client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:            userID,
 		CartId:            cartID,
@@ -170,7 +179,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		IdempotencyKey:    idempKey,
 		ShippingFee:       shipFee,
 		DiscountAmount:    discAmt,
-		PlatformFee:       7.00,
+		PlatformFee:       platformFee,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)

@@ -7450,6 +7450,8 @@ input CreateOrderInput {
   currency: String
   idempotencyKey: String
   discountAmount: Float
+  platformFee: Float
+  shippingFee: Float
 }
 
 extend type Query {
@@ -51053,7 +51055,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"deliveryPartnerId", "userId", "cartId", "shippingAddress", "shippingAddressId", "billingAddressId", "currency", "idempotencyKey", "discountAmount"}
+	fieldsInOrder := [...]string{"deliveryPartnerId", "userId", "cartId", "shippingAddress", "shippingAddressId", "billingAddressId", "currency", "idempotencyKey", "discountAmount", "platformFee", "shippingFee"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -51123,6 +51125,20 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.DiscountAmount = data
+		case "platformFee":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("platformFee"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PlatformFee = data
+		case "shippingFee":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("shippingFee"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ShippingFee = data
 		}
 	}
 

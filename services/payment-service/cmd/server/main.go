@@ -96,9 +96,29 @@ func main() {
 	}
 
 	// 5. Initialize Outbox Publisher background worker for Kafka event streaming
-	if strings.EqualFold(cfg.App.Environment, "production") && isLocalhostBrokers(cfg.Kafka.Brokers) && os.Getenv("KAFKA_BROKERS") == "" {
-		log.Warn("Kafka disabled: in production environment, KAFKA_BROKERS is unset or defaulting to localhost:9092 where no broker exists. To enable, configure KAFKA_BROKERS with a valid remote broker address (e.g. Upstash, Confluent, or internal service URL).")
+	if strings.EqualFold(cfg.App.Environment, "production") && isLocalhostBrokers(cfg.Kafka.Brokers) {
+		log.Warn("Kafka disabled: in production environment, KAFKA_BROKERS is pointing to localhost:9092 where no broker exists. To enable, configure KAFKA_BROKERS with a valid remote broker address (e.g. Upstash, Confluent, or internal service URL).")
 		cfg.Kafka.Enabled = false
+		cfg.Outbox.Enabled = false
+	}
+
+	// 5b. Probe broker connectivity before starting Kafka producer and outbox publisher
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		probeCtx, probeCancel := context.WithTimeout(ctx, 2*time.Second)
+		healthRes := kafka.CheckHealth(probeCtx, kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ConnectTimeout: 2 * time.Second,
+		})
+		probeCancel()
+
+		if healthRes.Status != "UP" {
+			log.Warn("Kafka broker is unreachable at startup, disabling Kafka and outbox publisher",
+				"brokers", cfg.Kafka.Brokers,
+				"error", healthRes.Error,
+			)
+			cfg.Kafka.Enabled = false
+			cfg.Outbox.Enabled = false
+		}
 	}
 
 	var kafkaProducer *kafka.Producer

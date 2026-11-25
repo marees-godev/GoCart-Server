@@ -50,6 +50,8 @@ input CreateOrderInput {
   currency: String
   idempotencyKey: String
   discountAmount: Float
+  platformFee: Float
+  shippingFee: Float
 }
 
 extend type Query {

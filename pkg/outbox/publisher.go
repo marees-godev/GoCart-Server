@@ -154,16 +154,28 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 				}
 			}
 
-			slog.Error("outbox: publish failed, applying backoff",
-				"event_id", evt.ID,
-				"event_type", evt.EventType,
-				"topic", evt.Topic,
-				"retry_count", evt.RetryCount,
-				"next_retry_delay", delay,
-				"error", err,
-			)
-
 			connErr := isConnectionError(err)
+
+			if connErr {
+				if time.Since(p.lastErrLogged) > 30*time.Second {
+					p.lastErrLogged = time.Now()
+					slog.Warn("outbox: kafka broker unreachable, applying backoff and waiting for broker",
+						"event_id", evt.ID,
+						"topic", evt.Topic,
+						"next_retry_delay", delay,
+						"error", err,
+					)
+				}
+			} else {
+				slog.Error("outbox: publish failed, applying backoff",
+					"event_id", evt.ID,
+					"event_type", evt.EventType,
+					"topic", evt.Topic,
+					"retry_count", evt.RetryCount,
+					"next_retry_delay", delay,
+					"error", err,
+				)
+			}
 
 			// If max retries exceeded and broker connection is alive, route to DLQ.
 			// If broker is completely unreachable (connection refused/down), avoid hammering DLQ on the dead broker.
