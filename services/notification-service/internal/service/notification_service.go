@@ -184,26 +184,27 @@ func (s *notificationService) SendNotification(ctx context.Context, input dto.Se
 
 	if s.prefRepo != nil && eventType != "" {
 		if !isCriticalNotification(eventType) {
-			category := EventToCategory(eventType)
-			pref, prefErr := s.prefRepo.GetPreference(ctx, userID, channel.ID, category)
-			if prefErr != nil {
-				s.logger.WarnContext(ctx, "Failed to check push preference; proceeding with default allow",
-					"user_id", userID,
-					"event_type", eventType,
-					"category", category,
-					"error", prefErr,
-				)
-			} else if pref != nil && !pref.IsEnabled {
-				s.logger.InfoContext(ctx, "User opted out of PUSH notifications for category; history preserved without push",
-					"notification_id", notif.ID,
-					"user_id", userID,
-					"category", category,
-				)
-				return &dto.SendNotificationResult{
-					Notification: notif,
-					Success:      true,
-					Message:      "notification saved; user opted out of push delivery",
-				}, nil
+			if category, ok := EventToCategory(eventType); ok {
+				pref, prefErr := s.prefRepo.GetPreference(ctx, userID, channel.ID, category)
+				if prefErr != nil {
+					s.logger.WarnContext(ctx, "Failed to check push preference; proceeding with default allow",
+						"user_id", userID,
+						"event_type", eventType,
+						"category", category,
+						"error", prefErr,
+					)
+				} else if pref != nil && !pref.IsEnabled {
+					s.logger.InfoContext(ctx, "User opted out of PUSH notifications for category; history preserved without push",
+						"notification_id", notif.ID,
+						"user_id", userID,
+						"category", category,
+					)
+					return &dto.SendNotificationResult{
+						Notification: notif,
+						Success:      true,
+						Message:      "notification saved; user opted out of push delivery",
+					}, nil
+				}
 			}
 		}
 	}

@@ -88,23 +88,26 @@ func NormalizeEventType(eventType string) string {
 	}
 }
 
-func EventToCategory(eventType string) string {
+func EventToCategory(eventType string) (string, bool) {
 	switch NormalizeEventType(eventType) {
 	case "OrderCreated", "OrderConfirmed", "OrderShipped", "OrderDelivered", "OrderCancelled":
-		return CategoryOrders
+		return CategoryOrders, true
 	case "DeliveryCreated", "DeliveryStatusUpdated", "DeliveryStatusChanged":
-		return CategoryDeliveries
+		return CategoryDeliveries, true
 	case "ReturnApproved", "ReturnRejected", "RefundCompleted":
-		return CategoryReturns
+		return CategoryReturns, true
 	case "PaymentFailed", "OrderPaymentFailed", "PaymentSuccessful":
-		return CategoryPayments
+		return CategoryPayments, true
+	case "UserRegistered", "StoreApproved", "StoreRejected", "MerchantApproved", "MerchantActivated", "MerchantRejected", "MerchantSuspended":
+		return CategoryAccount, true
 	default:
-		return CategoryAccount
+		return "", false
 	}
 }
 
 func isCriticalNotification(eventType string) bool {
-	return EventToCategory(eventType) == CategoryPayments
+	cat, ok := EventToCategory(eventType)
+	return ok && cat == CategoryPayments
 }
 
 func (s *preferenceService) CheckPreferenceAndSelectChannel(
@@ -135,12 +138,18 @@ func (s *preferenceService) CheckPreferenceAndSelectChannel(
 		return channel, true, nil
 	}
 
+	cleanUID := strings.TrimSpace(userID)
+
 	if isCriticalNotification(eventType) {
 		return channel, true, nil
 	}
 
-	category := EventToCategory(eventType)
-	pref, err := s.preferenceRepo.GetPreference(ctx, userID, channel.ID, category)
+	category, ok := EventToCategory(eventType)
+	if !ok {
+		return channel, true, nil
+	}
+
+	pref, err := s.preferenceRepo.GetPreference(ctx, cleanUID, channel.ID, category)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to check preference: %w", err)
 	}
@@ -156,7 +165,7 @@ func (s *preferenceService) GetUserPreferences(ctx context.Context, userID strin
 	if _, err := uuid.Parse(cleanUID); err != nil {
 		return nil, appErrors.BadRequest("valid user_id is required")
 	}
-	return s.preferenceRepo.GetPreferencesByUserID(ctx, userID)
+	return s.preferenceRepo.GetPreferencesByUserID(ctx, cleanUID)
 }
 
 func (s *preferenceService) UpdateUserPreference(ctx context.Context, userID string, channelCode string, category string, isEnabled bool) (*model.Preference, error) {
