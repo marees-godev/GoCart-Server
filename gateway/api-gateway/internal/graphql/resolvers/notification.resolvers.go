@@ -190,6 +190,44 @@ func (r *mutationResolver) DeactivatePushSubscription(ctx context.Context, id *s
 	return resp.GetSuccess(), nil
 }
 
+// UpdateNotificationPreference is the resolver for the updateNotificationPreference field.
+func (r *mutationResolver) UpdateNotificationPreference(ctx context.Context, input model.UpdateNotificationPreferenceInput) (*model.NotificationPreference, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.UpdateUserPreference(ctx, &notificationpb.UpdateUserPreferenceRequest{
+		UserId:    authUserID,
+		Channel:   input.Channel,
+		Category:  string(input.Category),
+		IsEnabled: input.IsEnabled,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	pref := resp.GetPreference()
+	if pref == nil {
+		return &model.NotificationPreference{
+			Channel:   input.Channel,
+			Category:  input.Category,
+			IsEnabled: input.IsEnabled,
+		}, nil
+	}
+
+	return &model.NotificationPreference{
+		Channel:   pref.GetChannel(),
+		Category:  model.NotificationCategory(pref.GetCategory()),
+		IsEnabled: pref.GetIsEnabled(),
+	}, nil
+}
+
 // Notifications is the resolver for the notifications field.
 func (r *queryResolver) Notifications(ctx context.Context, userID *string, filter *model.NotificationFilterInput, limit *int, offset *int) (*model.NotificationList, error) {
 	client, err := r.getNotificationClient()
@@ -330,4 +368,35 @@ func (r *queryResolver) VapidPublicKey(ctx context.Context) (*model.VAPIDPublicK
 		PublicKey: resp.GetPublicKey(),
 		Subject:   resp.GetSubject(),
 	}, nil
+}
+
+// MyNotificationPreferences is the resolver for the myNotificationPreferences field.
+func (r *queryResolver) MyNotificationPreferences(ctx context.Context) ([]*model.NotificationPreference, error) {
+	client, err := r.getNotificationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	authUserID := getAuthUserIDFromCtx(ctx)
+	if authUserID == "" {
+		return nil, appErrors.Unauthorized("authentication required")
+	}
+
+	resp, err := client.GetUserPreferences(ctx, &notificationpb.GetUserPreferencesRequest{
+		UserId: authUserID,
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	items := make([]*model.NotificationPreference, 0, len(resp.GetPreferences()))
+	for _, p := range resp.GetPreferences() {
+		items = append(items, &model.NotificationPreference{
+			Channel:   p.GetChannel(),
+			Category:  model.NotificationCategory(p.GetCategory()),
+			IsEnabled: p.GetIsEnabled(),
+		})
+	}
+
+	return items, nil
 }

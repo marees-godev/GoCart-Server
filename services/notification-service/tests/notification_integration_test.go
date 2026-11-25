@@ -348,7 +348,10 @@ func (r *intMemRepo) GetByEventType(ctx context.Context, eventType string) (*mod
 func (r *intMemRepo) GetByEventTypeAndChannel(ctx context.Context, eventType, channelID string) (*model.Template, error) {
 	return nil, nil
 }
-func (r *intMemRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *intMemRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
+	return nil, nil
+}
+func (r *intMemRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
 	return nil, nil
 }
 func (r *intMemRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {

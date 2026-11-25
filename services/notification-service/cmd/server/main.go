@@ -132,7 +132,7 @@ func main() {
 	notifSvc := service.NewNotificationService(repo, repo, repo, repo, tmplSvc, pushClient, log, localNotifier)
 	pipelineSvc := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, repo, repo, notifSvc, orderLookup, log, userLookup)
 	eventConsumer := consumer.NewNotificationEventConsumer(pipelineSvc, log)
-	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc)
+	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc, prefSvc)
 
 	// 6. Start Asynchronous Notification Job Worker with Provider Registry
 	providerRegistry := provider.NewRegistryFromConfig(cfg.Providers, log)

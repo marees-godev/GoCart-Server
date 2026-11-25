@@ -112,19 +112,31 @@ func (r *memoryNotificationRepo) GetByEventTypeAndChannel(ctx context.Context, e
 	return tmpl, nil
 }
 
-func (r *memoryNotificationRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
+func (r *memoryNotificationRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	key := fmt.Sprintf("%s:%s:%s", userID, channelID, eventType)
+	key := fmt.Sprintf("%s:%s:%s", userID, channelID, category)
 	return r.preferences[key], nil
 }
 
 func (r *memoryNotificationRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	key := fmt.Sprintf("%s:%s:%s", pref.UserID, pref.ChannelID, pref.EventType)
+	key := fmt.Sprintf("%s:%s:%s", pref.UserID, pref.ChannelID, pref.Category)
 	r.preferences[key] = pref
 	return nil
+}
+
+func (r *memoryNotificationRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var res []*model.Preference
+	for _, p := range r.preferences {
+		if p.UserID == userID {
+			res = append(res, p)
+		}
+	}
+	return res, nil
 }
 
 func (r *memoryNotificationRepo) CreateJob(ctx context.Context, job *model.NotificationJob) error {
@@ -566,11 +578,11 @@ func TestNotificationConsumer_UserPreferenceOptOut(t *testing.T) {
 	userID := "usr-optout-123"
 	channel, _ := repo.GetByCode(ctx, "EMAIL")
 
-	// Set preference: user opted out of OrderCreated notifications
+	// Set preference: user opted out of ORDERS notifications
 	_ = repo.UpsertPreference(ctx, &model.Preference{
 		UserID:    userID,
 		ChannelID: channel.ID,
-		EventType: events.EventTypeOrderCreated,
+		Category:  service.CategoryOrders,
 		IsEnabled: false,
 	})
 

@@ -669,6 +669,12 @@ type NotificationList struct {
 	UnreadCount   int             `json:"unreadCount"`
 }
 
+type NotificationPreference struct {
+	Channel   string               `json:"channel"`
+	Category  NotificationCategory `json:"category"`
+	IsEnabled bool                 `json:"isEnabled"`
+}
+
 type Order struct {
 	ID                string       `json:"id"`
 	UserID            string       `json:"userId"`
@@ -1110,6 +1116,12 @@ type UpdateMerchantInput struct {
 	LastName      *string `json:"lastName,omitempty"`
 	BusinessPhone *string `json:"businessPhone,omitempty"`
 	PanCardNumber *string `json:"panCardNumber,omitempty"`
+}
+
+type UpdateNotificationPreferenceInput struct {
+	Channel   string               `json:"channel"`
+	Category  NotificationCategory `json:"category"`
+	IsEnabled bool                 `json:"isEnabled"`
 }
 
 type UpdateProductInput struct {
@@ -1592,6 +1604,51 @@ func (e *MerchantStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e MerchantStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type NotificationCategory string
+
+const (
+	NotificationCategoryOrders     NotificationCategory = "ORDERS"
+	NotificationCategoryDeliveries NotificationCategory = "DELIVERIES"
+	NotificationCategoryReturns    NotificationCategory = "RETURNS"
+	NotificationCategoryAccount    NotificationCategory = "ACCOUNT"
+)
+
+var AllNotificationCategory = []NotificationCategory{
+	NotificationCategoryOrders,
+	NotificationCategoryDeliveries,
+	NotificationCategoryReturns,
+	NotificationCategoryAccount,
+}
+
+func (e NotificationCategory) IsValid() bool {
+	switch e {
+	case NotificationCategoryOrders, NotificationCategoryDeliveries, NotificationCategoryReturns, NotificationCategoryAccount:
+		return true
+	}
+	return false
+}
+
+func (e NotificationCategory) String() string {
+	return string(e)
+}
+
+func (e *NotificationCategory) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = NotificationCategory(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid NotificationCategory", str)
+	}
+	return nil
+}
+
+func (e NotificationCategory) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

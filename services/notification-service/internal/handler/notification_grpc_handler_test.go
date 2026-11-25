@@ -64,12 +64,21 @@ func (r *memGRPCTestRepo) GetByCode(ctx context.Context, code string) (*model.Ch
 func (r *memGRPCTestRepo) GetByID(ctx context.Context, id string) (*model.Channel, error) {
 	return r.channels[id], nil
 }
-func (r *memGRPCTestRepo) GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error) {
-	return r.prefs[userID+":"+channelID+":"+eventType], nil
+func (r *memGRPCTestRepo) GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error) {
+	return r.prefs[userID+":"+channelID+":"+category], nil
 }
 func (r *memGRPCTestRepo) UpsertPreference(ctx context.Context, pref *model.Preference) error {
-	r.prefs[pref.UserID+":"+pref.ChannelID+":"+pref.EventType] = pref
+	r.prefs[pref.UserID+":"+pref.ChannelID+":"+pref.Category] = pref
 	return nil
+}
+func (r *memGRPCTestRepo) GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error) {
+	var res []*model.Preference
+	for _, p := range r.prefs {
+		if p.UserID == userID {
+			res = append(res, p)
+		}
+	}
+	return res, nil
 }
 func (r *memGRPCTestRepo) CreateNotification(ctx context.Context, n *model.Notification) error {
 	if n.ID == "" {
@@ -283,8 +292,9 @@ func TestNotificationGRPCHandler_AllRPCsAndAuthorization(t *testing.T) {
 		logger,
 	)
 	subSvc := service.NewPushSubscriptionService(repo, config.VAPIDConfig{PublicKey: pubVAPID, PrivateKey: privVAPID, Subject: "mailto:push@gocart.local"}, logger)
+	prefSvc := service.NewPreferenceService(repo, repo)
 	notifSvc := service.NewNotificationService(repo, repo, repo, repo, tmplSvc, pushClient, logger)
-	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc)
+	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc, prefSvc)
 
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcclient.UnaryServerInterceptor()))

@@ -44,7 +44,7 @@ func TestRecord_OrderAndDeliveryNotificationsPersistedAndRetrieved(t *testing.T)
 
 	notifSvc := service.NewNotificationService(memRepo, memRepo, memRepo, memRepo, tmplSvc, nil, logger)
 	subSvc := service.NewPushSubscriptionService(memRepo, vapidCfg, logger)
-	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc)
+	grpcHandler := handler.NewNotificationGRPCHandler(notifSvc, subSvc, prefSvc)
 
 	// gRPC in-memory listener
 	lis := bufconn.Listen(1024 * 1024)

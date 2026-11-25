@@ -18,15 +18,18 @@ type NotificationGRPCHandler struct {
 	notificationpb.UnimplementedNotificationServiceServer
 	notifSvc service.NotificationService
 	subSvc   service.PushSubscriptionService
+	prefSvc  service.PreferenceService
 }
 
 func NewNotificationGRPCHandler(
 	notifSvc service.NotificationService,
 	subSvc service.PushSubscriptionService,
+	prefSvc service.PreferenceService,
 ) *NotificationGRPCHandler {
 	return &NotificationGRPCHandler{
 		notifSvc: notifSvc,
 		subSvc:   subSvc,
+		prefSvc:  prefSvc,
 	}
 }
 
@@ -367,6 +370,60 @@ func (h *NotificationGRPCHandler) GetVAPIDPublicKey(
 	return &notificationpb.GetVAPIDPublicKeyResponse{
 		PublicKey: pubKey,
 		Subject:   subject,
+	}, nil
+}
+
+func (h *NotificationGRPCHandler) GetUserPreferences(ctx context.Context, req *notificationpb.GetUserPreferencesRequest) (*notificationpb.GetUserPreferencesResponse, error) {
+	if req == nil {
+		return nil, appErrors.ToGRPC(appErrors.BadRequest("request cannot be nil"))
+	}
+
+	userID, err := h.resolveAuthorizedUserID(ctx, req.GetUserId())
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	prefs, err := h.prefSvc.GetUserPreferences(ctx, userID)
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	items := make([]*notificationpb.PreferenceItem, 0, len(prefs))
+	for _, p := range prefs {
+		items = append(items, &notificationpb.PreferenceItem{
+			Channel:   p.ChannelID,
+			Category:  p.Category,
+			IsEnabled: p.IsEnabled,
+		})
+	}
+
+	return &notificationpb.GetUserPreferencesResponse{
+		Preferences: items,
+	}, nil
+}
+
+func (h *NotificationGRPCHandler) UpdateUserPreference(ctx context.Context, req *notificationpb.UpdateUserPreferenceRequest) (*notificationpb.UpdateUserPreferenceResponse, error) {
+	if req == nil {
+		return nil, appErrors.ToGRPC(appErrors.BadRequest("request cannot be nil"))
+	}
+
+	userID, err := h.resolveAuthorizedUserID(ctx, req.GetUserId())
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	pref, err := h.prefSvc.UpdateUserPreference(ctx, userID, req.GetChannel(), req.GetCategory(), req.GetIsEnabled())
+	if err != nil {
+		return nil, appErrors.ToGRPC(err)
+	}
+
+	return &notificationpb.UpdateUserPreferenceResponse{
+		Success: true,
+		Preference: &notificationpb.PreferenceItem{
+			Channel:   req.GetChannel(),
+			Category:  pref.Category,
+			IsEnabled: pref.IsEnabled,
+		},
 	}, nil
 }
 

@@ -17,7 +17,8 @@ type TemplateRepository interface {
 }
 
 type PreferenceRepository interface {
-	GetPreference(ctx context.Context, userID, channelID, eventType string) (*model.Preference, error)
+	GetPreference(ctx context.Context, userID, channelID, category string) (*model.Preference, error)
+	GetPreferencesByUserID(ctx context.Context, userID string) ([]*model.Preference, error)
 	UpsertPreference(ctx context.Context, pref *model.Preference) error
 }
 
