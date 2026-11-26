@@ -135,26 +135,26 @@ func TestOrderEventConsumer_PaymentSuccessful_ConfirmsOrder(t *testing.T) {
 	}
 
 	order := repo.orders[orderID]
-	if order.Status != model.OrderStatusConfirmed {
-		t.Errorf("expected order status CONFIRMED, got %s", order.Status)
+	if order.Status != model.OrderStatusPaid {
+		t.Errorf("expected order status PAID, got %s", order.Status)
 	}
 	if order.PaymentStatus != model.PaymentStatusPaid {
 		t.Errorf("expected payment status PAID, got %s", order.PaymentStatus)
 	}
 
-	// Verify outbox has OrderConfirmed event
+	// Verify outbox has OrderPaymentConfirmed event requesting merchant confirmation
 	if len(repo.outboxEnvelopes) != 1 {
 		t.Fatalf("expected 1 outbox envelope, got %d", len(repo.outboxEnvelopes))
 	}
 	outboxEnv := repo.outboxEnvelopes[0]
-	if outboxEnv.EventType != events.EventTypeOrderConfirmed {
-		t.Errorf("expected outbox event type OrderConfirmed, got %s", outboxEnv.EventType)
+	if outboxEnv.EventType != events.EventTypeOrderPaymentConfirmed {
+		t.Errorf("expected outbox event type OrderPaymentConfirmed, got %s", outboxEnv.EventType)
 	}
 	if outboxEnv.CorrelationID != "corr-test-123" {
 		t.Errorf("expected correlation ID corr-test-123, got %s", outboxEnv.CorrelationID)
 	}
-	if repo.outboxTopic != events.TopicOrderConfirmed {
-		t.Errorf("expected topic %s, got %s", events.TopicOrderConfirmed, repo.outboxTopic)
+	if repo.outboxTopic != events.TopicOrderPaymentConfirmed {
+		t.Errorf("expected topic %s, got %s", events.TopicOrderPaymentConfirmed, repo.outboxTopic)
 	}
 
 	// Test Idempotency: duplicate event does not recreate or duplicate state changes

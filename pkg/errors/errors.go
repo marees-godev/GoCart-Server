@@ -21,6 +21,7 @@ const (
 	CodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
 	CodeTooManyRequests     = "TOO_MANY_REQUESTS"
 	CodeInvalidCredentials  = "INVALID_CREDENTIALS"
+	CodeFailedPrecondition  = "FAILED_PRECONDITION"
 )
 
 type ErrorDetail struct {
@@ -170,6 +171,13 @@ func TooManyRequests(message string) *AppError {
 	return New(CodeTooManyRequests, message, http.StatusTooManyRequests)
 }
 
+func FailedPrecondition(message string) *AppError {
+	if message == "" {
+		message = "Failed precondition"
+	}
+	return New(CodeFailedPrecondition, message, http.StatusBadRequest)
+}
+
 type appErrorProvider interface {
 	ToAppError() *AppError
 }
@@ -188,8 +196,10 @@ func AsAppError(err error) *AppError {
 	}
 	if st, ok := status.FromError(err); ok {
 		switch st.Code() {
-		case codes.InvalidArgument, codes.FailedPrecondition:
+		case codes.InvalidArgument:
 			return BadRequest(st.Message())
+		case codes.FailedPrecondition:
+			return FailedPrecondition(st.Message())
 		case codes.NotFound:
 			return NotFound(st.Message())
 		case codes.AlreadyExists:
@@ -242,6 +252,8 @@ func MapAppErrorToGRPC(err error) error {
 		return status.Error(codes.InvalidArgument, appErr.Message)
 	case CodeConflict:
 		return status.Error(codes.AlreadyExists, appErr.Message)
+	case CodeFailedPrecondition:
+		return status.Error(codes.FailedPrecondition, appErr.Message)
 	case CodeTooManyRequests:
 		return status.Error(codes.ResourceExhausted, appErr.Message)
 	case CodeServiceUnavailable:

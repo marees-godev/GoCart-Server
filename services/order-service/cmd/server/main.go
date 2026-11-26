@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -97,28 +98,61 @@ func main() {
 		}
 	}
 
-	// 5. Initialize Kafka producer
-	producer := kafka.NewProducer(kafka.Config{
-		Brokers:        cfg.Kafka.Brokers,
-		ClientID:       cfg.Kafka.ClientID,
-		ConnectTimeout: 10 * time.Second,
-		MaxRetries:     cfg.Outbox.MaxRetries,
-		RetryInterval:  500 * time.Millisecond,
-	})
-	defer func() {
-		if err := producer.Close(); err != nil {
-			log.Error("Failed to close Kafka producer", "error", err)
-		}
-	}()
+	// 5. Initialize Kafka producer and outbox publisher if enabled
+	if strings.EqualFold(cfg.App.Environment, "production") && isLocalhostBrokers(cfg.Kafka.Brokers) {
+		log.Warn("Kafka disabled: in production environment, KAFKA_BROKERS is pointing to localhost:9092 where no broker exists. To enable, configure KAFKA_BROKERS with a valid remote broker address.")
+		cfg.Kafka.Enabled = false
+		cfg.Outbox.Enabled = false
+	}
 
-	// 6. Start the outbox publisher as a background goroutine.
+	// 5b. Probe broker connectivity before starting Kafka producer and outbox publisher
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		probeCtx, probeCancel := context.WithTimeout(ctx, 2*time.Second)
+		healthRes := kafka.CheckHealth(probeCtx, kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ConnectTimeout: 2 * time.Second,
+		})
+		probeCancel()
+
+		if healthRes.Status != "UP" {
+			log.Warn("Kafka broker is currently unreachable at startup; background publisher and consumer reconnect logic will retry until broker recovers",
+				"brokers", cfg.Kafka.Brokers,
+				"error", healthRes.Error,
+			)
+		}
+	}
+
 	outboxStore := outbox.NewStore()
-	outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
-		PollInterval: cfg.Outbox.PollInterval,
-		BatchSize:    cfg.Outbox.BatchSize,
-		MaxRetries:   cfg.Outbox.MaxRetries,
-	})
-	go outboxPublisher.Start(ctx)
+	var producer *kafka.Producer
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		producer = kafka.NewProducer(kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ClientID:       cfg.Kafka.ClientID,
+			ConnectTimeout: 10 * time.Second,
+			MaxRetries:     cfg.Outbox.MaxRetries,
+			RetryInterval:  500 * time.Millisecond,
+		})
+		defer func() {
+			if err := producer.Close(); err != nil {
+				log.Error("Failed to close Kafka producer", "error", err)
+			}
+		}()
+
+		// 6. Start the outbox publisher as a background goroutine.
+		if cfg.Outbox.Enabled {
+			outboxPublisher := outbox.NewPublisher(db.Pool, producer, outboxStore, outbox.Config{
+				PollInterval: cfg.Outbox.PollInterval,
+				BatchSize:    cfg.Outbox.BatchSize,
+				MaxRetries:   cfg.Outbox.MaxRetries,
+			})
+			go outboxPublisher.Start(ctx)
+		}
+	} else {
+		log.Info("Kafka or Outbox publisher disabled via configuration; order events will remain safely in the outbox table",
+			"kafka_enabled", cfg.Kafka.Enabled,
+			"outbox_enabled", cfg.Outbox.Enabled,
+		)
+	}
 
 	// 7. Initialize downstream service clients
 	var cartClient client.CartClient
@@ -163,7 +197,7 @@ func main() {
 	orderGRPCHandler := handler.NewOrderGRPCHandler(orderService, log)
 
 	// 8b. Start Kafka event consumer for order lifecycle events (PaymentSuccessful, PaymentFailed)
-	if len(cfg.Kafka.Brokers) > 0 {
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 && producer != nil {
 		consumerCfg := kafka.ConsumerConfig{
 			GroupID: "order-service-group",
 			Topics: []string{
@@ -260,4 +294,18 @@ func main() {
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
+}
+
+func isLocalhostBrokers(brokers []string) bool {
+	for _, b := range brokers {
+		trimmed := strings.TrimSpace(b)
+		host, _, err := net.SplitHostPort(trimmed)
+		if err != nil {
+			host = trimmed
+		}
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
+			return true
+		}
+	}
+	return false
 }

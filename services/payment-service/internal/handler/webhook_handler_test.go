@@ -118,6 +118,10 @@ func (m *mockOrderClient) GetOrder(ctx context.Context, orderID string) (*client
 	return &client.AuthoritativeOrder{ID: orderID, TotalAmount: 100}, nil
 }
 
+func (m *mockOrderClient) UpdateOrderStatus(ctx context.Context, orderID string, status string) error {
+	return nil
+}
+
 func generateSignature(body []byte, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)

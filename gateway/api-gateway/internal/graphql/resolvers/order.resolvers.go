@@ -159,6 +159,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	if input.ShippingFee != nil && *input.ShippingFee >= 0 {
+		shipFee = *input.ShippingFee
+	}
+
+	var platformFee float64 = 7.00
+	if input.PlatformFee != nil && *input.PlatformFee >= 0 {
+		platformFee = *input.PlatformFee
+	}
+
 	resp, err := client.CreateOrder(ctx, &orderpb.CreateOrderRequest{
 		UserId:            userID,
 		CartId:            cartID,
@@ -169,7 +178,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		IdempotencyKey:    idempKey,
 		ShippingFee:       shipFee,
 		DiscountAmount:    discAmt,
-		PlatformFee:       7.00,
+		PlatformFee:       platformFee,
 	})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
@@ -199,7 +208,22 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 
 	userCtx := getAuthUser(ctx)
 	if userCtx != nil && (strings.EqualFold(userCtx.Role, "ADMIN") || userCtx.Role == auth.RoleAdmin) {
-		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the user who placed the order can cancel")
+		return nil, appErrors.Forbidden("access denied: admins do not have permission to cancel orders; only the customer who placed the order or the merchant can cancel")
+	}
+
+	if userCtx != nil && (strings.EqualFold(userCtx.Role, "MERCHANT") || userCtx.Role == auth.RoleMerchant) {
+		ordResp, ordErr := client.GetOrder(ctx, &orderpb.GetOrderRequest{Id: id})
+		if ordErr == nil && ordResp != nil && ordResp.GetOrder() != nil {
+			ord := ordResp.GetOrder()
+			st := strings.ToUpper(strings.TrimSpace(ord.GetStatus()))
+			ps := strings.ToUpper(strings.TrimSpace(ord.GetPaymentStatus()))
+			if st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" {
+				return nil, appErrors.FailedPrecondition("cannot cancel or reject order: confirmed orders cannot be cancelled by the merchant")
+			}
+			if ps != "PAID" && st != "PAID" {
+				return nil, appErrors.FailedPrecondition("cannot cancel order: merchants are allowed to cancel paid orders only before confirming them")
+			}
+		}
 	}
 
 	var reasonStr string
@@ -225,6 +249,26 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
 	r.notifyOrderCancelled(ctx, ord, reasonStr)
+	return ord, nil
+}
+
+// ConfirmOrder is the resolver for the confirmOrder field.
+func (r *mutationResolver) ConfirmOrder(ctx context.Context, id string) (*model.Order, error) {
+	client, err := r.getOrderClient()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+		Id:     id,
+		Status: "CONFIRMED",
+	})
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.notifyOrderStatusUpdated(ctx, ord, "CONFIRMED")
 	return ord, nil
 }
 
@@ -306,9 +350,9 @@ func (r *queryResolver) ListMyOrders(ctx context.Context, limit *int, offset *in
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	orders := make([]*model.Order, len(resp.GetOrders()))
-	for i, ord := range resp.GetOrders() {
-		orders[i] = mapProtoOrderToGraphQL(ord)
+	orders := make([]*model.Order, 0, len(resp.GetOrders()))
+	for _, ord := range resp.GetOrders() {
+		orders = append(orders, mapProtoOrderToGraphQL(ord))
 	}
 
 	return &model.OrderList{
@@ -352,9 +396,9 @@ func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, o
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	orders := make([]*model.Order, len(resp.GetOrders()))
-	for i, ord := range resp.GetOrders() {
-		orders[i] = mapProtoOrderToGraphQL(ord)
+	orders := make([]*model.Order, 0, len(resp.GetOrders()))
+	for _, ord := range resp.GetOrders() {
+		orders = append(orders, mapProtoOrderToGraphQL(ord))
 	}
 
 	return &model.OrderList{
@@ -467,6 +511,22 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 	shippingFee := o.GetShippingFee()
 	discountAmount := o.GetDiscountAmount()
 
+	st := strings.ToUpper(strings.TrimSpace(o.GetStatus()))
+	ps := strings.ToUpper(strings.TrimSpace(o.GetPaymentStatus()))
+
+	canCancel := o.GetCanCancel()
+	if !canCancel && (st == "CREATED" || st == "PENDING_PAYMENT" || st == "PAID" || st == "CONFIRMED" || st == "PROCESSING") {
+		canCancel = true
+	}
+
+	merchantCanCancel := o.GetMerchantCanCancel()
+	if (ps == "PAID" || st == "PAID") && st != "CONFIRMED" && st != "PROCESSING" && st != "SHIPPED" && st != "OUT_FOR_DELIVERY" && st != "DELIVERED" && st != "CANCELLED" {
+		merchantCanCancel = true
+	}
+	if st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "CANCELLED" {
+		merchantCanCancel = false
+	}
+
 	return &model.Order{
 		ID:                o.GetId(),
 		UserID:            o.GetUserId(),
@@ -489,5 +549,7 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		OrderNumber:       orderNumber,
 		CreatedAt:         caPtr,
 		UpdatedAt:         uaPtr,
+		CanCancel:         &canCancel,
+		MerchantCanCancel: &merchantCanCancel,
 	}
 }

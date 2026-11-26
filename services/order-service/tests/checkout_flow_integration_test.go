@@ -148,38 +148,53 @@ func TestCheckoutFlow_PaymentSuccessful_EndToEnd(t *testing.T) {
 		t.Fatalf("HandleEvent for PaymentSuccessful failed: %v", err)
 	}
 
-	// 3. Verify order transitioned to CONFIRMED and PAID
+	// 3. Verify order transitioned to PAID and PaymentStatus is PAID
 	updatedOrder, err := repo.GetOrderByID(ctx, createdOrder.GetId())
 	if err != nil {
 		t.Fatalf("GetOrderByID failed: %v", err)
 	}
-	if updatedOrder.Status != model.OrderStatusConfirmed {
-		t.Errorf("expected order status CONFIRMED, got: %s", updatedOrder.Status)
+	if updatedOrder.Status != model.OrderStatusPaid {
+		t.Errorf("expected order status PAID, got: %s", updatedOrder.Status)
 	}
 	if updatedOrder.PaymentStatus != model.PaymentStatusPaid {
 		t.Errorf("expected payment status PAID, got: %s", updatedOrder.PaymentStatus)
 	}
 
-	// Verify OrderConfirmed outbox event was generated
+	// Verify OrderPaymentConfirmed outbox event was generated
 	repo.mu.RLock()
-	var orderConfirmedEnv *events.EventEnvelope
-	outboxCountBeforeDup := len(repo.outbox)
+	var orderPaymentConfirmedEnv *events.EventEnvelope
 	for _, env := range repo.outbox {
-		if env.EventType == events.EventTypeOrderConfirmed {
-			orderConfirmedEnv = env
+		if env.EventType == events.EventTypeOrderPaymentConfirmed {
+			orderPaymentConfirmedEnv = env
 			break
 		}
 	}
 	repo.mu.RUnlock()
 
-	if orderConfirmedEnv == nil {
-		t.Fatal("expected OrderConfirmed event in outbox, none found")
+	if orderPaymentConfirmedEnv == nil {
+		t.Fatal("expected OrderPaymentConfirmed event in outbox, none found")
 	}
-	if orderConfirmedEnv.CorrelationID != corrID {
-		t.Errorf("expected correlation ID %s on OrderConfirmed event, got %s", corrID, orderConfirmedEnv.CorrelationID)
+	if orderPaymentConfirmedEnv.CorrelationID != corrID {
+		t.Errorf("expected correlation ID %s on OrderPaymentConfirmed event, got %s", corrID, orderPaymentConfirmedEnv.CorrelationID)
+	}
+
+	// Merchant confirms the order
+	confirmedOrder, err := grpcClient.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+		Id:     createdOrder.GetId(),
+		Status: "CONFIRMED",
+	})
+	if err != nil {
+		t.Fatalf("merchant confirm order failed: %v", err)
+	}
+	if confirmedOrder.GetOrder().GetStatus() != "CONFIRMED" {
+		t.Errorf("expected order status CONFIRMED after merchant confirmation, got: %s", confirmedOrder.GetOrder().GetStatus())
 	}
 
 	// 4. Test Idempotency: duplicate PaymentSuccessful event
+	repo.mu.RLock()
+	outboxCountBeforeDup := len(repo.outbox)
+	repo.mu.RUnlock()
+
 	if err := orderConsumer.HandleEvent(ctx, paySuccessEnv); err != nil {
 		t.Fatalf("duplicate PaymentSuccessful HandleEvent failed: %v", err)
 	}

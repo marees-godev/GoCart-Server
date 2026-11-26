@@ -75,6 +75,19 @@
     "body_template": "Your order #{{.OrderID}} is confirmed and being prepared for shipment."
   },
   {
+    "event_type": "OrderPaymentConfirmed",
+    "channel": "EMAIL",
+    "subject_template": "Action Required: Payment Received for Order #{{if .OrderNumber}}{{.OrderNumber}}{{else}}{{.OrderID}}{{end}}",
+    "body_template": "Payment of {{.TotalAmount}} {{.Currency}} for Order #{{if .OrderNumber}}{{.OrderNumber}}{{else}}{{.OrderID}}{{end}} has been received successfully. Please confirm the order to begin processing.",
+    "template_file": "emails/order_notification.html"
+  },
+  {
+    "event_type": "OrderPaymentConfirmed",
+    "channel": "PUSH",
+    "subject_template": "Payment Received - Confirm Order #{{if .OrderNumber}}{{.OrderNumber}}{{else}}{{.OrderID}}{{end}}",
+    "body_template": "Payment for order #{{if .OrderNumber}}{{.OrderNumber}}{{else}}{{.OrderID}}{{end}} ({{.TotalAmount}} {{.Currency}}) is successful. Please confirm the order."
+  },
+  {
     "event_type": "OrderShipped",
     "channel": "EMAIL",
     "subject_template": "Your Order #{{.OrderID}} has Shipped!",

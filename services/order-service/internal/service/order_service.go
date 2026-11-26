@@ -19,6 +19,7 @@ import (
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 	"github.com/marees-godev/GoCart-Server/pkg/logger"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/order-service/internal/dto"
@@ -166,6 +167,7 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 	}
 
 	storeMap := make(map[string][]enrichedItem)
+	var storeOrder []string
 
 	for i := range rawItems {
 		item := &rawItems[i]
@@ -275,6 +277,9 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 		itemDiscount := 0.00
 		itemTotal := math.Round((itemSubtotal+itemTax-itemDiscount)*100) / 100
 
+		if _, exists := storeMap[storeID]; !exists {
+			storeOrder = append(storeOrder, storeID)
+		}
 		storeMap[storeID] = append(storeMap[storeID], enrichedItem{
 			productID:   item.ProductID,
 			storeID:     storeID,
@@ -357,7 +362,8 @@ func (s *orderService) CreateOrder(ctx context.Context, input dto.CreateOrderInp
 
 	firstStore := true
 	idempKeyFirst := true
-	for storeID, items := range storeMap {
+	for _, storeID := range storeOrder {
+		items := storeMap[storeID]
 		storeShippingFee := baseStoreShippingFee
 		if needsShippingCalculation {
 			if overallSubtotal >= 500.0 {
@@ -713,6 +719,12 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.BadRequest(fmt.Sprintf("invalid order status transition from %s to %s", order.Status, orderStatus))
 	}
 
+	if orderStatus == model.OrderStatusConfirmed {
+		if order.PaymentStatus != model.PaymentStatusPaid {
+			return nil, appErrors.FailedPrecondition(fmt.Sprintf("cannot confirm order: payment status must be PAID (current payment status: %s)", order.PaymentStatus))
+		}
+	}
+
 	now := time.Now().UTC()
 	var envelope *events.EventEnvelope
 	var topic string
@@ -722,7 +734,20 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 	}
 
 	switch orderStatus {
-	case model.OrderStatusConfirmed, model.OrderStatusPaid:
+	case model.OrderStatusPaid:
+		topic = events.TopicOrderPaymentConfirmed
+		payload := events.OrderPaymentConfirmedEvent{
+			OrderID:       order.ID,
+			OrderNumber:   order.OrderNumber,
+			UserID:        order.UserID,
+			StoreID:       order.StoreID,
+			TotalAmount:   order.TotalAmount,
+			Currency:      order.Currency,
+			PaymentStatus: string(model.PaymentStatusPaid),
+			PaidAt:        now,
+		}
+		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentConfirmed, "order-service", order.ID, payload)
+	case model.OrderStatusConfirmed:
 		topic = OrderConfirmedTopic
 		payload := events.OrderConfirmedEvent{
 			OrderID:       order.ID,
@@ -801,21 +826,25 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 	}
 
 	now := time.Now().UTC()
-	confirmedEvt := events.OrderConfirmedEvent{
+	paymentConfirmedEvt := events.OrderPaymentConfirmedEvent{
 		OrderID:       order.ID,
+		OrderNumber:   order.OrderNumber,
 		UserID:        order.UserID,
-		PaymentStatus: string(model.OrderStatusPaid),
-		ConfirmedAt:   now,
+		StoreID:       order.StoreID,
+		TotalAmount:   order.TotalAmount,
+		Currency:      order.Currency,
+		PaymentStatus: string(model.PaymentStatusPaid),
+		PaidAt:        now,
 	}
 
 	envelope, err := events.NewEventEnvelopeWithAggregate(
-		events.EventTypeOrderConfirmed,
+		events.EventTypeOrderPaymentConfirmed,
 		"order-service",
 		order.ID,
-		confirmedEvt,
+		paymentConfirmedEvt,
 	)
 	if err != nil {
-		return nil, appErrors.Internal(err, "failed to create OrderConfirmed event envelope")
+		return nil, appErrors.Internal(err, "failed to create OrderPaymentConfirmed event envelope")
 	}
 	if correlationID != "" {
 		envelope.CorrelationID = correlationID
@@ -827,16 +856,16 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
 		orderID,
-		model.OrderStatusConfirmed,
+		model.OrderStatusPaid,
 		envelope,
-		events.TopicOrderConfirmed,
+		events.TopicOrderPaymentConfirmed,
 		"Payment successful",
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	s.log.Info("Order transitioned to CONFIRMED and OrderConfirmed event recorded in outbox",
+	s.log.Info("Order transitioned to PAID and OrderPaymentConfirmed event recorded in outbox",
 		"order_id", orderID,
 		"payment_id", event.PaymentID,
 	)
@@ -937,13 +966,32 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 		}
 		callerRole = strings.ToUpper(strings.TrimSpace(userCtx.Role))
 	}
-
-	if callerRole == "ADMIN" || callerRole == auth.RoleAdmin {
-		return nil, appErrors.Forbidden("admins do not have permission to cancel orders; only the customer who placed the order can cancel")
+	if callerRole == "" {
+		callerRole = strings.ToUpper(strings.TrimSpace(grpcclient.GetUserRole(ctx)))
 	}
 
-	if callerUserID == "" || order.UserID != callerUserID {
-		return nil, appErrors.Forbidden("you do not have permission to cancel this order")
+	if callerRole == "ADMIN" || callerRole == auth.RoleAdmin {
+		return nil, appErrors.Forbidden("admins do not have permission to cancel orders; only the customer who placed the order or the merchant can cancel")
+	}
+
+	if callerRole == "MERCHANT" || callerRole == auth.RoleMerchant {
+		// Merchant cancellation rules:
+		// 1. Once order transitions to CONFIRMED (or beyond), merchant has NO permission to cancel/reject.
+		if order.Status == model.OrderStatusConfirmed ||
+			order.Status == model.OrderStatusProcessing ||
+			order.Status == model.OrderStatusShipped ||
+			order.Status == model.OrderStatusOutForDelivery ||
+			order.Status == model.OrderStatusDelivered {
+			return nil, appErrors.FailedPrecondition("cannot cancel or reject order: confirmed orders cannot be cancelled by the merchant")
+		}
+		// 2. Before confirmation: Merchant is allowed to cancel paid orders only.
+		if !model.CanMerchantCancelOrder(order.Status, order.PaymentStatus) {
+			return nil, appErrors.FailedPrecondition("cannot cancel order: merchants are allowed to cancel paid orders only before confirming them")
+		}
+	} else {
+		if callerUserID == "" || order.UserID != callerUserID {
+			return nil, appErrors.Forbidden("you do not have permission to cancel this order")
+		}
 	}
 
 	// 2. State transition check:

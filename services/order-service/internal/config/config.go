@@ -61,12 +61,14 @@ type TracingConfig struct {
 type KafkaConfig struct {
 	Brokers  []string
 	ClientID string
+	Enabled  bool
 }
 
 type OutboxConfig struct {
 	PollInterval time.Duration
 	BatchSize    int
 	MaxRetries   int
+	Enabled      bool
 }
 
 func LoadEnv() *Config {
@@ -103,11 +105,13 @@ func LoadEnv() *Config {
 		Kafka: KafkaConfig{
 			Brokers:  GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
 			ClientID: GetEnv("KAFKA_CLIENT_ID", "order-service"),
+			Enabled:  GetEnvAsBool("KAFKA_ENABLED", true),
 		},
 		Outbox: OutboxConfig{
 			PollInterval: GetEnvAsDuration("OUTBOX_POLL_INTERVAL", 2*time.Second),
 			BatchSize:    GetEnvAsInt("OUTBOX_BATCH_SIZE", 50),
 			MaxRetries:   GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
+			Enabled:      GetEnvAsBool("OUTBOX_ENABLED", true),
 		},
 		GRPC: GRPCConfig{
 			Port:                 GetEnv("GRPC_PORT", "50059"),

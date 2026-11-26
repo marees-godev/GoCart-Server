@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,7 +24,6 @@ type Publisher struct {
 	producer      KafkaPublisher
 	store         *Store
 	cfg           Config
-	lastErr       string
 	lastErrLogged time.Time
 }
 
@@ -153,6 +153,27 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 				}
 			}
 
+			connErr := isConnectionError(err)
+
+			if connErr {
+				if time.Since(p.lastErrLogged) > 30*time.Second {
+					p.lastErrLogged = time.Now()
+					slog.Warn("outbox: kafka broker unreachable, applying backoff and waiting for broker",
+						"event_id", evt.ID,
+						"topic", evt.Topic,
+						"next_retry_delay", delay,
+						"error", err,
+					)
+				}
+				// Broker is temporarily unreachable. Retain PENDING status with backoff
+				// so that the event resumes publishing as soon as Kafka recovers, without exhausting retry budget.
+				if mErr := p.store.MarkRetryAfter(ctx, tx, evt.ID, delay); mErr != nil {
+					slog.Error("outbox: could not mark event retry after", "event_id", evt.ID, "error", mErr)
+				}
+				// If the broker is unreachable, stop attempting remaining events in this batch to prevent hammering.
+				break
+			}
+
 			slog.Error("outbox: publish failed, applying backoff",
 				"event_id", evt.ID,
 				"event_type", evt.EventType,
@@ -162,7 +183,7 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 				"error", err,
 			)
 
-			// If max retries exceeded, route to DLQ
+			// If max retries exceeded and broker connection is alive, route to DLQ.
 			if evt.RetryCount+1 >= p.cfg.MaxRetries {
 				dlqTopic := p.cfg.DLQTopic
 				if dlqTopic == "" && evt.Topic != "" {
@@ -202,4 +223,23 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 	}
 
 	return tx.Commit(ctx)
+}
+
+// IsConnectionError returns true if err indicates a transient network or broker connection failure.
+func IsConnectionError(err error) bool {
+	return isConnectionError(err)
+}
+
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "connection refused") ||
+		strings.Contains(s, "no such host") ||
+		strings.Contains(s, "network is unreachable") ||
+		strings.Contains(s, "i/o timeout") ||
+		strings.Contains(s, "dial tcp") ||
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "broken pipe")
 }

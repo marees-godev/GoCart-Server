@@ -150,6 +150,16 @@ func (m *mockOrderRepo) UpdateOrderStatus(ctx context.Context, id string, orderS
 	}
 	prev := o.Status
 	o.Status = orderStatus
+	switch orderStatus {
+	case model.OrderStatusConfirmed, model.OrderStatusPaid:
+		o.PaymentStatus = model.PaymentStatusPaid
+	case model.OrderStatusPaymentFailed:
+		o.PaymentStatus = model.PaymentStatusFailed
+	case model.OrderStatusRefunded:
+		o.PaymentStatus = model.PaymentStatusRefunded
+	case model.OrderStatusPendingPayment:
+		o.PaymentStatus = model.PaymentStatusPending
+	}
 	o.UpdatedAt = time.Now().UTC()
 
 	rText := ""
@@ -1709,5 +1719,93 @@ func TestOrderService_CreateOrder_PlatformFeeAndShippingThresholds(t *testing.T)
 				t.Errorf("expected total amount %.2f, got %.2f", tt.expectedTotalAmount, order.TotalAmount)
 			}
 		})
+	}
+}
+
+func TestOrderService_MerchantConfirmationAndCancellationLifecycle(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockOrderRepo()
+	svc := service.NewOrderService(repo, nil, nil, nil, nil, 5, nil)
+
+	customerID := uuid.New().String()
+	merchantID := uuid.New().String()
+	merchantCtx := auth.WithUser(ctx, &auth.UserContext{UserID: merchantID, Role: "MERCHANT"})
+
+	// 1. Order in PENDING_PAYMENT status cannot be confirmed by merchant (fails with FAILED_PRECONDITION)
+	unpaidOrderID := uuid.New().String()
+	repo.orders[unpaidOrderID] = &model.Order{
+		ID:            unpaidOrderID,
+		UserID:        customerID,
+		StoreID:       uuid.New().String(),
+		Status:        model.OrderStatusPendingPayment,
+		PaymentStatus: model.PaymentStatusPending,
+		TotalAmount:   100.00,
+	}
+
+	_, err := svc.UpdateOrderStatus(merchantCtx, unpaidOrderID, model.OrderStatusConfirmed)
+	if err == nil {
+		t.Fatalf("expected confirming unpaid order to fail")
+	}
+	appErr := appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION for unpaid order confirmation, got %v", err)
+	}
+
+	// 2. Order in PAID status can be confirmed by merchant
+	paidOrderID := uuid.New().String()
+	repo.orders[paidOrderID] = &model.Order{
+		ID:            paidOrderID,
+		UserID:        customerID,
+		StoreID:       uuid.New().String(),
+		Status:        model.OrderStatusPaid,
+		PaymentStatus: model.PaymentStatusPaid,
+		TotalAmount:   100.00,
+	}
+
+	confirmedOrder, err := svc.UpdateOrderStatus(merchantCtx, paidOrderID, model.OrderStatusConfirmed)
+	if err != nil {
+		t.Fatalf("expected confirming paid order to succeed, got %v", err)
+	}
+	if confirmedOrder.Status != model.OrderStatusConfirmed {
+		t.Errorf("expected status CONFIRMED, got %s", confirmedOrder.Status)
+	}
+
+	// 3. Merchant CAN cancel order before confirmation (e.g. while in PAID status)
+	paidOrderToCancelID := uuid.New().String()
+	repo.orders[paidOrderToCancelID] = &model.Order{
+		ID:            paidOrderToCancelID,
+		UserID:        customerID,
+		StoreID:       uuid.New().String(),
+		Status:        model.OrderStatusPaid,
+		PaymentStatus: model.PaymentStatusPaid,
+		TotalAmount:   100.00,
+	}
+
+	cancelledOrder, err := svc.CancelOrder(merchantCtx, paidOrderToCancelID, merchantID, "Out of stock prior to confirmation")
+	if err != nil {
+		t.Fatalf("expected merchant cancellation before confirmation to succeed, got %v", err)
+	}
+	if cancelledOrder.Status != model.OrderStatusCancelled {
+		t.Errorf("expected status CANCELLED, got %s", cancelledOrder.Status)
+	}
+
+	// 4. Merchant CANNOT cancel order once confirmed (fails with FAILED_PRECONDITION)
+	_, err = svc.CancelOrder(merchantCtx, paidOrderID, merchantID, "Merchant wants to cancel after confirmation")
+	if err == nil {
+		t.Fatalf("expected merchant cancellation after confirmation to fail")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION for post-confirmation cancellation, got %v", err)
+	}
+
+	// 5. Merchant CANNOT cancel order if it is unpaid/pending (merchants can only cancel paid orders before confirmation)
+	_, err = svc.CancelOrder(merchantCtx, unpaidOrderID, merchantID, "Merchant wants to cancel unpaid order")
+	if err == nil {
+		t.Fatalf("expected merchant cancellation of unpaid order to fail")
+	}
+	appErr = appErrors.AsAppError(err)
+	if appErr == nil || appErr.Code != appErrors.CodeFailedPrecondition {
+		t.Fatalf("expected FAILED_PRECONDITION for unpaid order cancellation by merchant, got %v", err)
 	}
 }

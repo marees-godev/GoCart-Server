@@ -29,6 +29,7 @@ type AuthoritativeOrder struct {
 
 type OrderClient interface {
 	GetOrder(ctx context.Context, orderID string) (*AuthoritativeOrder, error)
+	UpdateOrderStatus(ctx context.Context, orderID string, status string) error
 }
 
 type grpcOrderClient struct {
@@ -88,4 +89,25 @@ func (c *grpcOrderClient) GetOrder(ctx context.Context, orderID string) (*Author
 		Status:      resp.Order.Status,
 		Items:       items,
 	}, nil
+}
+
+func (c *grpcOrderClient) UpdateOrderStatus(ctx context.Context, orderID string, status string) error {
+	if orderID == "" {
+		return appErrors.BadRequest("order_id cannot be empty")
+	}
+
+	client, conn, err := grpcclient.NewOrderClient(c.target, 5*time.Second)
+	if err != nil {
+		return appErrors.Internal(err, "failed to connect to order service")
+	}
+	defer func() { _ = conn.Close() }()
+
+	_, err = client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+		Id:     orderID,
+		Status: status,
+	})
+	if err != nil {
+		return appErrors.Internal(err, fmt.Sprintf("failed to update order %s status to %s", orderID, status))
+	}
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -95,6 +96,29 @@ func main() {
 	}
 
 	// 5. Initialize Outbox Publisher background worker for Kafka event streaming
+	if strings.EqualFold(cfg.App.Environment, "production") && isLocalhostBrokers(cfg.Kafka.Brokers) {
+		log.Warn("Kafka disabled: in production environment, KAFKA_BROKERS is pointing to localhost:9092 where no broker exists. To enable, configure KAFKA_BROKERS with a valid remote broker address (e.g. Upstash, Confluent, or internal service URL).")
+		cfg.Kafka.Enabled = false
+		cfg.Outbox.Enabled = false
+	}
+
+	// 5b. Probe broker connectivity before starting Kafka producer and outbox publisher
+	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
+		probeCtx, probeCancel := context.WithTimeout(ctx, 2*time.Second)
+		healthRes := kafka.CheckHealth(probeCtx, kafka.Config{
+			Brokers:        cfg.Kafka.Brokers,
+			ConnectTimeout: 2 * time.Second,
+		})
+		probeCancel()
+
+		if healthRes.Status != "UP" {
+			log.Warn("Kafka broker is currently unreachable at startup; background publisher and consumer reconnect logic will retry until broker recovers",
+				"brokers", cfg.Kafka.Brokers,
+				"error", healthRes.Error,
+			)
+		}
+	}
+
 	var kafkaProducer *kafka.Producer
 	if cfg.Kafka.Enabled && len(cfg.Kafka.Brokers) > 0 {
 		kafkaProducer = kafka.NewProducer(kafka.Config{
@@ -232,4 +256,18 @@ func main() {
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
+}
+
+func isLocalhostBrokers(brokers []string) bool {
+	for _, b := range brokers {
+		trimmed := strings.TrimSpace(b)
+		host, _, err := net.SplitHostPort(trimmed)
+		if err != nil {
+			host = trimmed
+		}
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
+			return true
+		}
+	}
+	return false
 }

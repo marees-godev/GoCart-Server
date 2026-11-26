@@ -135,6 +135,26 @@ func CanCancel(current OrderStatus) bool {
 	}
 }
 
+func CanMerchantCancel(current OrderStatus, paymentStatus ...PaymentStatus) bool {
+	ps := PaymentStatusPending
+	if len(paymentStatus) > 0 {
+		ps = paymentStatus[0]
+	}
+	return CanMerchantCancelOrder(current, ps)
+}
+
+func CanMerchantCancelOrder(status OrderStatus, paymentStatus PaymentStatus) bool {
+	if status == OrderStatusConfirmed ||
+		status == OrderStatusProcessing ||
+		status == OrderStatusShipped ||
+		status == OrderStatusOutForDelivery ||
+		status == OrderStatusDelivered ||
+		status == OrderStatusCancelled {
+		return false
+	}
+	return paymentStatus == PaymentStatusPaid || status == OrderStatusPaid
+}
+
 type OrderStatusHistory struct {
 	ID         string       `json:"id" db:"id"`
 	OrderID    string       `json:"order_id" db:"order_id"`

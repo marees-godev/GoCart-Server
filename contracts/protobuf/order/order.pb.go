@@ -160,6 +160,8 @@ type Order struct {
 	UpdatedAt         string                 `protobuf:"bytes,19,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	OrderNumber       string                 `protobuf:"bytes,20,opt,name=order_number,json=orderNumber,proto3" json:"order_number,omitempty"`
 	PlatformFee       float64                `protobuf:"fixed64,21,opt,name=platform_fee,json=platformFee,proto3" json:"platform_fee,omitempty"`
+	CanCancel         bool                   `protobuf:"varint,22,opt,name=can_cancel,json=canCancel,proto3" json:"can_cancel,omitempty"`
+	MerchantCanCancel bool                   `protobuf:"varint,23,opt,name=merchant_can_cancel,json=merchantCanCancel,proto3" json:"merchant_can_cancel,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -339,6 +341,20 @@ func (x *Order) GetPlatformFee() float64 {
 		return x.PlatformFee
 	}
 	return 0
+}
+
+func (x *Order) GetCanCancel() bool {
+	if x != nil {
+		return x.CanCancel
+	}
+	return false
+}
+
+func (x *Order) GetMerchantCanCancel() bool {
+	if x != nil {
+		return x.MerchantCanCancel
+	}
+	return false
 }
 
 type CreateOrderRequest struct {
@@ -944,7 +960,7 @@ const file_contracts_protobuf_order_order_proto_rawDesc = "" +
 	"\bdiscount\x18\t \x01(\x01R\bdiscount\x12\x1f\n" +
 	"\vtotal_price\x18\n" +
 	" \x01(\x01R\n" +
-	"totalPrice\"\xda\x05\n" +
+	"totalPrice\"\xa9\x06\n" +
 	"\x05Order\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
@@ -970,7 +986,10 @@ const file_contracts_protobuf_order_order_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x13 \x01(\tR\tupdatedAt\x12!\n" +
 	"\forder_number\x18\x14 \x01(\tR\vorderNumber\x12!\n" +
-	"\fplatform_fee\x18\x15 \x01(\x01R\vplatformFee\"\x83\x03\n" +
+	"\fplatform_fee\x18\x15 \x01(\x01R\vplatformFee\x12\x1d\n" +
+	"\n" +
+	"can_cancel\x18\x16 \x01(\bR\tcanCancel\x12.\n" +
+	"\x13merchant_can_cancel\x18\x17 \x01(\bR\x11merchantCanCancel\"\x83\x03\n" +
 	"\x12CreateOrderRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\acart_id\x18\x02 \x01(\tR\x06cartId\x12)\n" +
