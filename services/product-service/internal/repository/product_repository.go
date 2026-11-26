@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -30,6 +31,7 @@ type ProductRepository interface {
 	GetProductReportByID(ctx context.Context, id string) (*model.ProductReport, error)
 	GetProductReportByUserAndProduct(ctx context.Context, productID, reporterID string) (*model.ProductReport, error)
 	ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error)
+	EnsureProductReportsTable(ctx context.Context) error
 }
 
 type pgProductRepository struct {
@@ -648,6 +650,12 @@ func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *m
 	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
 
 	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			_ = tx.Rollback(ctx)
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return r.CreateProductReport(ctx, report, outboxEvt...)
+			}
+		}
 		if strings.Contains(err.Error(), "uq_product_reports_user_product") || strings.Contains(err.Error(), "duplicate key") {
 			return appErrors.Conflict("you have already reported this product")
 		}
@@ -709,12 +717,64 @@ func (r *pgProductRepository) GetProductReportByUserAndProduct(ctx context.Conte
 	return &rep, nil
 }
 
+func (r *pgProductRepository) EnsureProductReportsTable(ctx context.Context) error {
+	ddl := `
+	DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_reason') THEN
+			CREATE TYPE report_reason AS ENUM (
+				'INAPPROPRIATE_CONTENT',
+				'MISLEADING_INFORMATION',
+				'COUNTERFEIT_OR_FRAUDULENT',
+				'PROHIBITED_PRODUCT',
+				'SPAM_OR_DUPLICATE',
+				'OTHER'
+			);
+		END IF;
+	END $$;
+
+	DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_status') THEN
+			CREATE TYPE report_status AS ENUM (
+				'PENDING',
+				'REVIEWED',
+				'DISMISSED',
+				'ACTION_TAKEN'
+			);
+		END IF;
+	END $$;
+
+	CREATE TABLE IF NOT EXISTS product_reports (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+		reporter_id UUID NOT NULL,
+		reason report_reason NOT NULL,
+		description TEXT,
+		status report_status NOT NULL DEFAULT 'PENDING',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		CONSTRAINT uq_product_reports_user_product UNIQUE (product_id, reporter_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_product_reports_product_id ON product_reports(product_id);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_reporter_id ON product_reports(reporter_id);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_status ON product_reports(status);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_created_at ON product_reports(created_at DESC);
+	`
+	_, err := r.pool.Exec(ctx, ddl)
+	return err
+}
+
 func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
 	whereClauses := []string{"1=1"}
 	args := []interface{}{}
 	argPos := 1
 
 	if req.ProductID != "" {
+		if _, err := uuid.Parse(req.ProductID); err != nil {
+			return []*model.ProductReport{}, 0, nil
+		}
 		whereClauses = append(whereClauses, fmt.Sprintf("product_id = $%d", argPos))
 		args = append(args, req.ProductID)
 		argPos++
@@ -732,6 +792,11 @@ func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.Li
 	var total int32
 	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return []*model.ProductReport{}, 0, nil
+			}
+		}
 		return nil, 0, appErrors.Internal(err, "failed to count product reports")
 	}
 
@@ -756,6 +821,11 @@ func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.Li
 
 	rows, err := r.pool.Query(ctx, listQuery, args...)
 	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return []*model.ProductReport{}, 0, nil
+			}
+		}
 		return nil, 0, appErrors.Internal(err, "failed to list product reports")
 	}
 	defer rows.Close()

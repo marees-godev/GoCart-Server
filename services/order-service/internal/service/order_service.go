@@ -711,7 +711,19 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.Internal(err, "failed to get order")
 	}
 
-	if order.Status == orderStatus {
+	expectedPaymentStatus := order.PaymentStatus
+	switch orderStatus {
+	case model.OrderStatusPaid, model.OrderStatusConfirmed:
+		expectedPaymentStatus = model.PaymentStatusPaid
+	case model.OrderStatusPaymentFailed:
+		expectedPaymentStatus = model.PaymentStatusFailed
+	case model.OrderStatusRefunded:
+		expectedPaymentStatus = model.PaymentStatusRefunded
+	case model.OrderStatusPendingPayment:
+		expectedPaymentStatus = model.PaymentStatusPending
+	}
+
+	if order.Status == orderStatus && order.PaymentStatus == expectedPaymentStatus {
 		return order, nil
 	}
 

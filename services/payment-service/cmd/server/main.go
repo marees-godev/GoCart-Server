@@ -232,7 +232,7 @@ func main() {
 	healthHandler.Register(app)
 	app.Get("/metrics", adaptor.HTTPHandler(metrics.Handler()))
 
-	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log)
+	paymentHandler := handler.NewPaymentHandler(paymentRepo, paymentGW, gwConfig, log, orderClient)
 	paymentHandler.RegisterRoutes(app)
 
 	// Webhook endpoints

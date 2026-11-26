@@ -105,6 +105,9 @@ func main() {
 
 	outboxStore := outbox.NewStore()
 	productRepo := repository.NewProductRepositoryWithOutbox(db.Pool, outboxStore, log)
+	if err := productRepo.EnsureProductReportsTable(ctx); err != nil {
+		log.Warn("Failed to auto-ensure product_reports table", "error", err)
+	}
 	productService := service.NewProductServiceWithAllClients(productRepo, storeClient, categoryClient, merchantClient, notifClient, s3Client, log)
 	productGRPCHandler := handler.NewProductGRPCHandler(productService, log)
 

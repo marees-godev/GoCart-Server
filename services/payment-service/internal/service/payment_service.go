@@ -208,8 +208,15 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 			return nil, err
 		}
 		if s.orderClient != nil {
-			if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAID"); ordErr != nil {
-				slog.WarnContext(ctx, "failed to notify order service of successful payment", "order_id", payment.OrderID, "error", ordErr)
+			targetOrderID := payment.OrderID
+			if targetOrderID == "" && authOrder != nil {
+				targetOrderID = authOrder.ID
+			}
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, targetOrderID, "PAID"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to notify order service of successful payment", "order_id", targetOrderID, "error", ordErr)
+			}
+			if authOrder != nil && authOrder.ID != "" && authOrder.ID != targetOrderID {
+				_ = s.orderClient.UpdateOrderStatus(ctx, authOrder.ID, "PAID")
 			}
 		}
 		slog.InfoContext(ctx, "payment successfully processed in service", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
@@ -694,6 +701,11 @@ func (s *paymentService) handlePaymentSuccessWebhook(ctx context.Context, event 
 
 	if payment.Status == model.PaymentStatusSuccess {
 		slog.InfoContext(ctx, "payment is already marked SUCCESS, skipping webhook update", "payment_id", payment.ID)
+		if s.orderClient != nil {
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAID"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to re-assert order status to PAID on already SUCCESS payment", "order_id", payment.OrderID, "error", ordErr)
+			}
+		}
 		return nil
 	}
 

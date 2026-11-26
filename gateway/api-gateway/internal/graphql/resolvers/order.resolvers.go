@@ -543,15 +543,21 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 	st := strings.ToUpper(strings.TrimSpace(o.GetStatus()))
 	ps := strings.ToUpper(strings.TrimSpace(o.GetPaymentStatus()))
 
-	if st == "PAID" || st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "COMPLETED" {
+	if ps == "PAID" || st == "PAID" || st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "COMPLETED" {
 		paidStr := "PAID"
 		payStatus = &paidStr
-	} else if st == "PAYMENT_FAILED" {
+	} else if ps == "FAILED" || ps == "PAYMENT_FAILED" || st == "PAYMENT_FAILED" {
 		failedStr := "FAILED"
 		payStatus = &failedStr
-	} else if st == "REFUNDED" {
+	} else if ps == "REFUNDED" || st == "REFUNDED" {
 		refundedStr := "REFUNDED"
 		payStatus = &refundedStr
+	} else if ps == "REFUND_PENDING" {
+		refundPendingStr := "REFUND_PENDING"
+		payStatus = &refundPendingStr
+	} else if payStatus == nil {
+		pendingStr := "PENDING"
+		payStatus = &pendingStr
 	}
 
 	canCancel := o.GetCanCancel()
@@ -629,24 +635,35 @@ func (r *Resolver) enrichOrderPaymentStatus(ctx context.Context, ord *model.Orde
 	}
 
 	var paymentResp *paymentpb.GetPaymentResponse
-	var err error
 
+	targets := []string{}
 	if ord.ID != "" {
-		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: ord.ID})
+		targets = append(targets, ord.ID)
 	}
-	if (err != nil || paymentResp == nil || paymentResp.GetPayment() == nil) && ord.ParentOrderID != nil && *ord.ParentOrderID != "" {
-		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: *ord.ParentOrderID})
+	if ord.ParentOrderID != nil && *ord.ParentOrderID != "" {
+		targets = append(targets, *ord.ParentOrderID)
 	}
-	if (err != nil || paymentResp == nil || paymentResp.GetPayment() == nil) && ord.OrderNumber != nil && *ord.OrderNumber != "" {
-		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: *ord.OrderNumber})
+	if ord.OrderNumber != nil && *ord.OrderNumber != "" {
+		targets = append(targets, *ord.OrderNumber)
 	}
 
-	if err == nil && paymentResp != nil && paymentResp.GetPayment() != nil {
+	for _, target := range targets {
+		resp, callErr := payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: target})
+		if callErr == nil && resp != nil && resp.GetPayment() != nil {
+			paymentResp = resp
+			break
+		}
+	}
+
+	if paymentResp != nil && paymentResp.GetPayment() != nil {
 		pmt := paymentResp.GetPayment()
 		pmtStatus := strings.ToUpper(strings.TrimSpace(pmt.GetStatus()))
 		if pmtStatus == "SUCCESS" || pmtStatus == "PAID" {
 			paid := "PAID"
 			ord.PaymentStatus = &paid
+			if ord.Status == "CREATED" || ord.Status == "PENDING_PAYMENT" {
+				ord.Status = "PAID"
+			}
 
 			orderClient, ordClientErr := r.getOrderClient()
 			if ordClientErr == nil && orderClient != nil {
@@ -660,6 +677,9 @@ func (r *Resolver) enrichOrderPaymentStatus(ctx context.Context, ord *model.Orde
 		} else if pmtStatus == "FAILED" {
 			failed := "FAILED"
 			ord.PaymentStatus = &failed
+			if ord.Status == "CREATED" || ord.Status == "PENDING_PAYMENT" {
+				ord.Status = "PAYMENT_FAILED"
+			}
 		} else if pmtStatus == "REFUNDED" {
 			refunded := "REFUNDED"
 			ord.PaymentStatus = &refunded

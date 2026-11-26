@@ -472,7 +472,19 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			return fmt.Errorf("failed to lock order for update: %w", err)
 		}
 
-		if currentStatus == status {
+		newPaymentStatus := paymentStatus
+		switch status {
+		case model.OrderStatusPaid, model.OrderStatusConfirmed:
+			newPaymentStatus = model.PaymentStatusPaid
+		case model.OrderStatusPaymentFailed:
+			newPaymentStatus = model.PaymentStatusFailed
+		case model.OrderStatusRefunded:
+			newPaymentStatus = model.PaymentStatusRefunded
+		case model.OrderStatusPendingPayment:
+			newPaymentStatus = model.PaymentStatusPending
+		}
+
+		if currentStatus == status && paymentStatus == newPaymentStatus {
 			var o model.Order
 			var parentID, shipAddrID, billAddrID, idempKey *string
 			var shipAddrStr, billAddrStr *string
@@ -515,18 +527,6 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			}
 		}
 
-		newPaymentStatus := paymentStatus
-		switch status {
-		case model.OrderStatusPaid, model.OrderStatusConfirmed:
-			newPaymentStatus = model.PaymentStatusPaid
-		case model.OrderStatusPaymentFailed:
-			newPaymentStatus = model.PaymentStatusFailed
-		case model.OrderStatusRefunded:
-			newPaymentStatus = model.PaymentStatusRefunded
-		case model.OrderStatusPendingPayment:
-			newPaymentStatus = model.PaymentStatusPending
-		}
-
 		query := `
 			UPDATE orders
 			SET status = $1, payment_status = $2, updated_at = NOW()
@@ -555,8 +555,15 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			_, _ = tx.Exec(ctx, `
 				UPDATE orders
 				SET status = $1, payment_status = $2, updated_at = NOW()
-				WHERE parent_order_id = $3 AND id != $4`,
+				WHERE (parent_order_id = $3 OR id = $3) AND id != $4`,
 				string(status), string(newPaymentStatus), *parentOrderID, targetID,
+			)
+		} else {
+			_, _ = tx.Exec(ctx, `
+				UPDATE orders
+				SET status = $1, payment_status = $2, updated_at = NOW()
+				WHERE parent_order_id = $3`,
+				string(status), string(newPaymentStatus), targetID,
 			)
 		}
 

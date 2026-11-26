@@ -171,6 +171,10 @@ func (m *mockRepo) GetProductReportByUserAndProduct(ctx context.Context, product
 	return nil, nil
 }
 
+func (m *mockRepo) EnsureProductReportsTable(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockRepo) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
 	res := []*model.ProductReport{}
 	for _, r := range m.reports {
