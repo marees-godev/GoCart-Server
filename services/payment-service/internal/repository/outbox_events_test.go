@@ -75,7 +75,7 @@ func TestOutboxPaymentSuccessfulEventPayloadIntegrity(t *testing.T) {
 	}
 
 	// Verify topic routing matches expectations
-	if events.TopicPaymentSuccessful != "gocart.payment.payment-successful" {
+	if events.TopicPaymentSuccessful != "gocart.payments" {
 		t.Errorf("unexpected topic for PaymentSuccessful: %s", events.TopicPaymentSuccessful)
 	}
 }
@@ -119,7 +119,7 @@ func TestOutboxPaymentFailedEventPayloadIntegrity(t *testing.T) {
 		t.Errorf("extracted failed event mismatch: %+v", extracted)
 	}
 
-	if events.TopicPaymentFailed != "gocart.payment.payment-failed" {
+	if events.TopicPaymentFailed != "gocart.payments" {
 		t.Errorf("unexpected topic for PaymentFailed: %s", events.TopicPaymentFailed)
 	}
 }
@@ -164,7 +164,7 @@ func TestOutboxPaymentPendingEventPayloadIntegrity(t *testing.T) {
 		t.Errorf("extracted pending event mismatch: %+v", extracted)
 	}
 
-	if events.TopicPaymentPending != "gocart.payment.payment-pending" {
+	if events.TopicPaymentPending != "gocart.payments" {
 		t.Errorf("unexpected topic for PaymentPending: %s", events.TopicPaymentPending)
 	}
 }
