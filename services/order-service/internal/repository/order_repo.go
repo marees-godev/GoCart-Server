@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	"github.com/marees-godev/GoCart-Server/pkg/database"
@@ -199,14 +200,34 @@ func (r *OrderRepo) CreateOrderWithOutbox(
 }
 
 func (r *OrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, error) {
-	query := `
-		SELECT 
-			id, order_number, parent_order_id, user_id, store_id,
-			subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
-			currency, payment_status, status, shipping_address::text, billing_address::text,
-			shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
-		FROM orders
-		WHERE id = $1`
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrOrderNotFound
+	}
+
+	var query string
+	if _, err := uuid.Parse(id); err == nil {
+		query = `
+			SELECT 
+				id, order_number, parent_order_id, user_id, store_id,
+				subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
+				currency, payment_status, status, shipping_address::text, billing_address::text,
+				shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
+			FROM orders
+			WHERE id = $1 OR parent_order_id = $1
+			ORDER BY created_at ASC
+			LIMIT 1`
+	} else {
+		query = `
+			SELECT 
+				id, order_number, parent_order_id, user_id, store_id,
+				subtotal, tax_amount, platform_fee, shipping_fee, discount_amount, total_amount,
+				currency, payment_status, status, shipping_address::text, billing_address::text,
+				shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
+			FROM orders
+			WHERE order_number = $1
+			LIMIT 1`
+	}
 
 	var o model.Order
 	var parentID, shipAddrID, billAddrID, idempKey *string
@@ -222,7 +243,7 @@ func (r *OrderRepo) GetOrderByID(ctx context.Context, id string) (*model.Order, 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
 		}
-		return nil, fmt.Errorf("failed to query order by id: %w", err)
+		return nil, fmt.Errorf("failed to query order: %w", err)
 	}
 
 	o.ParentOrderID = parentID
@@ -409,6 +430,11 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 	topic string,
 	reason ...string,
 ) (*model.Order, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrOrderNotFound
+	}
+
 	var updatedOrder *model.Order
 	reasonText := ""
 	if len(reason) > 0 {
@@ -416,15 +442,29 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 	}
 
 	err := r.db.WithTransaction(ctx, func(tx pgx.Tx) error {
-		selectQuery := `
-			SELECT status, payment_status
-			FROM orders
-			WHERE id = $1
-			FOR UPDATE`
+		var selectQuery string
+		if _, err := uuid.Parse(id); err == nil {
+			selectQuery = `
+				SELECT id, status, payment_status, parent_order_id
+				FROM orders
+				WHERE id = $1 OR parent_order_id = $1
+				ORDER BY created_at ASC
+				LIMIT 1
+				FOR UPDATE`
+		} else {
+			selectQuery = `
+				SELECT id, status, payment_status, parent_order_id
+				FROM orders
+				WHERE order_number = $1
+				LIMIT 1
+				FOR UPDATE`
+		}
 
+		var targetID string
 		var currentStatus model.OrderStatus
 		var paymentStatus model.PaymentStatus
-		err := tx.QueryRow(ctx, selectQuery, id).Scan(&currentStatus, &paymentStatus)
+		var parentOrderID *string
+		err := tx.QueryRow(ctx, selectQuery, id).Scan(&targetID, &currentStatus, &paymentStatus, &parentOrderID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrOrderNotFound
@@ -442,7 +482,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 					currency, payment_status, status, shipping_address::text, billing_address::text,
 					shipping_address_id, billing_address_id, idempotency_key, created_at, updated_at
 				FROM orders WHERE id = $1`
-			err = tx.QueryRow(ctx, readQuery, id).Scan(
+			err = tx.QueryRow(ctx, readQuery, targetID).Scan(
 				&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
 				&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 				&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
@@ -501,7 +541,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 		var parentID, shipAddrID, billAddrID, idempKey *string
 		var shipAddrStr, billAddrStr *string
 
-		err = tx.QueryRow(ctx, query, string(status), string(newPaymentStatus), id).Scan(
+		err = tx.QueryRow(ctx, query, string(status), string(newPaymentStatus), targetID).Scan(
 			&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
 			&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 			&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
@@ -509,6 +549,15 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 		)
 		if err != nil {
 			return fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		if parentOrderID != nil && *parentOrderID != "" {
+			_, _ = tx.Exec(ctx, `
+				UPDATE orders
+				SET status = $1, payment_status = $2, updated_at = NOW()
+				WHERE parent_order_id = $3 AND id != $4`,
+				string(status), string(newPaymentStatus), *parentOrderID, targetID,
+			)
 		}
 
 		o.ParentOrderID = parentID
@@ -532,7 +581,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			rVal = reasonText
 		}
 
-		if _, err := tx.Exec(ctx, historyQuery, id, string(currentStatus), string(status), rVal); err != nil {
+		if _, err := tx.Exec(ctx, historyQuery, targetID, string(currentStatus), string(status), rVal); err != nil {
 			return fmt.Errorf("failed to insert order status history: %w", err)
 		}
 
@@ -543,7 +592,7 @@ func (r *OrderRepo) UpdateOrderStatusWithOutbox(
 			}
 			evt := &outbox.Event{
 				AggregateType: "order",
-				AggregateID:   id,
+				AggregateID:   targetID,
 				EventType:     envelope.EventType,
 				Payload:       payload,
 				Topic:         topic,
@@ -596,6 +645,11 @@ func (r *OrderRepo) getItemsByOrderID(ctx context.Context, orderID string) ([]mo
 }
 
 func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events.EventEnvelope, topic string, reason ...string) (*model.Order, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, ErrOrderNotFound
+	}
+
 	var updatedOrder *model.Order
 	reasonText := ""
 	if len(reason) > 0 {
@@ -603,14 +657,28 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 	}
 
 	err := r.db.WithTransaction(ctx, func(tx pgx.Tx) error {
-		selectQuery := `
-			SELECT status
-			FROM orders
-			WHERE id = $1
-			FOR UPDATE`
+		var selectQuery string
+		if _, err := uuid.Parse(id); err == nil {
+			selectQuery = `
+				SELECT id, status, parent_order_id
+				FROM orders
+				WHERE id = $1 OR parent_order_id = $1
+				ORDER BY created_at ASC
+				LIMIT 1
+				FOR UPDATE`
+		} else {
+			selectQuery = `
+				SELECT id, status, parent_order_id
+				FROM orders
+				WHERE order_number = $1
+				LIMIT 1
+				FOR UPDATE`
+		}
 
+		var targetID string
 		var currentStatus model.OrderStatus
-		err := tx.QueryRow(ctx, selectQuery, id).Scan(&currentStatus)
+		var parentOrderID *string
+		err := tx.QueryRow(ctx, selectQuery, id).Scan(&targetID, &currentStatus, &parentOrderID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrOrderNotFound
@@ -639,7 +707,7 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 		var parentID, shipAddrID, billAddrID, idempKey *string
 		var shipAddrStr, billAddrStr *string
 
-		err = tx.QueryRow(ctx, query, string(model.OrderStatusCancelled), id).Scan(
+		err = tx.QueryRow(ctx, query, string(model.OrderStatusCancelled), targetID).Scan(
 			&o.ID, &o.OrderNumber, &parentID, &o.UserID, &o.StoreID,
 			&o.Subtotal, &o.TaxAmount, &o.PlatformFee, &o.ShippingFee, &o.DiscountAmount, &o.TotalAmount,
 			&o.Currency, &o.PaymentStatus, &o.Status, &shipAddrStr, &billAddrStr,
@@ -647,6 +715,15 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 		)
 		if err != nil {
 			return fmt.Errorf("failed to cancel order: %w", err)
+		}
+
+		if parentOrderID != nil && *parentOrderID != "" {
+			_, _ = tx.Exec(ctx, `
+				UPDATE orders
+				SET status = $1, updated_at = NOW()
+				WHERE parent_order_id = $2 AND id != $3`,
+				string(model.OrderStatusCancelled), *parentOrderID, targetID,
+			)
 		}
 
 		o.ParentOrderID = parentID
@@ -670,7 +747,7 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 			rVal = reasonText
 		}
 
-		if _, err := tx.Exec(ctx, historyQuery, id, string(currentStatus), string(model.OrderStatusCancelled), rVal); err != nil {
+		if _, err := tx.Exec(ctx, historyQuery, targetID, string(currentStatus), string(model.OrderStatusCancelled), rVal); err != nil {
 			return fmt.Errorf("failed to insert order status history for cancel: %w", err)
 		}
 
@@ -681,7 +758,7 @@ func (r *OrderRepo) CancelOrder(ctx context.Context, id string, envelope *events
 			}
 			evt := &outbox.Event{
 				AggregateType: "order",
-				AggregateID:   id,
+				AggregateID:   targetID,
 				EventType:     envelope.EventType,
 				Payload:       payload,
 				Topic:         topic,

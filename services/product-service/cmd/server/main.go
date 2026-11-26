@@ -101,10 +101,11 @@ func main() {
 	storeClient, _, _ := grpcclient.NewStoreClient(cfg.GRPC.StoreServiceAddr, 5*time.Second)
 	categoryClient, _, _ := grpcclient.NewCategoryClient(cfg.GRPC.CategoryServiceAddr, 5*time.Second)
 	merchantClient, _, _ := grpcclient.NewMerchantClient(cfg.GRPC.MerchantServiceAddr, 5*time.Second)
+	notifClient, _, _ := grpcclient.NewNotificationClient(cfg.GRPC.NotificationServiceAddr, 5*time.Second)
 
 	outboxStore := outbox.NewStore()
 	productRepo := repository.NewProductRepositoryWithOutbox(db.Pool, outboxStore, log)
-	productService := service.NewProductServiceWithClients(productRepo, storeClient, categoryClient, merchantClient, s3Client, log)
+	productService := service.NewProductServiceWithAllClients(productRepo, storeClient, categoryClient, merchantClient, notifClient, s3Client, log)
 	productGRPCHandler := handler.NewProductGRPCHandler(productService, log)
 
 	if cfg.Outbox.Enabled && len(cfg.Kafka.Brokers) > 0 {
@@ -134,9 +135,11 @@ func main() {
 	}
 
 	productMethodRoles := map[string][]string{
-		"/gocart.product.v1.ProductService/CreateProduct": {auth.RoleAdmin, auth.RoleMerchant},
-		"/gocart.product.v1.ProductService/UpdateProduct": {auth.RoleAdmin, auth.RoleMerchant},
-		"/gocart.product.v1.ProductService/DeleteProduct": {auth.RoleAdmin, auth.RoleMerchant},
+		"/gocart.product.v1.ProductService/CreateProduct":      {auth.RoleAdmin, auth.RoleMerchant},
+		"/gocart.product.v1.ProductService/UpdateProduct":      {auth.RoleAdmin, auth.RoleMerchant},
+		"/gocart.product.v1.ProductService/DeleteProduct":      {auth.RoleAdmin, auth.RoleMerchant},
+		"/gocart.product.v1.ProductService/ReportProduct":      {auth.RoleAdmin, auth.RoleMerchant, auth.RoleCustomer, auth.RoleUser},
+		"/gocart.product.v1.ProductService/ListProductReports": {auth.RoleAdmin, auth.RoleMerchant},
 	}
 
 	grpcServer := grpc.NewServer(

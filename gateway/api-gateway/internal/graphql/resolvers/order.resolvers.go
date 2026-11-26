@@ -12,6 +12,7 @@ import (
 	cartpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/cart"
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
@@ -185,6 +186,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	}
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.enrichOrderPaymentStatus(ctx, ord)
 	r.notifyOrderCreated(ctx, ord)
 	return ord, nil
 }
@@ -248,6 +250,7 @@ func (r *mutationResolver) CancelOrder(ctx context.Context, id string, reason *s
 	}
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.enrichOrderPaymentStatus(ctx, ord)
 	r.notifyOrderCancelled(ctx, ord, reasonStr)
 	return ord, nil
 }
@@ -264,10 +267,29 @@ func (r *mutationResolver) ConfirmOrder(ctx context.Context, id string) (*model.
 		Status: "CONFIRMED",
 	})
 	if err != nil {
+		if pClient := r.getPaymentClient(); pClient != nil {
+			payResp, pErr := pClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: id})
+			if pErr == nil && payResp != nil && payResp.GetPayment() != nil {
+				st := strings.ToUpper(strings.TrimSpace(payResp.GetPayment().GetStatus()))
+				if st == "SUCCESS" || st == "PAID" {
+					_, _ = client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+						Id:     id,
+						Status: "PAID",
+					})
+					resp, err = client.UpdateOrderStatus(ctx, &orderpb.UpdateOrderStatusRequest{
+						Id:     id,
+						Status: "CONFIRMED",
+					})
+				}
+			}
+		}
+	}
+	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.enrichOrderPaymentStatus(ctx, ord)
 	r.notifyOrderStatusUpdated(ctx, ord, "CONFIRMED")
 	return ord, nil
 }
@@ -288,6 +310,7 @@ func (r *mutationResolver) UpdateOrderStatus(ctx context.Context, id string, sta
 	}
 
 	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.enrichOrderPaymentStatus(ctx, ord)
 	r.notifyOrderStatusUpdated(ctx, ord, status)
 	return ord, nil
 }
@@ -317,7 +340,9 @@ func (r *queryResolver) GetOrder(ctx context.Context, id string) (*model.Order, 
 		return nil, grpcclient.TranslateGRPCError(err)
 	}
 
-	return mapProtoOrderToGraphQL(resp.GetOrder()), nil
+	ord := mapProtoOrderToGraphQL(resp.GetOrder())
+	r.enrichOrderPaymentStatus(ctx, ord)
+	return ord, nil
 }
 
 // ListMyOrders is the resolver for the listMyOrders field.
@@ -351,8 +376,10 @@ func (r *queryResolver) ListMyOrders(ctx context.Context, limit *int, offset *in
 	}
 
 	orders := make([]*model.Order, 0, len(resp.GetOrders()))
-	for _, ord := range resp.GetOrders() {
-		orders = append(orders, mapProtoOrderToGraphQL(ord))
+	for _, o := range resp.GetOrders() {
+		ord := mapProtoOrderToGraphQL(o)
+		r.enrichOrderPaymentStatus(ctx, ord)
+		orders = append(orders, ord)
 	}
 
 	return &model.OrderList{
@@ -397,8 +424,10 @@ func (r *queryResolver) Orders(ctx context.Context, userID string, limit *int, o
 	}
 
 	orders := make([]*model.Order, 0, len(resp.GetOrders()))
-	for _, ord := range resp.GetOrders() {
-		orders = append(orders, mapProtoOrderToGraphQL(ord))
+	for _, o := range resp.GetOrders() {
+		ord := mapProtoOrderToGraphQL(o)
+		r.enrichOrderPaymentStatus(ctx, ord)
+		orders = append(orders, ord)
 	}
 
 	return &model.OrderList{
@@ -514,6 +543,17 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 	st := strings.ToUpper(strings.TrimSpace(o.GetStatus()))
 	ps := strings.ToUpper(strings.TrimSpace(o.GetPaymentStatus()))
 
+	if st == "PAID" || st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "COMPLETED" {
+		paidStr := "PAID"
+		payStatus = &paidStr
+	} else if st == "PAYMENT_FAILED" {
+		failedStr := "FAILED"
+		payStatus = &failedStr
+	} else if st == "REFUNDED" {
+		refundedStr := "REFUNDED"
+		payStatus = &refundedStr
+	}
+
 	canCancel := o.GetCanCancel()
 	if !canCancel && (st == "CREATED" || st == "PENDING_PAYMENT" || st == "PAID" || st == "CONFIRMED" || st == "PROCESSING") {
 		canCancel = true
@@ -551,5 +591,78 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		UpdatedAt:         uaPtr,
 		CanCancel:         &canCancel,
 		MerchantCanCancel: &merchantCanCancel,
+	}
+}
+
+func (r *Resolver) enrichOrderPaymentStatus(ctx context.Context, ord *model.Order) {
+	if ord == nil {
+		return
+	}
+	st := strings.ToUpper(strings.TrimSpace(ord.Status))
+	if st == "PAID" || st == "CONFIRMED" || st == "PROCESSING" || st == "SHIPPED" || st == "OUT_FOR_DELIVERY" || st == "DELIVERED" || st == "COMPLETED" {
+		paid := "PAID"
+		ord.PaymentStatus = &paid
+		return
+	}
+	if st == "PAYMENT_FAILED" {
+		failed := "FAILED"
+		ord.PaymentStatus = &failed
+		return
+	}
+	if st == "REFUNDED" {
+		refunded := "REFUNDED"
+		ord.PaymentStatus = &refunded
+		return
+	}
+
+	currentPS := ""
+	if ord.PaymentStatus != nil {
+		currentPS = strings.ToUpper(strings.TrimSpace(*ord.PaymentStatus))
+	}
+	if currentPS == "PAID" || currentPS == "FAILED" || currentPS == "REFUNDED" {
+		return
+	}
+
+	payClient := r.getPaymentClient()
+	if payClient == nil {
+		return
+	}
+
+	var paymentResp *paymentpb.GetPaymentResponse
+	var err error
+
+	if ord.ID != "" {
+		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: ord.ID})
+	}
+	if (err != nil || paymentResp == nil || paymentResp.GetPayment() == nil) && ord.ParentOrderID != nil && *ord.ParentOrderID != "" {
+		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: *ord.ParentOrderID})
+	}
+	if (err != nil || paymentResp == nil || paymentResp.GetPayment() == nil) && ord.OrderNumber != nil && *ord.OrderNumber != "" {
+		paymentResp, err = payClient.GetPaymentByOrderID(ctx, &paymentpb.GetPaymentByOrderIDRequest{OrderId: *ord.OrderNumber})
+	}
+
+	if err == nil && paymentResp != nil && paymentResp.GetPayment() != nil {
+		pmt := paymentResp.GetPayment()
+		pmtStatus := strings.ToUpper(strings.TrimSpace(pmt.GetStatus()))
+		if pmtStatus == "SUCCESS" || pmtStatus == "PAID" {
+			paid := "PAID"
+			ord.PaymentStatus = &paid
+
+			orderClient, ordClientErr := r.getOrderClient()
+			if ordClientErr == nil && orderClient != nil {
+				go func(targetID string) {
+					_, _ = orderClient.UpdateOrderStatus(context.Background(), &orderpb.UpdateOrderStatusRequest{
+						Id:     targetID,
+						Status: "PAID",
+					})
+				}(ord.ID)
+			}
+		} else if pmtStatus == "FAILED" {
+			failed := "FAILED"
+			ord.PaymentStatus = &failed
+		} else if pmtStatus == "REFUNDED" {
+			refunded := "REFUNDED"
+			ord.PaymentStatus = &refunded
+		}
 	}
 }

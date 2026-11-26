@@ -26,7 +26,7 @@ type ProductRepository interface {
 	UpdateProduct(ctx context.Context, p *model.Product) error
 	DeleteProduct(ctx context.Context, id string) error
 	DeleteProductVariant(ctx context.Context, productID, variantID string) error
-	CreateProductReport(ctx context.Context, report *model.ProductReport) error
+	CreateProductReport(ctx context.Context, report *model.ProductReport, outboxEvt ...*outbox.Event) error
 	GetProductReportByID(ctx context.Context, id string) (*model.ProductReport, error)
 	GetProductReportByUserAndProduct(ctx context.Context, productID, reporterID string) (*model.ProductReport, error)
 	ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error)
@@ -624,7 +624,13 @@ func (r *pgProductRepository) DeleteProductVariant(ctx context.Context, productI
 	return nil
 }
 
-func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *model.ProductReport) error {
+func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *model.ProductReport, outboxEvt ...*outbox.Event) error {
+	tx, err := r.startTx(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to start database transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	query := `
 		INSERT INTO product_reports (
 			product_id, reporter_id, reason, description, status
@@ -637,7 +643,7 @@ func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *m
 		status = model.ReportStatusPending
 	}
 
-	err := r.pool.QueryRow(ctx, query,
+	err = tx.QueryRow(ctx, query,
 		report.ProductID, report.ReporterID, report.Reason, report.Description, status,
 	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
 
@@ -649,6 +655,19 @@ func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *m
 	}
 
 	report.Status = status
+
+	for _, evt := range outboxEvt {
+		if evt != nil {
+			if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+				return appErrors.Internal(err, "failed to record outbox event for ProductReported")
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit transaction")
+	}
+
 	return nil
 }
 

@@ -212,5 +212,17 @@
     "subject_template": "Refund Completed - Order #{{.OrderID}}",
     "body_template": "Your refund of {{.Amount}} {{.Currency}} for Order #{{.OrderID}} (Refund ID: {{.RefundID}}) has been processed successfully.",
     "template_file": "emails/payment_notification.html"
+  },
+  {
+    "event_type": "ProductReported",
+    "channel": "EMAIL",
+    "subject_template": "Product Report Notice - Product #{{.ProductID}}",
+    "body_template": "A report has been submitted for product #{{.ProductID}}. Reason: {{.Reason}}. Description: {{.Description}}."
+  },
+  {
+    "event_type": "ProductReported",
+    "channel": "PUSH",
+    "subject_template": "Product Reported",
+    "body_template": "A report was submitted for product #{{.ProductID}}."
   }
 ]

@@ -80,6 +80,7 @@ jobs:
               - 'go.sum'
             notification-service:
               - 'services/notification-service/**'
+              - 'contracts/events/**'
               - 'pkg/**'
               - 'go.work'
               - 'go.work.sum'
@@ -102,6 +103,7 @@ jobs:
             product-service:
               - 'services/product-service/**'
               - 'contracts/protobuf/product/**'
+              - 'contracts/events/**'
               - 'pkg/**'
               - 'go.work'
               - 'go.work.sum'

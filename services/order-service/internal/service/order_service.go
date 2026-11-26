@@ -792,7 +792,7 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", order.ID, payload)
 	}
 
-	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, id, orderStatus, envelope, topic, reason...)
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, order.ID, orderStatus, envelope, topic, reason...)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
@@ -855,7 +855,7 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 
 	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
-		orderID,
+		order.ID,
 		model.OrderStatusPaid,
 		envelope,
 		events.TopicOrderPaymentConfirmed,
@@ -926,7 +926,7 @@ func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.Pa
 
 	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
-		orderID,
+		order.ID,
 		model.OrderStatusPaymentFailed,
 		envelope,
 		OrderPaymentFailedTopic,

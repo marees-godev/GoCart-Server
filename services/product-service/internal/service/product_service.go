@@ -6,14 +6,19 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/dto"
+	productEvents "github.com/marees-godev/GoCart-Server/services/product-service/internal/events"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/repository"
 	"google.golang.org/grpc"
@@ -29,6 +34,10 @@ type CategoryClient interface {
 
 type MerchantClient interface {
 	GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error)
+}
+
+type NotificationClient interface {
+	SendNotification(ctx context.Context, in *notificationpb.SendNotificationRequest, opts ...grpc.CallOption) (*notificationpb.SendNotificationResponse, error)
 }
 
 type ProductService interface {
@@ -47,6 +56,7 @@ type productService struct {
 	storeClient    StoreClient
 	categoryClient CategoryClient
 	merchantClient MerchantClient
+	notifClient    NotificationClient
 	uploader       storage.Uploader
 	stateValidator *model.StateTransitionValidator
 	logger         *slog.Logger
@@ -70,6 +80,18 @@ func NewProductServiceWithClients(
 	uploader storage.Uploader,
 	log ...*slog.Logger,
 ) ProductService {
+	return NewProductServiceWithAllClients(repo, storeClient, categoryClient, merchantClient, nil, uploader, log...)
+}
+
+func NewProductServiceWithAllClients(
+	repo repository.ProductRepository,
+	storeClient StoreClient,
+	categoryClient CategoryClient,
+	merchantClient MerchantClient,
+	notifClient NotificationClient,
+	uploader storage.Uploader,
+	log ...*slog.Logger,
+) ProductService {
 	var l *slog.Logger
 	if len(log) > 0 {
 		l = log[0]
@@ -79,6 +101,7 @@ func NewProductServiceWithClients(
 		storeClient:    storeClient,
 		categoryClient: categoryClient,
 		merchantClient: merchantClient,
+		notifClient:    notifClient,
 		uploader:       uploader,
 		stateValidator: model.NewStateTransitionValidator(),
 		logger:         l,
@@ -513,8 +536,56 @@ func (s *productService) ReportProduct(ctx context.Context, req dto.ReportProduc
 		Status:      model.ReportStatusPending,
 	}
 
-	if err := s.repo.CreateProductReport(ctx, report); err != nil {
+	var merchantID string
+	if s.storeClient != nil && prod.StoreID != "" {
+		stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: prod.StoreID})
+		if err == nil && stResp != nil && stResp.Store != nil {
+			merchantID = stResp.Store.MerchantId
+		}
+	}
+
+	var outboxEvts []*outbox.Event
+	if outboxEvt, err := productEvents.BuildProductReportedOutboxEvent(report, prod, merchantID); err == nil && outboxEvt != nil {
+		outboxEvts = append(outboxEvts, outboxEvt)
+	}
+
+	if err := s.repo.CreateProductReport(ctx, report, outboxEvts...); err != nil {
 		return nil, err
+	}
+
+	if s.notifClient != nil {
+		go func() {
+			nCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if merchantID != "" {
+				_, notifErr := s.notifClient.SendNotification(nCtx, &notificationpb.SendNotificationRequest{
+					UserId:    merchantID,
+					Channel:   "IN_APP",
+					Subject:   fmt.Sprintf("Product Reported: %s", prod.Name),
+					Content:   fmt.Sprintf("Your product %q was reported for %s. Details: %s", prod.Name, report.Reason, report.Description),
+					EventType: events.EventTypeProductReported,
+					Recipient: merchantID,
+				})
+				if notifErr != nil && s.logger != nil {
+					s.logger.WarnContext(nCtx, "failed to notify merchant of product report", "product_id", prod.ID, "merchant_id", merchantID, "error", notifErr)
+				}
+			}
+
+			if req.ReporterID != "" {
+				_, notifErr := s.notifClient.SendNotification(nCtx, &notificationpb.SendNotificationRequest{
+					UserId:    req.ReporterID,
+					Channel:   "IN_APP",
+					Subject:   fmt.Sprintf("Report Received: %s", prod.Name),
+					Content:   fmt.Sprintf("Thank you for your report regarding %q. Our moderation team will review it.", prod.Name),
+					EventType: events.EventTypeProductReported,
+					Recipient: req.ReporterID,
+				})
+				if notifErr != nil && s.logger != nil {
+					s.logger.WarnContext(nCtx, "failed to send report confirmation notification to reporter", "product_id", prod.ID, "reporter_id", req.ReporterID, "error", notifErr)
+				}
+			}
+		}()
 	}
 
 	return report, nil

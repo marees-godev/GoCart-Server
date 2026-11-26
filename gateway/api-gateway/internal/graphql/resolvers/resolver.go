@@ -4,6 +4,7 @@ import (
 	"context"
 
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/config"
@@ -27,6 +28,13 @@ func (r *Resolver) getMerchantClient() merchantpb.MerchantServiceClient {
 	}
 	if r.ClientMgr != nil && r.ClientMgr.MerchantClient != nil {
 		return r.ClientMgr.MerchantClient
+	}
+	return nil
+}
+
+func (r *Resolver) getPaymentClient() paymentpb.PaymentServiceClient {
+	if r.ClientMgr != nil && r.ClientMgr.PaymentClient != nil {
+		return r.ClientMgr.PaymentClient
 	}
 	return nil
 }

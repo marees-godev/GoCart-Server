@@ -7956,7 +7956,7 @@ input ReportProductInput {
 extend type Query {
   product(id: ID!): Product
   products(limit: Int, offset: Int, categoryId: String, storeId: String, status: ProductStatus): ProductList!
-  productReports(productId: ID, limit: Int, offset: Int, status: ProductReportStatus): ProductReportList! @auth(requires: [ADMIN])
+  productReports(productId: ID, limit: Int, offset: Int, status: ProductReportStatus): ProductReportList! @auth(requires: [ADMIN, MERCHANT])
 }
 
 extend type Mutation {
@@ -42248,7 +42248,7 @@ func (ec *executionContext) _Query_productReports(ctx context.Context, field gra
 			return ec.resolvers.Query().ProductReports(rctx, fc.Args["productId"].(*string), fc.Args["limit"].(*int), fc.Args["offset"].(*int), fc.Args["status"].(*model.ProductReportStatus))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN"})
+			requires, err := ec.unmarshalORole2ᚕgithubᚗcomᚋmareesᚑgodevᚋGoCartᚑServerᚋgatewayᚋapiᚑgatewayᚋinternalᚋgraphqlᚋmodelᚐRoleᚄ(ctx, []interface{}{"ADMIN", "MERCHANT"})
 			if err != nil {
 				return nil, err
 			}

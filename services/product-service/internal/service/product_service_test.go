@@ -6,20 +6,38 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/dto"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/service"
 	"google.golang.org/grpc"
 )
+
+type mockNotificationClient struct {
+	sentRequests []*notificationpb.SendNotificationRequest
+	mu           sync.Mutex
+}
+
+func (m *mockNotificationClient) SendNotification(ctx context.Context, in *notificationpb.SendNotificationRequest, opts ...grpc.CallOption) (*notificationpb.SendNotificationResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sentRequests = append(m.sentRequests, in)
+	return &notificationpb.SendNotificationResponse{
+		NotificationId: "notif-123",
+		Success:        true,
+	}, nil
+}
 
 type mockRepo struct {
 	counter  int64
@@ -122,7 +140,7 @@ func (m *mockRepo) DeleteProductVariant(ctx context.Context, productID, variantI
 	return appErrors.NotFound("product variant not found for this product")
 }
 
-func (m *mockRepo) CreateProductReport(ctx context.Context, report *model.ProductReport) error {
+func (m *mockRepo) CreateProductReport(ctx context.Context, report *model.ProductReport, outboxEvt ...*outbox.Event) error {
 	for _, r := range m.reports {
 		if r.ProductID == report.ProductID && r.ReporterID == report.ReporterID {
 			return appErrors.Conflict("you have already reported this product")
@@ -661,8 +679,9 @@ func TestDirectProductPublishingWithoutVerification(t *testing.T) {
 			merchantID: {Id: merchantID, Status: merchantpb.MerchantStatus_APPROVED},
 		},
 	}
+	notifClient := &mockNotificationClient{}
 
-	svc := service.NewProductServiceWithClients(repo, storeClient, catClient, merchantClient, nil)
+	svc := service.NewProductServiceWithAllClients(repo, storeClient, catClient, merchantClient, notifClient, nil)
 	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: merchantID,
 		Role:   auth.RoleMerchant,
@@ -743,8 +762,9 @@ func TestProductReporting(t *testing.T) {
 			merchantID: {Id: merchantID, Status: merchantpb.MerchantStatus_APPROVED},
 		},
 	}
+	notifClient := &mockNotificationClient{}
 
-	svc := service.NewProductServiceWithClients(repo, storeClient, catClient, merchantClient, nil)
+	svc := service.NewProductServiceWithAllClients(repo, storeClient, catClient, merchantClient, notifClient, nil)
 	merchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
 		UserID: merchantID,
 		Role:   auth.RoleMerchant,
@@ -811,6 +831,15 @@ func TestProductReporting(t *testing.T) {
 		}
 		if rep.Status != model.ReportStatusPending {
 			t.Errorf("expected status PENDING, got %s", rep.Status)
+		}
+
+		// Wait briefly for notification goroutine to complete
+		time.Sleep(50 * time.Millisecond)
+		notifClient.mu.Lock()
+		sentCount := len(notifClient.sentRequests)
+		notifClient.mu.Unlock()
+		if sentCount < 2 {
+			t.Errorf("expected at least 2 notifications (merchant + reporter), got %d", sentCount)
 		}
 
 		// Verify product is NOT automatically removed or unpublished

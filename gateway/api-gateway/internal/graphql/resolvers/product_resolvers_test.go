@@ -345,3 +345,42 @@ func TestProductResolvers_ProductReports_Success(t *testing.T) {
 		t.Errorf("expected report ID rep-1, got %s", res.Reports[0].ID)
 	}
 }
+
+func TestProductResolvers_ProductReports_MerchantRole(t *testing.T) {
+	mockClient := &mockProductClient{
+		listRepResp: &productpb.ListProductReportsResponse{
+			Reports: []*productpb.ProductReport{
+				{
+					Id:         "rep-merchant-1",
+					ProductId:  "prod-100",
+					ReporterId: "customer-1",
+					Reason:     "MISLEADING_INFORMATION",
+					Status:     "PENDING",
+				},
+			},
+			Total: 1,
+		},
+	}
+
+	clients := &grpc.Clients{ProductClient: mockClient}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-123",
+		Role:   auth.RoleMerchant,
+	})
+
+	prodID := "prod-100"
+	limit := 10
+	offset := 0
+	res, err := r.ProductReports(ctx, &prodID, &limit, &offset, nil)
+	if err != nil {
+		t.Fatalf("expected success for merchant role, got %v", err)
+	}
+	if res.Total != 1 || len(res.Reports) != 1 {
+		t.Errorf("unexpected reports count: %d", res.Total)
+	}
+	if res.Reports[0].ID != "rep-merchant-1" {
+		t.Errorf("expected report ID rep-merchant-1, got %s", res.Reports[0].ID)
+	}
+}

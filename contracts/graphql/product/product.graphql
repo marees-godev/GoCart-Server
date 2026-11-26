@@ -168,7 +168,7 @@ input ReportProductInput {
 extend type Query {
   product(id: ID!): Product
   products(limit: Int, offset: Int, categoryId: String, storeId: String, status: ProductStatus): ProductList!
-  productReports(productId: ID, limit: Int, offset: Int, status: ProductReportStatus): ProductReportList! @auth(requires: [ADMIN])
+  productReports(productId: ID, limit: Int, offset: Int, status: ProductReportStatus): ProductReportList! @auth(requires: [ADMIN, MERCHANT])
 }
 
 extend type Mutation {
