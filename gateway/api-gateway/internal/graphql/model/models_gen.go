@@ -793,6 +793,22 @@ type ProductRatings struct {
 	Stars         *StarRating `json:"stars"`
 }
 
+type ProductReport struct {
+	ID          string              `json:"id"`
+	ProductID   string              `json:"productId"`
+	ReporterID  string              `json:"reporterId"`
+	Reason      ProductReportReason `json:"reason"`
+	Description *string             `json:"description,omitempty"`
+	Status      ProductReportStatus `json:"status"`
+	CreatedAt   *string             `json:"createdAt,omitempty"`
+	UpdatedAt   *string             `json:"updatedAt,omitempty"`
+}
+
+type ProductReportList struct {
+	Reports []*ProductReport `json:"reports"`
+	Total   int              `json:"total"`
+}
+
 type ProductVariant struct {
 	ID             string        `json:"id"`
 	ProductID      string        `json:"productId"`
@@ -910,6 +926,18 @@ type RegisterPushSubscriptionInput struct {
 	Auth       string  `json:"auth"`
 	UserAgent  *string `json:"userAgent,omitempty"`
 	DeviceName *string `json:"deviceName,omitempty"`
+}
+
+type ReportProductInput struct {
+	ProductID   string              `json:"productId"`
+	Reason      ProductReportReason `json:"reason"`
+	Description *string             `json:"description,omitempty"`
+}
+
+type ReportProductResponse struct {
+	Success bool           `json:"success"`
+	Message string         `json:"message"`
+	Report  *ProductReport `json:"report,omitempty"`
 }
 
 type RequestReplacementInput struct {
@@ -1698,6 +1726,100 @@ func (e *PartnerApprovalStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e PartnerApprovalStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ProductReportReason string
+
+const (
+	ProductReportReasonInappropriateContent    ProductReportReason = "INAPPROPRIATE_CONTENT"
+	ProductReportReasonMisleadingInformation   ProductReportReason = "MISLEADING_INFORMATION"
+	ProductReportReasonCounterfeitOrFraudulent ProductReportReason = "COUNTERFEIT_OR_FRAUDULENT"
+	ProductReportReasonProhibitedProduct       ProductReportReason = "PROHIBITED_PRODUCT"
+	ProductReportReasonSpamOrDuplicate         ProductReportReason = "SPAM_OR_DUPLICATE"
+	ProductReportReasonOther                   ProductReportReason = "OTHER"
+)
+
+var AllProductReportReason = []ProductReportReason{
+	ProductReportReasonInappropriateContent,
+	ProductReportReasonMisleadingInformation,
+	ProductReportReasonCounterfeitOrFraudulent,
+	ProductReportReasonProhibitedProduct,
+	ProductReportReasonSpamOrDuplicate,
+	ProductReportReasonOther,
+}
+
+func (e ProductReportReason) IsValid() bool {
+	switch e {
+	case ProductReportReasonInappropriateContent, ProductReportReasonMisleadingInformation, ProductReportReasonCounterfeitOrFraudulent, ProductReportReasonProhibitedProduct, ProductReportReasonSpamOrDuplicate, ProductReportReasonOther:
+		return true
+	}
+	return false
+}
+
+func (e ProductReportReason) String() string {
+	return string(e)
+}
+
+func (e *ProductReportReason) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProductReportReason(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProductReportReason", str)
+	}
+	return nil
+}
+
+func (e ProductReportReason) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ProductReportStatus string
+
+const (
+	ProductReportStatusPending     ProductReportStatus = "PENDING"
+	ProductReportStatusReviewed    ProductReportStatus = "REVIEWED"
+	ProductReportStatusDismissed   ProductReportStatus = "DISMISSED"
+	ProductReportStatusActionTaken ProductReportStatus = "ACTION_TAKEN"
+)
+
+var AllProductReportStatus = []ProductReportStatus{
+	ProductReportStatusPending,
+	ProductReportStatusReviewed,
+	ProductReportStatusDismissed,
+	ProductReportStatusActionTaken,
+}
+
+func (e ProductReportStatus) IsValid() bool {
+	switch e {
+	case ProductReportStatusPending, ProductReportStatusReviewed, ProductReportStatusDismissed, ProductReportStatusActionTaken:
+		return true
+	}
+	return false
+}
+
+func (e ProductReportStatus) String() string {
+	return string(e)
+}
+
+func (e *ProductReportStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ProductReportStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ProductReportStatus", str)
+	}
+	return nil
+}
+
+func (e ProductReportStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

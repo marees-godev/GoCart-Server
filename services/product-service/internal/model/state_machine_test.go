@@ -18,7 +18,8 @@ func TestProductStateMachineTransitions(t *testing.T) {
 	}{
 		{"DRAFT -> PENDING_REVIEW (Valid)", model.StatusDraft, model.StatusPendingReview, false},
 		{"DRAFT -> DELETED (Valid)", model.StatusDraft, model.StatusDeleted, false},
-		{"DRAFT -> PUBLISHED (Invalid)", model.StatusDraft, model.StatusPublished, true},
+		{"DRAFT -> PUBLISHED (Valid)", model.StatusDraft, model.StatusPublished, false},
+		{"DRAFT -> UNPUBLISHED (Valid)", model.StatusDraft, model.StatusUnpublished, false},
 		{"DRAFT -> SUSPENDED (Invalid)", model.StatusDraft, model.StatusSuspended, true},
 
 		{"PENDING_REVIEW -> PUBLISHED (Valid)", model.StatusPendingReview, model.StatusPublished, false},

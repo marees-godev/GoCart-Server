@@ -326,3 +326,72 @@ func ToProductVariantPB(v *model.ProductVariant) *productpb.ProductVariant {
 		DeletedAt:      deletedAtStr,
 	}
 }
+
+type ReportProductRequest struct {
+	ProductID   string `json:"product_id"`
+	ReporterID  string `json:"reporter_id"`
+	Reason      string `json:"reason"`
+	Description string `json:"description"`
+}
+
+func (r *ReportProductRequest) Validate() error {
+	r.ProductID = strings.TrimSpace(r.ProductID)
+	if r.ProductID == "" {
+		return appErrors.InvalidArgument("product_id is required")
+	}
+	if _, err := uuid.Parse(r.ProductID); err != nil {
+		return appErrors.InvalidArgument("product_id must be a valid UUID")
+	}
+
+	r.ReporterID = strings.TrimSpace(r.ReporterID)
+	if r.ReporterID == "" {
+		return appErrors.InvalidArgument("reporter_id is required")
+	}
+	if _, err := uuid.Parse(r.ReporterID); err != nil {
+		return appErrors.InvalidArgument("reporter_id must be a valid UUID")
+	}
+
+	r.Reason = strings.TrimSpace(r.Reason)
+	if r.Reason == "" {
+		return appErrors.InvalidArgument("report reason is required")
+	}
+
+	r.Description = strings.TrimSpace(r.Description)
+	if len(r.Description) > 1000 {
+		return appErrors.InvalidArgument("description cannot exceed 1000 characters")
+	}
+
+	return nil
+}
+
+type ListProductReportsRequest struct {
+	ProductID string `json:"product_id"`
+	Limit     int32  `json:"limit"`
+	Offset    int32  `json:"offset"`
+	Status    string `json:"status"`
+}
+
+func ToProductReportPB(r *model.ProductReport) *productpb.ProductReport {
+	if r == nil {
+		return nil
+	}
+	return &productpb.ProductReport{
+		Id:          r.ID,
+		ProductId:   r.ProductID,
+		ReporterId:  r.ReporterID,
+		Reason:      string(r.Reason),
+		Description: r.Description,
+		Status:      string(r.Status),
+		CreatedAt:   r.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   r.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+func ToProductReportListPB(reports []*model.ProductReport) []*productpb.ProductReport {
+	res := make([]*productpb.ProductReport, 0, len(reports))
+	for _, r := range reports {
+		res = append(res, ToProductReportPB(r))
+	}
+	return res
+}
+

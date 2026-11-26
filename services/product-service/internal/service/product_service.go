@@ -38,6 +38,8 @@ type ProductService interface {
 	UpdateProduct(ctx context.Context, req dto.UpdateProductRequest) (*model.Product, error)
 	DeleteProduct(ctx context.Context, id string) error
 	DeleteProductVariant(ctx context.Context, productID, variantID string) error
+	ReportProduct(ctx context.Context, req dto.ReportProductRequest) (*model.ProductReport, error)
+	ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error)
 }
 
 type productService struct {
@@ -471,4 +473,60 @@ func (s *productService) DeleteProductVariant(ctx context.Context, productID, va
 	}
 
 	return s.repo.DeleteProductVariant(ctx, productID, variantID)
+}
+
+func (s *productService) ReportProduct(ctx context.Context, req dto.ReportProductRequest) (*model.ProductReport, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	normalizedReason, err := model.NormalizeReportReason(req.Reason)
+	if err != nil {
+		return nil, err
+	}
+
+	prod, err := s.repo.GetProductByID(ctx, req.ProductID)
+	if err != nil {
+		return nil, err
+	}
+	if prod == nil {
+		return nil, appErrors.NotFound("product not found")
+	}
+
+	if prod.DeletedAt != nil || prod.Status == model.StatusDeleted {
+		return nil, appErrors.BadRequest("cannot report a deleted product")
+	}
+	if prod.Status == model.StatusDraft {
+		return nil, appErrors.BadRequest("cannot report an unpublished draft product")
+	}
+
+	existing, err := s.repo.GetProductReportByUserAndProduct(ctx, req.ProductID, req.ReporterID)
+	if err == nil && existing != nil {
+		return nil, appErrors.Conflict("you have already reported this product")
+	}
+
+	report := &model.ProductReport{
+		ProductID:   req.ProductID,
+		ReporterID:  req.ReporterID,
+		Reason:      normalizedReason,
+		Description: req.Description,
+		Status:      model.ReportStatusPending,
+	}
+
+	if err := s.repo.CreateProductReport(ctx, report); err != nil {
+		return nil, err
+	}
+
+	return report, nil
+}
+
+func (s *productService) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
+	if req.Status != "" {
+		st := model.ReportStatus(strings.ToUpper(strings.TrimSpace(req.Status)))
+		if !st.IsValid() {
+			return nil, 0, appErrors.BadRequest("invalid report status filter")
+		}
+		req.Status = string(st)
+	}
+	return s.repo.ListProductReports(ctx, req)
 }

@@ -30,6 +30,7 @@ jobs:
           filters: |
             api-gateway:
               - 'gateway/api-gateway/**'
+              - 'contracts/**'
               - 'pkg/**'
               - 'go.work'
               - 'go.work.sum'
@@ -100,6 +101,7 @@ jobs:
               - 'go.sum'
             product-service:
               - 'services/product-service/**'
+              - 'contracts/protobuf/product/**'
               - 'pkg/**'
               - 'go.work'
               - 'go.work.sum'

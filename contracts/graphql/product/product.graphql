@@ -121,9 +121,54 @@ input UpdateProductInput {
   variants: [UpdateProductVariantInput!]
 }
 
+enum ProductReportReason {
+  INAPPROPRIATE_CONTENT
+  MISLEADING_INFORMATION
+  COUNTERFEIT_OR_FRAUDULENT
+  PROHIBITED_PRODUCT
+  SPAM_OR_DUPLICATE
+  OTHER
+}
+
+enum ProductReportStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+  ACTION_TAKEN
+}
+
+type ProductReport {
+  id: ID!
+  productId: String!
+  reporterId: String!
+  reason: ProductReportReason!
+  description: String
+  status: ProductReportStatus!
+  createdAt: String
+  updatedAt: String
+}
+
+type ReportProductResponse {
+  success: Boolean!
+  message: String!
+  report: ProductReport
+}
+
+type ProductReportList {
+  reports: [ProductReport!]!
+  total: Int!
+}
+
+input ReportProductInput {
+  productId: ID!
+  reason: ProductReportReason!
+  description: String
+}
+
 extend type Query {
   product(id: ID!): Product
   products(limit: Int, offset: Int, categoryId: String, storeId: String, status: ProductStatus): ProductList!
+  productReports(productId: ID, limit: Int, offset: Int, status: ProductReportStatus): ProductReportList! @auth(requires: [ADMIN])
 }
 
 extend type Mutation {
@@ -131,4 +176,5 @@ extend type Mutation {
   updateProduct(id: ID!, input: UpdateProductInput!): Product @auth(requires: [ADMIN, MERCHANT])
   deleteProduct(id: ID!): DeleteProductResponse! @auth(requires: [ADMIN, MERCHANT])
   deleteProductVariant(productId: ID!, id: ID!): DeleteProductVariantResponse! @auth(requires: [ADMIN, MERCHANT])
+  reportProduct(input: ReportProductInput!): ReportProductResponse! @auth
 }

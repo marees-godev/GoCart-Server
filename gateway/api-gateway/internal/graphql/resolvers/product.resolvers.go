@@ -10,6 +10,7 @@ import (
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
 )
@@ -286,6 +287,43 @@ func (r *mutationResolver) DeleteProductVariant(ctx context.Context, productID s
 	}, nil
 }
 
+// ReportProduct is the resolver for the reportProduct field.
+func (r *mutationResolver) ReportProduct(ctx context.Context, input model.ReportProductInput) (*model.ReportProductResponse, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	user, ok := auth.UserFromContext(ctx)
+	if !ok || user == nil || user.UserID == "" {
+		return nil, appErrors.Unauthorized("authentication required to report a product")
+	}
+
+	var desc *string
+	if input.Description != nil {
+		d := *input.Description
+		desc = &d
+	}
+
+	req := &productpb.ReportProductRequest{
+		ProductId:   input.ProductID,
+		ReporterId:  user.UserID,
+		Reason:      string(input.Reason),
+		Description: desc,
+	}
+
+	resp, err := client.ReportProduct(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ReportProductResponse{
+		Success: resp.GetSuccess(),
+		Message: resp.GetMessage(),
+		Report:  maps.MapProductReport(resp.GetReport()),
+	}, nil
+}
+
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id string) (*model.Product, error) {
 	client, err := r.getProductClient()
@@ -353,6 +391,53 @@ func (r *queryResolver) Products(ctx context.Context, limit *int, offset *int, c
 	return &model.ProductList{
 		Products: maps.MapProducts(resp.GetProducts()),
 		Total:    int(resp.GetTotal()),
+	}, nil
+}
+
+// ProductReports is the resolver for the productReports field.
+func (r *queryResolver) ProductReports(ctx context.Context, productID *string, limit *int, offset *int, status *model.ProductReportStatus) (*model.ProductReportList, error) {
+	client, err := r.getProductClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var l int32 = 50
+	if limit != nil && *limit > 0 {
+		l = int32(*limit)
+	}
+
+	var o int32 = 0
+	if offset != nil && *offset >= 0 {
+		o = int32(*offset)
+	}
+
+	var pID *string
+	if productID != nil {
+		id := *productID
+		pID = &id
+	}
+
+	var st *string
+	if status != nil {
+		s := string(*status)
+		st = &s
+	}
+
+	req := &productpb.ListProductReportsRequest{
+		ProductId: pID,
+		Limit:     l,
+		Offset:    o,
+		Status:    st,
+	}
+
+	resp, err := client.ListProductReports(ctx, req)
+	if err != nil {
+		return nil, grpcclient.TranslateGRPCError(err)
+	}
+
+	return &model.ProductReportList{
+		Reports: maps.MapProductReports(resp.GetReports()),
+		Total:   int(resp.GetTotal()),
 	}, nil
 }
 

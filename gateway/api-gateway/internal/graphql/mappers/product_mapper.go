@@ -133,3 +133,44 @@ func MapProducts(products []*productpb.Product) []*model.Product {
 	}
 	return res
 }
+
+func MapProductReport(r *productpb.ProductReport) *model.ProductReport {
+	if r == nil {
+		return nil
+	}
+	var desc *string
+	if r.Description != "" {
+		desc = &r.Description
+	}
+	var createdAt *string
+	if r.CreatedAt != "" {
+		createdAt = &r.CreatedAt
+	}
+	var updatedAt *string
+	if r.UpdatedAt != "" {
+		updatedAt = &r.UpdatedAt
+	}
+	return &model.ProductReport{
+		ID:          r.Id,
+		ProductID:   r.ProductId,
+		ReporterID:  r.ReporterId,
+		Reason:      model.ProductReportReason(r.Reason),
+		Description: desc,
+		Status:      model.ProductReportStatus(r.Status),
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
+	}
+}
+
+func MapProductReports(reports []*productpb.ProductReport) []*model.ProductReport {
+	if reports == nil {
+		return []*model.ProductReport{}
+	}
+	res := make([]*model.ProductReport, 0, len(reports))
+	for _, r := range reports {
+		if r != nil {
+			res = append(res, MapProductReport(r))
+		}
+	}
+	return res
+}

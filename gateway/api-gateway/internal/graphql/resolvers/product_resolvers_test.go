@@ -7,6 +7,7 @@ import (
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
+	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	grpcPkg "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,6 +25,10 @@ type mockProductClient struct {
 	updateErr  error
 	deleteResp *productpb.DeleteProductResponse
 	deleteErr  error
+	reportResp *productpb.ReportProductResponse
+	reportErr  error
+	listRepResp *productpb.ListProductReportsResponse
+	listRepErr  error
 }
 
 func (m *mockProductClient) CreateProduct(ctx context.Context, in *productpb.CreateProductRequest, opts ...grpcPkg.CallOption) (*productpb.CreateProductResponse, error) {
@@ -59,6 +64,20 @@ func (m *mockProductClient) DeleteProduct(ctx context.Context, in *productpb.Del
 		return nil, m.deleteErr
 	}
 	return m.deleteResp, nil
+}
+
+func (m *mockProductClient) ReportProduct(ctx context.Context, in *productpb.ReportProductRequest, opts ...grpcPkg.CallOption) (*productpb.ReportProductResponse, error) {
+	if m.reportErr != nil {
+		return nil, m.reportErr
+	}
+	return m.reportResp, nil
+}
+
+func (m *mockProductClient) ListProductReports(ctx context.Context, in *productpb.ListProductReportsRequest, opts ...grpcPkg.CallOption) (*productpb.ListProductReportsResponse, error) {
+	if m.listRepErr != nil {
+		return nil, m.listRepErr
+	}
+	return m.listRepResp, nil
 }
 
 func TestProductResolvers_CreateProduct_Success(t *testing.T) {
@@ -185,5 +204,144 @@ func TestProductResolvers_DeleteProduct_Success(t *testing.T) {
 	}
 	if !res.Success {
 		t.Errorf("expected success true, got %v", res.Success)
+	}
+}
+
+func TestProductResolvers_PublishWithoutVerification(t *testing.T) {
+	mockClient := &mockProductClient{
+		createResp: &productpb.CreateProductResponse{
+			Product: &productpb.Product{
+				Id:     "prod-pub-1",
+				Name:   "Direct Published",
+				Price:  100.0,
+				Status: "PUBLISHED",
+			},
+		},
+		updateResp: &productpb.UpdateProductResponse{
+			Product: &productpb.Product{
+				Id:     "prod-pub-1",
+				Name:   "Direct Published",
+				Price:  100.0,
+				Status: "PUBLISHED",
+			},
+		},
+	}
+
+	clients := &grpc.Clients{ProductClient: mockClient}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+
+	pubStatus := model.ProductStatusPublished
+	createRes, err := r.CreateProduct(context.Background(), model.CreateProductInput{
+		StoreID:    "store-1",
+		CategoryID: "cat-1",
+		Sku:        "DIRECT-PUB",
+		Name:       "Direct Published",
+		Price:      100.0,
+		Mrp:        120.0,
+		Status:     &pubStatus,
+	})
+	if err != nil {
+		t.Fatalf("expected direct publishing during creation without verification, got %v", err)
+	}
+	if createRes.Status != model.ProductStatusPublished {
+		t.Errorf("expected PUBLISHED status, got %s", createRes.Status)
+	}
+
+	updateRes, err := r.UpdateProduct(context.Background(), "prod-pub-1", model.UpdateProductInput{
+		Status: &pubStatus,
+	})
+	if err != nil {
+		t.Fatalf("expected direct update to PUBLISHED without verification, got %v", err)
+	}
+	if updateRes.Status != model.ProductStatusPublished {
+		t.Errorf("expected PUBLISHED status, got %s", updateRes.Status)
+	}
+}
+
+func TestProductResolvers_ReportProduct_Success(t *testing.T) {
+	mockClient := &mockProductClient{
+		reportResp: &productpb.ReportProductResponse{
+			Success: true,
+			Message: "Product reported successfully",
+			Report: &productpb.ProductReport{
+				Id:          "rep-1",
+				ProductId:   "prod-1",
+				ReporterId:  "user-123",
+				Reason:      "INAPPROPRIATE_CONTENT",
+				Description: "Inappropriate image",
+				Status:      "PENDING",
+			},
+		},
+	}
+
+	clients := &grpc.Clients{ProductClient: mockClient}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "user-123",
+		Role:   auth.RoleCustomer,
+	})
+
+	desc := "Inappropriate image"
+	res, err := r.ReportProduct(ctx, model.ReportProductInput{
+		ProductID:   "prod-1",
+		Reason:      model.ProductReportReasonInappropriateContent,
+		Description: &desc,
+	})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if !res.Success || res.Report == nil {
+		t.Fatalf("expected report response, got %+v", res)
+	}
+	if res.Report.ID != "rep-1" || res.Report.Reason != model.ProductReportReasonInappropriateContent {
+		t.Errorf("unexpected report details: %+v", res.Report)
+	}
+}
+
+func TestProductResolvers_ReportProduct_Unauthenticated(t *testing.T) {
+	clients := &grpc.Clients{ProductClient: &mockProductClient{}}
+	r := &mutationResolver{Resolver: &Resolver{Clients: clients}}
+
+	_, err := r.ReportProduct(context.Background(), model.ReportProductInput{
+		ProductID: "prod-1",
+		Reason:    model.ProductReportReasonInappropriateContent,
+	})
+	if err == nil {
+		t.Fatal("expected unauthorized error for unauthenticated user, got nil")
+	}
+}
+
+func TestProductResolvers_ProductReports_Success(t *testing.T) {
+	mockClient := &mockProductClient{
+		listRepResp: &productpb.ListProductReportsResponse{
+			Reports: []*productpb.ProductReport{
+				{
+					Id:         "rep-1",
+					ProductId:  "prod-1",
+					ReporterId: "user-123",
+					Reason:     "INAPPROPRIATE_CONTENT",
+					Status:     "PENDING",
+				},
+			},
+			Total: 1,
+		},
+	}
+
+	clients := &grpc.Clients{ProductClient: mockClient}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+
+	prodID := "prod-1"
+	limit := 10
+	offset := 0
+	res, err := r.ProductReports(context.Background(), &prodID, &limit, &offset, nil)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if res.Total != 1 || len(res.Reports) != 1 {
+		t.Errorf("unexpected reports count: %d", res.Total)
+	}
+	if res.Reports[0].ID != "rep-1" {
+		t.Errorf("expected report ID rep-1, got %s", res.Reports[0].ID)
 	}
 }
