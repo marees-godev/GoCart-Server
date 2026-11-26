@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 )
 
 // Status represents the lifecycle state of an outbox event.
@@ -60,6 +61,6 @@ func DefaultConfig() Config {
 		MaxRetries:     5,
 		BaseRetryDelay: 1 * time.Second,
 		MaxRetryDelay:  60 * time.Second,
-		DLQTopic:       "",
+		DLQTopic:       events.TopicDLQ,
 	}
 }

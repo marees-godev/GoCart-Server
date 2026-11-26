@@ -122,3 +122,48 @@ func TestHeaderHelpers(t *testing.T) {
 		t.Errorf("expected default 10, got %d", val)
 	}
 }
+
+func TestAuthDefaultsUnset(t *testing.T) {
+	cfg := kafka.DefaultConfig()
+	if cfg.User != "" || cfg.Password != "" || cfg.TLSEnabled {
+		t.Errorf("expected empty user/pass and TLSEnabled=false by default, got user=%q pass=%q tls=%v", cfg.User, cfg.Password, cfg.TLSEnabled)
+	}
+
+	prod := kafka.NewProducer(cfg)
+	if prod == nil {
+		t.Fatal("expected NewProducer to succeed with default config")
+	}
+	defer prod.Close()
+}
+
+func TestAuthDefaultsFromEnv(t *testing.T) {
+	os.Setenv("KAFKA_USER", "test-user")
+	os.Setenv("KAFKA_PASSWORD", "test-pass")
+	os.Setenv("KAFKA_TLS", "true")
+	defer func() {
+		os.Unsetenv("KAFKA_USER")
+		os.Unsetenv("KAFKA_PASSWORD")
+		os.Unsetenv("KAFKA_TLS")
+	}()
+
+	cfg, err := kafka.LoadConfigFromEnv("")
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if cfg.User != "test-user" {
+		t.Errorf("expected user test-user, got %s", cfg.User)
+	}
+	if cfg.Password != "test-pass" {
+		t.Errorf("expected password test-pass, got %s", cfg.Password)
+	}
+	if !cfg.TLSEnabled {
+		t.Errorf("expected TLSEnabled=true, got %v", cfg.TLSEnabled)
+	}
+
+	prod := kafka.NewProducer(cfg)
+	if prod == nil {
+		t.Fatal("expected NewProducer to initialize with cloud credentials")
+	}
+	defer prod.Close()
+}

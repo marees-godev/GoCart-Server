@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -19,6 +20,7 @@ type HealthResult struct {
 
 // CheckHealth checks connectivity to configured Kafka brokers and measures response latency.
 func CheckHealth(ctx context.Context, cfg Config) HealthResult {
+	resolveAuthDefaults(&cfg)
 	if len(cfg.Brokers) == 0 {
 		return HealthResult{
 			Status:  "DOWN",
@@ -32,8 +34,18 @@ func CheckHealth(ctx context.Context, cfg Config) HealthResult {
 		Timeout: cfg.ConnectTimeout,
 	}
 
-	// Dial the primary broker
-	conn, err := dialer.DialContext(ctx, "tcp", cfg.Brokers[0])
+	// Dial the primary broker with TLS if enabled
+	var conn net.Conn
+	var err error
+	if cfg.TLSEnabled || (cfg.User != "" && cfg.Password != "") {
+		tlsDialer := &tls.Dialer{
+			NetDialer: dialer,
+			Config:    buildTLSConfig(cfg.InsecureSkipVerify),
+		}
+		conn, err = tlsDialer.DialContext(ctx, "tcp", cfg.Brokers[0])
+	} else {
+		conn, err = dialer.DialContext(ctx, "tcp", cfg.Brokers[0])
+	}
 	latency := time.Since(start).Milliseconds()
 
 	if err != nil {

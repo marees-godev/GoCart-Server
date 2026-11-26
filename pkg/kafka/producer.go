@@ -19,6 +19,8 @@ type Producer struct {
 
 // NewProducer initializes a new Kafka Producer with the provided configuration.
 func NewProducer(cfg Config) *Producer {
+	resolveAuthDefaults(&cfg)
+
 	writer := &segmentio.Writer{
 		Addr:                   segmentio.TCP(cfg.Brokers...),
 		Balancer:               &segmentio.LeastBytes{},
@@ -28,6 +30,19 @@ func NewProducer(cfg Config) *Producer {
 		AllowAutoTopicCreation: true,
 		Logger:                 segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
 		ErrorLogger:            segmentio.LoggerFunc(func(msg string, args ...interface{}) {}),
+	}
+
+	if cfg.TLSEnabled || (cfg.User != "" && cfg.Password != "") {
+		transport := &segmentio.Transport{
+			TLS: buildTLSConfig(cfg.InsecureSkipVerify),
+		}
+		if cfg.User != "" && cfg.Password != "" {
+			mechanism, err := buildSASLMechanism(cfg.SASLMechanism, cfg.User, cfg.Password)
+			if err == nil {
+				transport.SASL = mechanism
+			}
+		}
+		writer.Transport = transport
 	}
 
 	return &Producer{

@@ -186,8 +186,8 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 			// If max retries exceeded and broker connection is alive, route to DLQ.
 			if evt.RetryCount+1 >= p.cfg.MaxRetries {
 				dlqTopic := p.cfg.DLQTopic
-				if dlqTopic == "" && evt.Topic != "" {
-					dlqTopic = evt.Topic + ".dlq"
+				if dlqTopic == "" {
+					dlqTopic = events.TopicDLQ
 				}
 				if dlqTopic != "" {
 					slog.Warn("outbox: max retries reached, forwarding to DLQ",
