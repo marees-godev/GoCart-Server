@@ -35,6 +35,9 @@ const (
 	EventTypeDeliveryDispatched         = "DeliveryDispatched"
 	EventTypeUserRegistered             = "UserRegistered"
 	EventTypePartnerRegistered          = "PartnerRegistered"
+	EventTypeUserLoggedIn               = "UserLoggedIn"
+	EventTypePasswordReset              = "PasswordReset"
+	EventTypePasswordChanged            = "PasswordChanged"
 
 	// Store Service Events
 	EventTypeStoreCreated     = "StoreCreated"
@@ -90,6 +93,9 @@ const (
 const (
 	TopicUserRegistered        = "gocart.accounts"
 	TopicPartnerRegistered     = "gocart.accounts"
+	TopicUserLoggedIn          = "gocart.accounts"
+	TopicPasswordReset         = "gocart.accounts"
+	TopicPasswordChanged       = "gocart.accounts"
 	TopicOrderCreated          = "gocart.orders"
 	TopicOrderCancelled        = "gocart.orders"
 	TopicOrderConfirmed        = "gocart.orders"
