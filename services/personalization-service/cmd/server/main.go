@@ -118,6 +118,7 @@ func main() {
 				ConnectTimeout: 10 * time.Second,
 				MaxRetries:     3,
 				RetryInterval:  1 * time.Second,
+				DLQTopic:       "gocart.dlq",
 				DLQSuffix:      ".dlq",
 			},
 			kafka.ConsumerConfig{

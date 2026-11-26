@@ -145,7 +145,7 @@ func LoadEnv() *Config {
 			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
 			BaseRetryDelay: time.Duration(GetEnvAsInt("OUTBOX_BASE_RETRY_DELAY_MS", 1000)) * time.Millisecond,
 			MaxRetryDelay:  time.Duration(GetEnvAsInt("OUTBOX_MAX_RETRY_DELAY_MS", 60000)) * time.Millisecond,
-			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.delivery.dlq"),
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.dlq"),
 		},
 		Services: ServicesConfig{
 			OrderServiceURL:          GetEnv("ORDER_SERVICE_GRPC_URL", GetEnv("ORDER_SERVICE_GRPC_ADDR", "localhost:50059")),

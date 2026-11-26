@@ -17,6 +17,8 @@ import (
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
 	"github.com/marees-godev/GoCart-Server/pkg/grpcclient"
+	"github.com/marees-godev/GoCart-Server/pkg/logger"
+	"github.com/marees-godev/GoCart-Server/pkg/middleware"
 )
 
 // CreateDelivery is the resolver for the createDelivery field.
@@ -67,7 +69,11 @@ func (r *mutationResolver) CreateDelivery(ctx context.Context, input model.Creat
 		return nil, appErrors.Internal(nil, "order service unavailable")
 	}
 
-	orderResp, err := orderClient.GetOrder(ctx, &orderpb.GetOrderRequest{Id: orderID})
+	internalCtx := context.Background()
+	if reqID := middleware.GetRequestID(ctx); reqID != "" {
+		internalCtx = logger.WithRequestID(internalCtx, reqID)
+	}
+	orderResp, err := orderClient.GetOrder(internalCtx, &orderpb.GetOrderRequest{Id: orderID})
 	if err != nil {
 		return nil, grpcclient.TranslateGRPCError(err)
 	}

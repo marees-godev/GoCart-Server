@@ -48,8 +48,8 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 			Topic:         events.TopicStoreCreated,
 		}
 
-		if evt.Topic != "gocart.store.store-created" {
-			t.Errorf("expected topic gocart.store.store-created, got %s", evt.Topic)
+		if evt.Topic != events.TopicStoreCreated {
+			t.Errorf("expected topic %s, got %s", events.TopicStoreCreated, evt.Topic)
 		}
 		if evt.AggregateID != "store-uuid-1" {
 			t.Errorf("expected aggregate_id store-uuid-1, got %s", evt.AggregateID)
@@ -98,8 +98,8 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 			Topic:         events.TopicStoreSubmitted,
 		}
 
-		if evt.Topic != "gocart.store.store-submitted" {
-			t.Errorf("expected topic gocart.store.store-submitted, got %s", evt.Topic)
+		if evt.Topic != events.TopicStoreSubmitted {
+			t.Errorf("expected topic %s, got %s", events.TopicStoreSubmitted, evt.Topic)
 		}
 		if evt.EventType != events.EventTypeStoreSubmitted {
 			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreSubmitted, evt.EventType)
@@ -148,8 +148,8 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 			Topic:         events.TopicStoreApproved,
 		}
 
-		if evt.Topic != "gocart.store.store-approved" {
-			t.Errorf("expected topic gocart.store.store-approved, got %s", evt.Topic)
+		if evt.Topic != events.TopicStoreApproved {
+			t.Errorf("expected topic %s, got %s", events.TopicStoreApproved, evt.Topic)
 		}
 		if evt.EventType != events.EventTypeStoreApproved {
 			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreApproved, evt.EventType)
@@ -199,8 +199,8 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 			Topic:         events.TopicStoreRejected,
 		}
 
-		if evt.Topic != "gocart.store.store-rejected" {
-			t.Errorf("expected topic gocart.store.store-rejected, got %s", evt.Topic)
+		if evt.Topic != events.TopicStoreRejected {
+			t.Errorf("expected topic %s, got %s", events.TopicStoreRejected, evt.Topic)
 		}
 		if evt.EventType != events.EventTypeStoreRejected {
 			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreRejected, evt.EventType)
@@ -250,8 +250,8 @@ func TestRepositoryOutboxEvents(t *testing.T) {
 			Topic:         events.TopicStoreSuspended,
 		}
 
-		if evt.Topic != "gocart.store.store-suspended" {
-			t.Errorf("expected topic gocart.store.store-suspended, got %s", evt.Topic)
+		if evt.Topic != events.TopicStoreSuspended {
+			t.Errorf("expected topic %s, got %s", events.TopicStoreSuspended, evt.Topic)
 		}
 		if evt.EventType != events.EventTypeStoreSuspended {
 			t.Errorf("expected event_type %s, got %s", events.EventTypeStoreSuspended, evt.EventType)

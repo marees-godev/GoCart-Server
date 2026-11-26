@@ -228,7 +228,7 @@ func LoadEnv() *Config {
 			MaxRetries:     GetEnvAsInt("OUTBOX_MAX_RETRIES", 5),
 			BaseRetryDelay: GetEnvAsDuration("OUTBOX_BASE_RETRY_DELAY", 1*time.Second),
 			MaxRetryDelay:  GetEnvAsDuration("OUTBOX_MAX_RETRY_DELAY", 60*time.Second),
-			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.auth.dlq"),
+			DLQTopic:       GetEnv("OUTBOX_DLQ_TOPIC", "gocart.dlq"),
 		},
 	}
 }

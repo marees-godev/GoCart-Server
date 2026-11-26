@@ -435,7 +435,7 @@ func (s *authService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		AggregateType: "auth",
 		AggregateID:   cred.UserID.String(),
 		EventType:     "UserLoggedIn",
-		Topic:         "auth.user.logged_in",
+		Topic:         events.TopicUserLoggedIn,
 		Payload:       eventPayload,
 	}
 
@@ -1241,7 +1241,7 @@ func (s *authService) processOAuth(ctx context.Context, params oauthParams) (*dt
 			AggregateType: "auth",
 			AggregateID:   userID.String(),
 			EventType:     "UserLoggedIn",
-			Topic:         "gocart.auth.user-logged-in",
+			Topic:         events.TopicUserLoggedIn,
 			Payload:       envPayload,
 		}
 	}
@@ -1896,7 +1896,7 @@ func (s *authService) ResetPasswordWithOtp(ctx context.Context, req *dto.ResetPa
 		AggregateType: "auth",
 		AggregateID:   cred.UserID.String(),
 		EventType:     "PasswordReset",
-		Topic:         "auth.user.password_reset",
+		Topic:         events.TopicPasswordReset,
 		Payload:       evtPayload,
 	}
 
@@ -1992,7 +1992,7 @@ func (s *authService) ChangePassword(ctx context.Context, req *dto.ChangePasswor
 		AggregateType: "auth",
 		AggregateID:   cred.UserID.String(),
 		EventType:     "PasswordChanged",
-		Topic:         "auth.user.password_changed",
+		Topic:         events.TopicPasswordChanged,
 		Payload:       evtPayload,
 	}
 

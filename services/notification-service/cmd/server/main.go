@@ -153,7 +153,7 @@ func main() {
 			if envelope == nil {
 				return nil
 			}
-			dlqTopic := topicForEventType(envelope.EventType) + cfg.Kafka.DLQSuffix
+			dlqTopic := events.TopicDLQ
 			copyEnv := *envelope
 			copyEnv.Metadata = make(map[string]string, len(envelope.Metadata)+1)
 			for k, v := range envelope.Metadata {
@@ -165,28 +165,31 @@ func main() {
 			return producer.Publish(pCtx, dlqTopic, envelope.EventID, &copyEnv)
 		})
 
-		topics := []string{
-			events.TopicUserRegistered,
-			events.TopicStoreApproved,
-			events.TopicStoreRejected,
-			events.TopicMerchantApproved,
-			events.TopicMerchantActivated,
-			events.TopicMerchantRejected,
-			events.TopicMerchantSuspended,
-			events.TopicOrderCreated,
-			events.TopicOrderConfirmed,
-			events.TopicOrderPaymentConfirmed,
-			events.TopicOrderShipped,
-			events.TopicOrderDelivered,
-			events.TopicOrderCancelled,
-			events.TopicOrderPaymentFailed,
-			events.TopicPaymentSuccessful,
-			events.TopicPaymentFailed,
-			events.TopicDeliveryCreated,
-			events.TopicDeliveryStatusUpdated,
-			events.TopicReturnApproved,
-			events.TopicReturnRejected,
-			events.TopicRefundCompleted,
+		topics := cfg.Kafka.Topics
+		if len(topics) == 0 {
+			topics = []string{
+				events.TopicUserRegistered,
+				events.TopicStoreApproved,
+				events.TopicStoreRejected,
+				events.TopicMerchantApproved,
+				events.TopicMerchantActivated,
+				events.TopicMerchantRejected,
+				events.TopicMerchantSuspended,
+				events.TopicOrderCreated,
+				events.TopicOrderConfirmed,
+				events.TopicOrderPaymentConfirmed,
+				events.TopicOrderShipped,
+				events.TopicOrderDelivered,
+				events.TopicOrderCancelled,
+				events.TopicOrderPaymentFailed,
+				events.TopicPaymentSuccessful,
+				events.TopicPaymentFailed,
+				events.TopicDeliveryCreated,
+				events.TopicDeliveryStatusUpdated,
+				events.TopicReturnApproved,
+				events.TopicReturnRejected,
+				events.TopicRefundCompleted,
+			}
 		}
 
 		kafkaConsumer := kafka.NewConsumer(
@@ -267,55 +270,4 @@ func main() {
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
-}
-
-func topicForEventType(eventType string) string {
-	switch eventType {
-	case events.EventTypeUserRegistered:
-		return events.TopicUserRegistered
-	case events.EventTypeStoreApproved:
-		return events.TopicStoreApproved
-	case events.EventTypeStoreRejected:
-		return events.TopicStoreRejected
-	case events.EventTypeMerchantApproved:
-		return events.TopicMerchantApproved
-	case events.EventTypeMerchantActivated:
-		return events.TopicMerchantActivated
-	case events.EventTypeMerchantRejected:
-		return events.TopicMerchantRejected
-	case events.EventTypeMerchantSuspended:
-		return events.TopicMerchantSuspended
-	case events.EventTypeOrderCreated:
-		return events.TopicOrderCreated
-	case events.EventTypeOrderConfirmed:
-		return events.TopicOrderConfirmed
-	case events.EventTypeOrderPaymentConfirmed:
-		return events.TopicOrderPaymentConfirmed
-	case events.EventTypeOrderShipped:
-		return events.TopicOrderShipped
-	case events.EventTypeOrderDelivered:
-		return events.TopicOrderDelivered
-	case events.EventTypeOrderCancelled:
-		return events.TopicOrderCancelled
-	case events.EventTypeOrderPaymentFailed:
-		return events.TopicOrderPaymentFailed
-	case events.EventTypePaymentSuccessful:
-		return events.TopicPaymentSuccessful
-	case events.EventTypePaymentFailed:
-		return events.TopicPaymentFailed
-	case events.EventTypeDeliveryCreated:
-		return events.TopicDeliveryCreated
-	case events.EventTypeDeliveryStatusUpdated:
-		return events.TopicDeliveryStatusUpdated
-	case events.EventTypeDeliveryStatusChanged:
-		return events.TopicDeliveryStatusChanged
-	case events.EventTypeReturnApproved:
-		return events.TopicReturnApproved
-	case events.EventTypeReturnRejected:
-		return events.TopicReturnRejected
-	case events.EventTypeRefundCompleted:
-		return events.TopicRefundCompleted
-	default:
-		return "gocart.notification.events"
-	}
 }

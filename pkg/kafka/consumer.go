@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +38,10 @@ type Consumer struct {
 
 // NewConsumer initializes a Kafka Consumer configured for consumer groups.
 func NewConsumer(cfg Config, consumerCfg ConsumerConfig, producer *Producer) *Consumer {
+	resolveAuthDefaults(&cfg)
+	if cfg.DLQTopic == "" {
+		cfg.DLQTopic = "gocart.dlq"
+	}
 	if cfg.DLQSuffix == "" {
 		cfg.DLQSuffix = ".dlq"
 	}
@@ -52,14 +58,38 @@ func NewConsumer(cfg Config, consumerCfg ConsumerConfig, producer *Producer) *Co
 		consumerCfg.StartOffset = segmentio.FirstOffset
 	}
 
+	var uniqueTopics []string
+	seenTopics := make(map[string]bool)
+	for _, t := range consumerCfg.Topics {
+		trimmed := strings.TrimSpace(t)
+		if trimmed != "" && !seenTopics[trimmed] {
+			seenTopics[trimmed] = true
+			uniqueTopics = append(uniqueTopics, trimmed)
+		}
+	}
+
 	readerConfig := segmentio.ReaderConfig{
 		Brokers:        cfg.Brokers,
 		GroupID:        consumerCfg.GroupID,
-		GroupTopics:    consumerCfg.Topics,
+		GroupTopics:    uniqueTopics,
 		MinBytes:       consumerCfg.MinBytes,
 		MaxBytes:       consumerCfg.MaxBytes,
 		StartOffset:    consumerCfg.StartOffset,
 		CommitInterval: 1 * time.Second,
+	}
+
+	if cfg.TLSEnabled || (cfg.User != "" && cfg.Password != "") {
+		dialer := &segmentio.Dialer{
+			Timeout: cfg.ConnectTimeout,
+			TLS:     buildTLSConfig(cfg.InsecureSkipVerify),
+		}
+		if cfg.User != "" && cfg.Password != "" {
+			mechanism, err := buildSASLMechanism(cfg.SASLMechanism, cfg.User, cfg.Password)
+			if err == nil {
+				dialer.SASLMechanism = mechanism
+			}
+		}
+		readerConfig.Dialer = dialer
 	}
 
 	reader := segmentio.NewReader(readerConfig)
@@ -102,7 +132,7 @@ func (c *Consumer) Start(ctx context.Context, handler HandlerFunc) error {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return ctx.Err()
 			}
-			// Connection / transient error fetching message, backoff before retry
+			slog.Default().Error("kafka consumer: failed to fetch message", "error", err, "topics", c.consumerCfg.Topics, "group", c.consumerCfg.GroupID)
 			time.Sleep(c.cfg.RetryInterval)
 			continue
 		}

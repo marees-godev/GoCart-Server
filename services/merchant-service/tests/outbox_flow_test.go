@@ -560,7 +560,7 @@ func TestMaxRetriesAndDLQReplay(t *testing.T) {
 	ctx := context.Background()
 	cfg := outbox.Config{
 		MaxRetries: 3,
-		DLQTopic:   "gocart.merchant.dlq",
+		DLQTopic:   "gocart.dlq",
 	}
 
 	merchID := uuid.New()

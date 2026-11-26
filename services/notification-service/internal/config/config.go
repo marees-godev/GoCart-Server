@@ -64,6 +64,7 @@ type KafkaConfig struct {
 	Brokers       []string
 	ClientID      string
 	GroupID       string
+	Topics        []string
 	Enabled       bool
 	MaxRetries    int
 	RetryInterval time.Duration
@@ -147,6 +148,7 @@ func LoadEnv() *Config {
 			Brokers:       GetEnvAsStringSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
 			ClientID:      GetEnv("KAFKA_CLIENT_ID", "notification-service"),
 			GroupID:       GetEnv("KAFKA_GROUP_ID", "gocart.notification-service.domain-events-group"),
+			Topics:        GetEnvAsStringSlice("KAFKA_TOPICS", nil),
 			Enabled:       GetEnvAsBool("KAFKA_ENABLED", true),
 			MaxRetries:    GetEnvAsInt("KAFKA_MAX_RETRIES", 3),
 			RetryInterval: GetEnvAsDuration("KAFKA_RETRY_INTERVAL", 500*time.Millisecond),
