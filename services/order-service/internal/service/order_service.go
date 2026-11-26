@@ -977,7 +977,11 @@ func (s *orderService) CancelOrder(ctx context.Context, id string, userID string
 	if callerRole == "MERCHANT" || callerRole == auth.RoleMerchant {
 		// Merchant cancellation rules:
 		// 1. Once order transitions to CONFIRMED (or beyond), merchant has NO permission to cancel/reject.
-		if order.Status == model.OrderStatusConfirmed || !model.CanMerchantCancel(order.Status) {
+		if order.Status == model.OrderStatusConfirmed ||
+			order.Status == model.OrderStatusProcessing ||
+			order.Status == model.OrderStatusShipped ||
+			order.Status == model.OrderStatusOutForDelivery ||
+			order.Status == model.OrderStatusDelivered {
 			return nil, appErrors.FailedPrecondition("cannot cancel or reject order: confirmed orders cannot be cancelled by the merchant")
 		}
 		// 2. Before confirmation: Merchant is allowed to cancel paid orders only.

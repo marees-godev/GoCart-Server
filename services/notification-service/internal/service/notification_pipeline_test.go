@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
@@ -346,6 +347,9 @@ func TestIsPushSupportedEvent(t *testing.T) {
 		{"order_cancelled", true},
 		{"OrderConfirmed", true},
 		{"order.confirmed", true},
+		{"OrderPaymentConfirmed", true},
+		{"order.payment_confirmed", true},
+		{"order_payment_confirmed", true},
 		{"OrderShipped", true},
 		{"order.shipped", true},
 		{"OrderDelivered", true},
@@ -434,5 +438,92 @@ func TestNotificationPipeline_UserEmailLookup(t *testing.T) {
 	}
 	if job.Status != model.JobStatusPending {
 		t.Errorf("expected status PENDING, got: %s", job.Status)
+	}
+}
+
+func TestNotificationPipeline_OrderPaymentConfirmedEvent(t *testing.T) {
+	channelID := uuid.New().String()
+	templateID := uuid.New().String()
+
+	tmplRepo := &mockTemplateRepo{
+		templates: map[string]*model.Template{
+			events.EventTypeOrderPaymentConfirmed: {
+				ID:              templateID,
+				EventType:       events.EventTypeOrderPaymentConfirmed,
+				ChannelID:       channelID,
+				SubjectTemplate: "Action Required: Payment Received for Order #{{.OrderNumber}}",
+				BodyTemplate:    "Payment of {{.TotalAmount}} for Order #{{.OrderNumber}} has been received.",
+				IsActive:        true,
+			},
+			events.EventTypeOrderConfirmed: {
+				ID:              uuid.New().String(),
+				EventType:       events.EventTypeOrderConfirmed,
+				ChannelID:       channelID,
+				SubjectTemplate: "Generic Confirmed #{{.OrderID}}",
+				BodyTemplate:    "Order {{.OrderID}} is confirmed.",
+				IsActive:        true,
+			},
+		},
+	}
+	channelRepo := &mockChannelRepo{
+		channels: map[string]*model.Channel{
+			"EMAIL": {ID: channelID, Code: "EMAIL", Name: "Email", IsActive: true},
+		},
+	}
+	prefRepo := &mockPreferenceRepo{preferences: make(map[string]*model.Preference)}
+	jobRepo := &mockJobRepo{
+		jobs:          make(map[string]*model.NotificationJob),
+		jobsByEventID: make(map[string]*model.NotificationJob),
+	}
+	idempotencyRepo := &mockIdempotencyRepo{processed: make(map[string]*model.ProcessedEvent)}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	tmplSvc := service.NewTemplateService(tmplRepo)
+	prefSvc := service.NewPreferenceService(channelRepo, prefRepo)
+
+	merchantEmailLookup := &mockUserEmailLookup{email: "merchant@example.com"}
+	pipeline := service.NewPushNotificationPipelineService(tmplSvc, prefSvc, jobRepo, idempotencyRepo, nil, nil, logger, merchantEmailLookup)
+
+	ctx := context.Background()
+
+	testEventTypes := []string{
+		events.EventTypeOrderPaymentConfirmed,
+		"order.payment_confirmed",
+		"order_payment_confirmed",
+	}
+
+	for _, evtType := range testEventTypes {
+		t.Run(evtType, func(t *testing.T) {
+			now := time.Now().UTC()
+			payload := events.OrderPaymentConfirmedEvent{
+				OrderID:       "ORD-PAY-100",
+				OrderNumber:   "ORD-20261125-99999",
+				UserID:        "USR-CUST-1",
+				StoreID:       "STORE-MERCH-1",
+				TotalAmount:   1500.00,
+				Currency:      "INR",
+				PaymentStatus: "PAID",
+				PaidAt:        now,
+			}
+			env, err := events.NewEventEnvelope(evtType, "order-service", payload)
+			if err != nil {
+				t.Fatalf("failed to create envelope: %v", err)
+			}
+			env.EventID = uuid.New().String()
+
+			job, err := pipeline.ProcessEvent(ctx, env)
+			if err != nil {
+				t.Fatalf("failed to process event %s: %v", evtType, err)
+			}
+			if job == nil {
+				t.Fatalf("expected job for %s, got nil", evtType)
+			}
+			if job.TemplateID != templateID {
+				t.Errorf("expected dedicated OrderPaymentConfirmed template %s, got %s", templateID, job.TemplateID)
+			}
+			if job.Recipient != "merchant@example.com" {
+				t.Errorf("expected recipient 'merchant@example.com', got: %s", job.Recipient)
+			}
+		})
 	}
 }

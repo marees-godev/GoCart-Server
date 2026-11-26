@@ -166,21 +166,77 @@ type extractedEvent struct {
 	pushMeta     map[string]string
 }
 
+func normalizeEventType(eventType string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(eventType), ".", ""), "_", ""), "-", ""))
+}
+
+// CanonicalEventType resolves any legacy, dot-separated, or snake_cased event type string to its canonical domain event type constant.
+func CanonicalEventType(eventType string) string {
+	switch normalizeEventType(eventType) {
+	case normalizeEventType(events.EventTypeUserRegistered):
+		return events.EventTypeUserRegistered
+	case normalizeEventType(events.EventTypeStoreApproved):
+		return events.EventTypeStoreApproved
+	case normalizeEventType(events.EventTypeStoreRejected):
+		return events.EventTypeStoreRejected
+	case normalizeEventType(events.EventTypeMerchantApproved):
+		return events.EventTypeMerchantApproved
+	case normalizeEventType(events.EventTypeMerchantActivated):
+		return events.EventTypeMerchantActivated
+	case normalizeEventType(events.EventTypeMerchantRejected):
+		return events.EventTypeMerchantRejected
+	case normalizeEventType(events.EventTypeMerchantSuspended):
+		return events.EventTypeMerchantSuspended
+	case normalizeEventType(events.EventTypeOrderCreated), "orderplaced":
+		return events.EventTypeOrderCreated
+	case normalizeEventType(events.EventTypeOrderPaymentConfirmed):
+		return events.EventTypeOrderPaymentConfirmed
+	case normalizeEventType(events.EventTypeOrderConfirmed):
+		return events.EventTypeOrderConfirmed
+	case normalizeEventType(events.EventTypeOrderCancelled), "ordercanceled":
+		return events.EventTypeOrderCancelled
+	case normalizeEventType(events.EventTypeOrderPaymentFailed):
+		return events.EventTypeOrderPaymentFailed
+	case normalizeEventType(events.EventTypePaymentSuccessful):
+		return events.EventTypePaymentSuccessful
+	case normalizeEventType(events.EventTypePaymentFailed):
+		return events.EventTypePaymentFailed
+	case normalizeEventType(events.EventTypeOrderShipped):
+		return events.EventTypeOrderShipped
+	case normalizeEventType(events.EventTypeOrderDelivered):
+		return events.EventTypeOrderDelivered
+	case normalizeEventType(events.EventTypeDeliveryCreated):
+		return events.EventTypeDeliveryCreated
+	case normalizeEventType(events.EventTypeDeliveryStatusUpdated):
+		return events.EventTypeDeliveryStatusUpdated
+	case normalizeEventType(events.EventTypeDeliveryStatusChanged):
+		return events.EventTypeDeliveryStatusChanged
+	case normalizeEventType(events.EventTypeReturnApproved):
+		return events.EventTypeReturnApproved
+	case normalizeEventType(events.EventTypeReturnRejected):
+		return events.EventTypeReturnRejected
+	case normalizeEventType(events.EventTypeRefundCompleted):
+		return events.EventTypeRefundCompleted
+	default:
+		return eventType
+	}
+}
+
 // IsPushSupportedEvent checks if an event type triggers Web Push notifications.
 // Web push notifications are triggered when an order is created, confirmed, shipped, delivered, or cancelled,
 // or when a delivery is created.
 func IsPushSupportedEvent(eventType string) bool {
-	clean := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(eventType), ".", ""), "_", ""))
-	switch clean {
-	case "ordercreated", "orderplaced",
-		"orderpaymentconfirmed",
-		"orderconfirmed",
-		"ordershipped",
-		"orderdelivered",
-		"ordercancelled", "ordercanceled",
-		"orderpaymentfailed",
-		"deliverycreated",
-		"deliverystatusupdated", "deliverystatuschanged":
+	switch normalizeEventType(eventType) {
+	case normalizeEventType(events.EventTypeOrderCreated), "orderplaced",
+		normalizeEventType(events.EventTypeOrderPaymentConfirmed),
+		normalizeEventType(events.EventTypeOrderConfirmed),
+		normalizeEventType(events.EventTypeOrderShipped),
+		normalizeEventType(events.EventTypeOrderDelivered),
+		normalizeEventType(events.EventTypeOrderCancelled), "ordercanceled",
+		normalizeEventType(events.EventTypeOrderPaymentFailed),
+		normalizeEventType(events.EventTypeDeliveryCreated),
+		normalizeEventType(events.EventTypeDeliveryStatusUpdated),
+		normalizeEventType(events.EventTypeDeliveryStatusChanged):
 		return true
 	default:
 		return false
@@ -290,16 +346,18 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 		}
 	}
 
+	canonicalType := CanonicalEventType(envelope.EventType)
+
 	var job *model.NotificationJob
 	if existingJob != nil {
 		job = existingJob
 	} else {
-		channel, allowed, err := s.preferenceService.CheckPreferenceAndSelectChannel(ctx, userID, envelope.EventType, model.ChannelEmail)
+		channel, allowed, err := s.preferenceService.CheckPreferenceAndSelectChannel(ctx, userID, canonicalType, model.ChannelEmail)
 		if err != nil {
 			return nil, fmt.Errorf("channel and preference check failed: %w", err)
 		}
 
-		tmpl, err := s.templateService.ResolveTemplateForChannel(ctx, envelope.EventType, channel.ID, channel.Code)
+		tmpl, err := s.templateService.ResolveTemplateForChannel(ctx, canonicalType, channel.ID, channel.Code)
 		if err != nil {
 			return nil, fmt.Errorf("template resolution failed: %w", err)
 		}
@@ -314,7 +372,7 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 			status = model.JobStatusOptedOut
 			s.logger.InfoContext(ctx, "User has opted out of notification, marking job as OPTED_OUT",
 				"user_id", userID,
-				"event_type", envelope.EventType,
+				"event_type", canonicalType,
 				"channel", channel.Code,
 			)
 		}
@@ -325,7 +383,7 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 			ChannelID:     channel.ID,
 			ChannelCode:   channel.Code,
 			TemplateID:    tmpl.ID,
-			EventType:     envelope.EventType,
+			EventType:     canonicalType,
 			Recipient:     truncateString(extracted.recipient, 255),
 			Subject:       truncateString(renderedSubject, 255),
 			Content:       renderedContent,
@@ -347,18 +405,18 @@ func (s *notificationPipelineService) ProcessEvent(ctx context.Context, envelope
 	}
 
 	// 3. Persist notification history and deliver Web Push for authenticated users on supported events (Order Placed or Delivery Created)
-	if s.notificationService != nil && uID != nil && IsPushSupportedEvent(envelope.EventType) {
-		pushTitle, pushBody := s.renderPushContent(ctx, envelope.EventType, extracted.templateData, job)
+	if s.notificationService != nil && uID != nil && IsPushSupportedEvent(canonicalType) {
+		pushTitle, pushBody := s.renderPushContent(ctx, canonicalType, extracted.templateData, job)
 		if extracted.pushMeta == nil {
 			extracted.pushMeta = make(map[string]string)
 		}
 		extracted.pushMeta["event_id"] = eventID
-		extracted.pushMeta["event_type"] = envelope.EventType
+		extracted.pushMeta["event_type"] = canonicalType
 
 		_, sendErr := s.notificationService.SendNotification(ctx, dto.SendNotificationInput{
 			UserID:        *uID,
 			Channel:       model.ChannelPush,
-			EventType:     envelope.EventType,
+			EventType:     canonicalType,
 			EventID:       eventID,
 			Recipient:     *uID,
 			Subject:       pushTitle,
@@ -416,8 +474,8 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		pushMeta:     make(map[string]string),
 	}
 
-	switch envelope.EventType {
-	case events.EventTypeUserRegistered:
+	switch normalizeEventType(envelope.EventType) {
+	case normalizeEventType(events.EventTypeUserRegistered):
 		var payload events.UserRegisteredEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed UserRegisteredEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -431,7 +489,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["BusinessName"] = payload.BusinessName
 		res.templateData["Phone"] = payload.Phone
 
-	case events.EventTypeStoreApproved:
+	case normalizeEventType(events.EventTypeStoreApproved):
 		var payload events.StoreApprovedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed StoreApprovedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -448,7 +506,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["ApprovedAt"] = payload.ApprovedAt
 		res.pushMeta["store_id"] = payload.StoreID
 
-	case events.EventTypeStoreRejected:
+	case normalizeEventType(events.EventTypeStoreRejected):
 		var payload events.StoreRejectedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed StoreRejectedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -466,7 +524,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["RejectedAt"] = payload.RejectedAt
 		res.pushMeta["store_id"] = payload.StoreID
 
-	case events.EventTypeMerchantApproved:
+	case normalizeEventType(events.EventTypeMerchantApproved):
 		var payload events.MerchantApprovedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed MerchantApprovedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -486,7 +544,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["ApprovedAt"] = payload.ApprovedAt
 		res.pushMeta["merchant_id"] = payload.MerchantID
 
-	case events.EventTypeMerchantActivated:
+	case normalizeEventType(events.EventTypeMerchantActivated):
 		var payload events.MerchantActivatedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed MerchantActivatedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -506,7 +564,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["ActivatedAt"] = payload.ActivatedAt
 		res.pushMeta["merchant_id"] = payload.MerchantID
 
-	case events.EventTypeMerchantRejected:
+	case normalizeEventType(events.EventTypeMerchantRejected):
 		var payload events.MerchantRejectedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed MerchantRejectedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -526,7 +584,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["RejectedAt"] = payload.RejectedAt
 		res.pushMeta["merchant_id"] = payload.MerchantID
 
-	case events.EventTypeMerchantSuspended:
+	case normalizeEventType(events.EventTypeMerchantSuspended):
 		var payload events.MerchantSuspendedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed MerchantSuspendedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -546,7 +604,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["SuspendedAt"] = payload.SuspendedAt
 		res.pushMeta["merchant_id"] = payload.MerchantID
 
-	case events.EventTypeOrderCreated, "order.created", "order.placed", "OrderPlaced":
+	case normalizeEventType(events.EventTypeOrderCreated), "orderplaced":
 		var payload events.OrderCreatedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderCreatedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -573,25 +631,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 			res.pushMeta["currency"] = payload.Currency
 		}
 
-	case events.EventTypeOrderConfirmed, "order.confirmed", "order_confirmed":
-		var payload events.OrderConfirmedEvent
-		if err := envelope.UnmarshalData(&payload); err != nil {
-			s.logger.WarnContext(ctx, "malformed OrderConfirmedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
-			return nil, false, appErrors.BadRequest("malformed OrderConfirmedEvent payload")
-		}
-		res.userID = payload.UserID
-		res.recipient = firstNonEmpty(payload.UserID, payload.OrderID)
-		res.orderID = payload.OrderID
-		res.templateData["OrderID"] = payload.OrderID
-		res.templateData["UserID"] = payload.UserID
-		res.templateData["PaymentStatus"] = payload.PaymentStatus
-		res.templateData["ConfirmedAt"] = payload.ConfirmedAt
-		res.templateData["Status"] = "CONFIRMED"
-		res.templateData["Headline"] = "Your Order is Confirmed!"
-		res.templateData["Message"] = "Your order and payment have been confirmed and the store is preparing your items."
-		res.pushMeta["order_id"] = payload.OrderID
-
-	case events.EventTypeOrderPaymentConfirmed, "order.payment_confirmed", "order_payment_confirmed":
+	case normalizeEventType(events.EventTypeOrderPaymentConfirmed):
 		var payload events.OrderPaymentConfirmedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderPaymentConfirmedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -619,7 +659,25 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 			res.pushMeta["store_id"] = payload.StoreID
 		}
 
-	case events.EventTypeOrderCancelled, "order.cancelled", "order.canceled", "order_cancelled", "order_canceled", "OrderCanceled":
+	case normalizeEventType(events.EventTypeOrderConfirmed):
+		var payload events.OrderConfirmedEvent
+		if err := envelope.UnmarshalData(&payload); err != nil {
+			s.logger.WarnContext(ctx, "malformed OrderConfirmedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
+			return nil, false, appErrors.BadRequest("malformed OrderConfirmedEvent payload")
+		}
+		res.userID = payload.UserID
+		res.recipient = firstNonEmpty(payload.UserID, payload.OrderID)
+		res.orderID = payload.OrderID
+		res.templateData["OrderID"] = payload.OrderID
+		res.templateData["UserID"] = payload.UserID
+		res.templateData["PaymentStatus"] = payload.PaymentStatus
+		res.templateData["ConfirmedAt"] = payload.ConfirmedAt
+		res.templateData["Status"] = "CONFIRMED"
+		res.templateData["Headline"] = "Your Order is Confirmed!"
+		res.templateData["Message"] = "Your order and payment have been confirmed and the store is preparing your items."
+		res.pushMeta["order_id"] = payload.OrderID
+
+	case normalizeEventType(events.EventTypeOrderCancelled), "ordercanceled":
 		var payload events.OrderCancelledEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderCancelledEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -637,7 +695,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["Message"] = "Your order has been cancelled."
 		res.pushMeta["order_id"] = payload.OrderID
 
-	case events.EventTypeOrderPaymentFailed, "order.payment_failed", "order.payment-failed":
+	case normalizeEventType(events.EventTypeOrderPaymentFailed):
 		var payload events.OrderPaymentFailedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderPaymentFailedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -659,7 +717,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 			res.pushMeta["payment_id"] = payload.PaymentID
 		}
 
-	case events.EventTypePaymentSuccessful:
+	case normalizeEventType(events.EventTypePaymentSuccessful):
 		var payload events.PaymentSuccessfulEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed PaymentSuccessfulEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -684,7 +742,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["order_id"] = payload.OrderID
 		res.pushMeta["payment_id"] = payload.PaymentID
 
-	case events.EventTypePaymentFailed:
+	case normalizeEventType(events.EventTypePaymentFailed):
 		var payload events.PaymentFailedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed PaymentFailedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -705,7 +763,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["order_id"] = payload.OrderID
 		res.pushMeta["payment_id"] = payload.PaymentID
 
-	case events.EventTypeOrderShipped, "order.shipped", "order_shipped":
+	case normalizeEventType(events.EventTypeOrderShipped):
 		var payload events.OrderShippedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderShippedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -728,7 +786,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 			res.pushMeta["tracking_number"] = payload.TrackingNumber
 		}
 
-	case events.EventTypeOrderDelivered, "order.delivered", "order_delivered":
+	case normalizeEventType(events.EventTypeOrderDelivered):
 		var payload events.OrderDeliveredEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed OrderDeliveredEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -748,7 +806,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["Message"] = "Your package has been delivered. Thank you for shopping with GoCart!"
 		res.pushMeta["order_id"] = payload.OrderID
 
-	case events.EventTypeDeliveryCreated, "delivery.created", "delivery_created":
+	case normalizeEventType(events.EventTypeDeliveryCreated):
 		var payload events.DeliveryCreatedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed DeliveryCreatedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -770,7 +828,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["delivery_id"] = payload.DeliveryID
 		res.pushMeta["tracking_number"] = payload.TrackingNumber
 
-	case events.EventTypeDeliveryStatusUpdated:
+	case normalizeEventType(events.EventTypeDeliveryStatusUpdated):
 		var payload events.DeliveryStatusUpdatedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed DeliveryStatusUpdatedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -793,7 +851,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["delivery_id"] = payload.DeliveryID
 		res.pushMeta["tracking_number"] = payload.TrackingNumber
 
-	case events.EventTypeDeliveryStatusChanged:
+	case normalizeEventType(events.EventTypeDeliveryStatusChanged):
 		var payload events.DeliveryStatusChangedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed DeliveryStatusChangedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -819,7 +877,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["delivery_id"] = payload.DeliveryID
 		res.pushMeta["tracking_number"] = payload.TrackingNumber
 
-	case events.EventTypeReturnApproved:
+	case normalizeEventType(events.EventTypeReturnApproved):
 		var payload events.ReturnApprovedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed ReturnApprovedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -842,7 +900,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["order_id"] = payload.OrderID
 		res.pushMeta["return_id"] = payload.ReturnID
 
-	case events.EventTypeReturnRejected:
+	case normalizeEventType(events.EventTypeReturnRejected):
 		var payload events.ReturnRejectedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed ReturnRejectedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
@@ -865,7 +923,7 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.pushMeta["order_id"] = payload.OrderID
 		res.pushMeta["return_id"] = payload.ReturnID
 
-	case events.EventTypeRefundCompleted:
+	case normalizeEventType(events.EventTypeRefundCompleted):
 		var payload events.RefundCompletedEvent
 		if err := envelope.UnmarshalData(&payload); err != nil {
 			s.logger.WarnContext(ctx, "malformed RefundCompletedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)

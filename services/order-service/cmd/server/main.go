@@ -115,12 +115,10 @@ func main() {
 		probeCancel()
 
 		if healthRes.Status != "UP" {
-			log.Warn("Kafka broker is unreachable at startup, disabling Kafka and outbox publisher",
+			log.Warn("Kafka broker is currently unreachable at startup; background publisher and consumer reconnect logic will retry until broker recovers",
 				"brokers", cfg.Kafka.Brokers,
 				"error", healthRes.Error,
 			)
-			cfg.Kafka.Enabled = false
-			cfg.Outbox.Enabled = false
 		}
 	}
 

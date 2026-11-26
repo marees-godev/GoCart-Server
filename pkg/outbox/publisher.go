@@ -24,7 +24,6 @@ type Publisher struct {
 	producer      KafkaPublisher
 	store         *Store
 	cfg           Config
-	lastErr       string
 	lastErrLogged time.Time
 }
 
@@ -166,20 +165,26 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 						"error", err,
 					)
 				}
-			} else {
-				slog.Error("outbox: publish failed, applying backoff",
-					"event_id", evt.ID,
-					"event_type", evt.EventType,
-					"topic", evt.Topic,
-					"retry_count", evt.RetryCount,
-					"next_retry_delay", delay,
-					"error", err,
-				)
+				// Broker is temporarily unreachable. Retain PENDING status with backoff
+				// so that the event resumes publishing as soon as Kafka recovers, without exhausting retry budget.
+				if mErr := p.store.MarkRetryAfter(ctx, tx, evt.ID, delay); mErr != nil {
+					slog.Error("outbox: could not mark event retry after", "event_id", evt.ID, "error", mErr)
+				}
+				// If the broker is unreachable, stop attempting remaining events in this batch to prevent hammering.
+				break
 			}
 
+			slog.Error("outbox: publish failed, applying backoff",
+				"event_id", evt.ID,
+				"event_type", evt.EventType,
+				"topic", evt.Topic,
+				"retry_count", evt.RetryCount,
+				"next_retry_delay", delay,
+				"error", err,
+			)
+
 			// If max retries exceeded and broker connection is alive, route to DLQ.
-			// If broker is completely unreachable (connection refused/down), avoid hammering DLQ on the dead broker.
-			if evt.RetryCount+1 >= p.cfg.MaxRetries && !connErr {
+			if evt.RetryCount+1 >= p.cfg.MaxRetries {
 				dlqTopic := p.cfg.DLQTopic
 				if dlqTopic == "" && evt.Topic != "" {
 					dlqTopic = evt.Topic + ".dlq"
@@ -198,11 +203,6 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 
 			if mErr := p.store.MarkFailedWithBackoff(ctx, tx, evt.ID, p.cfg.MaxRetries, delay); mErr != nil {
 				slog.Error("outbox: could not mark event failed with backoff", "event_id", evt.ID, "error", mErr)
-			}
-
-			// If the broker is unreachable, stop attempting remaining events in this batch to prevent hammering.
-			if connErr {
-				break
 			}
 			continue
 		}
@@ -225,13 +225,21 @@ func (p *Publisher) processOnce(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
+// IsConnectionError returns true if err indicates a transient network or broker connection failure.
+func IsConnectionError(err error) bool {
+	return isConnectionError(err)
+}
+
 func isConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	s := err.Error()
+	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "connection refused") ||
 		strings.Contains(s, "no such host") ||
 		strings.Contains(s, "network is unreachable") ||
-		strings.Contains(s, "i/o timeout")
+		strings.Contains(s, "i/o timeout") ||
+		strings.Contains(s, "dial tcp") ||
+		strings.Contains(s, "connection reset") ||
+		strings.Contains(s, "broken pipe")
 }

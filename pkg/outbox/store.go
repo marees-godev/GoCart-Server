@@ -174,6 +174,47 @@ func (s *Store) MarkFailed(ctx context.Context, tx pgx.Tx, id uuid.UUID, maxRetr
 	return s.MarkFailedWithBackoff(ctx, tx, id, maxRetries, 0)
 }
 
+// MarkRetryAfter sets next_retry_at with backoff delay while keeping status PENDING,
+// without burning the terminal retry budget for temporary infrastructure outages (e.g. Kafka broker down).
+func (s *Store) MarkRetryAfter(ctx context.Context, tx pgx.Tx, id uuid.UUID, backoffDelay time.Duration) error {
+	seconds := backoffDelay.Seconds()
+	if seconds <= 0 {
+		seconds = 1
+	}
+
+	sp, spErr := tx.Begin(ctx)
+	if spErr != nil {
+		return spErr
+	}
+
+	_, err := sp.Exec(ctx, `
+		UPDATE outbox_events
+		SET status = 'PENDING',
+		    next_retry_at = NOW() + ($2 || ' seconds')::interval,
+		    updated_at = NOW()
+		WHERE id = $1`,
+		id, fmt.Sprintf("%f", seconds),
+	)
+	if err == nil {
+		return sp.Commit(ctx)
+	}
+
+	_ = sp.Rollback(ctx)
+
+	// Fallback for tables without updated_at
+	_, err = tx.Exec(ctx, `
+		UPDATE outbox_events
+		SET status = 'PENDING',
+		    next_retry_at = NOW() + ($2 || ' seconds')::interval
+		WHERE id = $1`,
+		id, fmt.Sprintf("%f", seconds),
+	)
+	if err != nil {
+		return fmt.Errorf("outbox: mark retry after %s: %w", id, err)
+	}
+	return nil
+}
+
 // MarkFailedWithBackoff increments retry_count, sets next_retry_at with exponential backoff delay,
 // and sets status to FAILED if maxRetries is exceeded.
 func (s *Store) MarkFailedWithBackoff(ctx context.Context, tx pgx.Tx, id uuid.UUID, maxRetries int, backoffDelay time.Duration) error {

@@ -135,13 +135,12 @@ func CanCancel(current OrderStatus) bool {
 	}
 }
 
-func CanMerchantCancel(current OrderStatus) bool {
-	switch current {
-	case OrderStatusPaid:
-		return true
-	default:
-		return false
+func CanMerchantCancel(current OrderStatus, paymentStatus ...PaymentStatus) bool {
+	ps := PaymentStatusPending
+	if len(paymentStatus) > 0 {
+		ps = paymentStatus[0]
 	}
+	return CanMerchantCancelOrder(current, ps)
 }
 
 func CanMerchantCancelOrder(status OrderStatus, paymentStatus PaymentStatus) bool {

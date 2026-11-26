@@ -207,3 +207,30 @@ func TestBackoffCalculation(t *testing.T) {
 	}
 }
 
+func TestIsConnectionError(t *testing.T) {
+	connErrors := []error{
+		errors.New("dial tcp [::1]:9092: connect: connection refused"),
+		errors.New("dial tcp: lookup kafka-broker: no such host"),
+		errors.New("read tcp: network is unreachable"),
+		errors.New("i/o timeout while connecting to broker"),
+		errors.New("write tcp: broken pipe"),
+		errors.New("read tcp: connection reset by peer"),
+	}
+	for _, err := range connErrors {
+		if !outbox.IsConnectionError(err) {
+			t.Errorf("expected IsConnectionError to be true for %v", err)
+		}
+	}
+
+	nonConnErrors := []error{
+		errors.New("malformed envelope payload"),
+		errors.New("unknown topic"),
+		errors.New("schema validation failed"),
+	}
+	for _, err := range nonConnErrors {
+		if outbox.IsConnectionError(err) {
+			t.Errorf("expected IsConnectionError to be false for %v", err)
+		}
+	}
+}
+
