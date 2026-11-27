@@ -635,18 +635,26 @@ func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *m
 
 	query := `
 		INSERT INTO product_reports (
-			product_id, reporter_id, reason, description, status
+			id, product_id, reporter_id, reason, description, status, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5
+			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8
 		) RETURNING id, created_at, updated_at
 	`
 	status := report.Status
 	if status == "" {
 		status = model.ReportStatusPending
 	}
+	createdAt := report.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	updatedAt := report.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+	}
 
 	err = tx.QueryRow(ctx, query,
-		report.ProductID, report.ReporterID, report.Reason, report.Description, status,
+		report.ID, report.ProductID, report.ReporterID, report.Reason, report.Description, status, createdAt, updatedAt,
 	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
 
 	if err != nil {
@@ -691,7 +699,7 @@ func (r *pgProductRepository) GetProductReportByID(ctx context.Context, id strin
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, appErrors.NotFound("product report not found") 
+			return nil, appErrors.NotFound("product report not found")
 		}
 		return nil, appErrors.Internal(err, "failed to fetch product report")
 	}
@@ -775,20 +783,28 @@ func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.Li
 		if _, err := uuid.Parse(req.ProductID); err != nil {
 			return []*model.ProductReport{}, 0, nil
 		}
-		whereClauses = append(whereClauses, fmt.Sprintf("product_id = $%d", argPos))
+		whereClauses = append(whereClauses, fmt.Sprintf("product_reports.product_id = $%d", argPos))
 		args = append(args, req.ProductID)
 		argPos++
 	}
 
 	if req.Status != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("status = $%d", argPos))
+		whereClauses = append(whereClauses, fmt.Sprintf("product_reports.status = $%d", argPos))
 		args = append(args, req.Status)
+		argPos++
+	}
+
+	joinClause := ""
+	if len(req.StoreIDs) > 0 {
+		joinClause = "JOIN products ON product_reports.product_id = products.id"
+		whereClauses = append(whereClauses, fmt.Sprintf("products.store_id = ANY($%d)", argPos))
+		args = append(args, req.StoreIDs)
 		argPos++
 	}
 
 	whereStmt := strings.Join(whereClauses, " AND ")
 
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM product_reports WHERE %s", whereStmt)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM product_reports %s WHERE %s", joinClause, whereStmt)
 	var total int32
 	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
@@ -810,12 +826,13 @@ func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.Li
 	}
 
 	listQuery := fmt.Sprintf(`
-		SELECT id, product_id, reporter_id, reason, COALESCE(description, ''), status, created_at, updated_at
+		SELECT product_reports.id, product_reports.product_id, product_reports.reporter_id, product_reports.reason, COALESCE(product_reports.description, ''), product_reports.status, product_reports.created_at, product_reports.updated_at
 		FROM product_reports
+		%s
 		WHERE %s
-		ORDER BY created_at DESC
+		ORDER BY product_reports.created_at DESC
 		LIMIT $%d OFFSET $%d
-	`, whereStmt, argPos, argPos+1)
+	`, joinClause, whereStmt, argPos, argPos+1)
 
 	args = append(args, limit, offset)
 

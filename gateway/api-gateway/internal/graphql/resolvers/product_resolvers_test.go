@@ -384,3 +384,38 @@ func TestProductResolvers_ProductReports_MerchantRole(t *testing.T) {
 		t.Errorf("expected report ID rep-merchant-1, got %s", res.Reports[0].ID)
 	}
 }
+
+func TestProductResolvers_ProductReports_OmittedProductID(t *testing.T) {
+	mockClient := &mockProductClient{
+		listRepResp: &productpb.ListProductReportsResponse{
+			Reports: []*productpb.ProductReport{
+				{
+					Id:         "rep-all-1",
+					ProductId:  "prod-all-1",
+					ReporterId: "customer-1",
+					Reason:     "INAPPROPRIATE_CONTENT",
+					Status:     "PENDING",
+				},
+			},
+			Total: 1,
+		},
+	}
+
+	clients := &grpc.Clients{ProductClient: mockClient}
+	r := &queryResolver{Resolver: &Resolver{Clients: clients}}
+
+	ctx := auth.WithUser(context.Background(), &auth.UserContext{
+		UserID: "merchant-123",
+		Role:   auth.RoleMerchant,
+	})
+
+	limit := 10
+	offset := 0
+	res, err := r.ProductReports(ctx, nil, &limit, &offset, nil)
+	if err != nil {
+		t.Fatalf("expected success with omitted productId, got %v", err)
+	}
+	if res.Total != 1 || len(res.Reports) != 1 {
+		t.Errorf("unexpected reports count: %d", res.Total)
+	}
+}

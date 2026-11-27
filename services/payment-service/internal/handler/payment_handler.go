@@ -195,7 +195,9 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 				}
 				if h.orderClient != nil && pmt.OrderID != "" {
 					callCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					_ = h.orderClient.UpdateOrderStatus(callCtx, pmt.OrderID, "PAYMENT_FAILED")
+					if ordErr := h.orderClient.UpdateOrderStatus(callCtx, pmt.OrderID, "PAYMENT_FAILED"); ordErr != nil {
+						h.log.Warn("failed to update order status to PAYMENT_FAILED on payment callback", "order_id", pmt.OrderID, "error", ordErr)
+					}
 					cancel()
 				}
 			} else {

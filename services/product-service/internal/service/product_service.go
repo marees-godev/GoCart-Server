@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/marees-godev/GoCart-Server/contracts/events"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
@@ -26,6 +27,7 @@ import (
 
 type StoreClient interface {
 	GetStore(ctx context.Context, in *storepb.GetStoreRequest, opts ...grpc.CallOption) (*storepb.GetStoreResponse, error)
+	ListStores(ctx context.Context, in *storepb.ListStoresRequest, opts ...grpc.CallOption) (*storepb.ListStoresResponse, error)
 }
 
 type CategoryClient interface {
@@ -275,7 +277,7 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 		Status:              prodStatus,
 		ImageURL:            imgURL,
 		AvgRating:           0.00,
-		Weight:      req.Weight,
+		Weight:              req.Weight,
 		IsExchangeEligible:  req.IsExchangeEligible,
 		MaxExchangeDiscount: req.MaxExchangeDiscount,
 		Images:              images,
@@ -528,12 +530,16 @@ func (s *productService) ReportProduct(ctx context.Context, req dto.ReportProduc
 		return nil, appErrors.Conflict("you have already reported this product")
 	}
 
+	now := time.Now().UTC()
 	report := &model.ProductReport{
+		ID:          uuid.New().String(),
 		ProductID:   req.ProductID,
 		ReporterID:  req.ReporterID,
 		Reason:      normalizedReason,
 		Description: req.Description,
 		Status:      model.ReportStatusPending,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	var merchantID string
@@ -545,7 +551,14 @@ func (s *productService) ReportProduct(ctx context.Context, req dto.ReportProduc
 	}
 
 	var outboxEvts []*outbox.Event
-	if outboxEvt, err := productEvents.BuildProductReportedOutboxEvent(report, prod, merchantID); err == nil && outboxEvt != nil {
+	outboxEvt, err := productEvents.BuildProductReportedOutboxEvent(report, prod, merchantID)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.ErrorContext(ctx, "failed to build ProductReported outbox event", "error", err, "product_id", prod.ID)
+		}
+		return nil, appErrors.Internal(err, "failed to build product report notification event")
+	}
+	if outboxEvt != nil {
 		outboxEvts = append(outboxEvts, outboxEvt)
 	}
 
@@ -599,5 +612,44 @@ func (s *productService) ListProductReports(ctx context.Context, req dto.ListPro
 		}
 		req.Status = string(st)
 	}
+
+	user, hasUser := auth.UserFromContext(ctx)
+	if hasUser && (user.Role == auth.RoleMerchant || strings.EqualFold(user.Role, "MERCHANT")) {
+		if req.ProductID != "" {
+			prod, err := s.repo.GetProductByID(ctx, req.ProductID)
+			if err != nil {
+				return nil, 0, err
+			}
+			if s.storeClient != nil && prod.StoreID != "" {
+				stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: prod.StoreID})
+				if err != nil || stResp == nil || stResp.Store == nil || stResp.Store.MerchantId != user.UserID {
+					return nil, 0, appErrors.Forbidden("merchant does not own this product")
+				}
+			}
+		} else {
+			var storeIDs []string
+			if s.storeClient != nil {
+				stList, err := s.storeClient.ListStores(ctx, &storepb.ListStoresRequest{MerchantId: user.UserID, Limit: 100})
+				if err == nil && stList != nil {
+					for _, st := range stList.Stores {
+						if st != nil && st.Id != "" {
+							storeIDs = append(storeIDs, st.Id)
+						}
+					}
+				}
+				if len(storeIDs) == 0 {
+					stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{MerchantId: user.UserID})
+					if err == nil && stResp != nil && stResp.Store != nil && stResp.Store.Id != "" {
+						storeIDs = append(storeIDs, stResp.Store.Id)
+					}
+				}
+			}
+			if len(storeIDs) == 0 {
+				return []*model.ProductReport{}, 0, nil
+			}
+			req.StoreIDs = storeIDs
+		}
+	}
+
 	return s.repo.ListProductReports(ctx, req)
 }

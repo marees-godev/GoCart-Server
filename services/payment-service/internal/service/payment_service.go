@@ -190,7 +190,9 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 		// Persist FAILED state
 		updated, _ := s.repo.UpdatePaymentStatus(ctx, payment.ID, model.PaymentStatusFailed, "", sanitizedErr.Error())
 		if s.orderClient != nil {
-			_ = s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED")
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to update order status to PAYMENT_FAILED", "order_id", payment.OrderID, "error", ordErr)
+			}
 		}
 		if updated != nil {
 			return updated, nil
@@ -216,7 +218,9 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 				slog.WarnContext(ctx, "failed to notify order service of successful payment", "order_id", targetOrderID, "error", ordErr)
 			}
 			if authOrder != nil && authOrder.ID != "" && authOrder.ID != targetOrderID {
-				_ = s.orderClient.UpdateOrderStatus(ctx, authOrder.ID, "PAID")
+				if ordErr := s.orderClient.UpdateOrderStatus(ctx, authOrder.ID, "PAID"); ordErr != nil {
+					slog.WarnContext(ctx, "failed to update authoritative order status to PAID", "order_id", authOrder.ID, "error", ordErr)
+				}
 			}
 		}
 		slog.InfoContext(ctx, "payment successfully processed in service", "payment_id", updated.ID, "gateway_tx_id", updated.GatewayTransactionID)
@@ -250,7 +254,9 @@ func (s *paymentService) ProcessPayment(ctx context.Context, dto *ProcessPayment
 		return nil, err
 	}
 	if s.orderClient != nil {
-		_ = s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED")
+		if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED"); ordErr != nil {
+			slog.WarnContext(ctx, "failed to update order status to PAYMENT_FAILED", "order_id", payment.OrderID, "error", ordErr)
+		}
 	}
 
 	slog.InfoContext(ctx, "payment failed at gateway in service", "payment_id", updated.ID, "reason", failureReason)
@@ -477,7 +483,9 @@ func (s *paymentService) CreateRefund(ctx context.Context, dto *CreateRefundDTO)
 		}
 
 		if targetPaymentStatus == model.PaymentStatusRefunded && s.orderClient != nil {
-			_ = s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "REFUNDED")
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "REFUNDED"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to update order status to REFUNDED", "order_id", payment.OrderID, "error", ordErr)
+			}
 		}
 
 		slog.InfoContext(ctx, "refund processed successfully in service",
@@ -778,7 +786,9 @@ func (s *paymentService) handlePaymentFailedWebhook(ctx context.Context, event *
 		return err
 	}
 	if s.orderClient != nil {
-		_ = s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED")
+		if ordErr := s.orderClient.UpdateOrderStatus(ctx, payment.OrderID, "PAYMENT_FAILED"); ordErr != nil {
+			slog.WarnContext(ctx, "failed to update order status to PAYMENT_FAILED via webhook", "order_id", payment.OrderID, "error", ordErr)
+		}
 	}
 
 	slog.InfoContext(ctx, "payment status updated to FAILED via razorpay webhook", "payment_id", updated.ID, "failure_reason", failureReason)
@@ -822,7 +832,9 @@ func (s *paymentService) handleRefundSuccessWebhook(ctx context.Context, event *
 		}
 		_, _ = s.repo.UpdatePaymentStatus(ctx, targetPayment.ID, targetStatus, "", "")
 		if targetStatus == model.PaymentStatusRefunded && s.orderClient != nil {
-			_ = s.orderClient.UpdateOrderStatus(ctx, targetPayment.OrderID, "REFUNDED")
+			if ordErr := s.orderClient.UpdateOrderStatus(ctx, targetPayment.OrderID, "REFUNDED"); ordErr != nil {
+				slog.WarnContext(ctx, "failed to update order status to REFUNDED via webhook", "order_id", targetPayment.OrderID, "error", ordErr)
+			}
 		}
 		slog.InfoContext(ctx, "payment marked after refund webhook", "payment_id", targetPayment.ID, "status", targetStatus, "gateway_refund_id", refEntity.ID)
 	}

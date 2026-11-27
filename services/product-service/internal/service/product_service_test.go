@@ -184,6 +184,22 @@ func (m *mockRepo) ListProductReports(ctx context.Context, req dto.ListProductRe
 		if req.Status != "" && string(r.Status) != req.Status {
 			continue
 		}
+		if len(req.StoreIDs) > 0 {
+			prod, ok := m.products[r.ProductID]
+			if !ok {
+				continue
+			}
+			matched := false
+			for _, sID := range req.StoreIDs {
+				if prod.StoreID == sID {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
 		res = append(res, r)
 	}
 	return res, int32(len(res)), nil
@@ -194,11 +210,31 @@ type mockStoreClient struct {
 }
 
 func (m *mockStoreClient) GetStore(ctx context.Context, in *storepb.GetStoreRequest, opts ...grpc.CallOption) (*storepb.GetStoreResponse, error) {
-	st, ok := m.stores[in.Id]
-	if !ok {
-		return nil, errors.New("store not found")
+	if in.Id != "" {
+		st, ok := m.stores[in.Id]
+		if !ok {
+			return nil, errors.New("store not found")
+		}
+		return &storepb.GetStoreResponse{Store: st}, nil
 	}
-	return &storepb.GetStoreResponse{Store: st}, nil
+	if in.MerchantId != "" {
+		for _, st := range m.stores {
+			if st.MerchantId == in.MerchantId {
+				return &storepb.GetStoreResponse{Store: st}, nil
+			}
+		}
+	}
+	return nil, errors.New("store not found")
+}
+
+func (m *mockStoreClient) ListStores(ctx context.Context, in *storepb.ListStoresRequest, opts ...grpc.CallOption) (*storepb.ListStoresResponse, error) {
+	var matched []*storepb.Store
+	for _, s := range m.stores {
+		if in.MerchantId == "" || s.MerchantId == in.MerchantId {
+			matched = append(matched, s)
+		}
+	}
+	return &storepb.ListStoresResponse{Stores: matched, Total: int32(len(matched))}, nil
 }
 
 type mockCategoryClient struct {
@@ -917,6 +953,53 @@ func TestProductReporting(t *testing.T) {
 		}
 		if total < 1 || len(reports) < 1 {
 			t.Fatalf("expected at least 1 report, got %d", total)
+		}
+		if reports[0].ID == "" {
+			t.Fatal("expected report ID to be populated, got empty")
+		}
+		if reports[0].CreatedAt.IsZero() {
+			t.Fatal("expected report CreatedAt to be non-zero")
+		}
+	})
+
+	t.Run("merchant scopes reports to own products without productId", func(t *testing.T) {
+		ownerCtx := auth.WithUser(context.Background(), &auth.UserContext{
+			UserID: merchantID,
+			Role:   auth.RoleMerchant,
+		})
+		reports, total, err := svc.ListProductReports(ownerCtx, dto.ListProductReportsRequest{})
+		if err != nil {
+			t.Fatalf("failed to list product reports for merchant: %v", err)
+		}
+		if total < 1 || len(reports) < 1 {
+			t.Fatalf("expected at least 1 report for owner merchant, got %d", total)
+		}
+	})
+
+	t.Run("merchant cannot access other merchant product reports with productId", func(t *testing.T) {
+		otherMerchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+			UserID: "other-merchant-999",
+			Role:   auth.RoleMerchant,
+		})
+		_, _, err := svc.ListProductReports(otherMerchantCtx, dto.ListProductReportsRequest{
+			ProductID: pubProd.ID,
+		})
+		if err == nil {
+			t.Fatal("expected forbidden error for other merchant querying product reports")
+		}
+	})
+
+	t.Run("merchant with no stores receives empty report list", func(t *testing.T) {
+		emptyMerchantCtx := auth.WithUser(context.Background(), &auth.UserContext{
+			UserID: "storeless-merchant-999",
+			Role:   auth.RoleMerchant,
+		})
+		reports, total, err := svc.ListProductReports(emptyMerchantCtx, dto.ListProductReportsRequest{})
+		if err != nil {
+			t.Fatalf("expected success for merchant with no stores, got error: %v", err)
+		}
+		if total != 0 || len(reports) != 0 {
+			t.Fatalf("expected 0 reports for merchant with no stores, got %d", total)
 		}
 	})
 }

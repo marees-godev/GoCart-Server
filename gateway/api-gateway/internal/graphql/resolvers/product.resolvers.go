@@ -6,6 +6,7 @@ package resolvers
 
 import (
 	"context"
+	"strings"
 
 	productpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/product"
 	maps "github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/mappers"
@@ -412,8 +413,8 @@ func (r *queryResolver) ProductReports(ctx context.Context, productID *string, l
 	}
 
 	var pID *string
-	if productID != nil {
-		id := *productID
+	if productID != nil && strings.TrimSpace(*productID) != "" {
+		id := strings.TrimSpace(*productID)
 		pID = &id
 	}
 

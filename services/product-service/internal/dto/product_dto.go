@@ -22,21 +22,21 @@ type CreateVariantRequest struct {
 }
 
 type CreateProductRequest struct {
-	StoreID     string                 `json:"store_id"`
-	CategoryID  string                 `json:"category_id"`
-	SKU         string                 `json:"sku"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Price       float64                `json:"price"`
-	MRP         float64                `json:"mrp"`
-	Tax         float64                `json:"tax"`
-	Weight      float64                `json:"weight"`
-	Status      string                 `json:"status"`
+	StoreID             string                 `json:"store_id"`
+	CategoryID          string                 `json:"category_id"`
+	SKU                 string                 `json:"sku"`
+	Name                string                 `json:"name"`
+	Description         string                 `json:"description"`
+	Price               float64                `json:"price"`
+	MRP                 float64                `json:"mrp"`
+	Tax                 float64                `json:"tax"`
+	Weight              float64                `json:"weight"`
+	Status              string                 `json:"status"`
 	ImageURL            string                 `json:"image_url,omitempty"`
 	IsExchangeEligible  bool                   `json:"is_exchange_eligible"`
 	MaxExchangeDiscount float64                `json:"max_exchange_discount"`
 	Images              []string               `json:"images"`
-	Variants    []CreateVariantRequest `json:"variants"`
+	Variants            []CreateVariantRequest `json:"variants"`
 }
 
 func (r *CreateProductRequest) Validate() error {
@@ -135,20 +135,20 @@ type UpdateVariantRequest struct {
 }
 
 type UpdateProductRequest struct {
-	ID          string                 `json:"id"`
-	Name        *string                `json:"name,omitempty"`
-	Description *string                `json:"description,omitempty"`
-	Price       *float64               `json:"price,omitempty"`
-	MRP         *float64               `json:"mrp,omitempty"`
-	Tax         *float64               `json:"tax,omitempty"`
-	Weight      *float64               `json:"weight,omitempty"`
-	Status      *string                `json:"status,omitempty"`
-	CategoryID  *string                `json:"category_id,omitempty"`
+	ID                  string                 `json:"id"`
+	Name                *string                `json:"name,omitempty"`
+	Description         *string                `json:"description,omitempty"`
+	Price               *float64               `json:"price,omitempty"`
+	MRP                 *float64               `json:"mrp,omitempty"`
+	Tax                 *float64               `json:"tax,omitempty"`
+	Weight              *float64               `json:"weight,omitempty"`
+	Status              *string                `json:"status,omitempty"`
+	CategoryID          *string                `json:"category_id,omitempty"`
 	ImageURL            *string                `json:"image_url,omitempty"`
 	IsExchangeEligible  *bool                  `json:"is_exchange_eligible,omitempty"`
 	MaxExchangeDiscount *float64               `json:"max_exchange_discount,omitempty"`
 	Images              []string               `json:"images,omitempty"`
-	Variants    []UpdateVariantRequest `json:"variants,omitempty"`
+	Variants            []UpdateVariantRequest `json:"variants,omitempty"`
 }
 
 func (r *UpdateProductRequest) Validate() error {
@@ -270,25 +270,25 @@ func ToProductPB(p *model.Product) *productpb.Product {
 	}
 
 	return &productpb.Product{
-		Id:           p.ID,
-		StoreId:      p.StoreID,
-		CategoryId:   p.CategoryID,
-		Sku:          p.SKU,
-		Name:         p.Name,
-		Productname:  p.Name,
-		Description:  p.Description,
-		Price:        p.Price,
-		Mrp:          p.MRP,
-		Tax:          p.Tax,
-		Status:       string(p.Status),
-		Images:       images,
-		Variants:     variants,
-		AvgRating:    p.AvgRating,
-		CreatedAt:    p.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:    p.UpdatedAt.Format(time.RFC3339),
+		Id:                  p.ID,
+		StoreId:             p.StoreID,
+		CategoryId:          p.CategoryID,
+		Sku:                 p.SKU,
+		Name:                p.Name,
+		Productname:         p.Name,
+		Description:         p.Description,
+		Price:               p.Price,
+		Mrp:                 p.MRP,
+		Tax:                 p.Tax,
+		Status:              string(p.Status),
+		Images:              images,
+		Variants:            variants,
+		AvgRating:           p.AvgRating,
+		CreatedAt:           p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:           p.UpdatedAt.Format(time.RFC3339),
 		DeletedAt:           deletedAtStr,
 		IsReturnable:        true,
-		Weight:       p.Weight,
+		Weight:              p.Weight,
 		IsExchangeEligible:  p.IsExchangeEligible,
 		MaxExchangeDiscount: p.MaxExchangeDiscount,
 	}
@@ -365,10 +365,11 @@ func (r *ReportProductRequest) Validate() error {
 }
 
 type ListProductReportsRequest struct {
-	ProductID string `json:"product_id"`
-	Limit     int32  `json:"limit"`
-	Offset    int32  `json:"offset"`
-	Status    string `json:"status"`
+	ProductID string   `json:"product_id"`
+	StoreIDs  []string `json:"store_ids"`
+	Limit     int32    `json:"limit"`
+	Offset    int32    `json:"offset"`
+	Status    string   `json:"status"`
 }
 
 func ToProductReportPB(r *model.ProductReport) *productpb.ProductReport {
@@ -394,4 +395,3 @@ func ToProductReportListPB(reports []*model.ProductReport) []*productpb.ProductR
 	}
 	return res
 }
-

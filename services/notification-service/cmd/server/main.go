@@ -189,6 +189,7 @@ func main() {
 				events.TopicReturnApproved,
 				events.TopicReturnRejected,
 				events.TopicRefundCompleted,
+				events.TopicProductReported,
 			}
 		}
 
@@ -270,57 +271,4 @@ func main() {
 	}
 
 	log.Info("Service stopped", "service", cfg.App.Name)
-}
-
-func topicForEventType(eventType string) string {
-	switch eventType {
-	case events.EventTypeUserRegistered:
-		return events.TopicUserRegistered
-	case events.EventTypeStoreApproved:
-		return events.TopicStoreApproved
-	case events.EventTypeStoreRejected:
-		return events.TopicStoreRejected
-	case events.EventTypeMerchantApproved:
-		return events.TopicMerchantApproved
-	case events.EventTypeMerchantActivated:
-		return events.TopicMerchantActivated
-	case events.EventTypeMerchantRejected:
-		return events.TopicMerchantRejected
-	case events.EventTypeMerchantSuspended:
-		return events.TopicMerchantSuspended
-	case events.EventTypeOrderCreated:
-		return events.TopicOrderCreated
-	case events.EventTypeOrderConfirmed:
-		return events.TopicOrderConfirmed
-	case events.EventTypeOrderPaymentConfirmed:
-		return events.TopicOrderPaymentConfirmed
-	case events.EventTypeOrderShipped:
-		return events.TopicOrderShipped
-	case events.EventTypeOrderDelivered:
-		return events.TopicOrderDelivered
-	case events.EventTypeOrderCancelled:
-		return events.TopicOrderCancelled
-	case events.EventTypeOrderPaymentFailed:
-		return events.TopicOrderPaymentFailed
-	case events.EventTypePaymentSuccessful:
-		return events.TopicPaymentSuccessful
-	case events.EventTypePaymentFailed:
-		return events.TopicPaymentFailed
-	case events.EventTypeDeliveryCreated:
-		return events.TopicDeliveryCreated
-	case events.EventTypeDeliveryStatusUpdated:
-		return events.TopicDeliveryStatusUpdated
-	case events.EventTypeDeliveryStatusChanged:
-		return events.TopicDeliveryStatusChanged
-	case events.EventTypeReturnApproved:
-		return events.TopicReturnApproved
-	case events.EventTypeReturnRejected:
-		return events.TopicReturnRejected
-	case events.EventTypeRefundCompleted:
-		return events.TopicRefundCompleted
-	case events.EventTypeProductReported:
-		return events.TopicProductReported
-	default:
-		return "gocart.notification.events"
-	}
 }
