@@ -599,7 +599,6 @@ func mapProtoOrderToGraphQL(o *orderpb.Order) *model.Order {
 		MerchantCanCancel: &merchantCanCancel,
 	}
 }
-
 func (r *Resolver) enrichOrderPaymentStatus(ctx context.Context, ord *model.Order) {
 	if ord == nil {
 		return
