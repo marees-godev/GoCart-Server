@@ -65,6 +65,7 @@ const (
 	EventTypeProductUpdated   = "ProductUpdated"
 	EventTypeProductPublished = "ProductPublished"
 	EventTypeProductDeleted   = "ProductDeleted"
+	EventTypeProductReported  = "ProductReported"
 
 	// Return Service Events
 	EventTypeReturnRequested      = "ReturnRequested"
@@ -141,10 +142,11 @@ const (
 	TopicDeliveryStatusChanged = "gocart.deliveries"
 
 	// Product Service Topics
-	TopicProductCreated   = "gocart.accounts"
-	TopicProductUpdated   = "gocart.accounts"
-	TopicProductPublished = "gocart.accounts"
-	TopicProductDeleted   = "gocart.accounts"
+	TopicProductCreated   = "gocart.product.product-created"
+	TopicProductUpdated   = "gocart.product.product-updated"
+	TopicProductPublished = "gocart.product.product-published"
+	TopicProductDeleted   = "gocart.product.product-deleted"
+	TopicProductReported  = "gocart.product.product-reported"
 
 	// Return Service Topics
 	TopicReturnRequested      = "gocart.orders"

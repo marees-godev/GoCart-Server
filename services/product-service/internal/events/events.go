@@ -133,3 +133,33 @@ func BuildProductDeletedOutboxEvent(productID, storeID string, deletedAt time.Ti
 		Topic:         events.TopicProductDeleted,
 	}, nil
 }
+
+func BuildProductReportedOutboxEvent(report *model.ProductReport, p *model.Product, merchantID string) (*outbox.Event, error) {
+	payload := events.ProductReportedEvent{
+		ReportID:    report.ID,
+		ProductID:   report.ProductID,
+		ReporterID:  report.ReporterID,
+		StoreID:     p.StoreID,
+		MerchantID:  merchantID,
+		ProductName: p.Name,
+		Reason:      string(report.Reason),
+		Description: report.Description,
+		Status:      string(report.Status),
+		CreatedAt:   report.CreatedAt,
+	}
+	env, err := events.NewEventEnvelopeWithAggregate(events.EventTypeProductReported, SourceProductService, report.ProductID, payload)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := env.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	return &outbox.Event{
+		AggregateType: "product",
+		AggregateID:   report.ProductID,
+		EventType:     events.EventTypeProductReported,
+		Payload:       bytes,
+		Topic:         events.TopicProductReported,
+	}, nil
+}

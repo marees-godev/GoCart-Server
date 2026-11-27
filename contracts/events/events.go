@@ -439,6 +439,20 @@ type ProductDeletedEvent struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+// ProductReportedEvent represents the payload for ProductReported domain event.
+type ProductReportedEvent struct {
+	ReportID    string    `json:"report_id"`
+	ProductID   string    `json:"product_id"`
+	ReporterID  string    `json:"reporter_id"`
+	StoreID     string    `json:"store_id"`
+	MerchantID  string    `json:"merchant_id,omitempty"`
+	ProductName string    `json:"product_name"`
+	Reason      string    `json:"reason"`
+	Description string    `json:"description,omitempty"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // ReturnRequestedEvent represents the payload for ReturnRequested domain event.
 type ReturnRequestedEvent struct {
 	ReturnID     string    `json:"return_id"`

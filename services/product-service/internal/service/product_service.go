@@ -6,14 +6,20 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/marees-godev/GoCart-Server/contracts/events"
 	categorypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/category"
 	merchantpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/merchant"
+	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	storepb "github.com/marees-godev/GoCart-Server/contracts/protobuf/store"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
+	"github.com/marees-godev/GoCart-Server/pkg/outbox"
 	"github.com/marees-godev/GoCart-Server/pkg/storage"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/dto"
+	productEvents "github.com/marees-godev/GoCart-Server/services/product-service/internal/events"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/product-service/internal/repository"
 	"google.golang.org/grpc"
@@ -21,6 +27,7 @@ import (
 
 type StoreClient interface {
 	GetStore(ctx context.Context, in *storepb.GetStoreRequest, opts ...grpc.CallOption) (*storepb.GetStoreResponse, error)
+	ListStores(ctx context.Context, in *storepb.ListStoresRequest, opts ...grpc.CallOption) (*storepb.ListStoresResponse, error)
 }
 
 type CategoryClient interface {
@@ -31,6 +38,10 @@ type MerchantClient interface {
 	GetMerchant(ctx context.Context, in *merchantpb.GetMerchantRequest, opts ...grpc.CallOption) (*merchantpb.GetMerchantResponse, error)
 }
 
+type NotificationClient interface {
+	SendNotification(ctx context.Context, in *notificationpb.SendNotificationRequest, opts ...grpc.CallOption) (*notificationpb.SendNotificationResponse, error)
+}
+
 type ProductService interface {
 	CreateProduct(ctx context.Context, req dto.CreateProductRequest) (*model.Product, error)
 	GetProduct(ctx context.Context, id string) (*model.Product, error)
@@ -38,6 +49,8 @@ type ProductService interface {
 	UpdateProduct(ctx context.Context, req dto.UpdateProductRequest) (*model.Product, error)
 	DeleteProduct(ctx context.Context, id string) error
 	DeleteProductVariant(ctx context.Context, productID, variantID string) error
+	ReportProduct(ctx context.Context, req dto.ReportProductRequest) (*model.ProductReport, error)
+	ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error)
 }
 
 type productService struct {
@@ -45,6 +58,7 @@ type productService struct {
 	storeClient    StoreClient
 	categoryClient CategoryClient
 	merchantClient MerchantClient
+	notifClient    NotificationClient
 	uploader       storage.Uploader
 	stateValidator *model.StateTransitionValidator
 	logger         *slog.Logger
@@ -68,6 +82,18 @@ func NewProductServiceWithClients(
 	uploader storage.Uploader,
 	log ...*slog.Logger,
 ) ProductService {
+	return NewProductServiceWithAllClients(repo, storeClient, categoryClient, merchantClient, nil, uploader, log...)
+}
+
+func NewProductServiceWithAllClients(
+	repo repository.ProductRepository,
+	storeClient StoreClient,
+	categoryClient CategoryClient,
+	merchantClient MerchantClient,
+	notifClient NotificationClient,
+	uploader storage.Uploader,
+	log ...*slog.Logger,
+) ProductService {
 	var l *slog.Logger
 	if len(log) > 0 {
 		l = log[0]
@@ -77,6 +103,7 @@ func NewProductServiceWithClients(
 		storeClient:    storeClient,
 		categoryClient: categoryClient,
 		merchantClient: merchantClient,
+		notifClient:    notifClient,
 		uploader:       uploader,
 		stateValidator: model.NewStateTransitionValidator(),
 		logger:         l,
@@ -250,7 +277,7 @@ func (s *productService) CreateProduct(ctx context.Context, req dto.CreateProduc
 		Status:              prodStatus,
 		ImageURL:            imgURL,
 		AvgRating:           0.00,
-		Weight:      req.Weight,
+		Weight:              req.Weight,
 		IsExchangeEligible:  req.IsExchangeEligible,
 		MaxExchangeDiscount: req.MaxExchangeDiscount,
 		Images:              images,
@@ -471,4 +498,158 @@ func (s *productService) DeleteProductVariant(ctx context.Context, productID, va
 	}
 
 	return s.repo.DeleteProductVariant(ctx, productID, variantID)
+}
+
+func (s *productService) ReportProduct(ctx context.Context, req dto.ReportProductRequest) (*model.ProductReport, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	normalizedReason, err := model.NormalizeReportReason(req.Reason)
+	if err != nil {
+		return nil, err
+	}
+
+	prod, err := s.repo.GetProductByID(ctx, req.ProductID)
+	if err != nil {
+		return nil, err
+	}
+	if prod == nil {
+		return nil, appErrors.NotFound("product not found")
+	}
+
+	if prod.DeletedAt != nil || prod.Status == model.StatusDeleted {
+		return nil, appErrors.BadRequest("cannot report a deleted product")
+	}
+	if prod.Status == model.StatusDraft {
+		return nil, appErrors.BadRequest("cannot report an unpublished draft product")
+	}
+
+	existing, err := s.repo.GetProductReportByUserAndProduct(ctx, req.ProductID, req.ReporterID)
+	if err == nil && existing != nil {
+		return nil, appErrors.Conflict("you have already reported this product")
+	}
+
+	now := time.Now().UTC()
+	report := &model.ProductReport{
+		ID:          uuid.New().String(),
+		ProductID:   req.ProductID,
+		ReporterID:  req.ReporterID,
+		Reason:      normalizedReason,
+		Description: req.Description,
+		Status:      model.ReportStatusPending,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	var merchantID string
+	if s.storeClient != nil && prod.StoreID != "" {
+		stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: prod.StoreID})
+		if err == nil && stResp != nil && stResp.Store != nil {
+			merchantID = stResp.Store.MerchantId
+		}
+	}
+
+	var outboxEvts []*outbox.Event
+	outboxEvt, err := productEvents.BuildProductReportedOutboxEvent(report, prod, merchantID)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.ErrorContext(ctx, "failed to build ProductReported outbox event", "error", err, "product_id", prod.ID)
+		}
+		return nil, appErrors.Internal(err, "failed to build product report notification event")
+	}
+	if outboxEvt != nil {
+		outboxEvts = append(outboxEvts, outboxEvt)
+	}
+
+	if err := s.repo.CreateProductReport(ctx, report, outboxEvts...); err != nil {
+		return nil, err
+	}
+
+	if s.notifClient != nil {
+		go func() {
+			nCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if merchantID != "" {
+				_, notifErr := s.notifClient.SendNotification(nCtx, &notificationpb.SendNotificationRequest{
+					UserId:    merchantID,
+					Channel:   "IN_APP",
+					Subject:   fmt.Sprintf("Product Reported: %s", prod.Name),
+					Content:   fmt.Sprintf("Your product %q was reported for %s. Details: %s", prod.Name, report.Reason, report.Description),
+					EventType: events.EventTypeProductReported,
+					Recipient: merchantID,
+				})
+				if notifErr != nil && s.logger != nil {
+					s.logger.WarnContext(nCtx, "failed to notify merchant of product report", "product_id", prod.ID, "merchant_id", merchantID, "error", notifErr)
+				}
+			}
+
+			if req.ReporterID != "" {
+				_, notifErr := s.notifClient.SendNotification(nCtx, &notificationpb.SendNotificationRequest{
+					UserId:    req.ReporterID,
+					Channel:   "IN_APP",
+					Subject:   fmt.Sprintf("Report Received: %s", prod.Name),
+					Content:   fmt.Sprintf("Thank you for your report regarding %q. Our moderation team will review it.", prod.Name),
+					EventType: events.EventTypeProductReported,
+					Recipient: req.ReporterID,
+				})
+				if notifErr != nil && s.logger != nil {
+					s.logger.WarnContext(nCtx, "failed to send report confirmation notification to reporter", "product_id", prod.ID, "reporter_id", req.ReporterID, "error", notifErr)
+				}
+			}
+		}()
+	}
+
+	return report, nil
+}
+
+func (s *productService) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
+	if req.Status != "" {
+		st := model.ReportStatus(strings.ToUpper(strings.TrimSpace(req.Status)))
+		if !st.IsValid() {
+			return nil, 0, appErrors.BadRequest("invalid report status filter")
+		}
+		req.Status = string(st)
+	}
+
+	user, hasUser := auth.UserFromContext(ctx)
+	if hasUser && (user.Role == auth.RoleMerchant || strings.EqualFold(user.Role, "MERCHANT")) {
+		if req.ProductID != "" {
+			prod, err := s.repo.GetProductByID(ctx, req.ProductID)
+			if err != nil {
+				return nil, 0, err
+			}
+			if s.storeClient != nil && prod.StoreID != "" {
+				stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{Id: prod.StoreID})
+				if err != nil || stResp == nil || stResp.Store == nil || stResp.Store.MerchantId != user.UserID {
+					return nil, 0, appErrors.Forbidden("merchant does not own this product")
+				}
+			}
+		} else {
+			var storeIDs []string
+			if s.storeClient != nil {
+				stList, err := s.storeClient.ListStores(ctx, &storepb.ListStoresRequest{MerchantId: user.UserID, Limit: 100})
+				if err == nil && stList != nil {
+					for _, st := range stList.Stores {
+						if st != nil && st.Id != "" {
+							storeIDs = append(storeIDs, st.Id)
+						}
+					}
+				}
+				if len(storeIDs) == 0 {
+					stResp, err := s.storeClient.GetStore(ctx, &storepb.GetStoreRequest{MerchantId: user.UserID})
+					if err == nil && stResp != nil && stResp.Store != nil && stResp.Store.Id != "" {
+						storeIDs = append(storeIDs, stResp.Store.Id)
+					}
+				}
+			}
+			if len(storeIDs) == 0 {
+				return []*model.ProductReport{}, 0, nil
+			}
+			req.StoreIDs = storeIDs
+		}
+	}
+
+	return s.repo.ListProductReports(ctx, req)
 }

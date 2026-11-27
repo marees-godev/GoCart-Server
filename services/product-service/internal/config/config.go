@@ -56,10 +56,11 @@ type HTTPConfig struct {
 }
 
 type GRPCConfig struct {
-	Port                string
-	StoreServiceAddr    string
-	CategoryServiceAddr string
-	MerchantServiceAddr string
+	Port                    string
+	StoreServiceAddr        string
+	CategoryServiceAddr     string
+	MerchantServiceAddr     string
+	NotificationServiceAddr string
 }
 
 type DatabaseConfig struct {
@@ -97,10 +98,11 @@ func LoadEnv() *Config {
 			Port: GetEnv("PORT", "7070"),
 		},
 		GRPC: GRPCConfig{
-			Port:                GetEnv("PRODUCT_SERVICE_GRPC_PORT", GetEnv("GRPC_PORT", "50053")),
-			StoreServiceAddr:    GetEnv("STORE_SERVICE_GRPC_ADDR", "localhost:50055"),
-			CategoryServiceAddr: GetEnv("CATEGORY_SERVICE_GRPC_ADDR", "localhost:50054"),
-			MerchantServiceAddr: GetEnv("MERCHANT_SERVICE_GRPC_ADDR", "localhost:50056"),
+			Port:                    GetEnv("PRODUCT_SERVICE_GRPC_PORT", GetEnv("GRPC_PORT", "50053")),
+			StoreServiceAddr:        GetEnv("STORE_SERVICE_GRPC_ADDR", "localhost:50055"),
+			CategoryServiceAddr:     GetEnv("CATEGORY_SERVICE_GRPC_ADDR", "localhost:50054"),
+			MerchantServiceAddr:     GetEnv("MERCHANT_SERVICE_GRPC_ADDR", "localhost:50056"),
+			NotificationServiceAddr: GetEnv("NOTIFICATION_SERVICE_GRPC_ADDR", GetEnv("NOTIFICATION_SERVICE_ADDR", "localhost:50064")),
 		},
 		Database: DatabaseConfig{
 			URL:            GetEnv("PRODUCT_SERVICE_DATABASE_URL", GetEnv("DATABASE_URL", "")),

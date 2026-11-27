@@ -78,6 +78,13 @@ DELETE FROM notifications WHERE channel_id IN (SELECT id FROM notification_chann
 DELETE FROM notification_channels WHERE code::text IN ('PUSH', 'IN_APP');
 
 -- Restore Push Channel 
+DO $$ BEGIN
+    ALTER TABLE notification_channels ALTER COLUMN code TYPE VARCHAR(50);
+    DROP TYPE IF EXISTS channel_type CASCADE;
+    CREATE TYPE channel_type AS ENUM ('EMAIL', 'PUSH', 'IN_APP', 'SMS');
+    ALTER TABLE notification_channels ALTER COLUMN code TYPE channel_type USING code::channel_type;
+END $$;
+
 INSERT INTO notification_channels (code, name, is_active)
 VALUES ('PUSH'::channel_type, 'Push Notifications', TRUE)
 ON CONFLICT (code) DO UPDATE
