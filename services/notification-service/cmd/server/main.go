@@ -189,6 +189,7 @@ func main() {
 				events.TopicReturnApproved,
 				events.TopicReturnRejected,
 				events.TopicRefundCompleted,
+				events.TopicProductReported,
 			}
 		}
 

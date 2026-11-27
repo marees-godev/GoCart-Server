@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/client"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/gateway"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/model"
 	"github.com/marees-godev/GoCart-Server/services/payment-service/internal/repository"
@@ -18,17 +20,23 @@ type PaymentHandler struct {
 	paymentGW   gateway.PaymentGateway
 	gwConfig    gateway.GatewayConfig
 	log         *slog.Logger
+	orderClient client.OrderClient
 }
 
-func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gateway.PaymentGateway, gwConfig gateway.GatewayConfig, log *slog.Logger) *PaymentHandler {
+func NewPaymentHandler(paymentRepo repository.PaymentRepository, paymentGW gateway.PaymentGateway, gwConfig gateway.GatewayConfig, log *slog.Logger, orderClient ...client.OrderClient) *PaymentHandler {
 	if log == nil {
 		log = slog.Default()
+	}
+	var oc client.OrderClient
+	if len(orderClient) > 0 {
+		oc = orderClient[0]
 	}
 	return &PaymentHandler{
 		paymentRepo: paymentRepo,
 		paymentGW:   paymentGW,
 		gwConfig:    gwConfig,
 		log:         log,
+		orderClient: oc,
 	}
 }
 
@@ -185,12 +193,26 @@ func (h *PaymentHandler) PaymentCallback(c *fiber.Ctx) error {
 				} else {
 					h.log.Info("updated payment status to FAILED on callback", "payment_id", pmt.ID, "reason", reason)
 				}
+				if h.orderClient != nil && pmt.OrderID != "" {
+					callCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					if ordErr := h.orderClient.UpdateOrderStatus(callCtx, pmt.OrderID, "PAYMENT_FAILED"); ordErr != nil {
+						h.log.Warn("failed to update order status to PAYMENT_FAILED on payment callback", "order_id", pmt.OrderID, "error", ordErr)
+					}
+					cancel()
+				}
 			} else {
 				_, updateErr := h.paymentRepo.UpdatePaymentStatus(c.UserContext(), pmt.ID, model.PaymentStatusSuccess, paymentID, "")
 				if updateErr != nil {
 					h.log.Error("failed to update payment status to SUCCESS on callback", "payment_id", pmt.ID, "error", updateErr)
 				} else {
 					h.log.Info("updated payment status to SUCCESS on callback", "payment_id", pmt.ID, "razorpay_payment_id", paymentID)
+				}
+				if h.orderClient != nil && pmt.OrderID != "" {
+					callCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					if ordErr := h.orderClient.UpdateOrderStatus(callCtx, pmt.OrderID, "PAID"); ordErr != nil {
+						h.log.Warn("failed to update order status to PAID on payment callback", "order_id", pmt.OrderID, "error", ordErr)
+					}
+					cancel()
 				}
 			}
 		}

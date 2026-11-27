@@ -8,7 +8,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE channel_type AS ENUM ('EMAIL');
+    CREATE TYPE channel_type AS ENUM ('EMAIL', 'PUSH', 'IN_APP', 'SMS');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

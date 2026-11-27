@@ -81,6 +81,33 @@ func (m *mockProductService) DeleteProductVariant(ctx context.Context, productID
 	return nil
 }
 
+func (m *mockProductService) ReportProduct(ctx context.Context, req dto.ReportProductRequest) (*model.ProductReport, error) {
+	if req.ProductID == "" || req.ReporterID == "" {
+		return nil, appErrors.InvalidArgument("missing required fields")
+	}
+	return &model.ProductReport{
+		ID:          "44444444-4444-4444-4444-444444444444",
+		ProductID:   req.ProductID,
+		ReporterID:  req.ReporterID,
+		Reason:      model.ReportReasonInappropriateContent,
+		Description: req.Description,
+		Status:      model.ReportStatusPending,
+	}, nil
+}
+
+func (m *mockProductService) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
+	reports := []*model.ProductReport{
+		{
+			ID:         "44444444-4444-4444-4444-444444444444",
+			ProductID:  "33333333-3333-3333-3333-333333333333",
+			ReporterID: "user-123",
+			Reason:     model.ReportReasonInappropriateContent,
+			Status:     model.ReportStatusPending,
+		},
+	}
+	return reports, int32(len(reports)), nil
+}
+
 func TestProductGRPCHandler(t *testing.T) {
 	svc := newMockProductService()
 	h := handler.NewProductGRPCHandler(svc)
@@ -135,6 +162,35 @@ func TestProductGRPCHandler(t *testing.T) {
 		}
 		if !resp.Success {
 			t.Errorf("expected success true")
+		}
+	})
+
+	t.Run("ReportProduct RPC", func(t *testing.T) {
+		desc := "Violates policy"
+		resp, err := h.ReportProduct(ctx, &productpb.ReportProductRequest{
+			ProductId:   "33333333-3333-3333-3333-333333333333",
+			ReporterId:  "user-123",
+			Reason:      "INAPPROPRIATE_CONTENT",
+			Description: &desc,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !resp.Success || resp.Report == nil {
+			t.Fatalf("expected successful report response, got %v", resp)
+		}
+		if resp.Report.Reason != "INAPPROPRIATE_CONTENT" {
+			t.Errorf("expected reason INAPPROPRIATE_CONTENT, got %s", resp.Report.Reason)
+		}
+	})
+
+	t.Run("ListProductReports RPC", func(t *testing.T) {
+		resp, err := h.ListProductReports(ctx, &productpb.ListProductReportsRequest{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.Total != 1 || len(resp.Reports) != 1 {
+			t.Errorf("expected 1 report, got %d", resp.Total)
 		}
 	})
 }

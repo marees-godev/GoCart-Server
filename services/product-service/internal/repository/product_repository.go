@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	appErrors "github.com/marees-godev/GoCart-Server/pkg/errors"
@@ -26,6 +27,11 @@ type ProductRepository interface {
 	UpdateProduct(ctx context.Context, p *model.Product) error
 	DeleteProduct(ctx context.Context, id string) error
 	DeleteProductVariant(ctx context.Context, productID, variantID string) error
+	CreateProductReport(ctx context.Context, report *model.ProductReport, outboxEvt ...*outbox.Event) error
+	GetProductReportByID(ctx context.Context, id string) (*model.ProductReport, error)
+	GetProductReportByUserAndProduct(ctx context.Context, productID, reporterID string) (*model.ProductReport, error)
+	ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error)
+	EnsureProductReportsTable(ctx context.Context) error
 }
 
 type pgProductRepository struct {
@@ -618,4 +624,239 @@ func (r *pgProductRepository) DeleteProductVariant(ctx context.Context, productI
 	}
 
 	return nil
+}
+
+func (r *pgProductRepository) CreateProductReport(ctx context.Context, report *model.ProductReport, outboxEvt ...*outbox.Event) error {
+	tx, err := r.startTx(ctx)
+	if err != nil {
+		return appErrors.Internal(err, "failed to start database transaction")
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	query := `
+		INSERT INTO product_reports (
+			id, product_id, reporter_id, reason, description, status, created_at, updated_at
+		) VALUES (
+			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8
+		) RETURNING id, created_at, updated_at
+	`
+	status := report.Status
+	if status == "" {
+		status = model.ReportStatusPending
+	}
+	createdAt := report.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now().UTC()
+	}
+	updatedAt := report.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = createdAt
+	}
+
+	err = tx.QueryRow(ctx, query,
+		report.ID, report.ProductID, report.ReporterID, report.Reason, report.Description, status, createdAt, updatedAt,
+	).Scan(&report.ID, &report.CreatedAt, &report.UpdatedAt)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			_ = tx.Rollback(ctx)
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return r.CreateProductReport(ctx, report, outboxEvt...)
+			}
+		}
+		if strings.Contains(err.Error(), "uq_product_reports_user_product") || strings.Contains(err.Error(), "duplicate key") {
+			return appErrors.Conflict("you have already reported this product")
+		}
+		return appErrors.Internal(err, "failed to insert product report")
+	}
+
+	report.Status = status
+
+	for _, evt := range outboxEvt {
+		if evt != nil {
+			if err := r.outboxStore.Insert(ctx, tx, evt); err != nil {
+				return appErrors.Internal(err, "failed to record outbox event for ProductReported")
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return appErrors.Internal(err, "failed to commit transaction")
+	}
+
+	return nil
+}
+
+func (r *pgProductRepository) GetProductReportByID(ctx context.Context, id string) (*model.ProductReport, error) {
+	query := `
+		SELECT id, product_id, reporter_id, reason, COALESCE(description, ''), status, created_at, updated_at
+		FROM product_reports
+		WHERE id = $1
+	`
+	var rep model.ProductReport
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&rep.ID, &rep.ProductID, &rep.ReporterID, &rep.Reason, &rep.Description, &rep.Status, &rep.CreatedAt, &rep.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, appErrors.NotFound("product report not found")
+		}
+		return nil, appErrors.Internal(err, "failed to fetch product report")
+	}
+	return &rep, nil
+}
+
+func (r *pgProductRepository) GetProductReportByUserAndProduct(ctx context.Context, productID, reporterID string) (*model.ProductReport, error) {
+	query := `
+		SELECT id, product_id, reporter_id, reason, COALESCE(description, ''), status, created_at, updated_at
+		FROM product_reports
+		WHERE product_id = $1 AND reporter_id = $2
+	`
+	var rep model.ProductReport
+	err := r.pool.QueryRow(ctx, query, productID, reporterID).Scan(
+		&rep.ID, &rep.ProductID, &rep.ReporterID, &rep.Reason, &rep.Description, &rep.Status, &rep.CreatedAt, &rep.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, appErrors.Internal(err, "failed to query product report")
+	}
+	return &rep, nil
+}
+
+func (r *pgProductRepository) EnsureProductReportsTable(ctx context.Context) error {
+	ddl := `
+	DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_reason') THEN
+			CREATE TYPE report_reason AS ENUM (
+				'INAPPROPRIATE_CONTENT',
+				'MISLEADING_INFORMATION',
+				'COUNTERFEIT_OR_FRAUDULENT',
+				'PROHIBITED_PRODUCT',
+				'SPAM_OR_DUPLICATE',
+				'OTHER'
+			);
+		END IF;
+	END $$;
+
+	DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_status') THEN
+			CREATE TYPE report_status AS ENUM (
+				'PENDING',
+				'REVIEWED',
+				'DISMISSED',
+				'ACTION_TAKEN'
+			);
+		END IF;
+	END $$;
+
+	CREATE TABLE IF NOT EXISTS product_reports (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+		reporter_id UUID NOT NULL,
+		reason report_reason NOT NULL,
+		description TEXT,
+		status report_status NOT NULL DEFAULT 'PENDING',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+		CONSTRAINT uq_product_reports_user_product UNIQUE (product_id, reporter_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_product_reports_product_id ON product_reports(product_id);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_reporter_id ON product_reports(reporter_id);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_status ON product_reports(status);
+	CREATE INDEX IF NOT EXISTS idx_product_reports_created_at ON product_reports(created_at DESC);
+	`
+	_, err := r.pool.Exec(ctx, ddl)
+	return err
+}
+
+func (r *pgProductRepository) ListProductReports(ctx context.Context, req dto.ListProductReportsRequest) ([]*model.ProductReport, int32, error) {
+	whereClauses := []string{"1=1"}
+	args := []interface{}{}
+	argPos := 1
+
+	if req.ProductID != "" {
+		if _, err := uuid.Parse(req.ProductID); err != nil {
+			return []*model.ProductReport{}, 0, nil
+		}
+		whereClauses = append(whereClauses, fmt.Sprintf("product_reports.product_id = $%d", argPos))
+		args = append(args, req.ProductID)
+		argPos++
+	}
+
+	if req.Status != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("product_reports.status = $%d", argPos))
+		args = append(args, req.Status)
+		argPos++
+	}
+
+	joinClause := ""
+	if len(req.StoreIDs) > 0 {
+		joinClause = "JOIN products ON product_reports.product_id = products.id"
+		whereClauses = append(whereClauses, fmt.Sprintf("products.store_id = ANY($%d)", argPos))
+		args = append(args, req.StoreIDs)
+		argPos++
+	}
+
+	whereStmt := strings.Join(whereClauses, " AND ")
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM product_reports %s WHERE %s", joinClause, whereStmt)
+	var total int32
+	err := r.pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return []*model.ProductReport{}, 0, nil
+			}
+		}
+		return nil, 0, appErrors.Internal(err, "failed to count product reports")
+	}
+
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	listQuery := fmt.Sprintf(`
+		SELECT product_reports.id, product_reports.product_id, product_reports.reporter_id, product_reports.reason, COALESCE(product_reports.description, ''), product_reports.status, product_reports.created_at, product_reports.updated_at
+		FROM product_reports
+		%s
+		WHERE %s
+		ORDER BY product_reports.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, joinClause, whereStmt, argPos, argPos+1)
+
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, listQuery, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "product_reports") || strings.Contains(err.Error(), "does not exist") {
+			if ensErr := r.EnsureProductReportsTable(ctx); ensErr == nil {
+				return []*model.ProductReport{}, 0, nil
+			}
+		}
+		return nil, 0, appErrors.Internal(err, "failed to list product reports")
+	}
+	defer rows.Close()
+
+	var reports []*model.ProductReport
+	for rows.Next() {
+		var rep model.ProductReport
+		if err := rows.Scan(
+			&rep.ID, &rep.ProductID, &rep.ReporterID, &rep.Reason, &rep.Description, &rep.Status, &rep.CreatedAt, &rep.UpdatedAt,
+		); err != nil {
+			return nil, 0, appErrors.Internal(err, "failed to scan product report row")
+		}
+		reports = append(reports, &rep)
+	}
+
+	return reports, total, nil
 }

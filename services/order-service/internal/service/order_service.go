@@ -711,7 +711,19 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		return nil, appErrors.Internal(err, "failed to get order")
 	}
 
-	if order.Status == orderStatus {
+	expectedPaymentStatus := order.PaymentStatus
+	switch orderStatus {
+	case model.OrderStatusPaid, model.OrderStatusConfirmed:
+		expectedPaymentStatus = model.PaymentStatusPaid
+	case model.OrderStatusPaymentFailed:
+		expectedPaymentStatus = model.PaymentStatusFailed
+	case model.OrderStatusRefunded:
+		expectedPaymentStatus = model.PaymentStatusRefunded
+	case model.OrderStatusPendingPayment:
+		expectedPaymentStatus = model.PaymentStatusPending
+	}
+
+	if order.Status == orderStatus && order.PaymentStatus == expectedPaymentStatus {
 		return order, nil
 	}
 
@@ -792,7 +804,7 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, id string, orderSt
 		envelope, _ = events.NewEventEnvelopeWithAggregate(events.EventTypeOrderPaymentFailed, "order-service", order.ID, payload)
 	}
 
-	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, id, orderStatus, envelope, topic, reason...)
+	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(ctx, order.ID, orderStatus, envelope, topic, reason...)
 	if err != nil {
 		if errorsIs(err, repository.ErrOrderNotFound) {
 			return nil, appErrors.NotFound("order not found")
@@ -855,7 +867,7 @@ func (s *orderService) HandlePaymentSuccessful(ctx context.Context, event *event
 
 	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
-		orderID,
+		order.ID,
 		model.OrderStatusPaid,
 		envelope,
 		events.TopicOrderPaymentConfirmed,
@@ -926,7 +938,7 @@ func (s *orderService) HandlePaymentFailed(ctx context.Context, event *events.Pa
 
 	updatedOrder, err := s.repo.UpdateOrderStatusWithOutbox(
 		ctx,
-		orderID,
+		order.ID,
 		model.OrderStatusPaymentFailed,
 		envelope,
 		OrderPaymentFailedTopic,

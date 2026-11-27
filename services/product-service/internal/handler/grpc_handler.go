@@ -252,3 +252,73 @@ func (h *ProductGRPCHandler) DeleteProductVariant(ctx context.Context, req *prod
 		Message: "Product variant deleted successfully",
 	}, nil
 }
+
+func (h *ProductGRPCHandler) ReportProduct(ctx context.Context, req *productpb.ReportProductRequest) (*productpb.ReportProductResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	desc := ""
+	if req.Description != nil {
+		desc = *req.Description
+	}
+
+	reportReq := dto.ReportProductRequest{
+		ProductID:   req.ProductId,
+		ReporterID:  req.ReporterId,
+		Reason:      req.Reason,
+		Description: desc,
+	}
+
+	rep, err := h.productService.ReportProduct(ctx, reportReq)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("ReportProduct failed", "error", err)
+		}
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	if h.logger != nil {
+		h.logger.Info("ReportProduct RPC succeeded", "report_id", rep.ID, "product_id", rep.ProductID)
+	}
+
+	return &productpb.ReportProductResponse{
+		Success: true,
+		Message: "Product reported successfully",
+		Report:  dto.ToProductReportPB(rep),
+	}, nil
+}
+
+func (h *ProductGRPCHandler) ListProductReports(ctx context.Context, req *productpb.ListProductReportsRequest) (*productpb.ListProductReportsResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+
+	prodID := ""
+	if req.ProductId != nil {
+		prodID = *req.ProductId
+	}
+
+	st := ""
+	if req.Status != nil {
+		st = *req.Status
+	}
+
+	reports, total, err := h.productService.ListProductReports(ctx, dto.ListProductReportsRequest{
+		ProductID: prodID,
+		Limit:     req.Limit,
+		Offset:    req.Offset,
+		Status:    st,
+	})
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("ListProductReports failed", "error", err)
+		}
+		return nil, grpcclient.ToGRPCError(err)
+	}
+
+	return &productpb.ListProductReportsResponse{
+		Reports: dto.ToProductReportListPB(reports),
+		Total:   total,
+	}, nil
+}

@@ -417,6 +417,10 @@ func TestProcessPayment_AuthoritativeAmountEnforced(t *testing.T) {
 	if payment.GatewayTransactionID == "" {
 		t.Errorf("expected non-empty gateway transaction ID")
 	}
+
+	if orderClient.orders[orderID].Status != "PAID" {
+		t.Errorf("expected order status in order-service to be updated to PAID, got %s", orderClient.orders[orderID].Status)
+	}
 }
 
 func TestProcessPayment_AuthoritativeOrderUnavailable_RejectsPayment(t *testing.T) {

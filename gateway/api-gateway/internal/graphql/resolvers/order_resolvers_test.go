@@ -10,7 +10,9 @@ import (
 	deliverypb "github.com/marees-godev/GoCart-Server/contracts/protobuf/delivery"
 	notificationpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/notification"
 	orderpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/order"
+	paymentpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/payment"
 	userpb "github.com/marees-godev/GoCart-Server/contracts/protobuf/user"
+	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/client"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/graphql/model"
 	"github.com/marees-godev/GoCart-Server/gateway/api-gateway/internal/grpc"
 	"github.com/marees-godev/GoCart-Server/pkg/auth"
@@ -674,5 +676,84 @@ func TestMerchantCancelOrder_Restrictions(t *testing.T) {
 	mappedPaid := mapProtoOrderToGraphQL(paidProto)
 	if mappedPaid.MerchantCanCancel == nil || *mappedPaid.MerchantCanCancel != true {
 		t.Errorf("expected MerchantCanCancel to be true for PAID unconfirmed order, got %v", mappedPaid.MerchantCanCancel)
+	}
+}
+
+func TestMapProtoOrderToGraphQL_PaymentStatusInference(t *testing.T) {
+	// Orders confirmed or in fulfillment must display PAID
+	for _, st := range []string{"PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "COMPLETED"} {
+		proto := &orderpb.Order{
+			Id:            "ord-test-paid",
+			Status:        st,
+			PaymentStatus: "PENDING", // proto says pending, but status is terminal paid/fulfillment
+		}
+		mapped := mapProtoOrderToGraphQL(proto)
+		if mapped.PaymentStatus == nil || *mapped.PaymentStatus != "PAID" {
+			t.Errorf("expected payment status to be inferred as PAID for status %s, got %v", st, mapped.PaymentStatus)
+		}
+	}
+
+	// Failed payment order
+	failedProto := &orderpb.Order{
+		Id:     "ord-failed",
+		Status: "PAYMENT_FAILED",
+	}
+	mappedFailed := mapProtoOrderToGraphQL(failedProto)
+	if mappedFailed.PaymentStatus == nil || *mappedFailed.PaymentStatus != "FAILED" {
+		t.Errorf("expected payment status FAILED, got %v", mappedFailed.PaymentStatus)
+	}
+
+	// Refunded order
+	refundedProto := &orderpb.Order{
+		Id:     "ord-ref",
+		Status: "REFUNDED",
+	}
+	mappedRef := mapProtoOrderToGraphQL(refundedProto)
+	if mappedRef.PaymentStatus == nil || *mappedRef.PaymentStatus != "REFUNDED" {
+		t.Errorf("expected payment status REFUNDED, got %v", mappedRef.PaymentStatus)
+	}
+
+	// Unpaid/Created order
+	pendingProto := &orderpb.Order{
+		Id:            "ord-pending",
+		Status:        "CREATED",
+		PaymentStatus: "PENDING",
+	}
+	mappedPending := mapProtoOrderToGraphQL(pendingProto)
+	if mappedPending.PaymentStatus == nil || *mappedPending.PaymentStatus != "PENDING" {
+		t.Errorf("expected payment status PENDING for unpaid created order, got %v", mappedPending.PaymentStatus)
+	}
+}
+
+func TestEnrichOrderPaymentStatus_ReconcilesWithPaymentService(t *testing.T) {
+	mockPay := &mockPaymentClientForResolvers{
+		getByOrderIDResp: &paymentpb.GetPaymentResponse{
+			Payment: &paymentpb.Payment{
+				Id:      "pay-123",
+				OrderId: "ORD-20261126-163033",
+				Status:  "SUCCESS",
+			},
+		},
+	}
+	clientMgr := &client.ClientManager{
+		PaymentClient: mockPay,
+	}
+	res := &Resolver{
+		ClientMgr: clientMgr,
+	}
+
+	pStatus := "PENDING"
+	orderNum := "ORD-20261126-163033"
+	ord := &model.Order{
+		ID:            "ord-uuid-1",
+		OrderNumber:   &orderNum,
+		Status:        "CREATED",
+		PaymentStatus: &pStatus,
+	}
+
+	res.enrichOrderPaymentStatus(context.Background(), ord)
+
+	if ord.PaymentStatus == nil || *ord.PaymentStatus != "PAID" {
+		t.Errorf("expected payment status to be enriched to PAID from payment-service, got %v", ord.PaymentStatus)
 	}
 }

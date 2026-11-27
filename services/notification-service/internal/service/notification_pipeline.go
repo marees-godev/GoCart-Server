@@ -217,6 +217,8 @@ func CanonicalEventType(eventType string) string {
 		return events.EventTypeReturnRejected
 	case normalizeEventType(events.EventTypeRefundCompleted):
 		return events.EventTypeRefundCompleted
+	case normalizeEventType(events.EventTypeProductReported):
+		return events.EventTypeProductReported
 	default:
 		return eventType
 	}
@@ -952,6 +954,29 @@ func (s *notificationPipelineService) extractEventData(ctx context.Context, enve
 		res.templateData["Message"] = "Your refund has been processed. Funds typically reflect in your account within 3 to 5 business days."
 		res.pushMeta["order_id"] = payload.OrderID
 		res.pushMeta["refund_id"] = payload.RefundID
+
+	case normalizeEventType(events.EventTypeProductReported):
+		var payload events.ProductReportedEvent
+		if err := envelope.UnmarshalData(&payload); err != nil {
+			s.logger.WarnContext(ctx, "malformed ProductReportedEvent payload, routing to dlq", "event_id", envelope.EventID, "error", err)
+			return nil, false, appErrors.BadRequest("malformed ProductReportedEvent payload")
+		}
+		targetUserID := firstNonEmpty(payload.MerchantID, payload.ReporterID)
+		res.userID = targetUserID
+		res.recipient = targetUserID
+		res.templateData["ReportID"] = payload.ReportID
+		res.templateData["ProductID"] = payload.ProductID
+		res.templateData["MerchantID"] = payload.MerchantID
+		res.templateData["ReporterID"] = payload.ReporterID
+		res.templateData["Reason"] = payload.Reason
+		res.templateData["Description"] = payload.Description
+		res.templateData["ReportedAt"] = payload.CreatedAt
+		res.templateData["CreatedAt"] = payload.CreatedAt
+		res.templateData["Status"] = "REPORTED"
+		res.templateData["Headline"] = "Product Reported"
+		res.templateData["Message"] = fmt.Sprintf("A report was submitted for product %s due to %s.", payload.ProductID, payload.Reason)
+		res.pushMeta["product_id"] = payload.ProductID
+		res.pushMeta["report_id"] = payload.ReportID
 
 	default:
 		return nil, false, nil

@@ -9,6 +9,8 @@ import (
 
 var allowedTransitions = map[ProductStatus][]ProductStatus{
 	StatusDraft: {
+		StatusPublished,
+		StatusUnpublished,
 		StatusPendingReview,
 		StatusDeleted,
 	},
@@ -25,16 +27,16 @@ var allowedTransitions = map[ProductStatus][]ProductStatus{
 		StatusDeleted,
 	},
 	StatusUnpublished: {
-		StatusPendingReview,
 		StatusPublished,
+		StatusPendingReview,
 		StatusSuspended,
 		StatusDeleted,
 		StatusDraft,
 	},
 	StatusSuspended: {
+		StatusPublished,
 		StatusPendingReview,
 		StatusUnpublished,
-		StatusPublished,
 		StatusDeleted,
 	},
 	StatusDeleted: {},
